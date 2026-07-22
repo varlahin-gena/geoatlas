@@ -476,6 +476,20 @@ function renderStorage(stats) {
         ['Parse (1h)', fmtNumber(parseErr.count_1h || 0)],
         ['Uptime', fmtDuration(stats.uptime_sec)],
     ]);
+
+    renderRetention();
+}
+
+function renderRetention() {
+    const el = document.getElementById('retentionList');
+    if (!el) return;
+    fillKvGrid(el, [
+        ['traffic_logs', '30 дней'],
+        ['traffic_edges_* (агрегаты)', '30 дней'],
+        ['parse_errors', '7 дней'],
+        ['system_metrics', '7 дней'],
+        ['geo_ranges', 'без TTL'],
+    ]);
 }
 
 function renderComponentHealth(stats) {

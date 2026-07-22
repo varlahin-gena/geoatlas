@@ -78,6 +78,7 @@
       href: '/',
       label: 'Карта',
       match: ['/', '/index.html'],
+      adminOnly: false,
       icon:
         ICON +
         '<path d="M1 6v15l7-3 8 3 7-3V3l-7 3-8-3-7 3z"/><path d="M8 3v15M16 6v15"/></svg>',
@@ -85,6 +86,7 @@
     {
       href: '/system.html',
       label: 'Мониторинг',
+      adminOnly: true,
       icon:
         ICON +
         '<path d="M3 3v18h18"/><path d="M7 14l3-3 3 3 5-5"/></svg>',
@@ -92,6 +94,7 @@
     {
       href: '/parser-test.html',
       label: 'Тест парсеров',
+      adminOnly: true,
       icon:
         ICON +
         '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
@@ -99,6 +102,7 @@
     {
       href: '/parse-errors.html',
       label: 'Ошибки парсинга',
+      adminOnly: true,
       icon:
         ICON +
         '<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>' +
@@ -107,6 +111,7 @@
     {
       href: '/geo-missing.html',
       label: 'IP без GeoIP',
+      adminOnly: true,
       icon:
         ICON +
         '<circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>',
@@ -114,6 +119,7 @@
     {
       href: '/geo-ranges.html',
       label: 'База GeoIP',
+      adminOnly: true,
       icon:
         ICON +
         '<ellipse cx="12" cy="5" rx="9" ry="3"/>' +
@@ -122,6 +128,7 @@
     {
       href: '/users.html',
       label: 'Пользователи',
+      adminOnly: true,
       icon:
         ICON +
         '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>' +
@@ -215,10 +222,12 @@
   /**
    * HTML бокового меню навигации.
    * @param {string} [pathname]
+   * @param {{ isAdmin?: boolean }} [opts]
    * @returns {string}
    */
-  function buildAdminSidebarHtml(pathname) {
+  function buildAdminSidebarHtml(pathname, opts) {
     var path = pathname || (typeof location !== 'undefined' ? location.pathname : '/');
+    var isAdmin = !opts || opts.isAdmin !== false;
     var html =
       '<div class="sidebar-header">' +
       '<img class="logo" src="/logo.png" alt="" width="28" height="28" aria-hidden="true" />' +
@@ -229,6 +238,7 @@
 
     for (var i = 0; i < PAGE_NAV.length; i++) {
       var item = PAGE_NAV[i];
+      if (item.adminOnly && !isAdmin) continue;
       var active = isNavActive(item, path);
       html +=
         '<a href="' +
@@ -263,7 +273,7 @@
    * @param {string} [pathname]
    * @returns {{ app: HTMLElement, sidebar: HTMLElement }}
    */
-  function mountAdminSidebar(pathname) {
+  function mountAdminSidebar(pathname, opts) {
     var layout = ensureAdminLayout();
     if (!layout.sidebar) return layout;
 
@@ -273,7 +283,7 @@
       layout.app.classList.remove('sidebar-collapsed');
     }
 
-    layout.sidebar.innerHTML = buildAdminSidebarHtml(pathname);
+    layout.sidebar.innerHTML = buildAdminSidebarHtml(pathname, opts);
 
     var btn = document.getElementById('btnToggleAdminSidebar');
     if (btn) {

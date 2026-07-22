@@ -51,10 +51,9 @@
     <h1>Адреса, которые не удалось поставить на карту</h1>
     <p class="hint">
       Список уникальных IP из трафика за выбранный период, для которых нет координат
-      (ни в live GeoIP, ни в полях записи лога). Публичные адреса можно добавить в базу GeoIP
-      прямо отсюда; приватные и спец. адреса на карте обычно не нужны.
-      Редактирование уже загруженных диапазонов — на странице
-      <a href="/geo-ranges.html">База GeoIP</a>.
+      (ни в live GeoIP, ни в полях записи лога). Публичные адреса можно
+      <b>добавить в базу</b> прямо отсюда или открыть
+      <a href="/geo-ranges.html">База GeoIP</a> с поиском по IP и правкой диапазона.
     </p>
 
     <div class="summary" id="summary"></div>
@@ -337,7 +336,10 @@ function render() {
         <button type="button" class="add-btn"
           data-ip="${esc(r.ip)}"
           data-country="${esc(r.log_country || '')}"
-          data-city="${esc(r.log_city || '')}">добавить в базу</button>
+          data-city="${esc(r.log_city || '')}">добавить</button>
+        <a class="add-btn" style="text-decoration:none;display:inline-block;"
+          href="/geo-ranges.html?ip=${encodeURIComponent(r.ip)}&edit=1"
+          title="Найти покрывающий диапазон и открыть правку">в базе</a>
       </td>
     </tr>`;
   }).join('');
@@ -351,7 +353,7 @@ function render() {
       }
     });
   });
-  tbody.querySelectorAll('.add-btn').forEach(btn => {
+  tbody.querySelectorAll('button.add-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       openAddModal(btn.dataset.ip, btn.dataset.country, btn.dataset.city);
     });
@@ -395,6 +397,11 @@ function applyQueryParams() {
   if (params.get('kind') && [...$('kind').options].some(o => o.value === params.get('kind'))) {
     $('kind').value = params.get('kind');
   }
+  return {
+    addIp: (params.get('add') || '').trim(),
+    country: (params.get('country') || '').trim(),
+    city: (params.get('city') || '').trim(),
+  };
 }
 
 $('refresh').addEventListener('click', load);
@@ -517,8 +524,9 @@ $('addForm').addEventListener('submit', async (e) => {
   if (!user) return;
   NMAuth.renderUserBar(user, bar.userBarHost);
   NMUI.startSystemHealthPolling({ isAdmin: true });
-  applyQueryParams();
-  load();
+  const q = applyQueryParams();
+  await load();
+  if (q.addIp) openAddModal(q.addIp, q.country, q.city);
 })();
 </script>
 </body>

@@ -108,10 +108,8 @@ function renderStats() {
 
 function setFilter(f) {
     currentFilter = f;
-    ['all','allowed','blocked'].forEach(x => {
-        document.getElementById(`filter-${x}`).classList.remove('active');
-    });
-    document.getElementById(`filter-${f}`).classList.add('active');
+    applyFilterUI();
+    saveUIState();
     // Локальная фильтрация без запроса в backend
     if (viewMode === 'map') updateDeck();
     else updateGlobe();
@@ -122,6 +120,7 @@ function onMinCountChange() {
     const el = document.getElementById('minCount');
     minCount = parseInt(el.value, 10) || 1;
     document.getElementById('minCountVal').textContent = minCount;
+    saveUIState();
     if (viewMode === 'map') updateDeck();
     else updateGlobe();
     updateMapOverlay();
@@ -155,10 +154,7 @@ function resetView() {
     document.getElementById('minCountVal').textContent = '1';
     document.getElementById('maxArcs').value = MAX_ARCS_DEFAULT;
     document.getElementById('maxArcsVal').textContent = fmtNumber(MAX_ARCS_DEFAULT);
-    ['all','allowed','blocked'].forEach(x => {
-        document.getElementById(`filter-${x}`).classList.remove('active');
-    });
-    document.getElementById('filter-all').classList.add('active');
+    applyFilterUI();
     mapViewState = { longitude: 37.6, latitude: 55.7, zoom: 2.5, pitch: 0, bearing: 0 };
     globeViewState = { longitude: 30, latitude: 30, zoom: 0.85, pitch: 0, bearing: 0 };
     if (viewMode === 'map' && deckInstance) {
@@ -167,6 +163,7 @@ function resetView() {
         deckInstance.setProps({ initialViewState: globeViewState, viewState: globeViewState });
         startGlobeAutoRotate();
     }
+    saveUIState();
     refreshMap();
 }
 

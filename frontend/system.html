@@ -218,6 +218,14 @@
                     <div class="kv-grid cols-2" id="storageList"></div>
                 </div>
             </section>
+
+            <section class="card card-compact">
+                <h3 class="card-title"><span class="accent-dot" style="background: var(--orange);"></span> Срок хранения (TTL)</h3>
+                <div class="kv-grid cols-2" id="retentionList"></div>
+                <p class="hint" style="margin: 10px 0 0; font-size: 11px; color: var(--text-dim);">
+                    Значения из схемы ClickHouse (Ensure* / init.sql). Смена TTL — через миграции/конфиг сервера.
+                </p>
+            </section>
         </div>
 
         <!-- ===== Безопасность ===== -->

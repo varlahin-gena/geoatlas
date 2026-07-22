@@ -29,7 +29,10 @@ function bindUI() {
     $('toggleCountryLabelsChk')?.addEventListener('change', () => onToggleCountryLabels());
     $('toggleMonoArcsChk')?.addEventListener('change', () => onToggleMonoArcs());
 
-    $('groupBy')?.addEventListener('change', () => refreshMap());
+    $('groupBy')?.addEventListener('change', () => {
+        saveUIState();
+        refreshMap();
+    });
     $('periodPreset')?.addEventListener('change', () => onPeriodPresetChange());
 
     $('filter-all')?.addEventListener('click', () => setFilter('all'));
@@ -49,6 +52,7 @@ function bindUI() {
         clearTimeout(searchDebounceTimer);
         searchDebounceTimer = setTimeout(() => {
             currentSearch = normalizeText(val);
+            saveUIState();
             if (viewMode === 'map') updateDeck();
             else updateGlobe();
             updateMapOverlay();
@@ -81,6 +85,8 @@ async function init() {
     document.addEventListener('nm-theme-change', applyMapTheme);
 
     loadUIState();
+    applyViewFromURL();
+    applyFilterUI();
     document.getElementById('toggleHeatmapChk').checked = showHeatmap;
     document.getElementById('toggleCountryLabelsChk').checked = showCountryLabels;
     document.getElementById('toggleMonoArcsChk').checked = monoArcColor;
@@ -94,6 +100,7 @@ async function init() {
     document.getElementById('autoRotateWrap').style.display = (viewMode === 'globe') ? '' : 'none';
     document.getElementById('maxArcs').value = maxArcs;
     document.getElementById('maxArcsVal').textContent = fmtNumber(maxArcs);
+    syncViewToURL();
 
     await loadCountries();
 

@@ -216,6 +216,20 @@ function loadUIState() {
         if (typeof s.periodTo === 'string') {
             document.getElementById('periodTo').value = s.periodTo;
         }
+        if (typeof s.groupBy === 'string' && document.getElementById('groupBy')) {
+            document.getElementById('groupBy').value = s.groupBy;
+        }
+        if (typeof s.filter === 'string' && ['all', 'allowed', 'blocked'].includes(s.filter)) {
+            currentFilter = s.filter;
+        }
+        if (typeof s.minCount === 'number' && s.minCount >= 1) {
+            minCount = s.minCount;
+        }
+        if (typeof s.search === 'string') {
+            currentSearch = normalizeText(s.search);
+            const searchEl = document.getElementById('searchInput');
+            if (searchEl) searchEl.value = s.search;
+        }
         syncPeriodCustomPanel();
     } catch (e) {}
 }
@@ -227,8 +241,96 @@ function saveUIState() {
             periodPreset: document.getElementById('periodPreset').value,
             periodFrom: document.getElementById('periodFrom').value,
             periodTo: document.getElementById('periodTo').value,
+            groupBy: currentGroupBy(),
+            filter: currentFilter,
+            minCount,
+            search: document.getElementById('searchInput')?.value || '',
         }));
     } catch (e) {}
+    syncViewToURL();
+}
+
+/** URL query overrides localStorage (shareable map views). */
+function applyViewFromURL() {
+    const params = new URLSearchParams(location.search);
+    if (!params.toString()) return;
+
+    const period = params.get('period');
+    if (period && document.getElementById('periodPreset')) {
+        const el = document.getElementById('periodPreset');
+        if ([...el.options].some(o => o.value === period)) el.value = period;
+    }
+    if (params.get('from')) {
+        document.getElementById('periodPreset').value = 'custom';
+        try {
+            document.getElementById('periodFrom').value = toDatetimeLocal(new Date(params.get('from')));
+        } catch (e) {}
+    }
+    if (params.get('to')) {
+        document.getElementById('periodPreset').value = 'custom';
+        try {
+            document.getElementById('periodTo').value = toDatetimeLocal(new Date(params.get('to')));
+        } catch (e) {}
+    }
+    const gb = params.get('group_by') || params.get('groupBy');
+    if (gb && document.getElementById('groupBy')) {
+        const el = document.getElementById('groupBy');
+        if ([...el.options].some(o => o.value === gb)) el.value = gb;
+    }
+    const filter = params.get('filter');
+    if (filter && ['all', 'allowed', 'blocked'].includes(filter)) {
+        currentFilter = filter;
+    }
+    if (params.get('min')) {
+        const n = parseInt(params.get('min'), 10);
+        if (Number.isFinite(n) && n >= 1) minCount = n;
+    }
+    if (params.has('q')) {
+        currentSearch = normalizeText(params.get('q') || '');
+        const searchEl = document.getElementById('searchInput');
+        if (searchEl) searchEl.value = params.get('q') || '';
+    }
+    const view = params.get('view');
+    if (view === 'map' || view === 'globe') viewMode = view;
+    syncPeriodCustomPanel();
+}
+
+function syncViewToURL() {
+    try {
+        const params = new URLSearchParams();
+        const preset = document.getElementById('periodPreset')?.value || '1d';
+        if (preset === 'custom') {
+            params.set('period', 'custom');
+            const from = document.getElementById('periodFrom')?.value;
+            const to = document.getElementById('periodTo')?.value;
+            if (from) params.set('from', toISOFromLocal(from));
+            if (to) params.set('to', toISOFromLocal(to));
+        } else if (preset && preset !== '1d') {
+            params.set('period', preset);
+        }
+        const gb = currentGroupBy();
+        if (gb && gb !== 'city') params.set('group_by', gb);
+        if (currentFilter && currentFilter !== 'all') params.set('filter', currentFilter);
+        if (minCount > 1) params.set('min', String(minCount));
+        const q = document.getElementById('searchInput')?.value?.trim() || '';
+        if (q) params.set('q', q);
+        if (viewMode && viewMode !== 'map') params.set('view', viewMode);
+        const qs = params.toString();
+        const next = qs ? (location.pathname + '?' + qs) : location.pathname;
+        const cur = location.pathname + location.search;
+        if (next !== cur) history.replaceState(null, '', next);
+    } catch (e) {}
+}
+
+function applyFilterUI() {
+    ['all', 'allowed', 'blocked'].forEach(x => {
+        const el = document.getElementById(`filter-${x}`);
+        if (el) el.classList.toggle('active', x === currentFilter);
+    });
+    const minEl = document.getElementById('minCount');
+    const minVal = document.getElementById('minCountVal');
+    if (minEl) minEl.value = minCount;
+    if (minVal) minVal.textContent = String(minCount);
 }
 
 function toDatetimeLocal(d) {

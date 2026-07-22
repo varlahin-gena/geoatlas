@@ -410,6 +410,14 @@ $('editForm').addEventListener('submit', async (e) => {
   }
 });
 
+function applyQueryParams() {
+  const params = new URLSearchParams(location.search);
+  const ip = (params.get('ip') || '').trim();
+  const edit = params.get('edit') === '1' || params.get('edit') === 'true';
+  if (ip) $('ipSearch').value = ip;
+  return { ip, edit };
+}
+
 (async function boot() {
   const bar = NMUI.mountAdminTopbar('#adminTopbar', {
     title: 'ГеоАтлас',
@@ -419,7 +427,11 @@ $('editForm').addEventListener('submit', async (e) => {
   if (!user) return;
   NMAuth.renderUserBar(user, bar.userBarHost);
   NMUI.startSystemHealthPolling({ isAdmin: true });
-  load();
+  const q = applyQueryParams();
+  await load();
+  if (q.edit && q.ip && ipLookupActive && ranges.length === 1) {
+    openEdit(ranges[0]);
+  }
 })();
 </script>
 </body>
