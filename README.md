@@ -441,16 +441,6 @@ cd /opt/network-monitor
 bash clickhouse/reset_data.sh
 ```
 
-**Проверка количества строк:**
-
-```bash
-docker compose exec -T clickhouse clickhouse-client --query "
-  SELECT 'traffic_logs' AS tbl, count() FROM traffic_logs
-  UNION ALL SELECT 'geo_ranges', count() FROM geo_ranges
-  UNION ALL SELECT 'parse_errors', count() FROM parse_errors
-  FORMAT PrettyCompact"
-```
-
 ---
 
 ### Мониторинг ingest
@@ -674,5 +664,3 @@ network_monitor/
 ├── install-profile.json          # Сводка установки
 └── clickhouse/users.d/zz_install_limits.xml
 ```
-
-Docker volume `auth-users` хранит `/app/data/users.json` и `/app/data/retention.json` между перезапусками.
