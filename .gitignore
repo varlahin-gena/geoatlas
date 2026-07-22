@@ -1,6 +1,8 @@
 # Сгенерировано установщиком / tune-resources.sh
 docker-compose.override.yml
 .env
+.env.*
+!.env.example
 install-profile.json
 install-modules.json
 clickhouse/users.d/zz_install_limits.xml
@@ -10,6 +12,12 @@ clickhouse/users.d/zz_install_limits.xml
 .tmp_*
 backend/.gotmp/
 *.exe
+*.test
+__debug_bin*
+coverage.out
+coverage.html
+*.prof
+*.log
 
 # Артефакты layout-экспериментов / временные серверы
 frontend/_layout*_results/
