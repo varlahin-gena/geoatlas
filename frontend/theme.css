@@ -1,0 +1,160 @@
+/* Общие токены и меню пользователя ГеоАтлас. */
+
+:root {
+  --bg: #0d1117;
+  --panel: #161b22;
+  --panel-2: #1c2128;
+  --panel-3: #22272e;
+  --border: #30363d;
+  --border-strong: #444c56;
+  --text: #c9d1d9;
+  --text-dim: #8b949e;
+  --text-muted: #6e7681;
+  --accent: #58a6ff;
+  --green: #3fb950;
+  --red: #f85149;
+  --orange: #d29922;
+  --purple: #bc8cff;
+  --cyan: #39c5cf;
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --topbar-h: 52px;
+  --sidebar-w-open: 240px;
+  --sidebar-w-closed: 60px;
+  --floating-bg: rgba(22, 27, 34, 0.92);
+  --overlay-bg: rgba(13, 17, 23, 0.55);
+  --loading-bg: rgba(13, 17, 23, 0.42);
+  --map-base-rgb: 13, 17, 23;
+  --map-land-rgb: 33, 39, 48;
+  --map-outline-rgb: 13, 17, 23;
+}
+
+html[data-theme="light"] {
+  --bg: #f4f6f8;
+  --panel: #ffffff;
+  --panel-2: #eef1f4;
+  --panel-3: #e4e8ed;
+  --border: #d0d7de;
+  --border-strong: #afb8c1;
+  --text: #1f2328;
+  --text-dim: #59636e;
+  --text-muted: #6e7781;
+  --accent: #0969da;
+  --green: #1a7f37;
+  --red: #cf222e;
+  --orange: #9a6700;
+  --purple: #8250df;
+  --cyan: #0550ae;
+  --shadow: 0 4px 16px rgba(31, 35, 40, 0.08);
+  --floating-bg: rgba(255, 255, 255, 0.92);
+  --overlay-bg: rgba(244, 246, 248, 0.55);
+  --loading-bg: rgba(244, 246, 248, 0.5);
+  --map-base-rgb: 244, 246, 248;
+  --map-land-rgb: 226, 232, 240;
+  --map-outline-rgb: 180, 190, 200;
+}
+
+/* --- Меню пользователя --- */
+.nm-user-menu {
+  position: relative;
+  flex-shrink: 0;
+}
+.nm-user-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  max-width: 200px;
+}
+.nm-user-menu-trigger:hover {
+  background: var(--panel-3);
+  border-color: var(--border-strong);
+}
+.nm-user-menu-trigger .nm-user-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.nm-user-menu-trigger .nm-user-caret {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  opacity: 0.6;
+  transition: transform 0.15s ease;
+}
+.nm-user-menu.open .nm-user-caret {
+  transform: rotate(180deg);
+}
+.nm-user-menu-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 2000;
+  min-width: 200px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 6px;
+}
+.nm-user-menu.open .nm-user-menu-dropdown {
+  display: block;
+  animation: nmMenuIn 0.15s ease;
+}
+@keyframes nmMenuIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.nm-user-menu-meta {
+  padding: 8px 10px 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.nm-user-menu-meta .nm-meta-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-word;
+}
+.nm-user-menu-meta .nm-meta-role {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.nm-user-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+.nm-user-menu-item:hover {
+  background: var(--panel-3);
+}
+.nm-user-menu-item.danger {
+  color: var(--red);
+}
+.nm-user-menu-item .nm-theme-value {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.nm-user-menu-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}

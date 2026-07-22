@@ -1,0 +1,56 @@
+---
+description: Pragmatic Clean Architecture for backend Go changes
+globs: backend/**/*.go
+alwaysApply: false
+---
+
+# Backend Clean Architecture
+
+New backend features follow the Events/Geo/Ingest/System/Auth/ParseTest/Bootstrap pattern.
+
+## Layers
+
+```
+cmd/network-monitor     → composition root (wire only)
+internal/adapter/httpapi → HTTP: parse request → usecase → JSON (cookies/CSRF helpers here)
+internal/usecase/<mod>  → application logic + ports (interfaces)
+internal/adapter/*      → ClickHouse, geojob, parser, geoip reload, live ingest, bootstrap
+internal/auth           → users/sessions domain + file store (ports for usecase/auth)
+internal/model          → shared domain types
+internal/mapagg         → map edge/node aggregation
+internal/storage        → SQL/DDL implementation detail (not imported by usecase)
+```
+
+## Rules
+
+- `usecase/*` must **not** import `storage`, `clickhouse-go`, `geoip`, or `ingest` concrete types.
+- Ports live in `usecase/<mod>` (or adjacent `ports.go`); adapters implement them under `internal/adapter/`.
+- HTTP handlers in `adapter/httpapi` stay thin: no ClickHouse conn, no SQL, no map/geo/ingest/auth orchestration beyond cookies/CSRF.
+- Cookie/CSRF helpers live in `adapter/httpapi`; `auth` keeps CookieName/CSRF* constants and SessionManager.Issue/Parse/TTL.
+- Wire new services in `cmd/network-monitor/main.go`, pass usecases into `httpapi.NewDeps` / `NewServer`.
+- Prefer domain types from `model` directly (avoid `storage` type aliases for model types).
+- Startup Ensure*/Backfill belongs in `usecase/bootstrap` (+ `adapter/bootstrapadapter`); geo jobs under `adapter/geojob`.
+
+## Examples
+
+```go
+// ❌ BAD — handler talks to ClickHouse
+rows, err := storage.ScanRawAggsForTimeRange(ctx, h.apiCH, tr, ...)
+
+// ✅ GOOD — handler calls usecase
+out, err := h.eventsUC.GetMap(ctx, events.GetMapInput{...})
+```
+
+```go
+// ❌ BAD — usecase imports storage
+import "network_monitor/internal/storage"
+
+// ✅ GOOD — usecase defines a port
+type TrafficRepository interface {
+  ScanRawAggsForTimeRange(ctx context.Context, tr model.TimeRange, ...) ([]model.RawAgg, error)
+}
+```
+
+## Out of scope for this rule
+
+- Frontend / stats-collector structure

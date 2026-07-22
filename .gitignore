@@ -1,0 +1,26 @@
+# Сгенерировано установщиком / tune-resources.sh
+docker-compose.override.yml
+.env
+install-profile.json
+install-modules.json
+clickhouse/users.d/zz_install_limits.xml
+
+# Локальные инструменты разработки
+.tmp/
+.tmp_*
+backend/.gotmp/
+*.exe
+
+# Артефакты layout-экспериментов / временные серверы
+frontend/_layout*_results/
+frontend/_layout_test*.html
+frontend/_gen_*.js
+frontend/_run_*.js
+frontend/_srv*
+frontend/_layout*_check.js
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,237 @@
+package httpapi
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"network_monitor/internal/config"
+	"network_monitor/internal/geoip"
+	"network_monitor/internal/model"
+	usecaseevents "network_monitor/internal/usecase/events"
+)
+
+type stubTraffic struct {
+	geoCalled bool
+	geoMode   string
+	rawCalled bool
+}
+
+func (s *stubTraffic) ScanRawAggsForTimeRange(ctx context.Context, tr model.TimeRange, limit int, filter string, timeout time.Duration) ([]model.RawAgg, error) {
+	s.rawCalled = true
+	return nil, nil
+}
+
+func (s *stubTraffic) ScanGeoEdgesForTimeRange(ctx context.Context, tr model.TimeRange, groupBy string, limit int, filter string, timeout time.Duration) ([]model.GeoEdgeAgg, bool, error) {
+	s.geoCalled = true
+	s.geoMode = tr.Mode
+	return []model.GeoEdgeAgg{{
+		SrcKey: "Moscow, Россия", DstKey: "Berlin, Germany",
+		SrcLabel: "Moscow", DstLabel: "Berlin",
+		SrcLat: 55.75, SrcLon: 37.62, DstLat: 52.52, DstLon: 13.40,
+		Count: 3, AllowedCnt: 3,
+	}}, true, nil
+}
+
+func TestGetEventsUsesTrafficStoreForHoursGeo(t *testing.T) {
+	stub := &stubTraffic{}
+	h := &EventsHandler{Deps: &Deps{
+		cfg:      config.Config{QueryTimeout: time.Minute},
+		eventsUC: usecaseevents.New(stub, geoip.New()),
+	}}
+	req := httptest.NewRequest(http.MethodGet, "/api/events?hours=6&group_by=city", nil)
+	rec := httptest.NewRecorder()
+	h.GetEvents(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if !stub.geoCalled {
+		t.Fatal("expected ScanGeoEdgesForTimeRange")
+	}
+	if stub.geoMode != "hours" {
+		t.Fatalf("geo mode = %q, want hours", stub.geoMode)
+	}
+	if stub.rawCalled {
+		t.Fatal("should not fall back to raw IP path when geo ok")
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	stats := body["stats"].(map[string]any)
+	if stats["source"] != "geo_city" {
+		t.Fatalf("source = %v", stats["source"])
+	}
+}
+
+func TestGetEventsIPUsesGeoEdgesPath(t *testing.T) {
+	stub := &stubTraffic{}
+	h := &EventsHandler{Deps: &Deps{
+		cfg:      config.Config{QueryTimeout: time.Minute},
+		eventsUC: usecaseevents.New(stub, geoip.New()),
+	}}
+	req := httptest.NewRequest(http.MethodGet, "/api/events?hours=6&group_by=ip", nil)
+	rec := httptest.NewRecorder()
+	h.GetEvents(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if !stub.geoCalled {
+		t.Fatal("expected ScanGeoEdgesForTimeRange for group_by=ip")
+	}
+	if stub.rawCalled {
+		t.Fatal("should not fall back to raw when geo edges ok")
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	stats := body["stats"].(map[string]any)
+	if stats["source"] != "geo_ip" {
+		t.Fatalf("source = %v, want geo_ip", stats["source"])
+	}
+	lines, _ := body["lines"].([]any)
+	if len(lines) == 0 {
+		t.Fatal("expected lines from geo_ip path")
+	}
+}
+
+type stubTrafficNoGeo struct {
+	stubTraffic
+}
+
+func (s *stubTrafficNoGeo) ScanGeoEdgesForTimeRange(ctx context.Context, tr model.TimeRange, groupBy string, limit int, filter string, timeout time.Duration) ([]model.GeoEdgeAgg, bool, error) {
+	s.geoCalled = true
+	s.geoMode = tr.Mode
+	return []model.GeoEdgeAgg{{
+		SrcKey: "city:unknown", DstKey: "city:unknown",
+		SrcLabel: "Неизвестно", DstLabel: "Неизвестно",
+		Count: 10, AllowedCnt: 10,
+	}}, true, nil
+}
+
+func (s *stubTrafficNoGeo) ScanRawAggsForTimeRange(ctx context.Context, tr model.TimeRange, limit int, filter string, timeout time.Duration) ([]model.RawAgg, error) {
+	s.rawCalled = true
+	return []model.RawAgg{{
+		SrcIP: "1.1.1.1", DstIP: "8.8.8.8",
+		Count: 5, AllowedCnt: 5,
+	}}, nil
+}
+
+func TestGetEventsFallsBackToLiveGeoWhenStoredCoordsEmpty(t *testing.T) {
+	stub := &stubTrafficNoGeo{}
+	h := &EventsHandler{Deps: &Deps{
+		cfg:      config.Config{QueryTimeout: time.Minute},
+		eventsUC: usecaseevents.New(stub, geoip.New()),
+	}}
+	req := httptest.NewRequest(http.MethodGet, "/api/events?hours=24&group_by=city", nil)
+	rec := httptest.NewRecorder()
+	h.GetEvents(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if !stub.geoCalled {
+		t.Fatal("expected geo path first")
+	}
+	if !stub.rawCalled {
+		t.Fatal("expected fallback to raw IP path")
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	stats := body["stats"].(map[string]any)
+	if stats["source"] != "ip_live_city" {
+		t.Fatalf("source = %v, want ip_live_city", stats["source"])
+	}
+}
+
+type stubTrafficIPLogGeo struct {
+	stubTraffic
+}
+
+func (s *stubTrafficIPLogGeo) ScanGeoEdgesForTimeRange(ctx context.Context, tr model.TimeRange, groupBy string, limit int, filter string, timeout time.Duration) ([]model.GeoEdgeAgg, bool, error) {
+	return nil, false, nil
+}
+
+func (s *stubTrafficIPLogGeo) ScanRawAggsForTimeRange(ctx context.Context, tr model.TimeRange, limit int, filter string, timeout time.Duration) ([]model.RawAgg, error) {
+	s.rawCalled = true
+	return []model.RawAgg{{
+		SrcIP: "10.0.0.1", DstIP: "10.0.0.2",
+		Count: 7, AllowedCnt: 7,
+		SrcCountry: "Russia", DstCountry: "Germany",
+		SrcLat: 55.75, SrcLon: 37.62,
+		DstLat: 52.52, DstLon: 13.40,
+	}}, nil
+}
+
+func TestGetEventsIPUsesStoredLogGeoWhenLiveMisses(t *testing.T) {
+	stub := &stubTrafficIPLogGeo{}
+	h := &EventsHandler{Deps: &Deps{
+		cfg:      config.Config{QueryTimeout: time.Minute},
+		eventsUC: usecaseevents.New(stub, geoip.New()),
+	}}
+	req := httptest.NewRequest(http.MethodGet, "/api/events?hours=6&group_by=ip", nil)
+	rec := httptest.NewRecorder()
+	h.GetEvents(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if !stub.rawCalled {
+		t.Fatal("expected raw IP path")
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	lines, ok := body["lines"].([]any)
+	if !ok || len(lines) == 0 {
+		t.Fatalf("expected lines from log geo fallback, body=%s", rec.Body.String())
+	}
+	stats := body["stats"].(map[string]any)
+	if stats["edges"].(float64) < 1 {
+		t.Fatalf("edges = %v", stats["edges"])
+	}
+}
+
+type stubTrafficIPCountryOnly struct {
+	stubTraffic
+}
+
+func (s *stubTrafficIPCountryOnly) ScanGeoEdgesForTimeRange(ctx context.Context, tr model.TimeRange, groupBy string, limit int, filter string, timeout time.Duration) ([]model.GeoEdgeAgg, bool, error) {
+	return nil, false, nil
+}
+
+func (s *stubTrafficIPCountryOnly) ScanRawAggsForTimeRange(ctx context.Context, tr model.TimeRange, limit int, filter string, timeout time.Duration) ([]model.RawAgg, error) {
+	s.rawCalled = true
+	return []model.RawAgg{{
+		SrcIP: "10.0.0.1", DstIP: "10.0.0.2",
+		Count: 7, AllowedCnt: 7,
+		SrcCountry: "Russia", DstCountry: "Germany",
+	}}, nil
+}
+
+func TestGetEventsSubnetUsesCountryFallback(t *testing.T) {
+	stub := &stubTrafficIPCountryOnly{}
+	h := &EventsHandler{Deps: &Deps{
+		cfg:      config.Config{QueryTimeout: time.Minute},
+		eventsUC: usecaseevents.New(stub, geoip.New()),
+	}}
+	req := httptest.NewRequest(http.MethodGet, "/api/events?hours=6&group_by=subnet", nil)
+	rec := httptest.NewRecorder()
+	h.GetEvents(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	lines, _ := body["lines"].([]any)
+	if len(lines) == 0 {
+		t.Fatalf("expected subnet lines via country center, body=%s", rec.Body.String())
+	}
+}

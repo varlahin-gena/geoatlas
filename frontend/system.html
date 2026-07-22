@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ГеоАтлас — Мониторинг системы</title>
+
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem('nm.theme');
+    if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+})();
+</script>
+
+<link rel="stylesheet" href="/vendor/uPlot.min.css" />
+<script src="/vendor/uPlot.iife.min.js"></script>
+<link rel="stylesheet" href="/theme.css" />
+<link rel="stylesheet" href="/common.css" />
+<link rel="stylesheet" href="/system.css" />
+</head>
+<body class="page-admin">
+
+<a class="skip-link" href="#system-main">К содержимому</a>
+
+<div class="app" id="adminApp">
+    <aside id="adminSidebar" class="sidebar" aria-label="Навигация">
+        <div class="sidebar-header">
+            <img class="logo" src="/logo.png" alt="" width="28" height="28" aria-hidden="true" />
+            <div class="title">ГеоАтлас</div>
+        </div>
+        <div class="sidebar-section">
+            <div class="sidebar-section-title">Разделы</div>
+            <a href="/" class="side-btn" title="Карта">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6v15l7-3 8 3 7-3V3l-7 3-8-3-7 3z"/><path d="M8 3v15M16 6v15"/></svg>
+                <span class="label">Карта</span>
+            </a>
+            <a href="/system.html" class="side-btn active" aria-current="page" title="Мониторинг">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 3 5-5"/></svg>
+                <span class="label">Мониторинг</span>
+            </a>
+            <a href="/parser-test.html" class="side-btn" title="Тест парсеров">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                <span class="label">Тест парсеров</span>
+            </a>
+            <a href="/parse-errors.html" class="side-btn" title="Ошибки парсинга">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                <span class="label">Ошибки парсинга</span>
+            </a>
+            <a href="/geo-missing.html" class="side-btn" title="IP без GeoIP">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+                <span class="label">IP без GeoIP</span>
+            </a>
+            <a href="/geo-ranges.html" class="side-btn" title="База GeoIP">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>
+                <span class="label">База GeoIP</span>
+            </a>
+            <a href="/users.html" class="side-btn" title="Пользователи">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <span class="label">Пользователи</span>
+            </a>
+        </div>
+        <div class="sidebar-collapse-btn">
+            <button type="button" class="side-btn" id="btnToggleAdminSidebar" title="Развернуть / свернуть меню">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+                <span class="label">Свернуть меню</span>
+            </button>
+        </div>
+    </aside>
+
+    <div class="admin-main">
+    <header class="header">
+        <div class="title-block">
+            <h1>Мониторинг системы</h1>
+            <div class="subtitle">ГеоАтлас · pipeline / containers / storage</div>
+        </div>
+
+        <div class="spacer"></div>
+
+        <div class="period-tabs" id="periodTabs" hidden>
+            <button data-period="1h"  class="active">1ч</button>
+            <button data-period="6h">6ч</button>
+            <button data-period="24h">24ч</button>
+            <button data-period="7d">7д</button>
+        </div>
+
+        <label class="toggle">
+            <input type="checkbox" id="autoRefreshChk" checked />
+            Авто-обновление
+        </label>
+
+        <div class="health-pill" id="healthPill">
+            <span class="dot"></span>
+            <span id="healthText">— загрузка —</span>
+        </div>
+
+        <div id="userBarHost"></div>
+    </header>
+
+    <main class="content" id="system-main">
+
+        <div class="content-chrome">
+            <section class="chrome-section chrome-alerts" id="chromeAlerts">
+                <div class="chrome-section-head">
+                    <span class="accent-dot" style="background: var(--orange);"></span>
+                    <span>Алёрты</span>
+                    <span class="chrome-section-meta" id="alertsCount"></span>
+                </div>
+                <div class="alerts" id="alertsList"></div>
+            </section>
+
+            <div class="status-strip" id="statusStrip" aria-label="Ключевые метрики">
+                <div class="status-metric">
+                    <span class="sm-label">EPS</span>
+                    <span class="sm-value" id="statusEps">—</span>
+                </div>
+                <div class="status-metric">
+                    <span class="sm-label">Лаг</span>
+                    <span class="sm-value" id="statusLag">—</span>
+                </div>
+                <div class="status-metric">
+                    <span class="sm-label">Очередь</span>
+                    <span class="sm-value" id="statusQueue">—</span>
+                </div>
+                <div class="status-metric">
+                    <span class="sm-label">Буфер</span>
+                    <span class="sm-value" id="statusBuffer">—</span>
+                </div>
+                <div class="status-metric" id="statusCapacityWrap" hidden>
+                    <span class="sm-label">Ёмкость</span>
+                    <span class="sm-value" id="statusCapacity">—</span>
+                </div>
+            </div>
+
+            <nav class="view-tabs" id="viewTabs" role="tablist" aria-label="Разделы мониторинга">
+                <button type="button" role="tab" data-tab="overview" class="active" aria-selected="true">Обзор</button>
+                <button type="button" role="tab" data-tab="pipeline" aria-selected="false">Pipeline</button>
+                <button type="button" role="tab" data-tab="security" aria-selected="false">Безопасность<span class="tab-badge" id="securityTabBadge" hidden></span></button>
+                <button type="button" role="tab" data-tab="charts" aria-selected="false">Графики</button>
+            </nav>
+        </div>
+
+        <div class="tab-panels">
+        <div class="tab-panel active" id="tab-overview" role="tabpanel" data-tab="overview">
+
+            <section class="card card-compact" id="installProfileSection" style="display:none;">
+                <h3 class="card-title">
+                    <span class="accent-dot" style="background: var(--accent);"></span>
+                    Профиль установки
+                    <span class="profile-badge" id="profileBadge">—</span>
+                </h3>
+                <div class="row cols-2" style="margin-top: 4px;">
+                    <div class="kv-list" id="profileHostList"></div>
+                    <div class="kv-list" id="profileLimitsList"></div>
+                </div>
+                <div class="capacity-meter" id="capacityMeter" style="display:none;">
+                    <div class="meter-label">
+                        <span>Текущая нагрузка vs расчётная ёмкость</span>
+                        <span id="capacityLabel">—</span>
+                    </div>
+                    <div class="capacity-track">
+                        <div class="capacity-fill" id="capacityFill" style="width:0%;"></div>
+                    </div>
+                    <div class="capacity-hint" id="capacityHint"></div>
+                </div>
+            </section>
+
+            <section class="row cols-2">
+                <div class="card card-compact">
+                    <h3 class="card-title">
+                        <span class="accent-dot" style="background: var(--green);"></span>
+                        Health компонентов
+                    </h3>
+                    <div class="health-grid" id="componentHealthGrid"></div>
+                </div>
+                <div class="card card-compact">
+                    <h3 class="card-title"><span class="accent-dot" style="background: var(--cyan);"></span> Контейнеры</h3>
+                    <div class="container-strip" id="containersRow"></div>
+                </div>
+            </section>
+
+            <section class="card card-compact edges-card" id="edgesAggSection">
+                <h3 class="card-title">
+                    <span class="accent-dot" style="background: var(--cyan);"></span>
+                    Агрегаты рёбер
+                    <span class="profile-badge" id="edgesAggBadge">—</span>
+                </h3>
+                <div class="kv-grid cols-3" id="edgesAggPrimary"></div>
+                <div class="capacity-hint" id="edgesAggHint"></div>
+                <details class="details-toggle" id="edgesAggDetails">
+                    <summary>Подробности</summary>
+                    <div class="kv-grid cols-2" id="edgesAggSecondary"></div>
+                </details>
+            </section>
+
+            <div class="footer-info" id="footerInfoOverview"></div>
+        </div>
+
+        <!-- ===== Pipeline ===== -->
+        <div class="tab-panel" id="tab-pipeline" role="tabpanel" data-tab="pipeline" hidden>
+
+            <section class="card card-compact">
+                <h3 class="card-title"><span class="accent-dot"></span> Pipeline</h3>
+                <div class="pipeline" id="pipelineRow"></div>
+            </section>
+
+            <section class="row cols-2">
+                <div class="card card-compact">
+                    <h3 class="card-title"><span class="accent-dot" style="background: var(--accent);"></span> Ingest</h3>
+                    <div class="kv-grid cols-2" id="ingestList"></div>
+                </div>
+                <div class="card card-compact">
+                    <h3 class="card-title"><span class="accent-dot" style="background: var(--purple);"></span> Хранилище</h3>
+                    <div class="kv-grid cols-2" id="storageList"></div>
+                </div>
+            </section>
+        </div>
+
+        <!-- ===== Безопасность ===== -->
+        <div class="tab-panel" id="tab-security" role="tabpanel" data-tab="security" hidden>
+
+            <section class="card" id="failedLoginsSection">
+                <details class="section-details" id="failedLoginsDetails">
+                    <summary class="card-title" style="margin:0;">
+                        <span class="accent-dot" style="background: var(--red);"></span>
+                        Неуспешные попытки входа
+                        <span id="failedLoginsCount" style="margin-left: auto; color: var(--text-dim); font-weight: normal; font-size: 11px;"></span>
+                    </summary>
+                    <div id="failedLoginsHost" style="margin-top: 10px;"></div>
+                </details>
+            </section>
+        </div>
+
+        <!-- ===== Графики ===== -->
+        <div class="tab-panel" id="tab-charts" role="tabpanel" data-tab="charts" hidden>
+
+            <div class="history-meta" id="historyMeta"></div>
+
+            <section class="row cols-2">
+                <div class="card chart-card">
+                    <h3 class="card-title"><span class="accent-dot" style="background: var(--green);"></span> События в секунду</h3>
+                    <div class="chart-host" id="chart-events" style="height: 240px;"></div>
+                </div>
+                <div class="card chart-card">
+                    <h3 class="card-title"><span class="accent-dot" style="background: var(--orange);"></span> Лаг pipeline (сек)</h3>
+                    <div class="chart-host" id="chart-lag" style="height: 240px;"></div>
+                </div>
+            </section>
+
+            <section class="row cols-2">
+                <div class="card chart-card">
+                    <h3 class="card-title"><span class="accent-dot" style="background: var(--accent);"></span> CPU контейнеров (%)</h3>
+                    <div class="chart-host" id="chart-cpu" style="height: 280px;"></div>
+                </div>
+                <div class="card chart-card">
+                    <h3 class="card-title"><span class="accent-dot" style="background: var(--purple);"></span> Память контейнеров (MB)</h3>
+                    <div class="chart-host" id="chart-mem" style="height: 280px;"></div>
+                </div>
+            </section>
+
+            <section class="row cols-2">
+                <div class="card chart-card">
+                    <h3 class="card-title"><span class="accent-dot" style="background: var(--cyan);"></span> Буфер импортера</h3>
+                    <div class="chart-host" id="chart-buffer" style="height: 200px;"></div>
+                </div>
+                <div class="card chart-card">
+                    <h3 class="card-title"><span class="accent-dot" style="background: var(--red);"></span> Размер хранилища (MB)</h3>
+                    <div class="chart-host" id="chart-storage" style="height: 200px;"></div>
+                </div>
+            </section>
+
+            <div class="footer-info" id="footerInfo"></div>
+        </div>
+
+        </div>
+
+    </main>
+    </div>
+</div>
+
+<script src="/config.js"></script>
+<script src="/auth.js"></script>
+<script src="/common.js"></script>
+<script>
+(function () {
+  var KEY = 'nm.adminSidebarCollapsed';
+  var app = document.getElementById('adminApp');
+  var btn = document.getElementById('btnToggleAdminSidebar');
+  if (!app || !btn) return;
+  try {
+    if (localStorage.getItem(KEY) === '1') app.classList.add('sidebar-collapsed');
+  } catch (e) {}
+  btn.addEventListener('click', function () {
+    app.classList.toggle('sidebar-collapsed');
+    try {
+      localStorage.setItem(KEY, app.classList.contains('sidebar-collapsed') ? '1' : '0');
+    } catch (e) {}
+  });
+})();
+</script>
+<script src="/js/system-app.js"></script>
+
+</body>
+</html>

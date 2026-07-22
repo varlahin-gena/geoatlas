@@ -1,0 +1,206 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+jobs:
+  backend:
+    name: backend (test + lint)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.24.x"
+          cache-dependency-path: |
+            backend/go.sum
+            backend/go.mod
+            pkg/chconn/go.sum
+            pkg/chconn/go.mod
+
+      # go mod verify не умеет local replace (нет ziphash у network_monitor/pkg/chconn).
+      - name: go mod download
+        run: go mod download
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test -race -count=1 ./...
+
+      - name: go fuzz (smoke)
+        run: |
+          go test ./internal/parser/ -run=^$ -fuzz=FuzzParseVerbose -fuzztime=10s
+          go test ./internal/ingest/ -run=^$ -fuzz=FuzzFrameReader -fuzztime=10s
+
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12.2
+          working-directory: backend
+          args: --timeout=5m
+
+  chconn:
+    name: pkg/chconn (test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pkg/chconn
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.24.x"
+          cache-dependency-path: |
+            pkg/chconn/go.sum
+            pkg/chconn/go.mod
+
+      - name: go test
+        run: go test -race -count=1 ./...
+
+  backend-integration:
+    name: backend (clickhouse integration)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      clickhouse:
+        image: clickhouse/clickhouse-server:25.8.28.1
+        ports:
+          - 9000:9000
+          - 8123:8123
+        env:
+          # CH 25+ без USER/PASSWORD режет network access для default;
+          # /ping с хоста всё равно отвечает, а native :9000 падает с auth failed.
+          CLICKHOUSE_DB: default
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: ci_test
+        options: >-
+          --health-cmd "wget -qO- 'http://localhost:8123/?user=default&password=ci_test&query=SELECT%201' || exit 1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 30
+          --ulimit nofile=262144:262144
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.24.x"
+          cache-dependency-path: |
+            backend/go.sum
+            backend/go.mod
+            pkg/chconn/go.sum
+            pkg/chconn/go.mod
+
+      - name: Wait for ClickHouse
+        env:
+          CLICKHOUSE_PASSWORD: ci_test
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS -G "http://127.0.0.1:8123/" \
+              --data-urlencode "user=default" \
+              --data-urlencode "password=${CLICKHOUSE_PASSWORD}" \
+              --data-urlencode "query=SELECT 1" >/dev/null 2>&1; then
+              echo "ClickHouse authenticated HTTP ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "ClickHouse not ready for authenticated queries"
+          exit 1
+
+      - name: integration tests
+        env:
+          CLICKHOUSE_TEST_ADDR: localhost:9000
+          CLICKHOUSE_TEST_USER: default
+          CLICKHOUSE_TEST_PASSWORD: ci_test
+          CLICKHOUSE_TEST_DB: default
+        run: |
+          set +e
+          go test -tags=integration -count=1 ./internal/storage/ -run Integration -v
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "::group::ClickHouse diagnostics"
+            curl -fsS -G http://127.0.0.1:8123/ \
+              --data-urlencode "user=default" \
+              --data-urlencode "password=ci_test" \
+              --data-urlencode "query=SELECT version() AS version, timezone() AS timezone FORMAT Vertical" || true
+            curl -fsS -G http://127.0.0.1:8123/ \
+              --data-urlencode "user=default" \
+              --data-urlencode "password=ci_test" \
+              --data-urlencode "query=SELECT name, engine FROM system.tables WHERE database = currentDatabase() ORDER BY name FORMAT Vertical" || true
+            container_id="$(docker ps -q --filter 'ancestor=clickhouse/clickhouse-server:25.8.28.1')"
+            if [ -n "$container_id" ]; then
+              docker logs --tail 200 "$container_id" || true
+            fi
+            echo "::endgroup::"
+          fi
+          exit "$status"
+
+  stats-collector:
+    name: stats-collector (test + lint)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: stats-collector
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.24.x"
+          cache-dependency-path: |
+            stats-collector/go.sum
+            stats-collector/go.mod
+            pkg/chconn/go.sum
+            pkg/chconn/go.mod
+
+      - name: go mod download
+        run: go mod download
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test -race -count=1 ./...
+
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12.2
+          working-directory: stats-collector
+          args: --timeout=3m
+
+  frontend-smoke:
+    name: frontend (auth smoke)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Auth / nginx contract
+        run: bash scripts/frontend-smoke.sh
+
+      - name: Login page smoke (static)
+        run: |
+          python3 -m http.server 8765 --directory frontend >/tmp/http-frontend.log 2>&1 &
+          echo $! > /tmp/http-frontend.pid
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8765/login.html >/dev/null && break
+            sleep 0.2
+          done
+          html=$(curl -sf http://127.0.0.1:8765/login.html)
+          echo "$html" | grep -q 'id="username"'
+          echo "$html" | grep -q 'id="password"'
+          echo "$html" | grep -q '/api/auth/login'
+          auth=$(curl -sf http://127.0.0.1:8765/auth.js)
+          echo "$auth" | grep -q 'function requireLogin'
+          echo "$auth" | grep -q 'X-CSRF-Token'
+          echo "$auth" | grep -q 'nm_csrf'
+          kill "$(cat /tmp/http-frontend.pid)" || true

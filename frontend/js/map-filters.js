@@ -1,0 +1,208 @@
+function setMapLoading(on) {
+    const el = document.getElementById('mapLoading');
+    const area = document.querySelector('.viz-area');
+    if (el) {
+        el.classList.toggle('visible', !!on);
+        el.setAttribute('aria-busy', on ? 'true' : 'false');
+    }
+    if (area) area.classList.toggle('is-loading', !!on);
+}
+
+async function fetchData(opts) {
+    const silent = !!(opts && opts.silent);
+    // Фоновый poll не мешает явной перестройке карты
+    if (silent && document.querySelector('.viz-area.is-loading')) return;
+
+    const gen = ++dataFetchGen;
+    if (!silent) setMapLoading(true);
+    try {
+        const groupBy = document.getElementById('groupBy').value;
+        const periodQuery = buildPeriodQuery();
+
+        // ВАЖНО: filter не передаём в backend — фильтруем локально на клиенте
+        const url = `${API_BASE}/api/events`
+            + `?group_by=${encodeURIComponent(groupBy)}`
+            + periodQuery;
+
+        const res = await fetch(url, { cache: 'no-store', credentials: 'same-origin' });
+        if (res.status === 401) {
+            location.replace(NMAuth.loginUrl(location.pathname));
+            return;
+        }
+        if (!res.ok) {
+            const text = await res.text();
+            throw new Error(text || `HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        if (gen !== dataFetchGen) return;
+        allPoints  = data.points || {};
+        allLines   = data.lines  || [];
+        lastStats  = data.stats  || {};
+        lastPeriodInfo = {
+            group_by: data.group_by,
+            from: data.from,
+            to: data.to,
+            minutes: data.minutes,
+            hours: data.hours,
+            days: data.days,
+            period: data.period,
+        };
+        lastFetchError = null;
+        backendHealthy = true;
+
+        // Инвалидация кэша stats при новых данных
+        _statsCacheVersion++;
+
+        renderStats();
+        updateMapOverlay();
+        NMUI.fetchSystemHealth();
+
+        if (viewMode === 'map') {
+            updateDeck();
+            if (autoFitPending) { fitDeckToData(); autoFitPending = false; }
+        } else {
+            updateGlobe();
+        }
+    } catch (err) {
+        if (gen !== dataFetchGen) return;
+        console.error(err);
+        backendHealthy = false;
+        lastFetchError = err.message || String(err);
+        updateMapOverlay();
+        NMUI.fetchSystemHealth();
+        toast('Ошибка загрузки данных: ' + err.message, 'error');
+    } finally {
+        if (!silent && gen === dataFetchGen) {
+            setMapLoading(false);
+            updateMapOverlay();
+        }
+    }
+}
+
+function renderStats() {
+    let totalEvents = 0;
+    let allowedEvents = 0;
+    let blockedEvents = 0;
+    allLines.forEach(function (l) {
+        const c = l.count || 0;
+        totalEvents += c;
+        if (l.status === 'allowed') allowedEvents += c;
+        else if (l.status === 'blocked') blockedEvents += c;
+    });
+
+    const uniqueCountries = new Set();
+    const uniqueCities = new Set();
+    Object.values(allPoints).forEach(p => {
+        if (p.country && p.country !== 'Неизвестно') uniqueCountries.add(p.country);
+        if (p.city && p.city !== 'Неизвестно') uniqueCities.add(p.city);
+    });
+
+    document.getElementById('stat-total').textContent     = fmtNumber(totalEvents);
+    document.getElementById('stat-allowed').textContent   = fmtNumber(allowedEvents);
+    document.getElementById('stat-blocked').textContent   = fmtNumber(blockedEvents);
+    document.getElementById('stat-edges').textContent     = fmtNumber(allLines.length);
+    document.getElementById('stat-nodes').textContent     = fmtNumber(Object.keys(allPoints).length);
+    document.getElementById('stat-countries').textContent = fmtNumber(uniqueCountries.size);
+    document.getElementById('stat-cities').textContent    = fmtNumber(uniqueCities.size);
+}
+
+function setFilter(f) {
+    currentFilter = f;
+    ['all','allowed','blocked'].forEach(x => {
+        document.getElementById(`filter-${x}`).classList.remove('active');
+    });
+    document.getElementById(`filter-${f}`).classList.add('active');
+    // Локальная фильтрация без запроса в backend
+    if (viewMode === 'map') updateDeck();
+    else updateGlobe();
+    updateMapOverlay();
+}
+
+function onMinCountChange() {
+    const el = document.getElementById('minCount');
+    minCount = parseInt(el.value, 10) || 1;
+    document.getElementById('minCountVal').textContent = minCount;
+    if (viewMode === 'map') updateDeck();
+    else updateGlobe();
+    updateMapOverlay();
+}
+
+function onMaxArcsChange() {
+    const el = document.getElementById('maxArcs');
+    maxArcs = parseInt(el.value, 10) || MAX_ARCS_DEFAULT;
+    document.getElementById('maxArcsVal').textContent = fmtNumber(maxArcs);
+    saveUIState();
+    if (viewMode === 'map') updateDeck();
+    else updateGlobe();
+    updateMapOverlay();
+}
+
+function refreshMap() { fetchData(); }
+
+function resetView() {
+    currentFilter = 'all';
+    autoFitPending = true;
+    currentSearch = '';
+    minCount = 1;
+    maxArcs = MAX_ARCS_DEFAULT;
+    document.getElementById('searchInput').value = '';
+    document.getElementById('groupBy').value = 'city';
+    document.getElementById('periodPreset').value = '1d';
+    document.getElementById('periodFrom').value = '';
+    document.getElementById('periodTo').value = '';
+    syncPeriodCustomPanel();
+    document.getElementById('minCount').value = 1;
+    document.getElementById('minCountVal').textContent = '1';
+    document.getElementById('maxArcs').value = MAX_ARCS_DEFAULT;
+    document.getElementById('maxArcsVal').textContent = fmtNumber(MAX_ARCS_DEFAULT);
+    ['all','allowed','blocked'].forEach(x => {
+        document.getElementById(`filter-${x}`).classList.remove('active');
+    });
+    document.getElementById('filter-all').classList.add('active');
+    mapViewState = { longitude: 37.6, latitude: 55.7, zoom: 2.5, pitch: 0, bearing: 0 };
+    globeViewState = { longitude: 30, latitude: 30, zoom: 0.85, pitch: 0, bearing: 0 };
+    if (viewMode === 'map' && deckInstance) {
+        deckInstance.setProps({ initialViewState: mapViewState, viewState: mapViewState });
+    } else if (viewMode === 'globe' && deckInstance) {
+        deckInstance.setProps({ initialViewState: globeViewState, viewState: globeViewState });
+        startGlobeAutoRotate();
+    }
+    refreshMap();
+}
+
+function onToggleLegend() {
+    showLegend = document.getElementById('toggleLegendChk').checked;
+    document.getElementById('legendBox').classList.toggle('hidden', !showLegend);
+}
+function onToggleStats() {
+    showStats = document.getElementById('toggleStatsChk').checked;
+    document.getElementById('statsFloating').classList.toggle('hidden', !showStats);
+}
+function onToggleHeatmap() {
+    showHeatmap = document.getElementById('toggleHeatmapChk').checked;
+    saveUIState();
+    if (viewMode === 'map') updateDeck();
+    else updateGlobe();
+}
+function onToggleCountryLabels() {
+    showCountryLabels = document.getElementById('toggleCountryLabelsChk').checked;
+    saveUIState();
+    if (viewMode === 'map') updateDeck();
+    else updateGlobe();
+}
+function syncLegendMode() {
+    const byStatus = document.getElementById('legendByStatus');
+    const mono = document.getElementById('legendMono');
+    const title = document.getElementById('legendTitle');
+    if (!byStatus || !mono) return;
+    byStatus.style.display = monoArcColor ? 'none' : '';
+    mono.style.display = monoArcColor ? '' : 'none';
+    if (title) title.textContent = monoArcColor ? 'Связи' : 'Статус трафика';
+}
+function onToggleMonoArcs() {
+    monoArcColor = document.getElementById('toggleMonoArcsChk').checked;
+    syncLegendMode();
+    saveUIState();
+    if (viewMode === 'map') updateDeck();
+    else updateGlobe();
+}

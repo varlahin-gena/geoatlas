@@ -1,0 +1,773 @@
+openapi: 3.0.3
+info:
+  title: ГеоАтлас API
+  version: "1.1.0"
+  description: |
+    Backend API для приёма syslog/логов МСЭ, GeoIP и карты трафика.
+
+    Локальная авторизация (cookie `nm_session` после `POST /api/auth/login`):
+    - **administrator** — полный доступ (карта, загрузки, система, парсеры, УЗ);
+    - **operator** — только карта (`GET /api/events`); без загрузок, мониторинга и парсеров.
+
+    Уровни доступа (backend middleware):
+    - **public** — `/health`, `/api/health`, login/logout/me/change-password/check*;
+    - **login** — любой залогиненный (`GET /api/events`);
+    - **admin** — роль administrator ИЛИ `Authorization: Bearer <API_AUTH_TOKEN>`
+      (system/*, parse-*, управление УЗ);
+    - **ops** — то же, что admin, для мутаций и pipeline (`POST /api/ingest`,
+      `/upload-logs`, `/upload-geo`, `GET /api/ingest/stats`, `/metrics`).
+      При `AUTH_DISABLED=1` / `API_AUTH_DISABLED=1` ops открыты; старт только с `NM_ALLOW_INSECURE=1`.
+
+servers:
+  - url: /
+    description: Через frontend nginx или напрямую backend :8080
+
+tags:
+  - name: health
+  - name: auth
+  - name: events
+  - name: ingest
+  - name: system
+  - name: parse
+  - name: geo
+  - name: metrics
+
+paths:
+  /api/auth/login:
+    post:
+      tags: [auth]
+      summary: Вход (логин/пароль → cookie nm_session)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string }
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Неверные учётные данные
+  /api/auth/logout:
+    post:
+      tags: [auth]
+      summary: Выход (очищает cookie)
+      responses:
+        "200":
+          description: OK
+  /api/auth/me:
+    get:
+      tags: [auth]
+      summary: Текущий пользователь
+      responses:
+        "200":
+          description: OK (поля username, role, must_reset_password)
+        "401":
+          description: Нет сессии
+  /api/auth/change-password:
+    post:
+      tags: [auth]
+      summary: Смена своего пароля (снимает must_reset_password)
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Неверный текущий пароль / нет сессии
+  /api/auth/check:
+    get:
+      tags: [auth]
+      summary: nginx auth_request — любой залогиненный или Bearer
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Нет сессии
+  /api/auth/check-admin:
+    get:
+      tags: [auth]
+      summary: nginx auth_request — administrator / Bearer / API_AUTH_DISABLED
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Нет сессии
+        "403":
+          description: Не администратор
+  /api/users:
+    get:
+      tags: [auth]
+      summary: Список локальных УЗ (администратор)
+      responses:
+        "200":
+          description: OK
+    post:
+      tags: [auth]
+      summary: Создать УЗ (обязательно must_reset_password)
+      responses:
+        "201":
+          description: Created
+  /api/users/{username}/role:
+    post:
+      tags: [auth]
+      summary: Назначить роль
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+  /api/users/{username}/full-name:
+    post:
+      tags: [auth]
+      summary: Обновить ФИО
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+  /api/users/{username}/reset-password:
+    post:
+      tags: [auth]
+      summary: Сброс пароля (обязательно must_reset_password)
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+  /api/users/{username}:
+    delete:
+      tags: [auth]
+      summary: Удалить УЗ
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+
+  /health:
+    get:
+      tags: [health]
+      summary: Liveness/readiness
+      description: Публичный probe — только ok и ping ClickHouse.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: ClickHouse недоступен
+
+  /api/health:
+    get:
+      tags: [health]
+      summary: Alias /health
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: ClickHouse недоступен
+
+  /metrics:
+    get:
+      tags: [metrics]
+      summary: Prometheus metrics
+      description: administrator или Bearer (ops).
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: text/plain exposition format
+        "401":
+          description: unauthorized
+
+  /api/events:
+    get:
+      tags: [events]
+      summary: Карта рёбер/узлов трафика
+      description: Требует сессию (administrator или operator) или Bearer API-токен.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: days
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 30, default: 1 }
+        - name: hours
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: minutes
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: from
+          in: query
+          description: RFC3339 или YYYY-MM-DD
+          schema: { type: string }
+        - name: to
+          in: query
+          schema: { type: string }
+        - name: group_by
+          in: query
+          schema:
+            type: string
+            enum: [ip, subnet, city, country]
+            default: city
+        - name: filter
+          in: query
+          schema:
+            type: string
+            enum: [all, allowed, blocked]
+            default: all
+        - name: limit
+          in: query
+          description: Макс. сырых пар (по умолчанию 10000, макс. 50000)
+          schema: { type: integer, minimum: 1, maximum: 50000, default: 10000 }
+      responses:
+        "200":
+          description: lines + points
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventsResponse"
+        "400":
+          description: Невалидный диапазон времени
+
+  /api/geo-missing:
+    get:
+      tags: [geo]
+      summary: IP без координат для карты
+      description: |
+        Только administrator или Bearer.
+        Агрегирует уникальные IP из трафика за период, которые нельзя поставить на карту
+        (нет live GeoIP и нет lat/lon в логе). Помогает понять, что добавить в GeoIP CSV.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: hours
+          in: query
+          schema: { type: integer }
+        - name: minutes
+          in: query
+          schema: { type: integer }
+        - name: days
+          in: query
+          schema: { type: integer }
+        - name: from
+          in: query
+          schema: { type: string }
+        - name: to
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 500, maximum: 5000 }
+        - name: scan_limit
+          in: query
+          schema: { type: integer, default: 20000 }
+      responses:
+        "200":
+          description: List of IPs missing geo (items, summary)
+        "401":
+          description: unauthorized
+        "403":
+          description: forbidden
+
+  /api/geo-ranges:
+    get:
+      tags: [geo]
+      summary: Список диапазонов GeoIP
+      description: |
+        Только administrator или Bearer.
+        Возвращает текущую таблицу `geo_ranges` (сначала in-memory индекс) в JSON.
+        Query: `q` (текстовый поиск), `ip` (найти диапазон, покрывающий IPv4),
+        `limit` (по умолчанию 2000, макс. 10000; не применяется при `ip`).
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+          description: Filter by Network / Country / Region / City
+        - name: ip
+          in: query
+          schema: { type: string }
+          description: IPv4 — вернуть единственный диапазон, в который попадает адрес
+          example: "203.0.113.10"
+        - name: limit
+          in: query
+          schema: { type: integer, default: 2000, maximum: 10000 }
+      responses:
+        "200":
+          description: ranges list
+        "401":
+          description: unauthorized
+        "403":
+          description: forbidden
+    post:
+      tags: [geo]
+      summary: Добавить один диапазон в базу GeoIP
+      description: |
+        administrator или Bearer (ops). Сессия operator — 403.
+        Загружает текущие `geo_ranges`, добавляет запись, проверяет отсутствие пересечений,
+        затем полностью перезаписывает таблицу, сразу обновляет in-memory индекс и планирует backfill.
+        Поля соответствуют шаблону CSV SIEM KUMA (`Network`, `Country`, `Region`, `City`, lat/lon).
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [network, country, region, city, lat, lon]
+              properties:
+                network:
+                  type: string
+                  description: "IP, CIDR (a.b.c.d/n) или диапазон (a.b.c.d-e.f.g.h)"
+                  example: "203.0.113.10"
+                country: { type: string, example: "Россия" }
+                region: { type: string, example: "OOO_Company" }
+                city: { type: string, example: "Москва" }
+                lat: { type: number, minimum: -90, maximum: 90, example: 55.76167 }
+                lon: { type: number, minimum: -180, maximum: 180, example: 37.60667 }
+      responses:
+        "200":
+          description: range appended; index applied; backfill scheduled
+        "400":
+          description: validation error or overlapping range
+        "401":
+          description: unauthorized
+        "403":
+          description: forbidden
+    put:
+      tags: [geo]
+      summary: Изменить существующий диапазон GeoIP
+      description: |
+        administrator или Bearer (ops). Находит запись по `original_network`, заменяет её
+        новыми полями (с проверкой пересечений), обновляет индекс и планирует backfill.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [original_network, network, country, region, city, lat, lon]
+              properties:
+                original_network:
+                  type: string
+                  description: Текущий Network редактируемой записи
+                  example: "203.0.113.10"
+                network: { type: string, example: "203.0.113.0/24" }
+                country: { type: string }
+                region: { type: string }
+                city: { type: string }
+                lat: { type: number }
+                lon: { type: number }
+      responses:
+        "200":
+          description: range updated
+        "400":
+          description: validation / overlap
+        "404":
+          description: original range not found
+        "401":
+          description: unauthorized
+        "403":
+          description: forbidden
+
+  /api/geo-ranges/export:
+    get:
+      tags: [geo]
+      summary: Выгрузка базы GeoIP в CSV
+      description: |
+        administrator или Bearer (ops). Отдаёт текущую таблицу `geo_ranges`
+        в формате SIEM KUMA (`Network,Country,Region,City,Latitude,Longitude`).
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: CSV attachment
+          content:
+            text/csv:
+              schema: { type: string }
+        "401":
+          description: unauthorized
+        "403":
+          description: forbidden
+
+  /api/ingest/stats:
+    get:
+      tags: [ingest]
+      summary: Live-ingest counters
+      description: administrator или Bearer (ops).
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Stats snapshot
+        "401":
+          description: unauthorized
+        "403":
+          description: forbidden (например operator)
+
+  /api/ingest:
+    post:
+      tags: [ingest]
+      summary: Загрузить сырые строки логов (text/plain)
+      description: |
+        administrator или Bearer (ops). Сессия operator — 403.
+        Строки ставятся в ту же очередь, что syslog TCP. При переполнении
+        очередь **не блокируется**: дропнутые строки → HTTP **503** + `Retry-After`
+        и `stats.dropped` (не маскируется под 200). Клиент должен backoff/retry.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema: { type: string }
+      responses:
+        "200":
+          description: все строки приняты в очередь (dropped=0)
+        "503":
+          description: очередь полна — часть/все строки дропнуты; смотри stats + Retry-After
+        "401":
+          description: unauthorized
+
+  /upload-logs:
+    post:
+      tags: [ingest]
+      summary: Upload логов (multipart file или raw body)
+      description: |
+        administrator или Bearer (ops). Сессия operator — 403.
+        Тот же delivery contract, что `POST /api/ingest` (503 при drops).
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        "200":
+          description: все строки приняты в очередь (dropped=0)
+        "503":
+          description: очередь полна — часть/все строки дропнуты; смотри stats + Retry-After
+        "401":
+          description: unauthorized
+
+  /upload-geo:
+    post:
+      tags: [geo]
+      summary: Импорт GeoIP CSV
+      description: |
+        administrator или Bearer (ops). Сессия operator — 403.
+        `?dry_run=1` — только валидация CSV (ReadCSV), без записи в ClickHouse и без reload.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: dry_run
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ["1", "true", "yes", "on"]
+          description: Validate CSV only; do not truncate/insert geo_ranges
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: ranges imported (or dry_run validation ok)
+        "400":
+          description: invalid CSV
+        "401":
+          description: unauthorized
+
+  /api/system/status:
+    get:
+      tags: [system]
+      summary: Краткий статус системы для индикатора
+      description: |
+        Любой залогиненный пользователь (administrator или operator).
+        Возвращает level (ok|warn|error), alert_count и список alerts без полных метрик.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: System status summary
+        "401":
+          description: unauthorized
+
+  /api/system/stats:
+    get:
+      tags: [system]
+      summary: Сводка системы (ingest, storage, alerts)
+      description: Только administrator или Bearer.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: System stats
+        "401":
+          description: unauthorized
+        "403":
+          description: forbidden
+
+  /api/system/history:
+    get:
+      tags: [system]
+      summary: История метрик
+      description: Только administrator или Bearer.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema: { type: string }
+        - name: step
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Time series
+
+  /api/system/edges-agg:
+    get:
+      tags: [system]
+      summary: Статус Ensure*/backfill traffic_edges_daily
+      description: |
+        Только administrator или Bearer.
+        Пока `prefer_agg=false`, карта читает `traffic_logs` (в т.ч. во время phase=schema DROP/CREATE MV).
+        State=`pending` — schema готова, тяжёлый backfill ещё не запускали
+        (`SKIP_STARTUP_BACKFILL` или незавершённый backfill).
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Edges agg status (state, phase, prefer_agg, map_source)
+
+  /api/system/maintenance/backfill:
+    post:
+      tags: [system]
+      summary: Запустить edges/geo-edges backfill (+ geo enrich)
+      description: |
+        Только administrator или Bearer (+ CSRF для cookie-сессии).
+        Ставит в очередь async job (до 6 ч): `BackfillEdgesAgg` → `BackfillGeoEdgesAgg` →
+        EnrichLogsMissingGeo при наличии GeoIP.
+        Прогресс — `GET /api/system/edges-agg`. HTTP 202 Accepted.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "202":
+          description: Job scheduled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  scheduled: { type: boolean }
+                  job: { type: string }
+                  status: { type: string }
+        "503":
+          description: Scheduler unavailable
+
+  /api/system/install-profile:
+    get:
+      tags: [system]
+      summary: Профиль установки (EPS limits)
+      description: Только administrator или Bearer.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Install profile JSON
+
+  /api/parse-errors:
+    get:
+      tags: [parse]
+      summary: Последние ошибки парсинга
+      description: Только administrator или Bearer.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 500, maximum: 5000 }
+        - name: search
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Parse errors list
+
+  /api/parse-errors/delete:
+    post:
+      tags: [parse]
+      summary: Удалить parse_errors
+      description: Только administrator или Bearer.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items: { type: string }
+                all:
+                  type: boolean
+      responses:
+        "200":
+          description: deleted
+        "401":
+          description: unauthorized
+
+  /api/parse-samples:
+    get:
+      tags: [parse]
+      summary: Встроенные сэмплы парсеров
+      description: Только administrator или Bearer.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Sample parse results
+
+  /api/parse-test:
+    post:
+      tags: [parse]
+      summary: Прогон произвольных строк через парсеры
+      description: Только administrator или Bearer.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema: { type: string }
+      responses:
+        "200":
+          description: Parse results
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: API_AUTH_TOKEN (мутации, admin/ops API)
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: nm_session
+      description: Сессия после POST /api/auth/login
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        ok: { type: boolean }
+        status:
+          type: string
+          enum: [healthy, degraded, overloaded, unavailable]
+          description: >
+            healthy — норма; degraded — очередь ≥75% или есть drops;
+            overloaded — очередь ≥90%, drops/s ≥100 или ingest error;
+            unavailable — ClickHouse недоступен (HTTP 503).
+        clickhouse: { type: string }
+        error: { type: string }
+        ingest:
+          type: object
+          additionalProperties: true
+          description: Краткий снимок очереди/drops (если live ingest включён)
+      description: >
+        Публичный liveness. HTTP 503 только если ClickHouse недоступен.
+        Перегрузка ingest отражается в status при HTTP 200 (чтобы docker
+        healthcheck не рестартил backend под нагрузкой). Детали —
+        /api/ingest/stats и /api/system/stats.
+
+    EventsResponse:
+      type: object
+      properties:
+        group_by: { type: string }
+        filter: { type: string }
+        period: { type: string }
+        days: { type: integer }
+        hours: { type: integer }
+        minutes: { type: integer }
+        from: { type: string }
+        to: { type: string }
+        lines:
+          type: array
+          items: { type: object }
+        points:
+          type: object
+          additionalProperties: { type: object }
+        stats:
+          type: object
+          properties:
+            raw_pairs: { type: integer }
+            edges: { type: integer }
+            nodes: { type: integer }
+            skipped_no_geo: { type: integer }
+            source:
+              type: string
+              description: "ip | geo_city | geo_country"
+              example: geo_city

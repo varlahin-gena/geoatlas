@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<clickhouse>
+    <listen_host>0.0.0.0</listen_host>
+    <listen_try>1</listen_try>
+    <!-- 6 GiB лимит контейнера → ~5 GiB на запросы сервера -->
+    <max_server_memory_usage_to_ram_ratio>0.85</max_server_memory_usage_to_ram_ratio>
+</clickhouse>

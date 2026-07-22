@@ -1,0 +1,456 @@
+/**
+ * Общие UI-хелперы ГеоАтлас.
+ * Подключать до page-скриптов; после /config.js и /auth.js на защищённых страницах.
+ */
+(function (global) {
+  'use strict';
+
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  function escapeHTML(v) {
+    return String(v ?? '').replace(/[&<>"']/g, function (ch) {
+      return ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      })[ch];
+    });
+  }
+
+  function fmtNumber(n) {
+    return (n ?? 0).toLocaleString('ru-RU');
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    try {
+      return new Date(iso).toLocaleString('ru-RU');
+    } catch (e) {
+      return String(iso);
+    }
+  }
+
+  function ensureToastHost() {
+    let host = document.getElementById('toastHost');
+    if (host) return host;
+    host = document.createElement('div');
+    host.id = 'toastHost';
+    host.className = 'toast-host';
+    host.setAttribute('aria-live', 'polite');
+    document.body.appendChild(host);
+    return host;
+  }
+
+  /**
+   * @param {string} msg
+   * @param {'info'|'success'|'error'|string} [kind]
+   * @param {number} [timeout]
+   */
+  function toast(msg, kind, timeout) {
+    const ms = typeof timeout === 'number' ? timeout : 4000;
+    const host = ensureToastHost();
+    const el = document.createElement('div');
+    el.className = 'toast' + (kind ? ' ' + kind : '');
+    el.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+    el.textContent = msg;
+    host.appendChild(el);
+    if (ms > 200) {
+      setTimeout(function () {
+        el.style.opacity = '0';
+      }, ms - 200);
+    }
+    setTimeout(function () {
+      el.remove();
+    }, ms);
+  }
+
+  var SIDEBAR_COLLAPSE_KEY = 'nm.adminSidebarCollapsed';
+  var ICON =
+    '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">';
+
+  /** Ссылки между страницами (как в сайдбаре карты). */
+  var PAGE_NAV = [
+    {
+      href: '/',
+      label: 'Карта',
+      match: ['/', '/index.html'],
+      icon:
+        ICON +
+        '<path d="M1 6v15l7-3 8 3 7-3V3l-7 3-8-3-7 3z"/><path d="M8 3v15M16 6v15"/></svg>',
+    },
+    {
+      href: '/system.html',
+      label: 'Мониторинг',
+      icon:
+        ICON +
+        '<path d="M3 3v18h18"/><path d="M7 14l3-3 3 3 5-5"/></svg>',
+    },
+    {
+      href: '/parser-test.html',
+      label: 'Тест парсеров',
+      icon:
+        ICON +
+        '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
+    },
+    {
+      href: '/parse-errors.html',
+      label: 'Ошибки парсинга',
+      icon:
+        ICON +
+        '<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>' +
+        '<line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+    },
+    {
+      href: '/geo-missing.html',
+      label: 'IP без GeoIP',
+      icon:
+        ICON +
+        '<circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>',
+    },
+    {
+      href: '/geo-ranges.html',
+      label: 'База GeoIP',
+      icon:
+        ICON +
+        '<ellipse cx="12" cy="5" rx="9" ry="3"/>' +
+        '<path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>',
+    },
+    {
+      href: '/users.html',
+      label: 'Пользователи',
+      icon:
+        ICON +
+        '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>' +
+        '<path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+    },
+  ];
+
+  function normalizePath(pathname) {
+    var p = pathname || '/';
+    if (p.length > 1 && p.charAt(p.length - 1) === '/') p = p.slice(0, -1);
+    return p || '/';
+  }
+
+  function isNavActive(item, pathname) {
+    var path = normalizePath(pathname);
+    var matches = item.match || [item.href];
+    for (var i = 0; i < matches.length; i++) {
+      if (normalizePath(matches[i]) === path) return true;
+    }
+    return false;
+  }
+
+  function readSidebarCollapsed() {
+    try {
+      return localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === '1';
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function writeSidebarCollapsed(collapsed) {
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSE_KEY, collapsed ? '1' : '0');
+    } catch (e) {}
+  }
+
+  /**
+   * Собирает layout: sidebar | admin-main (topbar + content).
+   * @returns {{ app: HTMLElement, sidebar: HTMLElement }}
+   */
+  function ensureAdminLayout() {
+    var existing = document.getElementById('adminApp');
+    if (existing) {
+      return {
+        app: existing,
+        sidebar: document.getElementById('adminSidebar'),
+      };
+    }
+
+    if (!document.body.classList.contains('page-admin')) {
+      document.body.classList.add('page-admin');
+    }
+
+    var app = document.createElement('div');
+    app.id = 'adminApp';
+    app.className = 'app';
+
+    var sidebar = document.createElement('aside');
+    sidebar.id = 'adminSidebar';
+    sidebar.className = 'sidebar';
+    sidebar.setAttribute('aria-label', 'Навигация');
+
+    var adminMain = document.createElement('div');
+    adminMain.className = 'admin-main';
+
+    var topbar = document.getElementById('adminTopbar');
+    var main =
+      document.querySelector('main.page-content') ||
+      document.querySelector('main');
+
+    if (topbar) adminMain.appendChild(topbar);
+    if (main) adminMain.appendChild(main);
+
+    app.appendChild(sidebar);
+    app.appendChild(adminMain);
+
+    var anchor = document.body.querySelector('script');
+    if (anchor) {
+      document.body.insertBefore(app, anchor);
+    } else {
+      document.body.appendChild(app);
+    }
+
+    if (readSidebarCollapsed()) {
+      app.classList.add('sidebar-collapsed');
+    }
+
+    return { app: app, sidebar: sidebar };
+  }
+
+  /**
+   * HTML бокового меню навигации.
+   * @param {string} [pathname]
+   * @returns {string}
+   */
+  function buildAdminSidebarHtml(pathname) {
+    var path = pathname || (typeof location !== 'undefined' ? location.pathname : '/');
+    var html =
+      '<div class="sidebar-header">' +
+      '<img class="logo" src="/logo.png" alt="" width="28" height="28" aria-hidden="true" />' +
+      '<div class="title">ГеоАтлас</div>' +
+      '</div>' +
+      '<div class="sidebar-section">' +
+      '<div class="sidebar-section-title">Разделы</div>';
+
+    for (var i = 0; i < PAGE_NAV.length; i++) {
+      var item = PAGE_NAV[i];
+      var active = isNavActive(item, path);
+      html +=
+        '<a href="' +
+        escapeHTML(item.href) +
+        '" class="side-btn' +
+        (active ? ' active' : '') +
+        '"' +
+        (active ? ' aria-current="page"' : '') +
+        ' title="' +
+        escapeHTML(item.label) +
+        '">' +
+        item.icon +
+        '<span class="label">' +
+        escapeHTML(item.label) +
+        '</span></a>';
+    }
+
+    html +=
+      '</div>' +
+      '<div class="sidebar-collapse-btn">' +
+      '<button type="button" class="side-btn" id="btnToggleAdminSidebar" title="Развернуть / свернуть меню">' +
+      ICON +
+      '<path d="M15 18l-6-6 6-6"/></svg>' +
+      '<span class="label">Свернуть меню</span>' +
+      '</button></div>';
+
+    return html;
+  }
+
+  /**
+   * Монтирует боковое меню и layout админ-страницы.
+   * @param {string} [pathname]
+   * @returns {{ app: HTMLElement, sidebar: HTMLElement }}
+   */
+  function mountAdminSidebar(pathname) {
+    var layout = ensureAdminLayout();
+    if (!layout.sidebar) return layout;
+
+    if (readSidebarCollapsed()) {
+      layout.app.classList.add('sidebar-collapsed');
+    } else {
+      layout.app.classList.remove('sidebar-collapsed');
+    }
+
+    layout.sidebar.innerHTML = buildAdminSidebarHtml(pathname);
+
+    var btn = document.getElementById('btnToggleAdminSidebar');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        layout.app.classList.toggle('sidebar-collapsed');
+        writeSidebarCollapsed(layout.app.classList.contains('sidebar-collapsed'));
+      });
+    }
+
+    return layout;
+  }
+
+  var STATUS_REFRESH_MS = 5000;
+  var STATUS_PILL_ICON =
+    '<svg class="status-pill-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">' +
+    '<path d="M14 3h7v7M10 14L21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>';
+  var _statusPollTimer = null;
+  var _statusPillIsAdmin = false;
+
+  function systemHealthPillHTML(isAdmin) {
+    if (isAdmin) {
+      return (
+        '<a href="/system.html" id="systemHealthPill" class="status-pill" ' +
+        'style="text-decoration:none;cursor:pointer;" title="Открыть мониторинг системы">' +
+        '<span class="dot"></span>' +
+        '<span id="systemHealthText">— загрузка —</span>' +
+        STATUS_PILL_ICON +
+        '</a>'
+      );
+    }
+    return (
+      '<span id="systemHealthPill" class="status-pill" title="Состояние системы">' +
+      '<span class="dot"></span>' +
+      '<span id="systemHealthText">— загрузка —</span>' +
+      '</span>'
+    );
+  }
+
+  /**
+   * Кликабельность индикатора только для администраторов.
+   * @param {boolean} isAdmin
+   */
+  function applySystemHealthPillAccess(isAdmin) {
+    _statusPillIsAdmin = !!isAdmin;
+    const pill = document.getElementById('systemHealthPill');
+    if (!pill) return;
+
+    const textEl = document.getElementById('systemHealthText');
+    const text = textEl ? textEl.textContent : '— загрузка —';
+    const cls = pill.className;
+    const html = systemHealthPillHTML(_statusPillIsAdmin);
+    const wrap = document.createElement('div');
+    wrap.innerHTML = html;
+    const next = wrap.firstElementChild;
+    next.className = cls;
+    const nextText = next.querySelector('#systemHealthText');
+    if (nextText) nextText.textContent = text;
+    pill.replaceWith(next);
+  }
+
+  async function fetchSystemHealth() {
+    const pill = document.getElementById('systemHealthPill');
+    const text = document.getElementById('systemHealthText');
+    if (!pill || !text) return;
+
+    try {
+      const res = await fetch('/api/system/status', { credentials: 'same-origin' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const status = await res.json();
+      const alerts = status.alerts || [];
+      const level = status.level || 'ok';
+
+      pill.classList.remove('ok', 'warn', 'bad');
+      if (level === 'error') {
+        pill.classList.add('bad');
+        text.textContent = '⚠ ' + alerts.length + ' проблем';
+        pill.title = alerts.map(function (a) {
+          return '[' + a.level + '] ' + a.target + ': ' + a.message;
+        }).join('\n');
+      } else if (level === 'warn') {
+        pill.classList.add('warn');
+        text.textContent = alerts.length + ' предупр.';
+        pill.title = alerts.map(function (a) {
+          return '[' + a.level + '] ' + a.target + ': ' + a.message;
+        }).join('\n');
+      } else {
+        pill.classList.add('ok');
+        text.textContent = 'Система ОК';
+        pill.title = _statusPillIsAdmin
+          ? 'Кликни, чтобы открыть мониторинг'
+          : 'Состояние системы';
+      }
+    } catch (e) {
+      pill.classList.remove('ok', 'warn');
+      pill.classList.add('bad');
+      text.textContent = 'API недоступен';
+      pill.title = 'Не удалось получить статус системы';
+    }
+  }
+
+  /**
+   * @param {{ isAdmin?: boolean }} [opts]
+   */
+  function startSystemHealthPolling(opts) {
+    const o = opts || {};
+    if (typeof o.isAdmin === 'boolean') {
+      applySystemHealthPillAccess(o.isAdmin);
+    }
+    fetchSystemHealth();
+    if (_statusPollTimer) clearInterval(_statusPollTimer);
+    _statusPollTimer = setInterval(function () {
+      if (document.hidden) return;
+      fetchSystemHealth();
+    }, STATUS_REFRESH_MS);
+  }
+
+  /**
+   * Единая шапка админ-страниц (+ боковое меню навигации).
+   * @param {HTMLElement|string} host
+   * @param {{
+   *   title?: string,
+   *   subtitle?: string,
+   *   userBar?: boolean,
+   *   sidebar?: boolean,
+   *   systemHealth?: boolean,
+   * }} opts
+   * @returns {{ userBarHost: HTMLElement|null }}
+   */
+  function mountAdminTopbar(host, opts) {
+    const el = typeof host === 'string' ? document.querySelector(host) : host;
+    const o = opts || {};
+    if (!el) return { userBarHost: null };
+
+    if (o.sidebar !== false) {
+      mountAdminSidebar();
+    }
+
+    const title = o.title || 'ГеоАтлас';
+    const subtitle = o.subtitle || '';
+    const withUserBar = o.userBar !== false;
+    const withHealth = o.systemHealth !== false;
+
+    if (!el.classList.contains('topbar')) el.classList.add('topbar');
+
+    let html =
+      '<div class="title">' +
+      escapeHTML(title);
+    if (subtitle) {
+      html += ' <span class="sub">' + escapeHTML(subtitle) + '</span>';
+    }
+    html += '</div><div class="topbar-spacer"></div>';
+    if (withUserBar) {
+      html += '<div id="userBarHost"></div>';
+    }
+    if (withHealth) {
+      html += systemHealthPillHTML(true);
+      _statusPillIsAdmin = true;
+    }
+    el.innerHTML = html;
+
+    return { userBarHost: withUserBar ? document.getElementById('userBarHost') : null };
+  }
+
+  global.NMUI = {
+    $,
+    escapeHTML,
+    fmtNumber,
+    fmtDate,
+    toast,
+    ensureToastHost,
+    mountAdminSidebar,
+    mountAdminTopbar,
+    applySystemHealthPillAccess,
+    fetchSystemHealth,
+    startSystemHealthPolling,
+  };
+
+  global.escapeHTML = escapeHTML;
+  global.fmtNumber = fmtNumber;
+})(window);

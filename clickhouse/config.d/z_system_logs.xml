@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<!--
+  Тяжёлые system.* логи ClickHouse на малых объёмах данных раздуваются
+  сильнее traffic_logs и держат высокий idle CPU на merges.
+  Файл z_* — применяется последним (алфавитный порядок config.d).
+  query_log оставляем (полезен для диагностики); остальное отключаем.
+-->
+<clickhouse>
+    <trace_log remove="1"/>
+    <text_log remove="1"/>
+    <processors_profile_log remove="1"/>
+    <query_thread_log remove="1"/>
+    <query_metric_log remove="1"/>
+    <metric_log remove="1"/>
+    <asynchronous_metric_log remove="1"/>
+    <opentelemetry_span_log remove="1"/>
+    <session_log remove="1"/>
+    <latency_log remove="1"/>
+    <background_schedule_pool_log remove="1"/>
+</clickhouse>

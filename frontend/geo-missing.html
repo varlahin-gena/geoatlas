@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ГеоАтлас — IP без GeoIP</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem('nm.theme');
+    if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+})();
+</script>
+<link rel="stylesheet" href="/theme.css" />
+<link rel="stylesheet" href="/common.css" />
+<style>
+.hint-cell { color: var(--text-dim); max-width: 360px; }
+.b-private { background: rgba(110,118,129,0.2); color: var(--text-dim); border: 1px solid var(--border); }
+.b-public { background: rgba(210,153,34,0.15); color: var(--orange); border: 1px solid rgba(210,153,34,0.4); }
+.b-invalid { background: rgba(248,81,73,0.15); color: var(--red); border: 1px solid rgba(248,81,73,0.4); }
+.b-other { background: rgba(88,166,255,0.12); color: var(--accent); border: 1px solid rgba(88,166,255,0.35); }
+.copy-btn, .add-btn {
+  background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+  border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer; margin-left: 6px;
+}
+.copy-btn:hover, .add-btn:hover { color: var(--accent); border-color: var(--accent); }
+.add-btn { color: var(--accent); border-color: rgba(88,166,255,0.45); }
+.search-box { max-width: 320px; }
+#addModal .modal { max-width: 480px; width: min(480px, 94vw); }
+#addModal .form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+}
+#addModal .form-grid .field.full { grid-column: 1 / -1; }
+#addModal .field-hint { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+@media (max-width: 520px) {
+  #addModal .form-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body class="page-admin">
+<header id="adminTopbar"></header>
+
+<main class="page-content" id="main-content">
+  <div class="page-content-inner">
+    <h1>Адреса, которые не удалось поставить на карту</h1>
+    <p class="hint">
+      Список уникальных IP из трафика за выбранный период, для которых нет координат
+      (ни в live GeoIP, ни в полях записи лога). Публичные адреса можно добавить в базу GeoIP
+      прямо отсюда; приватные и спец. адреса на карте обычно не нужны.
+      Редактирование уже загруженных диапазонов — на странице
+      <a href="/geo-ranges.html">База GeoIP</a>.
+    </p>
+
+    <div class="summary" id="summary"></div>
+
+    <div class="toolbar">
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input type="text" id="search" placeholder="Поиск по IP или peer…" />
+      </div>
+      <select id="period" class="ctrl">
+        <option value="15m">15 мин</option>
+        <option value="1h">1 час</option>
+        <option value="6h">6 часов</option>
+        <option value="12h" selected>12 часов</option>
+        <option value="1d">1 день</option>
+        <option value="3d">3 дня</option>
+        <option value="7d">7 дней</option>
+      </select>
+      <select id="kind" class="ctrl">
+        <option value="all">Все типы</option>
+        <option value="public_unknown">Только публичные</option>
+        <option value="private">Приватные</option>
+        <option value="loopback">Loopback</option>
+        <option value="link_local">Link-local</option>
+        <option value="multicast">Multicast</option>
+        <option value="invalid">Некорректные</option>
+      </select>
+      <select id="limit" class="ctrl">
+        <option value="200">200</option>
+        <option value="500" selected>500</option>
+        <option value="1000">1000</option>
+        <option value="2000">2000</option>
+      </select>
+      <button class="btn" id="refresh">Обновить</button>
+      <button class="btn" id="copyPublic" title="Скопировать публичные IP без geo">Копировать public IP</button>
+      <button class="btn" id="exportGeo" title="Скачать текущую базу geo_ranges в CSV">Выгрузить GeoIP CSV</button>
+      <div class="spacer"></div>
+      <span class="count-badge" id="countBadge"></span>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+                <tr>
+                    <th scope="col">IP</th>
+                    <th scope="col">Тип</th>
+                    <th scope="col">Событий</th>
+                    <th scope="col">src / dst</th>
+                    <th scope="col">Пример peer</th>
+                    <th scope="col">Из лога</th>
+                    <th scope="col">Что делать</th>
+                    <th scope="col"><span class="visually-hidden">Действия</span></th>
+                </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr><td colspan="8" class="empty">Загрузка…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<div class="modal-backdrop" id="addModal">
+  <form class="modal" id="addForm" role="dialog" aria-modal="true" aria-labelledby="addDialogTitle">
+    <h3 id="addDialogTitle">Добавить в базу GeoIP</h3>
+    <p class="hint" style="margin-top:0;">Поля соответствуют шаблону CSV SIEM KUMA.</p>
+    <div class="form-grid">
+      <div class="field full">
+        <label for="gNetwork">Network</label>
+        <input id="gNetwork" required maxlength="64" placeholder="1.2.3.4 или 1.2.3.0/24 или 1.2.3.4-1.2.3.10" />
+        <div class="field-hint">Один IP, CIDR или диапазон start-end</div>
+      </div>
+      <div class="field">
+        <label for="gCountry">Country</label>
+        <input id="gCountry" required maxlength="120" placeholder="Россия" />
+      </div>
+      <div class="field">
+        <label for="gRegion">Region</label>
+        <input id="gRegion" required maxlength="120" placeholder="OOO_Company" />
+      </div>
+      <div class="field">
+        <label for="gCity">City</label>
+        <input id="gCity" required maxlength="120" placeholder="Москва" />
+      </div>
+      <div class="field">
+        <label for="gLat">Latitude</label>
+        <input id="gLat" required type="number" step="any" min="-90" max="90" placeholder="55.76167" />
+      </div>
+      <div class="field">
+        <label for="gLon">Longitude</label>
+        <input id="gLon" required type="number" step="any" min="-180" max="180" placeholder="37.60667" />
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn" id="gCancel">Отмена</button>
+      <button type="submit" class="btn primary" id="gSubmit">Добавить в базу</button>
+    </div>
+  </form>
+</div>
+
+<div class="toast-host" id="toastHost" aria-live="polite"></div>
+
+<script src="/config.js"></script>
+<script src="/auth.js"></script>
+<script src="/common.js"></script>
+<script>
+'use strict';
+const $ = NMUI.$;
+const esc = NMUI.escapeHTML;
+const fmt = NMUI.fmtNumber;
+const toast = NMUI.toast;
+
+let rows = [];
+let searchTimer = null;
+
+function kindBadge(kind) {
+  const labels = {
+    public_unknown: 'public',
+    private: 'private',
+    loopback: 'loopback',
+    link_local: 'link-local',
+    multicast: 'multicast',
+    invalid: 'invalid',
+  };
+  let cls = 'b-other';
+  if (kind === 'public_unknown') cls = 'b-public';
+  else if (kind === 'private') cls = 'b-private';
+  else if (kind === 'invalid') cls = 'b-invalid';
+  return `<span class="badge ${cls}">${esc(labels[kind] || kind)}</span>`;
+}
+
+function periodQuery() {
+  const p = $('period').value;
+  const m = p.match(/^(\d+)m$/);
+  if (m) return `minutes=${m[1]}`;
+  const h = p.match(/^(\d+)h$/);
+  if (h) return `hours=${h[1]}`;
+  const d = p.match(/^(\d+)d$/);
+  if (d) return `hours=${parseInt(d[1], 10) * 24}`;
+  return 'hours=12';
+}
+
+function filteredRows() {
+  const q = $('search').value.trim().toLowerCase();
+  const kind = $('kind').value;
+  return rows.filter(r => {
+    if (kind !== 'all' && r.kind !== kind) return false;
+    if (!q) return true;
+    return String(r.ip || '').toLowerCase().includes(q)
+      || String(r.sample_peer || '').toLowerCase().includes(q);
+  });
+}
+
+function renderSummary(summary) {
+  const s = summary || {};
+  const by = s.by_kind || {};
+  $('summary').innerHTML = `
+    <div class="stat"><div class="lbl">Уникальных IP</div><div class="val">${fmt(s.unique_ips)}</div></div>
+    <div class="stat"><div class="lbl">Событий (показано)</div><div class="val">${fmt(s.events)}</div></div>
+    <div class="stat"><div class="lbl">Публичных без geo</div><div class="val orange">${fmt(s.public_focus || by.public_unknown || 0)}</div></div>
+    <div class="stat"><div class="lbl">Приватных</div><div class="val accent">${fmt(by.private || 0)}</div></div>
+  `;
+}
+
+function summarizeLocal(list) {
+  const by = {};
+  let events = 0;
+  for (const r of list) {
+    by[r.kind] = (by[r.kind] || 0) + 1;
+    events += Number(r.count) || 0;
+  }
+  return {
+    unique_ips: list.length,
+    events,
+    by_kind: by,
+    public_focus: by.public_unknown || 0,
+  };
+}
+
+/** IPv4 → uint32 (или null). */
+function ipv4ToUint(ip) {
+  const parts = String(ip || '').trim().split('.');
+  if (parts.length !== 4) return null;
+  let v = 0;
+  for (let i = 0; i < 4; i++) {
+    if (!/^\d+$/.test(parts[i])) return null;
+    const n = Number(parts[i]);
+    if (n < 0 || n > 255) return null;
+    v = ((v << 8) >>> 0) + n;
+  }
+  return v >>> 0;
+}
+
+/** Парсит Network (IP / CIDR / start-end) в {start,end} uint32. */
+function parseNetworkBounds(network) {
+  const s = String(network || '').trim();
+  if (!s) return null;
+  if (s.includes('/')) {
+    const slash = s.indexOf('/');
+    const startBase = ipv4ToUint(s.slice(0, slash));
+    const bits = parseInt(s.slice(slash + 1), 10);
+    if (startBase === null || !Number.isInteger(bits) || bits < 0 || bits > 32) return null;
+    const hostBits = 32 - bits;
+    const mask = bits === 0 ? 0 : ((0xffffffff << hostBits) >>> 0);
+    const start = (startBase & mask) >>> 0;
+    const end = (start | ((~mask) >>> 0)) >>> 0;
+    return { start, end };
+  }
+  if (s.includes('-')) {
+    const dash = s.indexOf('-');
+    let a = ipv4ToUint(s.slice(0, dash));
+    let b = ipv4ToUint(s.slice(dash + 1));
+    if (a === null || b === null) return null;
+    if (a > b) { const t = a; a = b; b = t; }
+    return { start: a, end: b };
+  }
+  const v = ipv4ToUint(s);
+  if (v === null) return null;
+  return { start: v, end: v };
+}
+
+function ipInBounds(ip, bounds) {
+  const v = ipv4ToUint(ip);
+  if (v === null || !bounds) return false;
+  return v >= bounds.start && v <= bounds.end;
+}
+
+/**
+ * Убирает из текущего списка строки, попадающие в добавленный диапазон
+ * (сразу после ручного добавления, без ожидания backfill логов).
+ */
+function refilterRowsCoveredBy(network) {
+  const bounds = parseNetworkBounds(network);
+  if (!bounds) return 0;
+  const before = rows.length;
+  rows = rows.filter(r => !ipInBounds(r.ip, bounds));
+  const removed = before - rows.length;
+  renderSummary(summarizeLocal(rows));
+  render();
+  return removed;
+}
+
+function openAddModal(ip, logCountry, logCity) {
+  $('gNetwork').value = ip || '';
+  $('gCountry').value = logCountry || '';
+  $('gRegion').value = '';
+  $('gCity').value = logCity || '';
+  $('gLat').value = '';
+  $('gLon').value = '';
+  $('addModal').classList.add('show');
+  $('gCountry').focus();
+}
+
+function closeAddModal() {
+  $('addModal').classList.remove('show');
+}
+
+function render() {
+  const list = filteredRows();
+  $('countBadge').textContent = list.length ? `Показано: ${fmt(list.length)}` : '';
+  const tbody = $('tbody');
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty">Нет IP без geo за выбранный период / фильтр</td></tr>';
+    return;
+  }
+  tbody.innerHTML = list.map(r => {
+    const logBits = [r.log_city, r.log_country].filter(Boolean).join(', ') || '—';
+    return `<tr>
+      <td class="mono">
+        ${esc(r.ip)}
+        <button type="button" class="copy-btn" data-ip="${esc(r.ip)}">копир.</button>
+      </td>
+      <td>${kindBadge(r.kind)}</td>
+      <td><b>${fmt(r.count)}</b></td>
+      <td>${fmt(r.as_src)} / ${fmt(r.as_dst)}</td>
+      <td class="mono">${esc(r.sample_peer || '—')}</td>
+      <td>${esc(logBits)}</td>
+      <td class="hint-cell">${esc(r.action_hint || '')}</td>
+      <td>
+        <button type="button" class="add-btn"
+          data-ip="${esc(r.ip)}"
+          data-country="${esc(r.log_country || '')}"
+          data-city="${esc(r.log_city || '')}">добавить в базу</button>
+      </td>
+    </tr>`;
+  }).join('');
+  tbody.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(btn.dataset.ip);
+        toast('IP скопирован', 'success');
+      } catch (e) {
+        toast('Не удалось скопировать', 'error');
+      }
+    });
+  });
+  tbody.querySelectorAll('.add-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      openAddModal(btn.dataset.ip, btn.dataset.country, btn.dataset.city);
+    });
+  });
+}
+
+async function load() {
+  $('tbody').innerHTML = '<tr><td colspan="8" class="empty">Загрузка…</td></tr>';
+  try {
+    const url = `/api/geo-missing?${periodQuery()}&limit=${encodeURIComponent($('limit').value)}`;
+    const res = await fetch(url, { credentials: 'same-origin', cache: 'no-store' });
+    if (res.status === 401) {
+      location.replace(NMAuth.loginUrl(location.pathname + location.search));
+      return;
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const detail = data.error || ('HTTP ' + res.status);
+      throw new Error(detail);
+    }
+    rows = data.items || [];
+    renderSummary(data.summary);
+    render();
+  } catch (e) {
+    $('tbody').innerHTML = `<tr><td colspan="8" class="empty">Ошибка: ${esc(e.message)}</td></tr>`;
+    toast('Ошибка загрузки: ' + e.message, 'error');
+  }
+}
+
+function applyQueryParams() {
+  const params = new URLSearchParams(location.search);
+  if (params.get('period')) {
+    const p = params.get('period');
+    if ([...$('period').options].some(o => o.value === p)) $('period').value = p;
+  }
+  if (params.get('hours')) {
+    const h = parseInt(params.get('hours'), 10);
+    const map = { 1: '1h', 6: '6h', 12: '12h', 24: '1d', 72: '3d', 168: '7d' };
+    if (map[h]) $('period').value = map[h];
+  }
+  if (params.get('kind') && [...$('kind').options].some(o => o.value === params.get('kind'))) {
+    $('kind').value = params.get('kind');
+  }
+}
+
+$('refresh').addEventListener('click', load);
+$('period').addEventListener('change', load);
+$('limit').addEventListener('change', load);
+$('kind').addEventListener('change', render);
+$('search').addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(render, 200);
+});
+$('copyPublic').addEventListener('click', async () => {
+  const ips = filteredRows().filter(r => r.kind === 'public_unknown').map(r => r.ip);
+  if (!ips.length) {
+    toast('Нет публичных IP в текущем фильтре', 'error');
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(ips.join('\n'));
+    toast(`Скопировано IP: ${ips.length}`, 'success');
+  } catch (e) {
+    toast('Не удалось скопировать', 'error');
+  }
+});
+
+$('exportGeo').addEventListener('click', async () => {
+  const btn = $('exportGeo');
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/geo-ranges/export', {
+      credentials: 'same-origin',
+      headers: NMAuth.nmAuthHeaders(),
+      cache: 'no-store',
+    });
+    if (res.status === 401) {
+      location.replace(NMAuth.loginUrl(location.pathname + location.search));
+      return;
+    }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || ('HTTP ' + res.status));
+    }
+    const blob = await res.blob();
+    const cd = res.headers.get('Content-Disposition') || '';
+    const m = cd.match(/filename="?([^";]+)"?/i);
+    const name = (m && m[1]) || ('geoip-' + new Date().toISOString().slice(0, 10) + '.csv');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
+    toast('GeoIP CSV скачан', 'success');
+  } catch (e) {
+    toast('Ошибка выгрузки: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$('gCancel').addEventListener('click', closeAddModal);
+$('addModal').addEventListener('click', (e) => {
+  if (e.target === $('addModal')) closeAddModal();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && $('addModal').classList.contains('show')) closeAddModal();
+});
+
+$('addForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = $('gSubmit');
+  const body = {
+    network: $('gNetwork').value.trim(),
+    country: $('gCountry').value.trim(),
+    region: $('gRegion').value.trim(),
+    city: $('gCity').value.trim(),
+    lat: parseFloat($('gLat').value),
+    lon: parseFloat($('gLon').value),
+  };
+  if (!body.network || !body.country || !body.region || !body.city) {
+    toast('Заполните все текстовые поля', 'error');
+    return;
+  }
+  if (!Number.isFinite(body.lat) || !Number.isFinite(body.lon)) {
+    toast('Укажите Latitude и Longitude', 'error');
+    return;
+  }
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/geo-ranges', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: NMAuth.nmAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+    closeAddModal();
+    const net = (data.entry && data.entry.network) || data.added || body.network;
+    const removed = refilterRowsCoveredBy(net);
+    const extra = removed
+      ? `; убрано из списка: ${removed}`
+      : '';
+    toast(`Добавлено: ${net} (всего диапазонов: ${data.ranges})${extra}`, 'success');
+    // Фоновый перезапрос: индекс уже синхронизирован на сервере.
+    load();
+  } catch (err) {
+    toast('Не удалось добавить: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+(async function boot() {
+  const bar = NMUI.mountAdminTopbar('#adminTopbar', {
+    title: 'ГеоАтлас',
+    subtitle: '· IP без GeoIP',
+  });
+  const user = await NMAuth.requireLogin({ admin: true });
+  if (!user) return;
+  NMAuth.renderUserBar(user, bar.userBarHost);
+  NMUI.startSystemHealthPolling({ isAdmin: true });
+  applyQueryParams();
+  load();
+})();
+</script>
+</body>
+</html>

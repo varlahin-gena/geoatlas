@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<clickhouse>
+    <profiles>
+        <default>
+            <!-- Базовые лимиты (fallback). При установке перекрываются zz_install_limits.xml -->
+            <max_memory_usage>2684354560</max_memory_usage>
+            <!-- При нехватке RAM сбрасываем GROUP BY / ORDER BY на диск вместо OOM -->
+            <max_bytes_before_external_group_by>268435456</max_bytes_before_external_group_by>
+            <max_bytes_before_external_sort>268435456</max_bytes_before_external_sort>
+            <!-- Не писать профилировщик/thread logs (кормят trace_log / processors_profile_log). -->
+            <log_processors_profiles>0</log_processors_profiles>
+            <log_query_threads>0</log_query_threads>
+            <log_query_views>0</log_query_views>
+            <query_profiler_real_time_period_ns>0</query_profiler_real_time_period_ns>
+            <query_profiler_cpu_time_period_ns>0</query_profiler_cpu_time_period_ns>
+        </default>
+    </profiles>
+</clickhouse>

@@ -1,0 +1,208 @@
+package events
+
+import (
+	"context"
+	"time"
+
+	"network_monitor/internal/model"
+	"network_monitor/internal/mapagg"
+)
+
+// GetMapInput — параметры построения карты.
+type GetMapInput struct {
+	TimeRange model.TimeRange
+	Limit     int
+	GroupBy   string // ip|subnet|city|country
+	Filter    string // all|allowed|blocked
+	Timeout   time.Duration
+}
+
+// GetMapResult — результат для HTTP/API слоя.
+type GetMapResult struct {
+	Lines        []model.Line
+	Points       map[string]model.Node
+	RawPairs     int
+	SkippedNoGeo int
+	Source       string
+	GroupBy      string
+	Filter       string
+	Period       string
+	Amount       int
+	From         time.Time
+	To           time.Time
+}
+
+// Service — application use cases для карты/events.
+type Service struct {
+	traffic TrafficRepository
+	geo     GeoLookuper
+}
+
+func New(traffic TrafficRepository, geo GeoLookuper) *Service {
+	return &Service{traffic: traffic, geo: geo}
+}
+
+// GetMap строит линии/узлы: сначала pre-agg geo edges, иначе live IP + GeoIP.
+func (s *Service) GetMap(ctx context.Context, in GetMapInput) (GetMapResult, error) {
+	groupBy := normalizeGroupBy(in.GroupBy)
+	filter := normalizeFilter(in.Filter)
+	out := GetMapResult{
+		GroupBy: groupBy,
+		Filter:  filter,
+		Period:  in.TimeRange.Mode,
+		Amount:  in.TimeRange.Amount,
+		From:    in.TimeRange.From,
+		To:      in.TimeRange.To,
+		Points:  map[string]model.Node{},
+		Source:  "ip",
+	}
+
+	if groupBy == "city" || groupBy == "country" || groupBy == "ip" || groupBy == "subnet" {
+		geoRows, ok, err := s.traffic.ScanGeoEdgesForTimeRange(
+			ctx, in.TimeRange, groupBy, in.Limit, filter, in.Timeout,
+		)
+		if err != nil {
+			return GetMapResult{}, err
+		}
+		if ok {
+			lines, points, skipped := mapagg.BuildMapFromGeoEdges(geoRows)
+			out.Lines = lines
+			out.Points = points
+			out.SkippedNoGeo = skipped
+			out.RawPairs = len(geoRows)
+			out.Source = "geo_" + groupBy
+			// GeoIP залили после ingest → в traffic_logs нет lat/city.
+			// Pre-agg путь пустой — считаем через live Lookup по IP.
+			if len(lines) == 0 {
+				out.Source = "ip"
+			}
+		}
+	}
+
+	if out.Source == "ip" {
+		raws, err := s.traffic.ScanRawAggsForTimeRange(
+			ctx, in.TimeRange, in.Limit, filter, in.Timeout,
+		)
+		if err != nil {
+			return GetMapResult{}, err
+		}
+		out.RawPairs = len(raws)
+		out.Lines, out.Points, out.SkippedNoGeo = buildMapFromIPRaws(raws, s.geo, groupBy)
+		if groupBy == "city" || groupBy == "country" || groupBy == "ip" || groupBy == "subnet" {
+			out.Source = "ip_live_" + groupBy
+		}
+	}
+
+	if out.Points == nil {
+		out.Points = map[string]model.Node{}
+	}
+	return out, nil
+}
+
+func normalizeGroupBy(v string) string {
+	switch v {
+	case "ip", "subnet", "country", "city":
+		return v
+	default:
+		return "city"
+	}
+}
+
+func normalizeFilter(v string) string {
+	switch v {
+	case "allowed", "blocked":
+		return v
+	default:
+		return "all"
+	}
+}
+
+func buildMapFromIPRaws(raws []model.RawAgg, geo mapagg.GeoLookuper, groupBy string) ([]model.Line, map[string]model.Node, int) {
+	edgesMap := make(map[string]*mapagg.EdgeAgg)
+	srcCache := make(map[string]model.GroupMeta)
+	dstCache := make(map[string]model.GroupMeta)
+
+	metaFor := func(ip string, hint mapagg.LogGeoHint, cache map[string]model.GroupMeta) model.GroupMeta {
+		if m, ok := cache[ip]; ok {
+			if m.Valid {
+				return m
+			}
+			m2 := mapagg.IPGroupMetaHinted(geo, ip, groupBy, hint)
+			if m2.Valid {
+				cache[ip] = m2
+				return m2
+			}
+			return m
+		}
+		m := mapagg.IPGroupMetaHinted(geo, ip, groupBy, hint)
+		cache[ip] = m
+		return m
+	}
+
+	for _, row := range raws {
+		s := metaFor(row.SrcIP, mapagg.LogGeoHint{
+			Lat: row.SrcLat, Lon: row.SrcLon, City: row.SrcCity, Country: row.SrcCountry,
+		}, srcCache)
+		d := metaFor(row.DstIP, mapagg.LogGeoHint{
+			Lat: row.DstLat, Lon: row.DstLon, City: row.DstCity, Country: row.DstCountry,
+		}, dstCache)
+		if !s.Valid || !d.Valid {
+			continue
+		}
+		key := s.Key + "→" + d.Key
+		edge, ok := edgesMap[key]
+		if !ok {
+			edge = &mapagg.EdgeAgg{}
+			edgesMap[key] = edge
+		}
+		edge.Add(row, s, d)
+	}
+
+	lines := make([]model.Line, 0, len(edgesMap))
+	active := make(map[string]struct{})
+	skippedNoGeo := 0
+	for _, e := range edgesMap {
+		if e.CoordWeight == 0 {
+			skippedNoGeo++
+			continue
+		}
+		for _, ln := range e.ToLines() {
+			lines = append(lines, ln)
+			active[ln.Src] = struct{}{}
+			active[ln.Dst] = struct{}{}
+		}
+	}
+
+	nodeMap := make(map[string]*mapagg.NodeAgg)
+	for _, row := range raws {
+		s := metaFor(row.SrcIP, mapagg.LogGeoHint{
+			Lat: row.SrcLat, Lon: row.SrcLon, City: row.SrcCity, Country: row.SrcCountry,
+		}, srcCache)
+		d := metaFor(row.DstIP, mapagg.LogGeoHint{
+			Lat: row.DstLat, Lon: row.DstLon, City: row.DstCity, Country: row.DstCountry,
+		}, dstCache)
+
+		if _, ok := active[s.Key]; ok {
+			n, ex := nodeMap[s.Key]
+			if !ex {
+				n = &mapagg.NodeAgg{}
+				nodeMap[s.Key] = n
+			}
+			n.Add(s, row.Count)
+		}
+		if _, ok := active[d.Key]; ok {
+			n, ex := nodeMap[d.Key]
+			if !ex {
+				n = &mapagg.NodeAgg{}
+				nodeMap[d.Key] = n
+			}
+			n.Add(d, row.Count)
+		}
+	}
+
+	points := make(map[string]model.Node, len(nodeMap))
+	for k, n := range nodeMap {
+		points[k] = n.ToNode()
+	}
+	return lines, points, skippedNoGeo
+}

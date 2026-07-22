@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<clickhouse>
+    <!--
+      ClickHouse 25.x entrypoint пытается записать default-user.xml при старте.
+      users.d смонтирован read-only → нужен явный файл + CLICKHOUSE_SKIP_USER_SETUP=1.
+      Порт 8123/9000 не публикуется наружу (только docker-сеть).
+    -->
+    <users>
+        <default>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+        </default>
+    </users>
+</clickhouse>
