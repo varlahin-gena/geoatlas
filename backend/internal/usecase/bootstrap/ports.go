@@ -35,13 +35,19 @@ type GeoRangeCounter interface {
 	RangeCount() int
 }
 
+// RetentionApplier — повторное применение TTL из файла к ClickHouse.
+type RetentionApplier interface {
+	ApplyFromStore(ctx context.Context) error
+}
+
 // Dependencies — порты для RunStartup.
 type Dependencies struct {
-	Schema   SchemaEnsurer
-	Backfill AggBackfiller
-	Ready    AggReadyRefresher
-	Enrich   EnrichScheduler
-	Geo      GeoRangeCounter
+	Schema    SchemaEnsurer
+	Backfill  AggBackfiller
+	Ready     AggReadyRefresher
+	Enrich    EnrichScheduler
+	Geo       GeoRangeCounter
+	Retention RetentionApplier
 }
 
 // Options — флаги старта.

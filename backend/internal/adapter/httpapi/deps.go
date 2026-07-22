@@ -12,6 +12,7 @@ import (
 	usecasegeo "network_monitor/internal/usecase/geo"
 	"network_monitor/internal/usecase/parseerrors"
 	"network_monitor/internal/usecase/parsetest"
+	usecaseretention "network_monitor/internal/usecase/retention"
 	usecasesystem "network_monitor/internal/usecase/system"
 )
 
@@ -25,6 +26,7 @@ type Deps struct {
 	geoUC         *usecasegeo.Service
 	systemUC      *usecasesystem.Service
 	systemPinger  usecasesystem.ClickHousePinger
+	retentionUC   *usecaseretention.Service
 	authUC        *usecaseauth.Service
 	users         *auth.UserStore // middleware / LiveSession
 	sessions      *auth.SessionManager
@@ -39,6 +41,7 @@ func NewDeps(
 	systemUC *usecasesystem.Service,
 	systemPinger usecasesystem.ClickHousePinger,
 	parseTestUC *parsetest.Service,
+	retentionUC *usecaseretention.Service,
 ) *Deps {
 	d := &Deps{
 		cfg:           cfg,
@@ -48,6 +51,7 @@ func NewDeps(
 		parseTestUC:   parseTestUC,
 		systemUC:      systemUC,
 		systemPinger:  systemPinger,
+		retentionUC:   retentionUC,
 	}
 	if ingestSvc != nil {
 		d.ingest = ingestSvc

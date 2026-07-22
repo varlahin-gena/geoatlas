@@ -19,6 +19,7 @@ import (
 	"network_monitor/internal/adapter/geojob"
 	httpapi "network_monitor/internal/adapter/httpapi"
 	"network_monitor/internal/adapter/parseradapter"
+	"network_monitor/internal/adapter/retentionfile"
 	"network_monitor/internal/adapter/systemlive"
 	"network_monitor/internal/auth"
 	"network_monitor/internal/config"
@@ -32,6 +33,7 @@ import (
 	usecasegeo "network_monitor/internal/usecase/geo"
 	"network_monitor/internal/usecase/parseerrors"
 	"network_monitor/internal/usecase/parsetest"
+	usecaseretention "network_monitor/internal/usecase/retention"
 	usecasesystem "network_monitor/internal/usecase/system"
 )
 
@@ -122,16 +124,22 @@ func main() {
 		slog.Warn("geo index not loaded", "err", err)
 	}
 
+	retentionUC := usecaseretention.New(
+		retentionfile.New(cfg.RetentionFile),
+		chadapter.NewRetentionApplier(pools.Background),
+	)
+
 	bgStore := &bootstrapadapter.Storage{CH: pools.Background}
 	bgWg.Add(1)
 	go func() {
 		defer bgWg.Done()
 		bootstrap.RunStartup(bgCtx, bootstrap.Dependencies{
-			Schema:   bgStore,
-			Backfill: bgStore,
-			Ready:    bgStore,
-			Enrich:   geoJobs,
-			Geo:      geo,
+			Schema:    bgStore,
+			Backfill:  bgStore,
+			Ready:     bgStore,
+			Enrich:    geoJobs,
+			Geo:       geo,
+			Retention: retentionUC,
 		}, bootstrap.Options{
 			SkipStartupBackfill:     cfg.SkipStartupBackfill,
 			GeoBackfillLookbackDays: cfg.GeoBackfillLookbackDays,
@@ -202,7 +210,7 @@ func main() {
 	})
 
 	authUC := usecaseauth.New(users, sessions)
-	srv := httpapi.NewServer(cfg, ingestSvc, eventsUC, geoUC, parseErrorsUC, systemUC, systemRepo, parseTestUC, authUC, users, sessions)
+	srv := httpapi.NewServer(cfg, ingestSvc, eventsUC, geoUC, parseErrorsUC, systemUC, systemRepo, parseTestUC, retentionUC, authUC, users, sessions)
 
 	go func() {
 		slog.Info("backend listening", "addr", cfg.ListenAddr)

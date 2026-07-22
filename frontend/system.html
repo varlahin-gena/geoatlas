@@ -221,9 +221,32 @@
 
             <section class="card card-compact">
                 <h3 class="card-title"><span class="accent-dot" style="background: var(--orange);"></span> Срок хранения (TTL)</h3>
-                <div class="kv-grid cols-2" id="retentionList"></div>
-                <p class="hint" style="margin: 10px 0 0; font-size: 11px; color: var(--text-dim);">
-                    Значения из схемы ClickHouse (Ensure* / init.sql). Смена TTL — через миграции/конфиг сервера.
+                <form id="retentionForm" class="form-row" style="margin-top: 8px;">
+                    <div class="field">
+                        <label for="retTrafficLogs">Логи трафика (дни)</label>
+                        <input type="number" id="retTrafficLogs" name="traffic_logs_days" min="1" max="730" required />
+                    </div>
+                    <div class="field">
+                        <label for="retEdges">Агрегаты рёбер (дни)</label>
+                        <input type="number" id="retEdges" name="edges_days" min="1" max="730" required />
+                    </div>
+                    <div class="field">
+                        <label for="retParseErrors">Ошибки парсинга (дни)</label>
+                        <input type="number" id="retParseErrors" name="parse_errors_days" min="1" max="730" required />
+                    </div>
+                    <div class="field">
+                        <label for="retSystemMetrics">Метрики системы (дни)</label>
+                        <input type="number" id="retSystemMetrics" name="system_metrics_days" min="1" max="730" required />
+                    </div>
+                    <div class="field" style="min-width: auto;">
+                        <label>&nbsp;</label>
+                        <button type="submit" class="btn primary" id="retentionSaveBtn">Сохранить</button>
+                    </div>
+                </form>
+                <p id="retentionUpdatedAt" class="hint" style="margin: 8px 0 0; font-size: 11px;"></p>
+                <p class="hint" style="margin: 6px 0 0; font-size: 11px; color: var(--text-dim);">
+                    Уменьшение TTL удалит старые партиции при следующем TTL merge/drop в ClickHouse.
+                    geo_ranges хранится без TTL.
                 </p>
             </section>
         </div>
@@ -289,6 +312,8 @@
     </main>
     </div>
 </div>
+
+<div class="toast-host" id="toastHost" aria-live="polite"></div>
 
 <script src="/config.js"></script>
 <script src="/auth.js"></script>

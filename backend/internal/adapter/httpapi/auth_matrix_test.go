@@ -47,6 +47,8 @@ func expectedAuthMatrix() map[string]authTier {
 		"GET /api/system/edges-agg":                 tierAdmin,
 		"POST /api/system/maintenance/backfill":     tierAdmin,
 		"GET /api/system/install-profile":           tierAdmin,
+		"GET /api/system/retention":                 tierAdmin,
+		"PUT /api/system/retention":                 tierAdmin,
 		"GET /api/parse-errors":                     tierAdmin,
 		"GET /api/parse-samples":                    tierAdmin,
 		"POST /api/parse-test":                      tierAdmin,
@@ -76,6 +78,7 @@ func TestAuthMatrixCoversServerRoutes(t *testing.T) {
 		nil,      // systemUC
 		nil,      // systemPinger
 		nil,      // parseTestUC
+		nil,      // retentionUC
 		nil,      // authUC
 		nil, nil, // users, sessions
 	)

@@ -40,6 +40,14 @@ func RunStartup(ctx context.Context, deps Dependencies, opts Options, warn WarnF
 		}
 	}
 
+	if deps.Retention != nil {
+		if err := deps.Retention.ApplyFromStore(bctx); err != nil {
+			warn("retention TTL apply failed", err)
+		} else {
+			info("retention: TTL applied from store")
+		}
+	}
+
 	if bctx.Err() != nil {
 		return
 	}

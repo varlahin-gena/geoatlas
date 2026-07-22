@@ -30,6 +30,8 @@ type Config struct {
 	AuthOperatorUser     string
 	AuthOperatorPassword string
 	AuthUsersFile        string
+	// RetentionFile — JSON с TTL таблиц CH (том /app/data рядом с users.json).
+	RetentionFile string
 
 	MaxLogUploadSize    int64
 	MaxGeoUploadSize    int64
@@ -87,6 +89,7 @@ func FromEnv() Config {
 		AuthOperatorUser:     envOr("AUTH_OPERATOR_USER", "operator"),
 		AuthOperatorPassword: envOr("AUTH_OPERATOR_PASSWORD", ""),
 		AuthUsersFile:        envOr("AUTH_USERS_FILE", "/app/data/users.json"),
+		RetentionFile:        envOr("RETENTION_FILE", "/app/data/retention.json"),
 		MaxLogUploadSize: envInt64("MAX_LOG_UPLOAD_SIZE", 1<<30), // 1 GiB
 		MaxGeoUploadSize: envInt64("MAX_GEO_UPLOAD_SIZE", 1<<30), // 1 GiB
 		IngestBatchSize:      envInt("INGEST_BATCH_SIZE", 10000),

@@ -2,9 +2,12 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
+	"time"
 
 	"network_monitor/internal/usecase/system"
+	usecaseretention "network_monitor/internal/usecase/retention"
 )
 
 type systemStatsPayload struct {
@@ -97,6 +100,50 @@ func (h *SystemHandler) GetInstallProfile(w http.ResponseWriter, r *http.Request
 		return
 	}
 	writeJSON(w, http.StatusOK, profile)
+}
+
+func (h *SystemHandler) GetRetention(w http.ResponseWriter, r *http.Request) {
+	if h.retentionUC == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "retention service unavailable"})
+		return
+	}
+	settings, err := h.retentionUC.Get()
+	if err != nil {
+		writeInternalError(w, "retention get failed", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "retention": settings})
+}
+
+func (h *SystemHandler) PutRetention(w http.ResponseWriter, r *http.Request) {
+	if h.retentionUC == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "retention service unavailable"})
+		return
+	}
+	var req usecaseretention.Settings
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+		return
+	}
+	timeout := h.cfg.QueryTimeout
+	if timeout <= 0 {
+		timeout = 2 * time.Minute
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	defer cancel()
+
+	out, err := h.retentionUC.Update(ctx, req)
+	if err != nil {
+		if usecaseretention.IsClientError(err) {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			return
+		}
+		writeInternalError(w, "retention update failed", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "retention": out})
 }
 
 func failedLoginsSnapshot() []FailedLoginEvent {

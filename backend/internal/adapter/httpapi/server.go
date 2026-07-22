@@ -15,6 +15,7 @@ import (
 	usecasegeo "network_monitor/internal/usecase/geo"
 	"network_monitor/internal/usecase/parseerrors"
 	"network_monitor/internal/usecase/parsetest"
+	usecaseretention "network_monitor/internal/usecase/retention"
 	usecasesystem "network_monitor/internal/usecase/system"
 )
 
@@ -40,11 +41,12 @@ func NewServer(
 	systemUC *usecasesystem.Service,
 	systemPinger usecasesystem.ClickHousePinger,
 	parseTestUC *parsetest.Service,
+	retentionUC *usecaseretention.Service,
 	authUC *usecaseauth.Service,
 	users *auth.UserStore,
 	sessions *auth.SessionManager,
 ) *Server {
-	deps := NewDeps(cfg, ingestSvc, eventsUC, geoUC, parseErrorsUC, systemUC, systemPinger, parseTestUC).
+	deps := NewDeps(cfg, ingestSvc, eventsUC, geoUC, parseErrorsUC, systemUC, systemPinger, parseTestUC, retentionUC).
 		WithAuth(authUC, users, sessions)
 	health := &HealthHandler{deps}
 	events := &EventsHandler{deps}
@@ -157,6 +159,12 @@ func NewServer(
 	r.Handle("/api/system/install-profile",
 		withTimeout(chain(http.HandlerFunc(system.GetInstallProfile), adminMW), healthTimeout),
 	).Methods("GET")
+	r.Handle("/api/system/retention",
+		withTimeout(chain(http.HandlerFunc(system.GetRetention), adminMW), healthTimeout),
+	).Methods("GET")
+	r.Handle("/api/system/retention",
+		chain(http.HandlerFunc(system.PutRetention), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
+	).Methods("PUT")
 	r.Handle("/api/parse-errors",
 		withTimeout(chain(http.HandlerFunc(parse.ListParseErrors), adminMW), readTimeout),
 	).Methods("GET")

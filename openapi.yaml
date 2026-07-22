@@ -634,6 +634,62 @@ paths:
         "200":
           description: Install profile JSON
 
+  /api/system/retention:
+    get:
+      tags: [system]
+      summary: Срок хранения (TTL) таблиц ClickHouse
+      description: |
+        Только administrator или Bearer.
+        Значения из `/app/data/retention.json` или дефолты (30/30/7/7 дней).
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Текущие настройки retention
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  retention:
+                    $ref: '#/components/schemas/RetentionSettings'
+    put:
+      tags: [system]
+      summary: Обновить TTL таблиц ClickHouse
+      description: |
+        Только administrator или Bearer (+ CSRF для cookie-сессии).
+        Сохраняет JSON и выполняет ALTER TABLE MODIFY TTL.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: X-CSRF-Token
+          in: header
+          required: false
+          schema: { type: string }
+          description: Обязателен для cookie-сессии (см. nm_csrf)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RetentionSettings'
+      responses:
+        "200":
+          description: Применённые настройки
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  retention:
+                    $ref: '#/components/schemas/RetentionSettings'
+        "400":
+          description: Невалидные дни (нужно 1…730)
+
   /api/parse-errors:
     get:
       tags: [parse]
@@ -720,6 +776,35 @@ components:
       description: Сессия после POST /api/auth/login
 
   schemas:
+    RetentionSettings:
+      type: object
+      required: [traffic_logs_days, edges_days, parse_errors_days, system_metrics_days]
+      properties:
+        traffic_logs_days:
+          type: integer
+          minimum: 1
+          maximum: 730
+          description: TTL для traffic_logs (дни)
+        edges_days:
+          type: integer
+          minimum: 1
+          maximum: 730
+          description: TTL для traffic_edges_* агрегатов (дни)
+        parse_errors_days:
+          type: integer
+          minimum: 1
+          maximum: 730
+          description: TTL для parse_errors (дни)
+        system_metrics_days:
+          type: integer
+          minimum: 1
+          maximum: 730
+          description: TTL для system_metrics (дни)
+        updated_at:
+          type: string
+          format: date-time
+          description: Время последнего сохранения (UTC)
+
     HealthResponse:
       type: object
       properties:

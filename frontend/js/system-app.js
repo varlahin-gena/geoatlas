@@ -476,20 +476,64 @@ function renderStorage(stats) {
         ['Parse (1h)', fmtNumber(parseErr.count_1h || 0)],
         ['Uptime', fmtDuration(stats.uptime_sec)],
     ]);
-
-    renderRetention();
 }
 
-function renderRetention() {
-    const el = document.getElementById('retentionList');
-    if (!el) return;
-    fillKvGrid(el, [
-        ['traffic_logs', '30 дней'],
-        ['traffic_edges_* (агрегаты)', '30 дней'],
-        ['parse_errors', '7 дней'],
-        ['system_metrics', '7 дней'],
-        ['geo_ranges', 'без TTL'],
-    ]);
+function fillRetentionForm(r) {
+    if (!r) return;
+    const set = function (id, v) {
+        const el = document.getElementById(id);
+        if (el) el.value = v;
+    };
+    set('retTrafficLogs', r.traffic_logs_days);
+    set('retEdges', r.edges_days);
+    set('retParseErrors', r.parse_errors_days);
+    set('retSystemMetrics', r.system_metrics_days);
+    const meta = document.getElementById('retentionUpdatedAt');
+    if (meta) {
+        meta.textContent = r.updated_at
+            ? ('Сохранено: ' + r.updated_at)
+            : '';
+    }
+}
+
+async function loadRetention() {
+    try {
+        const res = await fetch('/api/system/retention', { credentials: 'same-origin' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        fillRetentionForm(data.retention || data);
+    } catch (e) {
+        console.warn('retention load failed', e);
+    }
+}
+
+async function saveRetention(ev) {
+    if (ev) ev.preventDefault();
+    const toast = window.NMUI && NMUI.toast ? NMUI.toast : function () {};
+    const body = {
+        traffic_logs_days: Number(document.getElementById('retTrafficLogs').value),
+        edges_days: Number(document.getElementById('retEdges').value),
+        parse_errors_days: Number(document.getElementById('retParseErrors').value),
+        system_metrics_days: Number(document.getElementById('retSystemMetrics').value),
+    };
+    const btn = document.getElementById('retentionSaveBtn');
+    if (btn) btn.disabled = true;
+    try {
+        const res = await fetch('/api/system/retention', {
+            method: 'PUT',
+            credentials: 'same-origin',
+            headers: NMAuth.nmAuthHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify(body),
+        });
+        const data = await res.json().catch(function () { return {}; });
+        if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+        fillRetentionForm(data.retention || body);
+        toast('TTL сохранён и применён', 'success');
+    } catch (e) {
+        toast(e.message || 'Ошибка сохранения TTL', 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
 }
 
 function renderComponentHealth(stats) {
@@ -1032,6 +1076,9 @@ window.addEventListener('load', async function () {
     NMAuth.renderUserBar(user, document.getElementById('userBarHost'));
     initTabs();
     initCharts();
+    const form = document.getElementById('retentionForm');
+    if (form) form.addEventListener('submit', saveRetention);
+    loadRetention();
     refresh();
     startAutoRefresh();
 });
