@@ -25,6 +25,7 @@
 - [Запуск и остановка](#запуск-и-остановка)
 - [Обслуживание](#обслуживание)
   - [Профили производительности](#профили-производительности)
+  - [Срок хранения (TTL / retention)](#срок-хранения-ttl--retention)
   - [Очистка данных ClickHouse](#очистка-данных-clickhouse)
   - [Backfill агрегатов рёбер](#backfill-агрегатов-рёбер)
   - [Мониторинг ingest](#мониторинг-ingest)
@@ -39,6 +40,7 @@
 - [Нагрузочное тестирование](#нагрузочное-тестирование)
 - [Переменные окружения](#переменные-окружения)
 - [Структура репозитория](#структура-репозитория)
+- [CI](#ci)
 - [Безопасность](#безопасность)
 - [Устранение неполадок](#устранение-неполадок)
 
@@ -53,13 +55,14 @@
 - **Авторизация по умолчанию**: роли `administrator` / `operator`, cookie-сессии, CSRF, Bearer `API_AUTH_TOKEN`; управление УЗ в UI
 - Загрузка и правка **GeoIP-базы** (CSV SIEM KUMA, страница `/geo-ranges.html`, IP без координат на `/geo-missing.html`), фоновые reload/backfill через `adapter/geojob.Scheduler`
 - Хранение и аналитика в **ClickHouse** (skip-индексы, агрегаты `traffic_edges_*`, представления `v_traffic_daily`, `v_top_blocked_dst`, `v_metrics_latest`)
+- **Настраиваемый TTL (retention)** таблиц из UI `/system.html` или `GET`/`PUT /api/system/retention` (файл `retention.json` на томе `auth-users`)
 - Построение связей на карте (2D) и глобусе (3D); на карту попадают только узлы/рёбра с координатами
 - Фильтрация: все / разрешённые / заблокированные (на клиенте, без повторного запроса к API)
 - Группировка узлов: по IP / по подсети `/24` / **по городу (по умолчанию)** / по стране; при отсутствии города — фолбэк на центр страны
 - Порог минимального числа событий на связь, тепловая карта стран, подписи стран, легенда, поиск, авто-обновление карты
 - **Тест парсеров** в браузере: статусы parsed / skipped / error, гео-обогащение, пресеты по вендорам
 - **Журнал ошибок парсинга**: поиск, выборочное и полное удаление, передача строк в «Тест парсеров»
-- Страница системного мониторинга: метрики контейнеров, пайплайна (в т.ч. **UDP/TCP EPS**, drops), хранилища, профиль установки, **индикатор ёмкости**, алёрты
+- Страница системного мониторинга (вкладки Обзор / Pipeline / Безопасность / Графики): метрики контейнеров, пайплайна (в т.ч. **UDP/TCP EPS**, drops), **форма TTL**, неуспешные логины, хранилище, профиль установки, **индикатор ёмкости**, алёрты
 - Индикатор здоровья системы на главной странице (ссылка на `/system.html`)
 - Prometheus-метрики на `GET /metrics` (за nginx auth + приватные сети)
 
@@ -106,7 +109,7 @@
 
 1. **Syslog**: МСЭ отправляет события на `<IP_сервера>:514` (TCP или UDP).
 2. **syslog-ng** принимает сообщения, при необходимости буферизует на диск и пересылает их по TCP на `backend:1514` с маркерами транспорта (`@@nm/udp/@@` / `@@nm/tcp/@@`).
-3. **backend** снимает маркеры транспорта, парсит строки, обогащает GeoIP, пишет в ClickHouse; при старте `Ensure*` создаёт/обновляет агрегаты (`traffic_edges_*`, geo) и при необходимости делает backfill. Полная очередь ingest **не блокирует** TCP — лишние строки дропаются (`dropped_total`, алерты на `/system.html`).
+3. **backend** снимает маркеры транспорта, парсит строки, обогащает GeoIP, пишет в ClickHouse; при старте `Ensure*` создаёт/обновляет агрегаты (`traffic_edges_*`, geo), применяет TTL из `retention.json` и при необходимости делает backfill. Полная очередь ingest **не блокирует** TCP — лишние строки дропаются (`dropped_total`, алерты на `/system.html`).
 4. **frontend** отдаёт статику и проксирует API-запросы на backend.
 5. **stats-collector** каждые 30 секунд собирает метрики CPU/RAM контейнеров и состояние пайплайна (включая разбивку UDP/TCP).
 
@@ -114,22 +117,24 @@
 
 ### Хранение данных (TTL)
 
-| Таблица / объект                    | Срок хранения | Источник |
-|------------------------------------|---------------|----------|
-| `traffic_logs`                     | 30 дней       | `init.sql` |
-| `traffic_edges_daily` (+ MV)       | 30 дней       | `EnsureEdgesAgg` |
-| `traffic_edges_city_daily` (+ MV)  | 30 дней       | `EnsureGeoEdgesAgg` |
-| `traffic_edges_country_daily` (+ MV)| 30 дней      | `EnsureGeoEdgesAgg` |
-| `parse_errors`                     | 7 дней        | `init.sql` |
-| `system_metrics`                   | 7 дней        | `init.sql` |
-| `geo_ranges`                       | без TTL       | `init.sql` |
-| `nm_schema_version`                | без TTL       | `Ensure*` (метаданные схемы) |
+Дефолты ниже задаются в `init.sql` / `Ensure*`. После старта backend применяет значения из **`RETENTION_FILE`** (`/app/data/retention.json` на томе `auth-users`) через `ALTER TABLE … MODIFY TTL`. Менять можно в UI (`/system.html` → Pipeline → «Срок хранения») или через API — см. [Срок хранения (TTL / retention)](#срок-хранения-ttl--retention).
 
-На `traffic_logs` / `parse_errors` / `system_metrics` включён `ttl_only_drop_parts`: истечение удаляет дневную партицию целиком (без дорогих row-level TTL merges).
+| Таблица / объект                    | Срок по умолчанию | Источник дефолта |
+|------------------------------------|-------------------|------------------|
+| `traffic_logs`                     | 30 дней           | `init.sql` / retention `traffic_logs_days` |
+| `traffic_edges_daily` (+ MV)       | 30 дней           | `EnsureEdgesAgg` / retention `edges_days` |
+| `traffic_edges_city_daily` (+ MV)  | 30 дней           | `EnsureGeoEdgesAgg` / retention `edges_days` |
+| `traffic_edges_country_daily` (+ MV)| 30 дней          | `EnsureGeoEdgesAgg` / retention `edges_days` |
+| `parse_errors`                     | 7 дней            | `init.sql` / retention `parse_errors_days` |
+| `system_metrics`                   | 7 дней            | `init.sql` / retention `system_metrics_days` |
+| `geo_ranges`                       | без TTL           | `init.sql` (не настраивается) |
+| `nm_schema_version`                | без TTL           | `Ensure*` (метаданные схемы) |
+
+Допустимый диапазон настраиваемых дней: **1…730**. На `traffic_logs` / `parse_errors` / `system_metrics` включён `ttl_only_drop_parts`: истечение удаляет дневную партицию целиком (без дорогих row-level TTL merges). Уменьшение TTL удалит старые партиции при следующем TTL merge/drop в ClickHouse.
 
 Geo backfill (`ALTER UPDATE`) на старте (если не `SKIP_STARTUP_BACKFILL`) запускается **после** schema Ensure* и только по окну `GEO_BACKFILL_LOOKBACK_DAYS` (по умолчанию 7).
 
-Системные логи ClickHouse (`trace_log`, `text_log`, `metric_log`, …) по умолчанию **отключены** (`clickhouse/config.d/z_system_logs.xml`): на малых объёмах данных они иначе раздуваются сильнее `traffic_logs` и держат высокий idle CPU. `query_log` остаётся включённым.
+Системные логи ClickHouse (`trace_log`, `text_log`, `metric_log`, …) по умолчанию **отключены** (`clickhouse/config.d/z_system_logs.xml`): на малых объёмах данных они иначе раздуваются сильнее `traffic_logs` и держат высокий idle CPU. `query_log` остаётся включённым. Образ ClickHouse в compose: **`clickhouse/clickhouse-server:25.8.28.1`**.
 
 ---
 
@@ -571,6 +576,43 @@ curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1/api/system/install-pr
 
 ---
 
+### Срок хранения (TTL / retention)
+
+TTL таблиц ClickHouse настраивается без правки `init.sql`. Настройки хранятся в JSON на томе `auth-users` (`RETENTION_FILE`, по умолчанию `/app/data/retention.json`) и применяются:
+
+1. при **старте backend** (после Ensure*, usecase `retention.ApplyFromStore`);
+2. сразу при **сохранении** из UI или `PUT /api/system/retention` (`ALTER TABLE … MODIFY TTL`).
+
+| Поле JSON | Таблицы | Дефолт |
+|-----------|---------|--------|
+| `traffic_logs_days` | `traffic_logs` | 30 |
+| `edges_days` | `traffic_edges_daily`, `traffic_edges_city_daily`, `traffic_edges_country_daily` | 30 |
+| `parse_errors_days` | `parse_errors` | 7 |
+| `system_metrics_days` | `system_metrics` | 7 |
+
+Диапазон каждого поля: **1…730** дней. `geo_ranges` без TTL.
+
+**UI:** `/system.html` → вкладка **Pipeline** → блок «Срок хранения (TTL)» (только administrator).
+
+**API:**
+
+```bash
+TOKEN="$(grep -E '^API_AUTH_TOKEN=' .env | cut -d= -f2-)"
+
+# текущие значения
+curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1/api/system/retention | jq .
+
+# изменить (CSRF не нужен для Bearer)
+curl -s -X PUT http://127.0.0.1/api/system/retention \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"traffic_logs_days":60,"edges_days":60,"parse_errors_days":14,"system_metrics_days":14}' | jq .
+```
+
+Ответ содержит объект `retention` (и `updated_at` после сохранения). Для cookie-сессии на `PUT` нужен CSRF (`nm_csrf` / `X-CSRF-Token`).
+
+---
+
 ### Очистка данных ClickHouse
 
 Удаляет все события, GeoIP, ошибки парсинга и метрики. **Схема таблиц сохраняется.**
@@ -731,6 +773,7 @@ docker compose exec clickhouse clickhouse-client --query "
 | Превышена расчётная ёмкость      | `/system.html` → алёрты `capacity_high` / `capacity_exceeded`, пересчёт профиля |
 | Drops под нагрузкой / очередь полная | `/api/ingest/stats` → `dropped_total`, `/system.html` → `ingest_dropping*`, `./scripts/watch-ingest.sh` |
 | UDP/TCP EPS не разделяются       | Перезапустить `syslog-ng` (маркеры `@@nm/udp/@@` / `@@nm/tcp/@@`) |
+| TTL не применился / старые данные остаются | `/api/system/retention`, логи backend `retention:`, том `auth-users` (`retention.json`) |
 
 ---
 
@@ -855,7 +898,7 @@ curl -OJ http://127.0.0.1/api/geo-ranges/export \
 | `/geo-missing.html`    | IP без GeoIP          | Адреса без координат; добавление в GeoIP; мгновенная перефильтрация списка |
 | `/geo-ranges.html`     | База GeoIP            | Просмотр/правка диапазонов, выгрузка CSV |
 | `/parser-test.html`    | Тест парсеров         | До 200 строк за запрос, пресеты по вендорам, статусы parsed/skipped/error |
-| `/system.html`         | Системный мониторинг  | Pipeline (UDP/TCP EPS, drops), контейнеры, хранилище, алёрты, профиль и ёмкость, графики |
+| `/system.html`         | Системный мониторинг  | Вкладки: Обзор (профиль, health, контейнеры), Pipeline (EPS/drops, **TTL retention**), Безопасность (неуспешные логины), Графики; алёрты и ёмкость |
 | `/users.html`          | Учётные записи        | Список/создание УЗ (только administrator) |
 | `/change-password.html`| Смена пароля          | Смена своего пароля |
 
@@ -960,6 +1003,8 @@ Frontend nginx дополнительно проверяет `auth_request` на
 | GET | `/api/system/edges-agg` | Статус агрегации рёбер |
 | POST | `/api/system/maintenance/backfill` | Запуск edges/geo backfill (+ geo enrich), async 202 |
 | GET | `/api/system/install-profile` | Профиль установки |
+| GET | `/api/system/retention` | Текущие TTL (дни) таблиц CH |
+| PUT | `/api/system/retention` | Сохранить TTL + `ALTER TABLE MODIFY TTL` (1…730; + CSRF для cookie) |
 | GET | `/api/geo-missing` | IP без координат для карты |
 | GET | `/api/geo-ranges` | Список диапазонов `geo_ranges` (JSON) |
 | GET | `/api/parse-errors` | Журнал ошибок парсинга |
@@ -1053,6 +1098,7 @@ Read-эндпоинты защищены **таймаутами** (60 с для 
 | `AUTH_ADMIN_USER` / `PASSWORD`| `admin` / `admin`         | Seed administrator (только если файла УЗ ещё нет) |
 | `AUTH_OPERATOR_USER` / `PASSWORD` | `operator` / `operator` | Seed operator |
 | `AUTH_USERS_FILE`             | `/app/data/users.json`    | Файл учёток (volume `auth-users`) |
+| `RETENTION_FILE`              | `/app/data/retention.json`| JSON с TTL таблиц CH (тот же том `auth-users`) |
 | `NM_ALLOW_INSECURE`           | `0`                       | `1` — плейсхолдеры секретов и/или `*_DISABLED` (local/dev) |
 | `LOG_LEVEL`                   | `info`                    | `debug` \| `info` \| `warn` \| `error` |
 | `LOG_FORMAT`                  | `text`                    | `text` \| `json` |
@@ -1088,13 +1134,14 @@ network_monitor/
 │   └── internal/
 │       ├── adapter/
 │       │   ├── httpapi/              # HTTP delivery (handlers, middleware, cookies/CSRF)
-│       │   ├── clickhouse/           # CH repos + ReloadableGeoIndex
+│       │   ├── clickhouse/           # CH repos + ReloadableGeoIndex + RetentionApplier
 │       │   ├── geojob/               # сериализация reload GeoIP + backfill
 │       │   ├── parseradapter/        # parser port
 │       │   ├── geoipcodec/           # GeoIP CSV/CIDR helpers
 │       │   ├── bootstrapadapter/     # Ensure*/Backfill* для usecase/bootstrap
+│       │   ├── retentionfile/        # JSON-store TTL (`retention.json`)
 │       │   └── systemlive/           # live ingest/profile adapters
-│       ├── usecase/                  # application use cases + ports (в т.ч. bootstrap)
+│       ├── usecase/                  # application use cases + ports (bootstrap, retention, …)
 │       ├── auth/                     # users / sessions / roles
 │       ├── config/                   # конфигурация из env
 │       ├── geoip/                    # импорт CSV и in-memory индекс
@@ -1147,7 +1194,8 @@ network_monitor/
 │   └── internal/
 │       ├── config/
 │       └── collector/
-├── openapi.yaml
+├── openapi.yaml                      # контракт HTTP API (в т.ч. retention)
+├── .github/workflows/ci.yml
 ├── start.sh / stop.sh
 └── syslog-ng.conf
 ```
@@ -1162,7 +1210,28 @@ network_monitor/
 └── clickhouse/users.d/zz_install_limits.xml
 ```
 
-Docker volume `auth-users` хранит `/app/data/users.json` между перезапусками.
+Docker volume `auth-users` хранит `/app/data/users.json` и `/app/data/retention.json` между перезапусками.
+
+---
+
+## CI
+
+GitHub Actions (`.github/workflows/ci.yml`) на `push`/`pull_request`:
+
+| Job | Что делает |
+|-----|------------|
+| `backend` | `go vet`, `go test -race`, короткий fuzz (parser/ingest), golangci-lint |
+| `chconn` | тесты `pkg/chconn` |
+| `backend-integration` | integration-тесты storage против ClickHouse `25.8.28.1` |
+| `stats-collector` | vet / test / lint |
+| `frontend-smoke` | `scripts/frontend-smoke.sh` + smoke `login.html` / `auth.js` |
+
+Локально без полного стека:
+
+```bash
+bash scripts/frontend-smoke.sh
+cd backend && go test ./...
+```
 
 ---
 
