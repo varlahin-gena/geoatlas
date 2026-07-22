@@ -64,7 +64,6 @@
 - **Журнал ошибок парсинга**: поиск, выборочное и полное удаление, передача строк в «Тест парсеров»
 - Страница системного мониторинга (вкладки Обзор / Pipeline / Безопасность / Графики): метрики контейнеров, пайплайна (в т.ч. **UDP/TCP EPS**, drops), **форма TTL**, неуспешные логины, хранилище, профиль установки, **индикатор ёмкости**, алёрты
 - Индикатор здоровья системы на главной странице (ссылка на `/system.html`)
-- Prometheus-метрики на `GET /metrics` (за nginx auth + приватные сети)
 
 ---
 
@@ -986,7 +985,6 @@ Frontend nginx дополнительно проверяет `auth_request` на
 | Метод | Путь | Описание |
 |-------|------|----------|
 | GET | `/api/ingest/stats` | Статистика ingest (UDP/TCP, backlog, drops, connections) |
-| GET | `/metrics` | Prometheus metrics |
 | GET | `/api/geo-ranges/export` | Скачать GeoIP CSV (формат SIEM KUMA) |
 | POST | `/api/geo-ranges` | Добавить один диапазон |
 | PUT | `/api/geo-ranges` | Изменить диапазон (`original_network` + новые поля) |
@@ -1148,7 +1146,6 @@ network_monitor/
 │       ├── ingest/                   # syslog TCP, очередь, batch INSERT
 │       ├── installprofile/           # чтение install-profile.json
 │       ├── logging/                  # slog setup
-│       ├── metrics/                  # Prometheus
 │       ├── model/                    # доменные структуры, action-списки
 │       ├── mapagg/                   # агрегация рёбер/узлов для карты
 │       ├── parser/                   # парсеры вендоров
@@ -1249,7 +1246,6 @@ cd backend && go test ./...
   - не отключайте auth без крайней необходимости; храните сильные `API_AUTH_TOKEN` / `SESSION_SECRET`
   - ограничьте доступ к порту 80 (VPN, reverse proxy, IP whitelist)
   - не открывайте ClickHouse и backend API напрямую
-  - `/metrics` дополнительно ограничен приватными сетями в nginx
 
 ---
 

@@ -9,7 +9,6 @@ import (
 
 	"network_monitor/internal/auth"
 	"network_monitor/internal/config"
-	"network_monitor/internal/metrics"
 	usecaseauth "network_monitor/internal/usecase/auth"
 	usecaseevents "network_monitor/internal/usecase/events"
 	usecasegeo "network_monitor/internal/usecase/geo"
@@ -72,14 +71,10 @@ func NewServer(
 
 	r := mux.NewRouter()
 
-	// Глобальные middleware: паника -> 500, request-логи + prometheus latency.
+	// Глобальные middleware: паника -> 500, access-логи.
 	r.Use(requestIDMW)
 	r.Use(recoverMW)
 	r.Use(loggingMW)
-
-	r.Handle("/metrics",
-		chain(metrics.Handler(), opsMW),
-	).Methods("GET")
 
 	// --- Auth (публичные / собственные) ---
 	r.Handle("/api/auth/login", chain(http.HandlerFunc(authH.Login), maxBytesMW(64<<10))).Methods("POST")

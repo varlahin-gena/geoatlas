@@ -38,7 +38,6 @@ func expectedAuthMatrix() map[string]authTier {
 		"POST /api/geo-ranges":                      tierOps,
 		"PUT /api/geo-ranges":                       tierOps,
 		"GET /api/ingest/stats":                     tierOps,
-		"GET /metrics":                              tierOps,
 		"POST /api/ingest":                          tierOps,
 		"POST /upload-logs":                         tierOps,
 		"POST /upload-geo":                          tierOps,

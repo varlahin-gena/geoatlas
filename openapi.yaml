@@ -15,7 +15,7 @@ info:
     - **admin** — роль administrator ИЛИ `Authorization: Bearer <API_AUTH_TOKEN>`
       (system/*, parse-*, управление УЗ);
     - **ops** — то же, что admin, для мутаций и pipeline (`POST /api/ingest`,
-      `/upload-logs`, `/upload-geo`, `GET /api/ingest/stats`, `/metrics`).
+      `/upload-logs`, `/upload-geo`, `GET /api/ingest/stats`).
       При `AUTH_DISABLED=1` / `API_AUTH_DISABLED=1` ops открыты; старт только с `NM_ALLOW_INSECURE=1`.
 
 servers:
@@ -30,7 +30,6 @@ tags:
   - name: system
   - name: parse
   - name: geo
-  - name: metrics
 
 paths:
   /api/auth/login:
@@ -187,20 +186,6 @@ paths:
                 $ref: "#/components/schemas/HealthResponse"
         "503":
           description: ClickHouse недоступен
-
-  /metrics:
-    get:
-      tags: [metrics]
-      summary: Prometheus metrics
-      description: administrator или Bearer (ops).
-      security:
-        - bearerAuth: []
-        - cookieAuth: []
-      responses:
-        "200":
-          description: text/plain exposition format
-        "401":
-          description: unauthorized
 
   /api/events:
     get:

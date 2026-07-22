@@ -9,8 +9,6 @@ import (
 	"math/big"
 	"strings"
 	"time"
-
-	"network_monitor/internal/metrics"
 )
 
 // Параметры retry (переопределяются в тестах).
@@ -124,14 +122,12 @@ func insertWithRetry(ctx context.Context, attemptTimeout time.Duration, table st
 		cancel()
 		if err == nil {
 			if attempt > 1 {
-				metrics.ClickHouseInsertRetries.WithLabelValues(table).Add(float64(attempt - 1))
 				slog.Info("ingest: insert succeeded after retry",
 					"table", table, "attempts", attempt)
 			}
 			return nil
 		}
 		lastErr = err
-		metrics.ClickHouseInsertErrors.WithLabelValues(table).Inc()
 
 		retry := attempt < attempts && isRetryableInsertError(err) && ctx.Err() == nil
 		if !retry {

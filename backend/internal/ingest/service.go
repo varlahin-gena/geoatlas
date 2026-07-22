@@ -11,7 +11,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"network_monitor/internal/metrics"
 	usecaseingest "network_monitor/internal/usecase/ingest"
 )
 
@@ -99,7 +98,6 @@ func NewService(cfg Config, deps ProcessorDeps) *Service {
 	for i := range s.processors {
 		s.processors[i] = usecaseingest.NewProcessor(ucDeps, st)
 	}
-	metrics.IngestQueueCapacity.Set(float64(cfg.QueueSize))
 	return s
 }
 
@@ -108,8 +106,6 @@ func (s *Service) Stats() StatsSnapshot {
 	if s.lineCh != nil {
 		snap.QueueDepth = int64(len(s.lineCh))
 		snap.QueueCapacity = int64(cap(s.lineCh))
-		metrics.IngestQueueDepth.Set(float64(snap.QueueDepth))
-		metrics.IngestQueueCapacity.Set(float64(snap.QueueCapacity))
 	}
 	return snap
 }
@@ -237,7 +233,6 @@ func (s *Service) handleConn(ctx context.Context, conn net.Conn, transport strin
 		line, err := reader.ReadLine()
 		if err != nil {
 			if errors.Is(err, errFrameTooLarge) {
-				metrics.IngestFrameTooLargeTotal.Inc()
 				slog.Warn("ingest: frame too large, closing connection",
 					"remote", remote, "max_bytes", maxFrameBytes, "lines", linesOnConn)
 			} else if err != io.EOF && !isClosedConn(err) && !isTimeout(err) {
@@ -307,7 +302,6 @@ func (s *Service) worker(ctx context.Context, proc *usecaseingest.Processor) {
 			cancel()
 			return
 		case item := <-s.lineCh:
-			metrics.IngestQueueDepth.Set(float64(len(s.lineCh)))
 			transport, line := ResolveTransport(item.line, item.transport)
 			if _, _, err := proc.ProcessLine(ctx, line, transport); err != nil {
 				s.stats.setState("error")

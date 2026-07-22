@@ -6,7 +6,6 @@ import (
 	"io"
 	"strings"
 
-	"network_monitor/internal/metrics"
 	"network_monitor/internal/model"
 )
 
@@ -20,15 +19,12 @@ func (s *Service) TryEnqueue(line, transport string) bool {
 	if line == "" {
 		return true // пустые не считаем drop
 	}
-	tr := transportOrUnknown(transport)
 	item := ingestedLine{line: line, transport: transport}
 	select {
 	case s.lineCh <- item:
-		metrics.IngestQueueDepth.Set(float64(len(s.lineCh)))
 		return true
 	default:
 		s.stats.addDropped(1)
-		metrics.IngestQueueDroppedTotal.WithLabelValues(tr).Inc()
 		return false
 	}
 }

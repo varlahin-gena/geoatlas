@@ -8,14 +8,12 @@ import (
 	"log/slog"
 	"net/http"
 	"runtime/debug"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
 
 	"network_monitor/internal/auth"
-	"network_monitor/internal/metrics"
 )
 
 type ctxKey int
@@ -138,31 +136,22 @@ func routeLabel(r *http.Request) string {
 	return "unmatched"
 }
 
-// loggingMW пишет строку доступа и latency в Prometheus.
+// loggingMW пишет access-лог с latency.
 func loggingMW(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rec, r)
 		elapsed := time.Since(start)
-		path := r.URL.Path
-		route := routeLabel(r)
 		slog.Info("http",
 			"request_id", RequestIDFromContext(r.Context()),
 			"method", r.Method,
-			"path", path,
-			"route", route,
+			"path", r.URL.Path,
+			"route", routeLabel(r),
 			"status", rec.status,
 			"bytes", rec.bytes,
 			"duration", elapsed.Round(time.Millisecond).String(),
 		)
-		if route != "/metrics" {
-			metrics.APIRequestDuration.WithLabelValues(
-				r.Method,
-				route,
-				strconv.Itoa(rec.status),
-			).Observe(elapsed.Seconds())
-		}
 	})
 }
 

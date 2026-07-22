@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"network_monitor/internal/metrics"
 	"network_monitor/internal/model"
 )
 
@@ -72,11 +71,6 @@ func (p *Processor) ProcessLine(ctx context.Context, line string, transport stri
 	if p.stats != nil {
 		p.stats.AddReceived(transport)
 	}
-	transportLabel := transport
-	if transportLabel == "" {
-		transportLabel = "unknown"
-	}
-	metrics.IngestReceivedTotal.WithLabelValues(transportLabel).Inc()
 
 	res := p.parser.ParseVerbose(line)
 	if !res.OK {
@@ -84,20 +78,17 @@ func (p *Processor) ProcessLine(ctx context.Context, line string, transport stri
 			if p.stats != nil {
 				p.stats.AddSkipped(1)
 			}
-			metrics.IngestSkippedTotal.Inc()
 			return OutcomeSkipped, 0, nil
 		}
 		if p.parser == nil || !p.parser.ContainsIPv4(line) {
 			if p.stats != nil {
 				p.stats.AddSkipped(1)
 			}
-			metrics.IngestSkippedTotal.Inc()
 			return OutcomeSkipped, 0, nil
 		}
 		if p.stats != nil {
 			p.stats.AddParseErrors(1)
 		}
-		metrics.IngestParseErrorsTotal.Inc()
 		p.appendParseError(model.ParseError{
 			Timestamp: time.Now(),
 			Vendor:    res.Vendor,
@@ -115,7 +106,6 @@ func (p *Processor) ProcessLine(ctx context.Context, line string, transport stri
 	if p.stats != nil {
 		p.stats.AddParsed(1)
 	}
-	metrics.IngestParsedTotal.Inc()
 	logEntry := res.Log
 	if logEntry.ParsedAt.IsZero() {
 		logEntry.ParsedAt = time.Now()
@@ -176,7 +166,6 @@ func (p *Processor) flushLogs(ctx context.Context) error {
 	}
 
 	n := len(p.buf)
-	start := time.Now()
 	err := insertWithRetry(ctx, p.queryTimeout, "traffic_logs", func(actx context.Context) error {
 		if p.logs == nil {
 			return nil
@@ -188,14 +177,12 @@ func (p *Processor) flushLogs(ctx context.Context) error {
 		return err
 	}
 	p.noteInsertSuccess()
-	metrics.IngestFlushDuration.Observe(time.Since(start).Seconds())
 
 	if p.stats != nil {
 		p.stats.AddInserted(int64(n))
 		p.stats.AddBuffered(-int64(n))
 		p.stats.SetLastFlushAt(time.Now())
 	}
-	metrics.IngestInsertedTotal.Add(float64(n))
 	p.buf = p.buf[:0]
 	return nil
 }
@@ -229,7 +216,6 @@ func (p *Processor) checkInsertCircuit() error {
 		return nil
 	}
 	if time.Now().Before(p.circuitOpenUntil) {
-		metrics.ClickHouseInsertCircuitOpen.Inc()
 		return errInsertCircuitOpen
 	}
 	return nil
@@ -244,7 +230,6 @@ func (p *Processor) noteInsertFailure() {
 	p.insertFails++
 	if p.insertFails >= circuitFailThreshold {
 		p.circuitOpenUntil = time.Now().Add(circuitCooldown)
-		metrics.ClickHouseInsertCircuitOpen.Inc()
 		slog.Warn("ingest: insert circuit open",
 			"failures", p.insertFails, "cooldown", circuitCooldown.String())
 	}
@@ -277,7 +262,6 @@ func (p *Processor) appendTrafficLog(entry model.TrafficLog) {
 		if p.stats != nil {
 			p.stats.AddBuffered(-int64(drop))
 		}
-		metrics.IngestTrafficBufDropped.Add(float64(drop))
 		slog.Warn("ingest: traffic buffer at capacity, dropping oldest",
 			"dropped", drop, "cap", max)
 	}
@@ -308,7 +292,6 @@ func (p *Processor) dropOldestParseErrors(n int) {
 		p.errBufBytes = 0
 	}
 	p.errBuf = append(p.errBuf[:0], p.errBuf[n:]...)
-	metrics.IngestParseErrorBufDropped.Add(float64(n))
 }
 
 func (p *Processor) appendParseError(pe model.ParseError) {
