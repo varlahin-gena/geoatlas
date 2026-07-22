@@ -230,6 +230,8 @@ function loadUIState() {
             const searchEl = document.getElementById('searchInput');
             if (searchEl) searchEl.value = s.search;
         }
+        periodCustomOpen = false;
+        updateCustomPeriodLabel();
         syncPeriodCustomPanel();
     } catch (e) {}
 }
@@ -292,6 +294,8 @@ function applyViewFromURL() {
     }
     const view = params.get('view');
     if (view === 'map' || view === 'globe') viewMode = view;
+    periodCustomOpen = false;
+    updateCustomPeriodLabel();
     syncPeriodCustomPanel();
 }
 
@@ -333,6 +337,9 @@ function applyFilterUI() {
     if (minVal) minVal.textContent = String(minCount);
 }
 
+const CUSTOM_PERIOD_LABEL = 'Свой диапазон…';
+let periodCustomOpen = false;
+
 function toDatetimeLocal(d) {
     const pad = n => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -341,9 +348,31 @@ function toISOFromLocal(v) {
     if (!v) return '';
     return new Date(v).toISOString();
 }
+/** datetime-local → «21.07.2026 17:10» */
+function formatPeriodDisplay(v) {
+    if (!v) return '';
+    const [date, time] = v.split('T');
+    if (!date) return v;
+    const [y, m, d] = date.split('-');
+    if (!y || !m || !d) return v;
+    return `${d}.${m}.${y}${time ? ' ' + time.slice(0, 5) : ''}`;
+}
+function updateCustomPeriodLabel() {
+    const opt = document.querySelector('#periodPreset option[value="custom"]');
+    if (!opt) return;
+    const preset = document.getElementById('periodPreset')?.value;
+    const from = document.getElementById('periodFrom')?.value;
+    const to = document.getElementById('periodTo')?.value;
+    if (preset === 'custom' && (from || to)) {
+        const a = formatPeriodDisplay(from) || '…';
+        const b = formatPeriodDisplay(to) || '…';
+        opt.textContent = `${a} – ${b}`;
+    } else {
+        opt.textContent = CUSTOM_PERIOD_LABEL;
+    }
+}
 function syncPeriodCustomPanel() {
-    const preset = document.getElementById('periodPreset').value;
-    document.getElementById('periodCustom').classList.toggle('visible', preset === 'custom');
+    document.getElementById('periodCustom')?.classList.toggle('visible', periodCustomOpen);
 }
 function initCustomPeriodDefaults() {
     const fromEl = document.getElementById('periodFrom');
@@ -373,13 +402,28 @@ function buildPeriodQuery() {
     if (d) return `&hours=${parseInt(d[1], 10) * 24}`;
     return '&days=1';
 }
-function onPeriodPresetChange() {
+function applyCustomPeriod() {
+    periodCustomOpen = false;
+    updateCustomPeriodLabel();
     syncPeriodCustomPanel();
+    saveUIState();
+    refreshMap();
+}
+function openCustomPeriodPanel() {
+    initCustomPeriodDefaults();
+    periodCustomOpen = true;
+    syncPeriodCustomPanel();
+}
+function onPeriodPresetChange() {
     if (document.getElementById('periodPreset').value === 'custom') {
-        initCustomPeriodDefaults();
+        openCustomPeriodPanel();
+        updateCustomPeriodLabel();
         saveUIState();
         return;
     }
+    periodCustomOpen = false;
+    updateCustomPeriodLabel();
+    syncPeriodCustomPanel();
     saveUIState();
     refreshMap();
 }

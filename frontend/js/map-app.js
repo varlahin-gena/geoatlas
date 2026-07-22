@@ -15,10 +15,7 @@ function bindUI() {
     $('btnExportPng')?.addEventListener('click', () => exportPNG());
     $('btnToggleSidebar')?.addEventListener('click', () => toggleSidebar());
     $('btnCloseDetail')?.addEventListener('click', () => closeDetail());
-    $('btnPeriodApply')?.addEventListener('click', () => {
-        saveUIState();
-        refreshMap();
-    });
+    $('btnPeriodApply')?.addEventListener('click', () => applyCustomPeriod());
 
     $('minCount')?.addEventListener('input', () => onMinCountChange());
     $('maxArcs')?.addEventListener('input', () => onMaxArcsChange());
@@ -34,6 +31,15 @@ function bindUI() {
         refreshMap();
     });
     $('periodPreset')?.addEventListener('change', () => onPeriodPresetChange());
+    // Повторный клик по уже выбранному «свой диапазон» снова открывает редактор
+    $('periodPreset')?.addEventListener('mousedown', function () {
+        this.dataset.periodPrev = this.value;
+    });
+    $('periodPreset')?.addEventListener('click', function () {
+        if (this.value === 'custom' && this.dataset.periodPrev === 'custom' && !periodCustomOpen) {
+            openCustomPeriodPanel();
+        }
+    });
 
     $('filter-all')?.addEventListener('click', () => setFilter('all'));
     $('filter-allowed')?.addEventListener('click', () => setFilter('allowed'));

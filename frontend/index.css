@@ -203,7 +203,7 @@ html, body {
     background: var(--panel-2); color: var(--text);
     border: 1px solid var(--border); border-radius: 6px;
     padding: 5px 8px; font-size: 12px; cursor: pointer;
-    max-width: 140px;
+    max-width: 280px;
 }
 .topbar .period-control select:focus { outline: 1px solid var(--accent); }
 .topbar .period-custom {

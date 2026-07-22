@@ -149,6 +149,8 @@ function resetView() {
     document.getElementById('periodPreset').value = '1d';
     document.getElementById('periodFrom').value = '';
     document.getElementById('periodTo').value = '';
+    periodCustomOpen = false;
+    updateCustomPeriodLabel();
     syncPeriodCustomPanel();
     document.getElementById('minCount').value = 1;
     document.getElementById('minCountVal').textContent = '1';
