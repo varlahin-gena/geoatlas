@@ -51,9 +51,10 @@
     <h1>Адреса, которые не удалось поставить на карту</h1>
     <p class="hint">
       Список уникальных IP из трафика за выбранный период, для которых нет координат
-      (ни в live GeoIP, ни в полях записи лога). Публичные адреса можно
-      <b>добавить в базу</b> прямо отсюда или открыть
-      <a href="/geo-ranges.html">База GeoIP</a> с поиском по IP и правкой диапазона.
+      (ни в live GeoIP, ни в полях записи лога). Публичные адреса можно добавить в базу GeoIP
+      прямо отсюда; приватные и спец. адреса на карте обычно не нужны.
+      Редактирование уже загруженных диапазонов — на странице
+      <a href="/geo-ranges.html">База GeoIP</a>.
     </p>
 
     <div class="summary" id="summary"></div>
@@ -336,10 +337,7 @@ function render() {
         <button type="button" class="add-btn"
           data-ip="${esc(r.ip)}"
           data-country="${esc(r.log_country || '')}"
-          data-city="${esc(r.log_city || '')}">добавить</button>
-        <a class="add-btn" style="text-decoration:none;display:inline-block;"
-          href="/geo-ranges.html?ip=${encodeURIComponent(r.ip)}&edit=1"
-          title="Найти покрывающий диапазон и открыть правку">в базе</a>
+          data-city="${esc(r.log_city || '')}">добавить в базу</button>
       </td>
     </tr>`;
   }).join('');
@@ -353,7 +351,7 @@ function render() {
       }
     });
   });
-  tbody.querySelectorAll('button.add-btn').forEach(btn => {
+  tbody.querySelectorAll('.add-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       openAddModal(btn.dataset.ip, btn.dataset.country, btn.dataset.city);
     });
