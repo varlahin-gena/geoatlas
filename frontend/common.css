@@ -303,6 +303,7 @@ body.page-admin .admin-main > .content {
 .form-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
 .field { display: flex; flex-direction: column; gap: 4px; min-width: 140px; }
 .field label { font-size: 11px; color: var(--text-dim); }
+.field-hint { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
 .field input,
 .field select,
 .ctrl,

@@ -484,10 +484,18 @@ function fillRetentionForm(r) {
         const el = document.getElementById(id);
         if (el) el.value = v;
     };
+    const setCur = function (id, v) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = (v != null && v !== '') ? ('сейчас: ' + v + ' дн.') : 'сейчас: —';
+    };
     set('retTrafficLogs', r.traffic_logs_days);
     set('retEdges', r.edges_days);
     set('retParseErrors', r.parse_errors_days);
     set('retSystemMetrics', r.system_metrics_days);
+    setCur('retTrafficLogsCur', r.traffic_logs_days);
+    setCur('retEdgesCur', r.edges_days);
+    setCur('retParseErrorsCur', r.parse_errors_days);
+    setCur('retSystemMetricsCur', r.system_metrics_days);
     const meta = document.getElementById('retentionUpdatedAt');
     if (meta) {
         meta.textContent = r.updated_at
