@@ -12,6 +12,7 @@ import (
 	usecasegeo "network_monitor/internal/usecase/geo"
 	"network_monitor/internal/usecase/parseerrors"
 	"network_monitor/internal/usecase/parsetest"
+	usecasereputation "network_monitor/internal/usecase/reputation"
 	usecaseretention "network_monitor/internal/usecase/retention"
 	usecasesystem "network_monitor/internal/usecase/system"
 )
@@ -24,6 +25,7 @@ type Deps struct {
 	parseTestUC   *parsetest.Service
 	eventsUC      *usecaseevents.Service
 	geoUC         *usecasegeo.Service
+	reputationUC  *usecasereputation.Service
 	systemUC      *usecasesystem.Service
 	systemPinger  usecasesystem.ClickHousePinger
 	retentionUC   *usecaseretention.Service
@@ -38,6 +40,7 @@ func NewDeps(
 	ingestSvc Ingester,
 	eventsUC *usecaseevents.Service,
 	geoUC *usecasegeo.Service,
+	reputationUC *usecasereputation.Service,
 	parseErrorsUC *parseerrors.Service,
 	systemUC *usecasesystem.Service,
 	systemPinger usecasesystem.ClickHousePinger,
@@ -48,6 +51,7 @@ func NewDeps(
 		cfg:           cfg,
 		eventsUC:      eventsUC,
 		geoUC:         geoUC,
+		reputationUC:  reputationUC,
 		parseErrorsUC: parseErrorsUC,
 		parseTestUC:   parseTestUC,
 		systemUC:      systemUC,

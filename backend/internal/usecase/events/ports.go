@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"network_monitor/internal/model"
 	"network_monitor/internal/mapagg"
+	"network_monitor/internal/model"
 )
 
 // TrafficRepository — чтение агрегатов для карты.
@@ -16,3 +16,8 @@ type TrafficRepository interface {
 
 // GeoLookuper — live GeoIP для fallback-пути по IP.
 type GeoLookuper = mapagg.GeoLookuper
+
+// ReputationLookuper — live репутация для groupBy=ip.
+type ReputationLookuper interface {
+	Lookup(ipStr string) []model.ReputationHit
+}

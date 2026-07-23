@@ -15,11 +15,13 @@ import (
 
 	"network_monitor/internal/adapter/bootstrapadapter"
 	chadapter "network_monitor/internal/adapter/clickhouse"
+	"network_monitor/internal/adapter/clickhouse/migrate"
 	"network_monitor/internal/adapter/clickhouse/query"
 	"network_monitor/internal/adapter/geoipcodec"
 	"network_monitor/internal/adapter/geojob"
 	httpapi "network_monitor/internal/adapter/httpapi"
 	"network_monitor/internal/adapter/parseradapter"
+	"network_monitor/internal/adapter/reputationjob"
 	"network_monitor/internal/adapter/retentionfile"
 	"network_monitor/internal/adapter/systemlive"
 	"network_monitor/internal/auth"
@@ -33,6 +35,7 @@ import (
 	usecasegeo "network_monitor/internal/usecase/geo"
 	"network_monitor/internal/usecase/parseerrors"
 	"network_monitor/internal/usecase/parsetest"
+	usecasereputation "network_monitor/internal/usecase/reputation"
 	usecaseretention "network_monitor/internal/usecase/retention"
 	usecasesystem "network_monitor/internal/usecase/system"
 )
@@ -134,6 +137,19 @@ func main() {
 		slog.Warn("geo index not loaded", "err", err)
 	}
 
+	repIdx := chadapter.NewReloadableReputationIndex(pools.Background)
+	repRepo := chadapter.NewReputationRepository(pools.API, pools.Ingest)
+	repUC := usecasereputation.New(repRepo, repIdx, usecasereputation.DefaultCodec{}, nil)
+	repJobs := reputationjob.New(cfg.ReputationFeeds, cfg.ReputationFetchInterval, cfg.ReputationFetchEnabled, repUC)
+	repUC.SetRefresher(repJobs)
+
+	if err := migrate.EnsureReputationRanges(ctx, pools.Background); err != nil {
+		slog.Warn("reputation_ranges ensure (early) failed", "err", err)
+	}
+	if err := repIdx.Reload(ctx); err != nil {
+		slog.Warn("reputation index not loaded", "err", err)
+	}
+
 	retentionUC := usecaseretention.New(
 		retentionfile.New(cfg.RetentionFile),
 		chadapter.NewRetentionApplier(pools.Background),
@@ -206,7 +222,7 @@ func main() {
 
 	trafficRepo := chadapter.NewTrafficRepository(pools.API)
 	geoRepo := chadapter.NewGeoRepository(pools.API, pools.Ingest)
-	eventsUC := usecaseevents.New(trafficRepo, geo)
+	eventsUC := usecaseevents.New(trafficRepo, geo, repIdx)
 	geoUC := usecasegeo.New(geoRepo, trafficRepo, geo, geoJobs, geoipcodec.New())
 	parseErrorsUC := parseerrors.New(chadapter.NewParseErrorRepository(pools.API, pools.Ingest))
 	parseTestAdapter := parseradapter.NewParseTest(parsers)
@@ -220,7 +236,9 @@ func main() {
 	})
 
 	authUC := usecaseauth.New(users, sessions)
-	srv := httpapi.NewServer(cfg, ingestSvc, eventsUC, geoUC, parseErrorsUC, systemUC, systemRepo, parseTestUC, retentionUC, authUC, users, sessions, apiTokens)
+	srv := httpapi.NewServer(cfg, ingestSvc, eventsUC, geoUC, repUC, parseErrorsUC, systemUC, systemRepo, parseTestUC, retentionUC, authUC, users, sessions, apiTokens)
+
+	repJobs.Start(bgCtx)
 
 	go func() {
 		slog.Info("backend listening", "addr", cfg.ListenAddr)
@@ -245,6 +263,10 @@ func main() {
 	geoStopCtx, geoStopCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	geoJobs.Shutdown(geoStopCtx)
 	geoStopCancel()
+
+	repStopCtx, repStopCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	repJobs.Shutdown(repStopCtx)
+	repStopCancel()
 
 	// Отдельный бюджет: не делим 15s HTTP с drain очереди ingest.
 	ingestWait := ingestSvc.ShutdownWaitTimeout()

@@ -9,8 +9,12 @@ function monoArcRGB() {
     return [88, 166, 255];
 }
 
-function arcRGB(status) {
-    return monoArcColor ? monoArcRGB() : statusRGB(status);
+function arcRGB(status, line) {
+    if (monoArcColor) return monoArcRGB();
+    if (line && typeof lineHasReputationHits === 'function' && lineHasReputationHits(line)) {
+        return [210, 153, 34]; // orange — репутационный хит
+    }
+    return statusRGB(status);
 }
 
 // Приглушённая палитра: страны без трафика = цвет суши, гамма мягче,
@@ -209,6 +213,8 @@ function pointMatchesSearch(key, point) {
 }
 
 function getVisibleLines() {
+    const ipMode = typeof currentGroupBy === 'function' && currentGroupBy() === 'ip';
+    const repActive = ipMode && typeof reputationFilterActiveCount === 'function' && reputationFilterActiveCount() > 0;
     return allLines.filter(line => {
         if (currentFilter === 'allowed' && line.status !== 'allowed') return false;
         if (currentFilter === 'blocked' && line.status !== 'blocked') return false;
@@ -216,6 +222,7 @@ function getVisibleLines() {
         // Self-loop (оба конца схлопнулись в один ключ) — дуга нулевой длины, не рисуем.
         if (line.src && line.src === line.dst) return false;
         if (!lineMatchesSearch(line, allPoints)) return false;
+        if (repActive && typeof lineMatchesReputation === 'function' && !lineMatchesReputation(line)) return false;
         return hasCoords(line);
     });
 }
@@ -369,8 +376,8 @@ function buildDeckLayers(mode = 'map') {
         // дуга стартует «в стороне» от маркера.
         getSourcePosition: d => nodeLonLat(d.src, d.src_lon, d.src_lat),
         getTargetPosition: d => nodeLonLat(d.dst, d.dst_lon, d.dst_lat),
-        getSourceColor: d => [...arcRGB(d.status), 210],
-        getTargetColor: d => [...arcRGB(d.status), 210],
+        getSourceColor: d => [...arcRGB(d.status, d), 210],
+        getTargetColor: d => [...arcRGB(d.status, d), 210],
         getWidth: d => Math.max(1, Math.min(6, 1 + Math.log2((d.count || 1) + 1))),
         widthUnits: 'pixels',
         getHeight: isGlobe
@@ -391,8 +398,8 @@ function buildDeckLayers(mode = 'map') {
         highlightColor: [255, 255, 255, 140],
         parameters: { depthTest: isGlobe },
         updateTriggers: {
-            getSourceColor: [currentFilter, monoArcColor],
-            getTargetColor: [currentFilter, monoArcColor],
+            getSourceColor: [currentFilter, monoArcColor, typeof reputationFilterActiveCount === 'function' ? reputationFilterActiveCount() : 0],
+            getTargetColor: [currentFilter, monoArcColor, typeof reputationFilterActiveCount === 'function' ? reputationFilterActiveCount() : 0],
             getSourcePosition: [_statsCacheVersion],
             getTargetPosition: [_statsCacheVersion],
         },

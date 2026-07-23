@@ -85,6 +85,22 @@ ORDER BY (start_ip, end_ip);
 
 
 -- ============================================================
+-- reputation_ranges: офлайн-репутационные списки (FireHOL и др.)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS reputation_ranges
+(
+    list_name   LowCardinality(String),
+    category    LowCardinality(String),
+    start_ip    UInt32,
+    end_ip      UInt32,
+    source      LowCardinality(String),
+    updated_at  DateTime64(3)
+)
+ENGINE = MergeTree()
+ORDER BY (list_name, start_ip, end_ip);
+
+
+-- ============================================================
 -- parse_errors: строки логов, которые не удалось распарсить
 -- ============================================================
 CREATE TABLE IF NOT EXISTS parse_errors

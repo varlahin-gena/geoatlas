@@ -40,7 +40,7 @@ func TestGetMapUsesGeoEdges(t *testing.T) {
 			Count: 2, AllowedCnt: 2,
 		}},
 	}
-	uc := New(repo, stubGeo{})
+	uc := New(repo, stubGeo{}, nil)
 	out, err := uc.GetMap(context.Background(), GetMapInput{
 		TimeRange: model.TimeRange{Mode: "hours", Amount: 6},
 		Limit:     100,
@@ -75,7 +75,7 @@ func TestGetMapFallsBackWhenGeoEmpty(t *testing.T) {
 		"1.1.1.1": {Found: true, Lat: 1, Lon: 1, City: "S", Country: "AU"},
 		"8.8.8.8": {Found: true, Lat: 2, Lon: 2, City: "M", Country: "US"},
 	}
-	uc := New(repo, geo)
+	uc := New(repo, geo, nil)
 	out, err := uc.GetMap(context.Background(), GetMapInput{
 		TimeRange: model.TimeRange{Mode: "hours", Amount: 6},
 		GroupBy:   "city",

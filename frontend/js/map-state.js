@@ -230,6 +230,17 @@ function loadUIState() {
             const searchEl = document.getElementById('searchInput');
             if (searchEl) searchEl.value = s.search;
         }
+        if (typeof repFilterCategories !== 'undefined' && Array.isArray(s.repCats)) {
+            repFilterCategories = new Set(s.repCats);
+        }
+        if (typeof repFilterLists !== 'undefined' && Array.isArray(s.repLists)) {
+            repFilterLists = new Set(s.repLists);
+        }
+        if (typeof s.repSide === 'string' && ['any', 'src', 'dst', 'both'].includes(s.repSide)) {
+            repFilterSide = s.repSide;
+            const sideEl = document.getElementById('repFilterSide');
+            if (sideEl) sideEl.value = s.repSide;
+        }
         periodCustomOpen = false;
         updateCustomPeriodLabel();
         syncPeriodCustomPanel();
@@ -247,6 +258,9 @@ function saveUIState() {
             filter: currentFilter,
             minCount,
             search: document.getElementById('searchInput')?.value || '',
+            repCats: Array.from(typeof repFilterCategories !== 'undefined' ? repFilterCategories : []),
+            repLists: Array.from(typeof repFilterLists !== 'undefined' ? repFilterLists : []),
+            repSide: typeof repFilterSide !== 'undefined' ? repFilterSide : 'any',
         }));
     } catch (e) {}
     syncViewToURL();
@@ -292,6 +306,20 @@ function applyViewFromURL() {
         const searchEl = document.getElementById('searchInput');
         if (searchEl) searchEl.value = params.get('q') || '';
     }
+    if (typeof repFilterCategories !== 'undefined' && params.get('rep_cat')) {
+        repFilterCategories = new Set(params.getAll('rep_cat').filter(Boolean));
+    }
+    if (typeof repFilterLists !== 'undefined' && params.get('rep_list')) {
+        repFilterLists = new Set(params.getAll('rep_list').filter(Boolean));
+    }
+    if (typeof repFilterSide !== 'undefined') {
+        const side = params.get('rep_side');
+        if (side && ['any', 'src', 'dst', 'both'].includes(side)) {
+            repFilterSide = side;
+            const sideEl = document.getElementById('repFilterSide');
+            if (sideEl) sideEl.value = side;
+        }
+    }
     const view = params.get('view');
     if (view === 'map' || view === 'globe') viewMode = view;
     periodCustomOpen = false;
@@ -318,6 +346,15 @@ function syncViewToURL() {
         if (minCount > 1) params.set('min', String(minCount));
         const q = document.getElementById('searchInput')?.value?.trim() || '';
         if (q) params.set('q', q);
+        if (typeof repFilterCategories !== 'undefined') {
+            Array.from(repFilterCategories).forEach(function (c) { params.append('rep_cat', c); });
+        }
+        if (typeof repFilterLists !== 'undefined') {
+            Array.from(repFilterLists).forEach(function (l) { params.append('rep_list', l); });
+        }
+        if (typeof repFilterSide !== 'undefined' && repFilterSide && repFilterSide !== 'any') {
+            params.set('rep_side', repFilterSide);
+        }
         if (viewMode && viewMode !== 'map') params.set('view', viewMode);
         const qs = params.toString();
         const next = qs ? (location.pathname + '?' + qs) : location.pathname;

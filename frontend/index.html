@@ -207,6 +207,28 @@
                 <button id="filter-allowed" class="allowed">Разрешённые</button>
                 <button id="filter-blocked" class="blocked">Заблокированные</button>
             </div>
+            <div class="reputation-filter" id="reputationFilterWrap">
+                <button type="button" id="btnReputationFilter" class="rep-filter-btn" title="Фильтр по репутационным спискам">
+                    Репутация
+                    <span id="repFilterBadge" class="rep-badge" style="display:none;">0</span>
+                </button>
+                <div class="reputation-menu" id="reputationMenu" role="dialog" aria-label="Фильтр репутации">
+                    <div class="rep-menu-head">
+                        <span>Репутация</span>
+                        <button type="button" class="rep-clear" id="btnRepFilterClear">Сбросить</button>
+                    </div>
+                    <div class="rep-menu-side">
+                        <label for="repFilterSide">Сторона</label>
+                        <select id="repFilterSide">
+                            <option value="any">src или dst</option>
+                            <option value="src">только src</option>
+                            <option value="dst">только dst</option>
+                            <option value="both">оба конца</option>
+                        </select>
+                    </div>
+                    <div class="rep-menu-body" id="reputationMenuBody"></div>
+                </div>
+            </div>
             <div class="period-control">
                 <span>Период:</span>
                 <select id="periodPreset" title="Период данных">
@@ -260,6 +282,7 @@
                 <div id="legendByStatus">
                     <div class="legend-row"><span class="legend-line" style="background: var(--green);"></span> Разрешённый</div>
                     <div class="legend-row"><span class="legend-line" style="background: var(--red);"></span> Заблокированный</div>
+                    <div class="legend-row"><span class="legend-line" style="background: var(--orange);"></span> Репутационный хит</div>
                 </div>
                 <div id="legendMono" class="legend-row" style="display:none;">
                     <span class="legend-line" style="background: var(--accent);"></span> Связь
@@ -295,6 +318,7 @@
 <script src="/auth.js"></script>
 <script src="/common.js"></script>
 <script src="/js/map-state.js"></script>
+<script src="/js/map-reputation.js"></script>
 <script src="/js/map-detail.js"></script>
 <script src="/js/map-render.js"></script>
 <script src="/js/map-filters.js"></script>

@@ -126,6 +126,14 @@
         '<path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>',
     },
     {
+      href: '/reputation.html',
+      label: 'Репутация IP',
+      adminOnly: true,
+      icon:
+        ICON +
+        '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+    },
+    {
       href: '/users.html',
       label: 'Пользователи',
       adminOnly: true,

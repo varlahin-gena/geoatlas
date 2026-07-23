@@ -54,7 +54,7 @@ func TestPostCASmoke(t *testing.T) {
 	geoJobs := &stubGeoJobs{reload: &reloadScheduled}
 	geoUC := usecasegeo.New(geoStore, &stubMissing{}, geoIdx, geoJobs, geoipcodec.New())
 
-	eventsUC := usecaseevents.New(&stubTraffic{}, geoIdx)
+	eventsUC := usecaseevents.New(&stubTraffic{}, geoIdx, nil)
 
 	var maintScheduled atomic.Int32
 	systemUC := usecasesystem.New(usecasesystem.Dependencies{
@@ -78,14 +78,15 @@ func TestPostCASmoke(t *testing.T) {
 	}, ingest.ProcessorDeps{})
 
 	cfg := config.Config{
-		ListenAddr:       ":0",
-		APIAuthToken:     "smoke-bearer-token",
-		MaxLogUploadSize: 1 << 20,
-		MaxGeoUploadSize: 1 << 20,
-		QueryTimeout:     time.Minute,
-		IngestFlushSec:   1,
+		ListenAddr:              ":0",
+		APIAuthToken:            "smoke-bearer-token",
+		MaxLogUploadSize:        1 << 20,
+		MaxGeoUploadSize:        1 << 20,
+		MaxReputationUploadSize: 1 << 20,
+		QueryTimeout:            time.Minute,
+		IngestFlushSec:          1,
 	}
-	srv := httpapi.NewServer(cfg, ingestSvc, eventsUC, geoUC, nil, systemUC, pinger, parseTestUC, nil, authUC, users, sessions, nil)
+	srv := httpapi.NewServer(cfg, ingestSvc, eventsUC, geoUC, nil, nil, systemUC, pinger, parseTestUC, nil, authUC, users, sessions, nil)
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(ts.Close)
 

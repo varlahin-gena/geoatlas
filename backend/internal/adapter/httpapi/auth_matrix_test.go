@@ -42,6 +42,11 @@ func expectedAuthMatrix() map[string]authTier {
 		"POST /api/ingest":                          tierOps,
 		"POST /upload-logs":                         tierOps,
 		"POST /upload-geo":                          tierOps,
+		"POST /upload-reputation":                   tierOps,
+		"GET /api/reputation/lists":                 tierAdmin,
+		"DELETE /api/reputation/lists/{name}":       tierOps,
+		"POST /api/reputation/refresh":              tierOps,
+		"GET /api/reputation/lookup":                tierLogin,
 		"GET /api/system/stats":                     tierAdmin,
 		"GET /api/system/history":                   tierAdmin,
 		"GET /api/system/edges-agg":                 tierAdmin,
@@ -70,13 +75,14 @@ func TestAuthMatrixCoversServerRoutes(t *testing.T) {
 
 	srv := NewServer(
 		config.Config{
-			ListenAddr:       ":0",
-			APIAuthToken:     "test-token",
-			MaxLogUploadSize: 1 << 20,
-			MaxGeoUploadSize: 1 << 20,
+			ListenAddr:              ":0",
+			APIAuthToken:            "test-token",
+			MaxLogUploadSize:        1 << 20,
+			MaxGeoUploadSize:        1 << 20,
+			MaxReputationUploadSize: 1 << 20,
 		},
 		nil, // ingest
-		nil, nil, // eventsUC, geoUC
+		nil, nil, nil, // eventsUC, geoUC, reputationUC
 		nil,      // parseErrorsUC
 		nil,      // systemUC
 		nil,      // systemPinger

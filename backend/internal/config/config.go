@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -8,16 +9,28 @@ import (
 	"time"
 )
 
+// DefaultFireholLevel1URL — raw netset FireHOL level1.
+const DefaultFireholLevel1URL = "https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset"
+
+func DefaultReputationFeeds() []ReputationFeed {
+	return []ReputationFeed{{
+		Name:     "firehol_level1",
+		URL:      DefaultFireholLevel1URL,
+		Category: "firehol",
+		Format:   "netset",
+	}}
+}
+
 type Config struct {
-	ListenAddr          string
-	IngestListenAddr    string
-	IngestUDPListenAddr string
-	IngestTCPListenAddr string
-	ClickHouseHost      string
-	ClickHousePort      string
-	ClickHouseUser      string
-	ClickHousePassword  string
-	ClickHouseDatabase  string
+	ListenAddr           string
+	IngestListenAddr     string
+	IngestUDPListenAddr  string
+	IngestTCPListenAddr  string
+	ClickHouseHost       string
+	ClickHousePort       string
+	ClickHouseUser       string
+	ClickHousePassword   string
+	ClickHouseDatabase   string
 	APIAuthToken         string
 	APIAuthPreviousToken string // API_AUTH_PREVIOUS_TOKEN — ротация Bearer без даунтайма
 	APIAuthDisabled      bool   // API_AUTH_DISABLED=1 — только local/dev; иначе токен обязателен
@@ -36,19 +49,19 @@ type Config struct {
 	// RetentionFile — JSON с TTL таблиц CH (том /app/data рядом с users.json).
 	RetentionFile string
 
-	MaxLogUploadSize    int64
-	MaxGeoUploadSize    int64
-	IngestBatchSize     int
-	IngestQueueSize     int
-	IngestWorkers       int
-	IngestFlushSec      int
+	MaxLogUploadSize     int64
+	MaxGeoUploadSize     int64
+	IngestBatchSize      int
+	IngestQueueSize      int
+	IngestWorkers        int
+	IngestFlushSec       int
 	IngestMaxConnections int
 	IngestConnIdleSec    int
-	QueryTimeout        time.Duration
-	CHMaxMemoryUsage    int64
-	CHExternalGroupBy   int64
-	CHExternalSort      int64
-	InstallProfilePath  string
+	QueryTimeout         time.Duration
+	CHMaxMemoryUsage     int64
+	CHExternalGroupBy    int64
+	CHExternalSort       int64
+	InstallProfilePath   string
 
 	// Размеры пулов ClickHouse (отдельные Conn на write/read/background).
 	CHIngestMaxOpen     int
@@ -67,8 +80,22 @@ type Config struct {
 	// через POST /api/system/maintenance/backfill (или оставьте false — поведение как раньше).
 	SkipStartupBackfill bool
 
+	// Reputation: офлайн-списки (FireHOL и др.).
+	MaxReputationUploadSize int64
+	ReputationFetchEnabled  bool
+	ReputationFetchInterval time.Duration
+	ReputationFeeds         []ReputationFeed // из REPUTATION_FEEDS JSON или дефолт
+
 	LogLevel  string // debug|info|warn|error
 	LogFormat string // text|json
+}
+
+// ReputationFeed — URL-фид для фонового обновления.
+type ReputationFeed struct {
+	Name     string `json:"name"`
+	URL      string `json:"url"`
+	Category string `json:"category"`
+	Format   string `json:"format"` // netset
 }
 
 func FromEnv() Config {
@@ -95,8 +122,8 @@ func FromEnv() Config {
 		AuthUsersFile:        envOr("AUTH_USERS_FILE", "/app/data/users.json"),
 		APITokensFile:        envOr("API_TOKENS_FILE", "/app/data/api_tokens.json"),
 		RetentionFile:        envOr("RETENTION_FILE", "/app/data/retention.json"),
-		MaxLogUploadSize: envInt64("MAX_LOG_UPLOAD_SIZE", 1<<30), // 1 GiB
-		MaxGeoUploadSize: envInt64("MAX_GEO_UPLOAD_SIZE", 1<<30), // 1 GiB
+		MaxLogUploadSize:     envInt64("MAX_LOG_UPLOAD_SIZE", 1<<30), // 1 GiB
+		MaxGeoUploadSize:     envInt64("MAX_GEO_UPLOAD_SIZE", 1<<30), // 1 GiB
 		IngestBatchSize:      envInt("INGEST_BATCH_SIZE", 10000),
 		IngestQueueSize:      envInt("INGEST_QUEUE_SIZE", 300000),
 		IngestWorkers:        envInt("INGEST_WORKERS", 4),
@@ -109,15 +136,19 @@ func FromEnv() Config {
 		CHExternalSort:       envInt64("CH_EXTERNAL_SORT_BYTES", 256<<20),
 		InstallProfilePath:   envOr("INSTALL_PROFILE_PATH", "/app/install-profile.json"),
 
-		CHIngestMaxOpen:     envInt("CH_INGEST_MAX_OPEN_CONNS", 4),
-		CHAPIMaxOpen:        envInt("CH_API_MAX_OPEN_CONNS", 8),
-		CHBackgroundMaxOpen: envInt("CH_BACKGROUND_MAX_OPEN_CONNS", 2),
-		CHIngestAsyncInsert: envBool("CH_INGEST_ASYNC_INSERT", true),
+		CHIngestMaxOpen:         envInt("CH_INGEST_MAX_OPEN_CONNS", 4),
+		CHAPIMaxOpen:            envInt("CH_API_MAX_OPEN_CONNS", 8),
+		CHBackgroundMaxOpen:     envInt("CH_BACKGROUND_MAX_OPEN_CONNS", 2),
+		CHIngestAsyncInsert:     envBool("CH_INGEST_ASYNC_INSERT", true),
 		GeoEnrichOnIngest:       envBool("GEO_ENRICH_ON_INGEST", true),
 		GeoBackfillLookbackDays: envInt("GEO_BACKFILL_LOOKBACK_DAYS", 7),
 		SkipStartupBackfill:     envBool("SKIP_STARTUP_BACKFILL", false),
-		LogLevel:            strings.ToLower(envOr("LOG_LEVEL", "info")),
-		LogFormat:           strings.ToLower(envOr("LOG_FORMAT", "text")),
+		MaxReputationUploadSize: envInt64("MAX_REPUTATION_UPLOAD_SIZE", 1<<30),
+		ReputationFetchEnabled:  envBool("REPUTATION_FETCH_ENABLED", true),
+		ReputationFetchInterval: envDurationFlexible("REPUTATION_FETCH_INTERVAL", 6*time.Hour),
+		ReputationFeeds:         parseReputationFeeds(os.Getenv("REPUTATION_FEEDS")),
+		LogLevel:                strings.ToLower(envOr("LOG_LEVEL", "info")),
+		LogFormat:               strings.ToLower(envOr("LOG_FORMAT", "text")),
 	}
 }
 
@@ -186,4 +217,51 @@ func envDuration(key string, def time.Duration) time.Duration {
 		}
 	}
 	return def
+}
+
+// envDurationFlexible принимает секунды (число) или Go duration ("6h", "30m").
+func envDurationFlexible(key string, def time.Duration) time.Duration {
+	v := strings.TrimSpace(os.Getenv(key))
+	if v == "" {
+		return def
+	}
+	if n, err := strconv.Atoi(v); err == nil && n > 0 {
+		return time.Duration(n) * time.Second
+	}
+	if d, err := time.ParseDuration(v); err == nil && d > 0 {
+		return d
+	}
+	return def
+}
+
+func parseReputationFeeds(raw string) []ReputationFeed {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return DefaultReputationFeeds()
+	}
+	var feeds []ReputationFeed
+	if err := json.Unmarshal([]byte(raw), &feeds); err != nil {
+		return DefaultReputationFeeds()
+	}
+	out := make([]ReputationFeed, 0, len(feeds))
+	for _, f := range feeds {
+		f.Name = strings.TrimSpace(f.Name)
+		f.URL = strings.TrimSpace(f.URL)
+		f.Category = strings.TrimSpace(f.Category)
+		f.Format = strings.ToLower(strings.TrimSpace(f.Format))
+		if f.Name == "" || f.URL == "" {
+			continue
+		}
+		if f.Category == "" {
+			f.Category = "unknown"
+		}
+		if f.Format == "" {
+			f.Format = "netset"
+		}
+		out = append(out, f)
+	}
+	if len(out) == 0 {
+		return DefaultReputationFeeds()
+	}
+	return out
 }

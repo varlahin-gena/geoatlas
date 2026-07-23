@@ -98,6 +98,9 @@ function updateMapOverlay() {
         if (currentFilter !== 'all') hints.push('фильтр «' + currentFilter + '»');
         if (currentSearch) hints.push('поиск «' + currentSearch + '»');
         if (minCount > 1) hints.push('порог ≥ ' + minCount + ' соб.');
+        if (typeof reputationFilterActiveCount === 'function' && reputationFilterActiveCount() > 0 && currentGroupBy() === 'ip') {
+            hints.push('репутация');
+        }
         text.textContent = hints.length
             ? 'Активные фильтры скрыли все связи: ' + hints.join(', ') + '.'
             : 'Все связи отфильтрованы текущими настройками.';
@@ -192,6 +195,10 @@ function showLineDetail(line) {
             zone: line.dst_zone,
             country: line.dst_country,
         }, groupBy, coarse) },
+        { title: 'Репутация', rows: [
+            { key: 'Src', value: typeof formatReputationHits === 'function' ? formatReputationHits(line.src_reputation) : '' },
+            { key: 'Dst', value: typeof formatReputationHits === 'function' ? formatReputationHits(line.dst_reputation) : '' },
+        ]},
         { title: 'Параметры', rows: [
             { key: lineDetailSampleKey('Protocol', coarse), value: line.proto || '' },
             { key: lineDetailSampleKey('Rule', coarse), value: line.rule || '' },
@@ -254,6 +261,7 @@ function showPointDetail(point, key) {
             { key: 'Страна', value: ruCountry(point.country) },
             { key: 'Lat / Lon', value: `${point.lat.toFixed(4)}, ${point.lon.toFixed(4)}` },
             { key: 'Событий', value: fmtNumber(point.count) },
+            { key: 'Репутация', value: typeof formatReputationHits === 'function' ? formatReputationHits(point.reputation) : '' },
         ]},
     ];
 

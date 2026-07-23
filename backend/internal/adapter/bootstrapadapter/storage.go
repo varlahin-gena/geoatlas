@@ -36,6 +36,10 @@ func (s *Storage) EnsureGeoEdgesAggSchema(ctx context.Context) error {
 	return migrate.EnsureGeoEdgesAggSchema(ctx, s.CH)
 }
 
+func (s *Storage) EnsureReputationRanges(ctx context.Context) error {
+	return migrate.EnsureReputationRanges(ctx, s.CH)
+}
+
 func (s *Storage) BackfillEdgesAgg(ctx context.Context) error {
 	return migrate.BackfillEdgesAgg(ctx, s.CH)
 }

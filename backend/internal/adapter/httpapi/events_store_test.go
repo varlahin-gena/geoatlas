@@ -40,7 +40,7 @@ func TestGetEventsUsesTrafficStoreForHoursGeo(t *testing.T) {
 	stub := &stubTraffic{}
 	h := &EventsHandler{Deps: &Deps{
 		cfg:      config.Config{QueryTimeout: time.Minute},
-		eventsUC: usecaseevents.New(stub, geoip.New()),
+		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
 	}}
 	req := httptest.NewRequest(http.MethodGet, "/api/events?hours=6&group_by=city", nil)
 	rec := httptest.NewRecorder()
@@ -71,7 +71,7 @@ func TestGetEventsIPUsesGeoEdgesPath(t *testing.T) {
 	stub := &stubTraffic{}
 	h := &EventsHandler{Deps: &Deps{
 		cfg:      config.Config{QueryTimeout: time.Minute},
-		eventsUC: usecaseevents.New(stub, geoip.New()),
+		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
 	}}
 	req := httptest.NewRequest(http.MethodGet, "/api/events?hours=6&group_by=ip", nil)
 	rec := httptest.NewRecorder()
@@ -125,7 +125,7 @@ func TestGetEventsFallsBackToLiveGeoWhenStoredCoordsEmpty(t *testing.T) {
 	stub := &stubTrafficNoGeo{}
 	h := &EventsHandler{Deps: &Deps{
 		cfg:      config.Config{QueryTimeout: time.Minute},
-		eventsUC: usecaseevents.New(stub, geoip.New()),
+		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
 	}}
 	req := httptest.NewRequest(http.MethodGet, "/api/events?hours=24&group_by=city", nil)
 	rec := httptest.NewRecorder()
@@ -172,7 +172,7 @@ func TestGetEventsIPUsesStoredLogGeoWhenLiveMisses(t *testing.T) {
 	stub := &stubTrafficIPLogGeo{}
 	h := &EventsHandler{Deps: &Deps{
 		cfg:      config.Config{QueryTimeout: time.Minute},
-		eventsUC: usecaseevents.New(stub, geoip.New()),
+		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
 	}}
 	req := httptest.NewRequest(http.MethodGet, "/api/events?hours=6&group_by=ip", nil)
 	rec := httptest.NewRecorder()
@@ -218,7 +218,7 @@ func TestGetEventsSubnetUsesCountryFallback(t *testing.T) {
 	stub := &stubTrafficIPCountryOnly{}
 	h := &EventsHandler{Deps: &Deps{
 		cfg:      config.Config{QueryTimeout: time.Minute},
-		eventsUC: usecaseevents.New(stub, geoip.New()),
+		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
 	}}
 	req := httptest.NewRequest(http.MethodGet, "/api/events?hours=6&group_by=subnet", nil)
 	rec := httptest.NewRecorder()

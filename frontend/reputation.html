@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ГеоАтлас — Репутация IP</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem('nm.theme');
+    if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+})();
+</script>
+<link rel="stylesheet" href="/theme.css" />
+<link rel="stylesheet" href="/common.css" />
+<style>
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0 16px; }
+.err { color: var(--red); font-size: 12px; }
+.source-pill {
+  display: inline-block; padding: 1px 6px; border-radius: 4px;
+  font-size: 11px; background: var(--panel-3); color: var(--text-dim);
+}
+</style>
+</head>
+<body class="page-admin">
+<header id="adminTopbar"></header>
+
+<main class="page-content" id="main-content">
+  <div class="page-content-inner">
+    <h1>Репутация IP</h1>
+    <p class="hint">
+      Офлайн-списки (по умолчанию FireHOL level1). Можно загрузить свой CSV
+      (<code>Network,List,Category</code>) или обновить URL-фиды.
+    </p>
+
+    <div class="summary" id="summary"></div>
+
+    <div class="toolbar">
+      <button class="btn" id="refresh">Обновить</button>
+      <button class="btn primary" id="btnRefreshFeeds" title="Скачать фиды заново">Обновить фиды</button>
+      <button class="btn" id="btnUpload" title="CSV: Network,List,Category">Загрузить CSV</button>
+      <input type="file" id="fileInput" accept=".csv,text/csv,text/plain" hidden />
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Список</th>
+            <th scope="col">Категория</th>
+            <th scope="col">Диапазонов</th>
+            <th scope="col">Источник</th>
+            <th scope="col">Обновлён</th>
+            <th scope="col">Ошибка</th>
+            <th scope="col"><span class="visually-hidden">Действия</span></th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr><td colspan="7" class="empty">Загрузка…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<div class="toast-host" id="toastHost" aria-live="polite"></div>
+
+<script src="/config.js"></script>
+<script src="/auth.js"></script>
+<script src="/common.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  async function loadLists() {
+    const tbody = document.getElementById('tbody');
+    const summary = document.getElementById('summary');
+    try {
+      const res = await fetch('/api/reputation/lists', { credentials: 'same-origin', cache: 'no-store' });
+      if (res.status === 401) {
+        location.replace(NMAuth.loginUrl(location.pathname));
+        return;
+      }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const lists = data.lists || [];
+      const totalRanges = lists.reduce(function (s, x) { return s + (x.count || 0); }, 0);
+      summary.textContent = lists.length
+        ? ('Списков: ' + lists.length + ', диапазонов: ' + NMUI.fmtNumber(totalRanges))
+        : 'Списки ещё не загружены — нажмите «Обновить фиды» или загрузите CSV.';
+      if (!lists.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty">Нет данных</td></tr>';
+        return;
+      }
+      tbody.innerHTML = lists.map(function (l) {
+        return '<tr>' +
+          '<td>' + NMUI.escapeHTML(l.name) + '</td>' +
+          '<td>' + NMUI.escapeHTML(l.category || '') + '</td>' +
+          '<td>' + NMUI.fmtNumber(l.count) + '</td>' +
+          '<td><span class="source-pill">' + NMUI.escapeHTML(l.source || '') + '</span></td>' +
+          '<td>' + NMUI.fmtDate(l.updated_at) + '</td>' +
+          '<td class="err">' + NMUI.escapeHTML(l.last_error || '') + '</td>' +
+          '<td><button type="button" class="btn" data-del="' + NMUI.escapeHTML(l.name) + '">Удалить</button></td>' +
+          '</tr>';
+      }).join('');
+    } catch (e) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty">Ошибка: ' + NMUI.escapeHTML(e.message) + '</td></tr>';
+      NMUI.toast('Не удалось загрузить списки', 'error');
+    }
+  }
+
+  document.getElementById('refresh').addEventListener('click', loadLists);
+  document.getElementById('btnUpload').addEventListener('click', function () {
+    document.getElementById('fileInput').click();
+  });
+  document.getElementById('fileInput').addEventListener('change', async function () {
+    const file = this.files && this.files[0];
+    this.value = '';
+    if (!file) return;
+    try {
+      const res = await fetch('/upload-reputation', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: NMAuth.nmAuthHeaders({ 'Content-Type': 'text/csv' }),
+        body: await file.text(),
+      });
+      const data = await res.json().catch(function () { return {}; });
+      if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+      NMUI.toast('Загружено диапазонов: ' + (data.ranges || 0), 'success');
+      loadLists();
+    } catch (e) {
+      NMUI.toast(e.message || String(e), 'error');
+    }
+  });
+  document.getElementById('btnRefreshFeeds').addEventListener('click', async function () {
+    try {
+      const res = await fetch('/api/reputation/refresh?force=1', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: NMAuth.nmAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: '{}',
+      });
+      const data = await res.json().catch(function () { return {}; });
+      if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+      const upd = (data.updated || []).length;
+      const fail = (data.failed || []).length;
+      NMUI.toast('Обновлено: ' + upd + (fail ? ', ошибок: ' + fail : ''), fail ? 'error' : 'success');
+      loadLists();
+    } catch (e) {
+      NMUI.toast(e.message || String(e), 'error');
+    }
+  });
+  document.getElementById('tbody').addEventListener('click', async function (e) {
+    const btn = e.target.closest('[data-del]');
+    if (!btn) return;
+    const name = btn.getAttribute('data-del');
+    if (!confirm('Удалить список «' + name + '»?')) return;
+    try {
+      const res = await fetch('/api/reputation/lists/' + encodeURIComponent(name), {
+        method: 'DELETE',
+        credentials: 'same-origin',
+        headers: NMAuth.nmAuthHeaders(),
+      });
+      const data = await res.json().catch(function () { return {}; });
+      if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+      NMUI.toast('Удалено: ' + name, 'success');
+      loadLists();
+    } catch (err) {
+      NMUI.toast(err.message || String(err), 'error');
+    }
+  });
+
+  (async function boot() {
+    const bar = NMUI.mountAdminTopbar('#adminTopbar', {
+      title: 'ГеоАтлас',
+      subtitle: '· Репутация IP',
+    });
+    const user = await NMAuth.requireLogin({ admin: true });
+    if (!user) return;
+    NMAuth.renderUserBar(user, bar.userBarHost);
+    NMUI.startSystemHealthPolling({ isAdmin: true });
+    await loadLists();
+  })();
+})();
+</script>
+</body>
+</html>

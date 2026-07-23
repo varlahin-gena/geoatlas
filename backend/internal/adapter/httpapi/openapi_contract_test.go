@@ -37,15 +37,17 @@ func TestOpenAPIPathsMatchMux(t *testing.T) {
 
 	srv := NewServer(
 		config.Config{
-			ListenAddr:       ":0",
-			APIAuthToken:     "test-token",
-			MaxLogUploadSize: 1 << 20,
-			MaxGeoUploadSize: 1 << 20,
-			QueryTimeout:     0,
+			ListenAddr:              ":0",
+			APIAuthToken:            "test-token",
+			MaxLogUploadSize:        1 << 20,
+			MaxGeoUploadSize:        1 << 20,
+			MaxReputationUploadSize: 1 << 20,
+			QueryTimeout:            0,
 		},
 		nil, // ingest
 		nil, // eventsUC
 		nil, // geoUC
+		nil, // reputationUC
 		nil, // parseErrorsUC
 		nil, // systemUC
 		nil, // systemPinger

@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"network_monitor/internal/model"
 	"network_monitor/internal/mapagg"
+	"network_monitor/internal/model"
 )
 
 // GetMapInput — параметры построения карты.
@@ -34,12 +34,13 @@ type GetMapResult struct {
 
 // Service — application use cases для карты/events.
 type Service struct {
-	traffic TrafficRepository
-	geo     GeoLookuper
+	traffic    TrafficRepository
+	geo        GeoLookuper
+	reputation ReputationLookuper
 }
 
-func New(traffic TrafficRepository, geo GeoLookuper) *Service {
-	return &Service{traffic: traffic, geo: geo}
+func New(traffic TrafficRepository, geo GeoLookuper, reputation ReputationLookuper) *Service {
+	return &Service{traffic: traffic, geo: geo, reputation: reputation}
 }
 
 // GetMap строит линии/узлы: сначала pre-agg geo edges, иначе live IP + GeoIP.
@@ -96,7 +97,36 @@ func (s *Service) GetMap(ctx context.Context, in GetMapInput) (GetMapResult, err
 	if out.Points == nil {
 		out.Points = map[string]model.Node{}
 	}
+	if groupBy == "ip" {
+		enrichMapReputation(out.Lines, out.Points, s.reputation)
+	}
 	return out, nil
+}
+
+func enrichMapReputation(lines []model.Line, points map[string]model.Node, rep ReputationLookuper) {
+	if rep == nil {
+		return
+	}
+	cache := map[string][]model.ReputationHit{}
+	lookup := func(ip string) []model.ReputationHit {
+		if ip == "" {
+			return nil
+		}
+		if h, ok := cache[ip]; ok {
+			return h
+		}
+		h := rep.Lookup(ip)
+		cache[ip] = h
+		return h
+	}
+	for i := range lines {
+		lines[i].SrcReputation = lookup(lines[i].Src)
+		lines[i].DstReputation = lookup(lines[i].Dst)
+	}
+	for k, n := range points {
+		n.Reputation = lookup(k)
+		points[k] = n
+	}
 }
 
 func normalizeGroupBy(v string) string {

@@ -45,6 +45,8 @@ function bindUI() {
     $('filter-allowed')?.addEventListener('click', () => setFilter('allowed'));
     $('filter-blocked')?.addEventListener('click', () => setFilter('blocked'));
 
+    if (typeof bindReputationMenu === 'function') bindReputationMenu();
+
     $('logFile')?.addEventListener('change', async function () {
         if (this.files && this.files.length) await uploadLogs();
         this.value = '';

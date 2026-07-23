@@ -54,6 +54,7 @@ async function fetchData(opts) {
         _statsCacheVersion++;
 
         renderStats();
+        if (typeof updateReputationMenuUI === 'function') updateReputationMenuUI();
         updateMapOverlay();
         NMUI.fetchSystemHealth();
 
@@ -156,6 +157,15 @@ function resetView() {
     document.getElementById('minCountVal').textContent = '1';
     document.getElementById('maxArcs').value = MAX_ARCS_DEFAULT;
     document.getElementById('maxArcsVal').textContent = fmtNumber(MAX_ARCS_DEFAULT);
+    if (typeof clearReputationFilters === 'function') {
+        // clearReputationFilters already redraws; avoid double refresh below by only clearing state here
+        repFilterCategories.clear();
+        repFilterLists.clear();
+        repFilterSide = 'any';
+        const sideEl = document.getElementById('repFilterSide');
+        if (sideEl) sideEl.value = 'any';
+        if (typeof updateReputationMenuUI === 'function') updateReputationMenuUI();
+    }
     applyFilterUI();
     mapViewState = { longitude: 37.6, latitude: 55.7, zoom: 2.5, pitch: 0, bearing: 0 };
     globeViewState = { longitude: 30, latitude: 30, zoom: 0.85, pitch: 0, bearing: 0 };

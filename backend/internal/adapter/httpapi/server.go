@@ -14,6 +14,7 @@ import (
 	usecasegeo "network_monitor/internal/usecase/geo"
 	"network_monitor/internal/usecase/parseerrors"
 	"network_monitor/internal/usecase/parsetest"
+	usecasereputation "network_monitor/internal/usecase/reputation"
 	usecaseretention "network_monitor/internal/usecase/retention"
 	usecasesystem "network_monitor/internal/usecase/system"
 )
@@ -36,6 +37,7 @@ func NewServer(
 	ingestSvc Ingester,
 	eventsUC *usecaseevents.Service,
 	geoUC *usecasegeo.Service,
+	reputationUC *usecasereputation.Service,
 	parseErrorsUC *parseerrors.Service,
 	systemUC *usecasesystem.Service,
 	systemPinger usecasesystem.ClickHousePinger,
@@ -46,12 +48,13 @@ func NewServer(
 	sessions *auth.SessionManager,
 	apiTokens *auth.TokenStore,
 ) *Server {
-	deps := NewDeps(cfg, ingestSvc, eventsUC, geoUC, parseErrorsUC, systemUC, systemPinger, parseTestUC, retentionUC).
+	deps := NewDeps(cfg, ingestSvc, eventsUC, geoUC, reputationUC, parseErrorsUC, systemUC, systemPinger, parseTestUC, retentionUC).
 		WithAuth(authUC, users, sessions, apiTokens)
 	health := &HealthHandler{deps}
 	events := &EventsHandler{deps}
 	ingestH := &IngestHandler{deps}
 	geoH := &GeoHandler{deps}
+	repH := &ReputationHandler{deps}
 	system := &SystemHandler{deps}
 	parse := &ParseHandler{deps}
 	authH := &AuthHandler{deps}
@@ -153,6 +156,19 @@ func NewServer(
 		chain(http.HandlerFunc(geoH.UpdateGeoRange), opsMW, csrf, maxBytesMW(maxJSONBodySize)),
 	).Methods("PUT")
 
+	r.Handle("/api/reputation/lists",
+		withTimeout(chain(http.HandlerFunc(repH.ListLists), adminMW), readTimeout),
+	).Methods("GET")
+	r.Handle("/api/reputation/lists/{name}",
+		chain(http.HandlerFunc(repH.DeleteList), opsMW, csrf),
+	).Methods("DELETE")
+	r.Handle("/api/reputation/refresh",
+		chain(http.HandlerFunc(repH.Refresh), opsMW, csrf, maxBytesMW(maxJSONBodySize)),
+	).Methods("POST")
+	r.Handle("/api/reputation/lookup",
+		withTimeout(chain(http.HandlerFunc(repH.Lookup), loginMW), healthTimeout),
+	).Methods("GET")
+
 	// --- Только администратор ---
 	r.Handle("/api/system/stats",
 		withTimeout(chain(http.HandlerFunc(system.GetSystemStats), adminMW), readTimeout),
@@ -197,6 +213,9 @@ func NewServer(
 	).Methods("POST")
 	r.Handle("/upload-geo",
 		chain(http.HandlerFunc(geoH.UploadGeo), opsMW, csrf, maxBytesMW(cfg.MaxGeoUploadSize)),
+	).Methods("POST")
+	r.Handle("/upload-reputation",
+		chain(http.HandlerFunc(repH.UploadReputation), opsMW, csrf, maxBytesMW(cfg.MaxReputationUploadSize)),
 	).Methods("POST")
 
 	return &Server{

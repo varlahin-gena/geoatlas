@@ -11,6 +11,7 @@ type SchemaEnsurer interface {
 	EnsureTrafficLogsSuccess(ctx context.Context) error
 	EnsureEdgesAggSchema(ctx context.Context) error
 	EnsureGeoEdgesAggSchema(ctx context.Context) error
+	EnsureReputationRanges(ctx context.Context) error
 }
 
 // AggBackfiller — backfill агрегатов.
