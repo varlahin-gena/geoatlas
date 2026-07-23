@@ -75,3 +75,28 @@ func TestValidateSecurityAPIAuthDisabledAlone(t *testing.T) {
 		t.Fatal("expected error for API_AUTH_DISABLED without NM_ALLOW_INSECURE")
 	}
 }
+
+func TestAPIAuthTokensIncludesPrevious(t *testing.T) {
+	cfg := Config{APIAuthToken: "current", APIAuthPreviousToken: "previous"}
+	got := cfg.APIAuthTokens()
+	if len(got) != 2 || got[0] != "current" || got[1] != "previous" {
+		t.Fatalf("tokens=%#v", got)
+	}
+	cfg.APIAuthPreviousToken = "current"
+	got = cfg.APIAuthTokens()
+	if len(got) != 1 || got[0] != "current" {
+		t.Fatalf("dedupe want 1, got %#v", got)
+	}
+}
+
+func TestValidateSecurityRejectsPreviousPlaceholder(t *testing.T) {
+	t.Setenv("NM_ALLOW_INSECURE", "")
+	cfg := Config{
+		APIAuthToken:         "unique-token-xyz",
+		APIAuthPreviousToken: "dev-insecure-change-me",
+		SessionSecret:        "ok-secret-not-placeholder",
+	}
+	if err := cfg.ValidateSecurity(); err == nil {
+		t.Fatal("expected error for insecure previous token")
+	}
+}

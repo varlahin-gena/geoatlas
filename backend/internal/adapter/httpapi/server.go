@@ -56,18 +56,18 @@ func NewServer(
 	authH := &AuthHandler{deps}
 	usersH := &UsersHandler{deps}
 
-	authToken := cfg.APIAuthToken
+	authTokens := cfg.APIAuthTokens()
 	if cfg.APIAuthDisabled {
-		authToken = ""
+		authTokens = nil
 	}
 	uiAuthOff := cfg.AuthDisabled
 	apiAuthOff := cfg.APIAuthDisabled
 
-	loginMW := requireLoginMW(authToken, sessions, users, uiAuthOff)
-	adminMW := requireAdminMW(authToken, sessions, users, uiAuthOff)
+	loginMW := requireLoginMW(authTokens, sessions, users, uiAuthOff)
+	adminMW := requireAdminMW(authTokens, sessions, users, uiAuthOff)
 	// Pipeline ops: Bearer / administrator; open if AUTH_DISABLED или API_AUTH_DISABLED.
-	opsMW := requireOpsMW(authToken, sessions, users, apiAuthOff, uiAuthOff)
-	csrf := csrfMW(authToken, uiAuthOff)
+	opsMW := requireOpsMW(authTokens, sessions, users, apiAuthOff, uiAuthOff)
+	csrf := csrfMW(authTokens, uiAuthOff)
 
 	r := mux.NewRouter()
 

@@ -18,8 +18,9 @@ type Config struct {
 	ClickHouseUser      string
 	ClickHousePassword  string
 	ClickHouseDatabase  string
-	APIAuthToken        string
-	APIAuthDisabled     bool // API_AUTH_DISABLED=1 — только local/dev; иначе токен обязателен
+	APIAuthToken         string
+	APIAuthPreviousToken string // API_AUTH_PREVIOUS_TOKEN — ротация Bearer без даунтайма
+	APIAuthDisabled      bool   // API_AUTH_DISABLED=1 — только local/dev; иначе токен обязателен
 
 	// Локальная авторизация UI (логин/роли). AUTH_DISABLED=1 — без логина (dev).
 	AuthDisabled         bool
@@ -80,6 +81,7 @@ func FromEnv() Config {
 		ClickHousePassword:   envOr("CLICKHOUSE_PASSWORD", ""),
 		ClickHouseDatabase:   envOr("CLICKHOUSE_DATABASE", "default"),
 		APIAuthToken:         envOr("API_AUTH_TOKEN", ""),
+		APIAuthPreviousToken: envOr("API_AUTH_PREVIOUS_TOKEN", ""),
 		APIAuthDisabled:      envBool("API_AUTH_DISABLED", false),
 		AuthDisabled:         envBool("AUTH_DISABLED", false),
 		SessionSecret:        envOr("SESSION_SECRET", ""),
@@ -133,6 +135,20 @@ func envBool(key string, def bool) bool {
 
 func (c Config) ClickHouseAddr() string {
 	return fmt.Sprintf("%s:%s", c.ClickHouseHost, c.ClickHousePort)
+}
+
+// APIAuthTokens — текущий Bearer и опциональный previous (ротация).
+func (c Config) APIAuthTokens() []string {
+	primary := strings.TrimSpace(c.APIAuthToken)
+	prev := strings.TrimSpace(c.APIAuthPreviousToken)
+	out := make([]string, 0, 2)
+	if primary != "" {
+		out = append(out, primary)
+	}
+	if prev != "" && prev != primary {
+		out = append(out, prev)
+	}
+	return out
 }
 
 func envOr(key, def string) string {

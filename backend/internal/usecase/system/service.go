@@ -237,6 +237,9 @@ func (s *Service) Health(ctx context.Context, pinger ClickHousePinger) (HealthRe
 			if snap.LastError != "" {
 				ingestInfo["last_error"] = snap.LastError
 			}
+			if snap.LastDropAt != "" {
+				ingestInfo["last_drop_at"] = snap.LastDropAt
+			}
 			if len(reasons) > 0 {
 				ingestInfo["reasons"] = reasons
 			}
@@ -284,6 +287,9 @@ func mergeLiveIngestStats(resp *SystemStatsResponse, ingestStats IngestSnapshot)
 	h["state"], h["state_text"] = stateValue, ingestStats.State
 	if ingestStats.LastError != "" {
 		h["last_error"] = ingestStats.LastError
+	}
+	if ingestStats.LastDropAt != "" {
+		h["last_drop_at"] = ingestStats.LastDropAt
 	}
 	now := time.Now()
 	if resp.Pipeline["rate"] == nil {

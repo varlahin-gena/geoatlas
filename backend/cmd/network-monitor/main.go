@@ -224,19 +224,28 @@ func main() {
 	<-ctx.Done()
 	slog.Info("shutdown signal received")
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	if err := srv.Shutdown(shutdownCtx); err != nil {
+	httpCtx, httpCancel := context.WithTimeout(context.Background(), 15*time.Second)
+	if err := srv.Shutdown(httpCtx); err != nil {
 		slog.Warn("http shutdown failed", "err", err)
 	} else {
 		slog.Info("http shutdown complete")
 	}
+	httpCancel()
 
 	geoStopCtx, geoStopCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	geoJobs.Shutdown(geoStopCtx)
 	geoStopCancel()
 
+	// Отдельный бюджет: не делим 15s HTTP с drain очереди ingest.
+	ingestWait := ingestSvc.ShutdownWaitTimeout()
+	ingestSnap := ingestSvc.Stats()
+	slog.Info("waiting for ingest drain",
+		"budget", ingestWait.String(),
+		"queue_depth", ingestSnap.QueueDepth,
+		"dropped_total", ingestSnap.DroppedTotal,
+	)
+	ingestWaitCtx, ingestWaitCancel := context.WithTimeout(context.Background(), ingestWait)
+	defer ingestWaitCancel()
 	if ingestDone != nil {
 		select {
 		case err := <-ingestDone:
@@ -245,13 +254,13 @@ func main() {
 			} else {
 				slog.Info("ingest shutdown complete")
 			}
-		case <-shutdownCtx.Done():
-			slog.Warn("ingest drain timeout")
+		case <-ingestWaitCtx.Done():
+			left := ingestSvc.Stats().QueueDepth
+			slog.Warn("ingest drain timeout", "queue_depth_left", left, "budget", ingestWait.String())
 		}
 	}
 
 	bgCancel()
-	// Отдельный бюджет: HTTP/ingest могли съесть общий shutdownCtx.
 	bgWaitCtx, bgWaitCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer bgWaitCancel()
 	bgDone := make(chan struct{})

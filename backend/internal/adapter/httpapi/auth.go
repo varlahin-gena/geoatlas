@@ -266,7 +266,7 @@ func (h *AuthHandler) bearerAuthorized(r *http.Request) bool {
 	if h == nil || h.Deps == nil || h.cfg.APIAuthDisabled {
 		return false
 	}
-	return bearerOK(r, h.cfg.APIAuthToken)
+	return bearerOK(r, h.cfg.APIAuthTokens()...)
 }
 
 // --- Users CRUD (admin) ---

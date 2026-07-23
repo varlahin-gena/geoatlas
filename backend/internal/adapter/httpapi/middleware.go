@@ -165,45 +165,15 @@ func maxBytesMW(n int64) middleware {
 	}
 }
 
-// authMW проверяет Bearer-токен ИЛИ валидную сессию пользователя.
-// apiAuthDisabled / authDisabled — доступ открыт (dev).
-func authMW(token string, sessions *auth.SessionManager, users *auth.UserStore, apiAuthDisabled, authDisabled bool) middleware {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if authDisabled || apiAuthDisabled {
-				next.ServeHTTP(w, r)
-				return
-			}
-			if bearerOK(r, token) {
-				next.ServeHTTP(w, r)
-				return
-			}
-			if sess, err := SessionFromRequest(r, sessions); err == nil {
-				live, ok := auth.LiveSession(users, sess)
-				if !ok {
-					writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
-					return
-				}
-				if denyIfMustReset(w, users, live.Username) {
-					return
-				}
-				next.ServeHTTP(w, r.WithContext(withSession(r.Context(), live)))
-				return
-			}
-			writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
-		})
-	}
-}
-
 // requireLoginMW требует cookie-сессию, Bearer API-токен, либо AUTH_DISABLED.
-func requireLoginMW(token string, sessions *auth.SessionManager, users *auth.UserStore, authDisabled bool) middleware {
+func requireLoginMW(tokens []string, sessions *auth.SessionManager, users *auth.UserStore, authDisabled bool) middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if authDisabled {
 				next.ServeHTTP(w, r)
 				return
 			}
-			if bearerOK(r, token) {
+			if bearerOK(r, tokens...) {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -226,14 +196,14 @@ func requireLoginMW(token string, sessions *auth.SessionManager, users *auth.Use
 }
 
 // requireAdminMW — роль administrator (из UserStore, не из cookie), Bearer API-токен, либо AUTH_DISABLED.
-func requireAdminMW(token string, sessions *auth.SessionManager, users *auth.UserStore, authDisabled bool) middleware {
+func requireAdminMW(tokens []string, sessions *auth.SessionManager, users *auth.UserStore, authDisabled bool) middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if authDisabled {
 				next.ServeHTTP(w, r)
 				return
 			}
-			if bearerOK(r, token) {
+			if bearerOK(r, tokens...) {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -261,14 +231,14 @@ func requireAdminMW(token string, sessions *auth.SessionManager, users *auth.Use
 
 // requireOpsMW — mutate / metrics / ingest stats: Bearer или administrator.
 // API_AUTH_DISABLED или AUTH_DISABLED открывают доступ (dev / локальный контур).
-func requireOpsMW(token string, sessions *auth.SessionManager, users *auth.UserStore, apiAuthDisabled, authDisabled bool) middleware {
+func requireOpsMW(tokens []string, sessions *auth.SessionManager, users *auth.UserStore, apiAuthDisabled, authDisabled bool) middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if authDisabled || apiAuthDisabled {
 				next.ServeHTTP(w, r)
 				return
 			}
-			if bearerOK(r, token) {
+			if bearerOK(r, tokens...) {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -302,15 +272,28 @@ func denyIfMustReset(w http.ResponseWriter, users *auth.UserStore, username stri
 	return false
 }
 
-func bearerOK(r *http.Request, token string) bool {
-	if token == "" || r == nil {
+// bearerOK принимает один или несколько токенов (текущий + previous при ротации).
+func bearerOK(r *http.Request, tokens ...string) bool {
+	if r == nil || len(tokens) == 0 {
 		return false
 	}
 	got := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
 	if got == "" {
 		return false
 	}
-	return subtle.ConstantTimeCompare([]byte(got), []byte(token)) == 1
+	gotb := []byte(got)
+	ok := 0
+	for _, token := range tokens {
+		if token == "" {
+			continue
+		}
+		tb := []byte(token)
+		if len(tb) != len(gotb) {
+			continue
+		}
+		ok |= subtle.ConstantTimeCompare(gotb, tb)
+	}
+	return ok == 1
 }
 
 // withTimeout навешивает жёсткий дедлайн на быстрые read-эндпоинты.

@@ -30,6 +30,6 @@ func (a *IngestAdapter) Snapshot() (system.IngestSnapshot, bool) {
 		DroppedTotal: snapshot.DroppedTotal, Connections: snapshot.Connections,
 		UDPReceived: snapshot.UDP.ReceivedTotal, UDPConnections: snapshot.UDP.Connections,
 		TCPReceived: snapshot.TCP.ReceivedTotal, TCPConnections: snapshot.TCP.Connections,
-		LastError: snapshot.LastError,
+		LastError: snapshot.LastError, LastDropAt: snapshot.LastDropAt,
 	}, true
 }

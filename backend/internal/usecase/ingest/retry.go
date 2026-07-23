@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"log/slog"
 	"math/big"
+	"net"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -21,6 +24,31 @@ var (
 )
 
 var errInsertCircuitOpen = errors.New("ingest: clickhouse insert circuit open")
+
+// permanentCHCodes — серверные коды ClickHouse, при которых ретрай бесполезен.
+// См. ErrorCodes.cpp в ClickHouse.
+var permanentCHCodes = map[int32]struct{}{
+	60:  {}, // UNKNOWN_TABLE
+	81:  {}, // UNKNOWN_DATABASE
+	62:  {}, // SYNTAX_ERROR
+	47:  {}, // UNKNOWN_IDENTIFIER
+	48:  {}, // NOT_FOUND_COLUMN_IN_BLOCK
+	16:  {}, // NO_SUCH_COLUMN_IN_TABLE (legacy)
+	36:  {}, // BAD_ARGUMENTS
+	53:  {}, // TYPE_MISMATCH
+	80:  {}, // INCORRECT_QUERY
+	117: {}, // NUMBER_OF_COLUMNS_DOESNT_MATCH
+	121: {}, // UNKNOWN_SETTING
+	194: {}, // IP_ADDRESS_NOT_ALLOWED
+	192: {}, // UNKNOWN_USER
+	193: {}, // WRONG_PASSWORD
+	195: {}, // REQUIRED_PASSWORD
+	516: {}, // AUTHENTICATION_FAILED
+	497: {}, // ACCESS_DENIED
+}
+
+// reCHCode ловит "code: 60" из *clickhouse.Exception.Error() и строковых обёрток.
+var reCHCode = regexp.MustCompile(`(?i)\bcode:\s*(\d+)\b`)
 
 func insertBackoff(attempt int) time.Duration {
 	// attempt 1 → base, 2 → 2*base, … с полным jitter.
@@ -48,12 +76,25 @@ func isRetryableInsertError(err error) bool {
 	if errors.Is(err, context.Canceled) {
 		return false
 	}
-	// DeadlineExceeded родителя — не ретраим; короткий attempt timeout отсекается ниже по тексту.
+	// DeadlineExceeded родителя — не ретраим; короткий attempt timeout отсекается ниже.
 	if errors.Is(err, context.DeadlineExceeded) {
 		return false
 	}
 	if errors.Is(err, errInsertCircuitOpen) {
 		return false
+	}
+
+	if code, ok := extractCHCode(err); ok {
+		if _, permanent := permanentCHCodes[code]; permanent {
+			return false
+		}
+		// Прочие CH-коды (MEMORY_LIMIT, TIMEOUT_EXCEEDED, TOO_MANY_SIMULTANEOUS_QUERIES…) — ретраим.
+		return true
+	}
+
+	var ne net.Error
+	if errors.As(err, &ne) {
+		return true
 	}
 
 	msg := strings.ToLower(err.Error())
@@ -63,10 +104,8 @@ func isRetryableInsertError(err error) bool {
 		"unknown database",
 		"authentication failed",
 		"access denied",
-		"code: 60",  // UNKNOWN_TABLE
-		"code: 81",  // UNKNOWN_DATABASE
-		"code: 62",  // SYNTAX_ERROR
-		"code: 516", // AUTHENTICATION_FAILED
+		"wrong password",
+		"unknown user",
 	}
 	for _, p := range permanent {
 		if strings.Contains(msg, p) {
@@ -91,6 +130,7 @@ func isRetryableInsertError(err error) bool {
 		"unexpected packet",
 		"read: connection",
 		"write: connection",
+		"acquire conn timeout",
 	}
 	for _, r := range retryable {
 		if strings.Contains(msg, r) {
@@ -99,6 +139,19 @@ func isRetryableInsertError(err error) bool {
 	}
 	// Неизвестные ошибки — ретраим осторожно (сеть/CH часто так сигналят).
 	return true
+}
+
+func extractCHCode(err error) (int32, bool) {
+	for e := err; e != nil; e = errors.Unwrap(e) {
+		if m := reCHCode.FindStringSubmatch(e.Error()); len(m) == 2 {
+			n, convErr := strconv.ParseInt(m[1], 10, 32)
+			if convErr != nil {
+				continue
+			}
+			return int32(n), true
+		}
+	}
+	return 0, false
 }
 
 // insertWithRetry вызывает fn с таймаутом на попытку; при retryable-ошибках —

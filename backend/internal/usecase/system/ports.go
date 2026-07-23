@@ -37,6 +37,7 @@ type IngestSnapshot struct {
 	BufferedLines, QueueDepth, QueueCapacity, DroppedTotal, Connections       int64
 	UDPReceived, UDPConnections, TCPReceived, TCPConnections                  int64
 	LastError                                                                 string
+	LastDropAt                                                                string // RFC3339; empty if never dropped
 }
 
 // IngestLive exposes optional live ingest metrics.

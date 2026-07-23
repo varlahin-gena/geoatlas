@@ -40,6 +40,10 @@ func (c Config) ValidateSecurity() error {
 		if !allowInsecure && isListed(token, insecureAPIAuthTokens) {
 			return fmt.Errorf("API_AUTH_TOKEN is a known insecure placeholder from docker-compose; generate via start.sh or set a unique token (NM_ALLOW_INSECURE=1 to override)")
 		}
+		prev := strings.TrimSpace(c.APIAuthPreviousToken)
+		if prev != "" && !allowInsecure && isListed(prev, insecureAPIAuthTokens) {
+			return fmt.Errorf("API_AUTH_PREVIOUS_TOKEN is a known insecure placeholder; use a real previous token or unset it")
+		}
 	}
 
 	if !c.AuthDisabled {

@@ -49,6 +49,36 @@ func TestDrainWorkerReturnsOnEmptyQueue(t *testing.T) {
 	}
 }
 
+func TestDrainTimeoutScalesWithQueue(t *testing.T) {
+	svc := &Service{
+		cfg: Config{
+			Workers:       2,
+			BatchSize:     100,
+			FlushInterval: time.Second,
+			QueryTimeout:  3 * time.Minute, // не должен стать базой drain
+		},
+		lineCh: make(chan ingestedLine, 10000),
+	}
+	empty := svc.drainTimeout()
+	if empty != 30*time.Second {
+		t.Fatalf("empty queue drain=%s want 30s", empty)
+	}
+	for i := 0; i < 5000; i++ {
+		svc.lineCh <- ingestedLine{line: "x"}
+	}
+	got := svc.drainTimeout()
+	if got <= empty {
+		t.Fatalf("deep queue drain=%s should exceed empty=%s", got, empty)
+	}
+	if got > 2*time.Minute {
+		t.Fatalf("drain=%s exceeds 2m cap", got)
+	}
+	wait := svc.ShutdownWaitTimeout()
+	if wait <= got {
+		t.Fatalf("ShutdownWaitTimeout=%s should exceed drainTimeout=%s", wait, got)
+	}
+}
+
 func TestIngestRunConnLimitAndShutdown(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

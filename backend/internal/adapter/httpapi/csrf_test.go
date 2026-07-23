@@ -20,7 +20,7 @@ func TestCSRFMiddlewareRejectsMissingToken(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	h := csrfMW("bearer-secret", false)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := csrfMW([]string{"bearer-secret"}, false)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 
@@ -48,7 +48,7 @@ func TestCSRFMiddlewareAcceptsMatchingToken(t *testing.T) {
 	}
 	csrf := "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899"
 
-	h := csrfMW("bearer-secret", false)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := csrfMW([]string{"bearer-secret"}, false)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 
@@ -66,7 +66,7 @@ func TestCSRFMiddlewareAcceptsMatchingToken(t *testing.T) {
 }
 
 func TestCSRFMiddlewareSkipsBearer(t *testing.T) {
-	h := csrfMW("bearer-secret", false)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := csrfMW([]string{"bearer-secret"}, false)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	req := httptest.NewRequest(http.MethodPost, "/api/ingest", nil)
@@ -81,7 +81,7 @@ func TestCSRFMiddlewareSkipsBearer(t *testing.T) {
 
 func TestCSRFMiddlewareRejectsBadOrigin(t *testing.T) {
 	csrf := "token-value-32chars-minimum-here!!"
-	h := csrfMW("bearer-secret", false)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := csrfMW([]string{"bearer-secret"}, false)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	req := httptest.NewRequest(http.MethodPost, "/upload-logs", nil)

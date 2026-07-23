@@ -71,7 +71,7 @@ func TestAuthCheckAdminOpenWhenAPIAuthDisabled(t *testing.T) {
 func TestRequireLoginMWAllowsBearer(t *testing.T) {
 	h := chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
-	}), requireLoginMW("secret", nil, nil, false))
+	}), requireLoginMW([]string{"secret"}, nil, nil, false))
 	req := httptest.NewRequest(http.MethodGet, "/api/events", nil)
 	req.Header.Set("Authorization", "Bearer secret")
 	rec := httptest.NewRecorder()
@@ -81,10 +81,10 @@ func TestRequireLoginMWAllowsBearer(t *testing.T) {
 	}
 }
 
-func TestAuthMWUnauthorized(t *testing.T) {
+func TestRequireLoginMWUnauthorized(t *testing.T) {
 	h := chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	}), authMW("secret", nil, nil, false, false))
+	}), requireLoginMW([]string{"secret"}, nil, nil, false))
 	req := httptest.NewRequest(http.MethodPost, "/api/ingest", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -93,16 +93,16 @@ func TestAuthMWUnauthorized(t *testing.T) {
 	}
 }
 
-func TestAuthMWAllowsBearer(t *testing.T) {
+func TestRequireLoginMWAllowsPreviousBearer(t *testing.T) {
 	h := chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
-	}), authMW("secret", nil, nil, false, false))
-	req := httptest.NewRequest(http.MethodPost, "/api/ingest", nil)
-	req.Header.Set("Authorization", "Bearer secret")
+	}), requireLoginMW([]string{"new-token", "old-token"}, nil, nil, false))
+	req := httptest.NewRequest(http.MethodGet, "/api/events", nil)
+	req.Header.Set("Authorization", "Bearer old-token")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusNoContent {
-		t.Fatalf("status = %d, want 204", rec.Code)
+		t.Fatalf("status = %d, want 204 for previous token", rec.Code)
 	}
 }
 
@@ -117,7 +117,7 @@ func TestRequireAdminMWForbiddenForOperator(t *testing.T) {
 	}
 	h := chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
-	}), requireAdminMW("api-token", mgr, nil, false))
+	}), requireAdminMW([]string{"api-token"}, mgr, nil, false))
 	req := httptest.NewRequest(http.MethodGet, "/api/system/stats", nil)
 	req.AddCookie(&http.Cookie{Name: auth.CookieName, Value: token})
 	rec := httptest.NewRecorder()
@@ -138,7 +138,7 @@ func TestRequireAdminMWAllowsAdministrator(t *testing.T) {
 	}
 	h := chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
-	}), requireAdminMW("api-token", mgr, nil, false))
+	}), requireAdminMW([]string{"api-token"}, mgr, nil, false))
 	req := httptest.NewRequest(http.MethodGet, "/api/system/stats", nil)
 	req.AddCookie(&http.Cookie{Name: auth.CookieName, Value: token})
 	rec := httptest.NewRecorder()
@@ -174,7 +174,7 @@ func TestRequireAdminMWDeniesStickyAdminAfterDemote(t *testing.T) {
 
 	h := chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
-	}), requireAdminMW("api-token", mgr, store, false))
+	}), requireAdminMW([]string{"api-token"}, mgr, store, false))
 	req := httptest.NewRequest(http.MethodGet, "/api/system/stats", nil)
 	req.AddCookie(&http.Cookie{Name: auth.CookieName, Value: token})
 	rec := httptest.NewRecorder()
@@ -184,7 +184,7 @@ func TestRequireAdminMWDeniesStickyAdminAfterDemote(t *testing.T) {
 	}
 }
 
-func TestAuthMWAllowsSession(t *testing.T) {
+func TestRequireLoginMWAllowsSession(t *testing.T) {
 	mgr, err := auth.NewSessionManager("mw-secret", time.Hour)
 	if err != nil {
 		t.Fatal(err)
@@ -195,7 +195,7 @@ func TestAuthMWAllowsSession(t *testing.T) {
 	}
 	h := chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
-	}), authMW("api-token", mgr, nil, false, false))
+	}), requireLoginMW([]string{"api-token"}, mgr, nil, false))
 	req := httptest.NewRequest(http.MethodPost, "/upload-logs", nil)
 	req.AddCookie(&http.Cookie{Name: auth.CookieName, Value: token})
 	rec := httptest.NewRecorder()
@@ -227,7 +227,7 @@ func TestOpsMWForbidsOperator(t *testing.T) {
 	}
 	h := chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
-	}), requireOpsMW("api-token", mgr, store, false, false))
+	}), requireOpsMW([]string{"api-token"}, mgr, store, false, false))
 	req := httptest.NewRequest(http.MethodPost, "/upload-logs", nil)
 	req.AddCookie(&http.Cookie{Name: auth.CookieName, Value: token})
 	rec := httptest.NewRecorder()
@@ -240,7 +240,7 @@ func TestOpsMWForbidsOperator(t *testing.T) {
 func TestOpsMWAllowsBearer(t *testing.T) {
 	h := chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
-	}), requireOpsMW("secret", nil, nil, false, false))
+	}), requireOpsMW([]string{"secret"}, nil, nil, false, false))
 	req := httptest.NewRequest(http.MethodGet, "/api/ingest/stats", nil)
 	req.Header.Set("Authorization", "Bearer secret")
 	rec := httptest.NewRecorder()
@@ -250,11 +250,11 @@ func TestOpsMWAllowsBearer(t *testing.T) {
 	}
 }
 
-func TestAuthMWEmptyTokenAllows(t *testing.T) {
+func TestOpsMWAPIAuthDisabledAllows(t *testing.T) {
 	// API_AUTH_DISABLED — мутирующие эндпоинты открыты.
 	h := chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
-	}), authMW("", nil, nil, true, false))
+	}), requireOpsMW(nil, nil, nil, true, false))
 	req := httptest.NewRequest(http.MethodPost, "/api/ingest", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)

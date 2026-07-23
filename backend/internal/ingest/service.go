@@ -52,10 +52,11 @@ type Service struct {
 	stats      *stats
 	processors []*usecaseingest.Processor
 
-	lineCh     chan ingestedLine
-	connSem    chan struct{}
-	activeConn atomic.Int64
-	wg         sync.WaitGroup
+	lineCh       chan ingestedLine
+	connSem      chan struct{}
+	activeConn   atomic.Int64
+	lastDropLog  atomic.Int64 // unix nano of last drop warn log
+	wg           sync.WaitGroup
 }
 
 func NewService(cfg Config, deps ProcessorDeps) *Service {
@@ -188,24 +189,106 @@ func (s *Service) Run(ctx context.Context) error {
 
 	s.stats.setState("running")
 	<-ctx.Done()
+	snap := s.Stats()
+	slog.Info("ingest: shutting down",
+		"queue_depth", snap.QueueDepth,
+		"queue_capacity", snap.QueueCapacity,
+		"drain_timeout", s.drainTimeout().String(),
+		"dropped_total", snap.DroppedTotal,
+	)
 	for _, ln := range listeners {
 		_ = ln.Close()
 	}
 	acceptWg.Wait()
 	s.wg.Wait()
-	slog.Info("ingest: stopped")
+	left := int64(0)
+	if s.lineCh != nil {
+		left = int64(len(s.lineCh))
+	}
+	if left > 0 {
+		slog.Warn("ingest: stopped with undrained queue", "queue_depth", left)
+	} else {
+		slog.Info("ingest: stopped")
+	}
 	return nil
 }
 
 func (s *Service) drainTimeout() time.Duration {
-	if s.cfg.QueryTimeout > 0 {
-		return s.cfg.QueryTimeout
+	// Не берём полный QueryTimeout (часто 3m) как бюджет drain — SIGTERM должен
+	// укладываться в разумный maxDrain; insertBudget — оценка одного flush.
+	insertBudget := 30 * time.Second
+	if s.cfg.QueryTimeout > 0 && s.cfg.QueryTimeout < insertBudget {
+		insertBudget = s.cfg.QueryTimeout
 	}
-	return 30 * time.Second
+	const maxDrain = 2 * time.Minute
+	if s == nil || s.lineCh == nil {
+		return insertBudget
+	}
+	depth := len(s.lineCh)
+	if depth == 0 {
+		return insertBudget
+	}
+	workers := s.cfg.Workers
+	if workers < 1 {
+		workers = 1
+	}
+	batch := s.cfg.BatchSize
+	if batch < 1 {
+		batch = 1
+	}
+	flush := s.cfg.FlushInterval
+	if flush < time.Second {
+		flush = time.Second
+	}
+	perCycle := workers * batch
+	cycles := (depth + perCycle - 1) / perCycle
+	estimated := time.Duration(cycles) * (flush + insertBudget)
+	if estimated < insertBudget {
+		return insertBudget
+	}
+	if estimated > maxDrain {
+		return maxDrain
+	}
+	return estimated
+}
+
+// ShutdownWaitTimeout — бюджет ожидания для main после отмены ctx
+// (не короче drainTimeout worker'ов + небольшой запас).
+func (s *Service) ShutdownWaitTimeout() time.Duration {
+	d := s.drainTimeout()
+	const margin = 5 * time.Second
+	const maxWait = 2*time.Minute + margin
+	wait := d + margin
+	if wait > maxWait {
+		return maxWait
+	}
+	return wait
 }
 
 func detachTimeout(_ context.Context, d time.Duration) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), d)
+}
+
+func (s *Service) noteQueueDrop(remote, transport string) {
+	total := s.stats.droppedTotal.Load()
+	now := time.Now().UnixNano()
+	last := s.lastDropLog.Load()
+	const quiet = int64(10 * time.Second)
+	shouldLog := total == 1 || total%1000 == 1 || last == 0 || now-last >= quiet
+	if !shouldLog {
+		return
+	}
+	if !s.lastDropLog.CompareAndSwap(last, now) {
+		// Другой writer уже залогировал — не спамим.
+		return
+	}
+	slog.Warn("ingest: queue full, dropping line",
+		"remote", remote,
+		"transport", transportOrUnknown(transport),
+		"queue_depth", len(s.lineCh),
+		"queue_capacity", cap(s.lineCh),
+		"dropped_total", total,
+	)
 }
 
 func (s *Service) handleConn(ctx context.Context, conn net.Conn, transport string) {
@@ -249,14 +332,7 @@ func (s *Service) handleConn(ctx context.Context, conn net.Conn, transport strin
 		default:
 		}
 		if !s.TryEnqueue(line, transport) {
-			if s.stats.droppedTotal.Load()%1000 == 1 {
-				slog.Warn("ingest: queue full, dropping line",
-					"remote", remote,
-					"transport", transportOrUnknown(transport),
-					"queue", cap(s.lineCh),
-					"dropped_total", s.stats.droppedTotal.Load(),
-				)
-			}
+			s.noteQueueDrop(remote, transport)
 		}
 	}
 	slog.Info("ingest: connection closed", "remote", remote, "transport", transportOrUnknown(transport), "lines", linesOnConn)

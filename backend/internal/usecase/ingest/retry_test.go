@@ -3,6 +3,7 @@ package ingest
 import (
 	"context"
 	"errors"
+	"net"
 	"testing"
 	"time"
 )
@@ -17,10 +18,13 @@ func TestIsRetryableInsertError(t *testing.T) {
 		{context.DeadlineExceeded, false},
 		{errInsertCircuitOpen, false},
 		{errors.New("syntax error"), false},
-		{errors.New("code: 60"), false},
+		{errors.New("code: 60, message: Table x doesn't exist"), false},
+		{errors.New("code: 516, message: Authentication failed"), false},
+		{errors.New("code: 241, message: Memory limit exceeded"), true},
 		{errors.New("connection refused"), true},
 		{errors.New("i/o timeout"), true},
 		{errors.New("weird unknown"), true},
+		{&net.OpError{Op: "dial", Err: errors.New("connection refused")}, true},
 	}
 	for _, tc := range cases {
 		if got := isRetryableInsertError(tc.err); got != tc.want {

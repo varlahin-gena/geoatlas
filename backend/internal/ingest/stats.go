@@ -23,6 +23,7 @@ type StatsSnapshot struct {
 	QueueDepth       int64          `json:"queue_depth"`
 	QueueCapacity    int64          `json:"queue_capacity"`
 	DroppedTotal     int64          `json:"dropped_total"`
+	LastDropAt       string         `json:"last_drop_at,omitempty"`
 	Connections      int64          `json:"connections"`
 	UDP              TransportStats `json:"udp"`
 	TCP              TransportStats `json:"tcp"`
@@ -51,6 +52,7 @@ type stats struct {
 	parseErrorsTotal atomic.Int64
 	bufferedLines    atomic.Int64
 	droppedTotal     atomic.Int64
+	lastDropAtUnix   atomic.Int64 // unix nano; 0 = never
 	connections      atomic.Int64
 	udp              transportStats
 	tcp              transportStats
@@ -117,12 +119,17 @@ func (s *stats) addBuffered(delta int64) {
 
 func (s *stats) addDropped(n int64) {
 	s.droppedTotal.Add(n)
+	s.lastDropAtUnix.Store(time.Now().UnixNano())
 }
 
 func (s *stats) snapshot() StatsSnapshot {
 	state, _ := s.state.Load().(string)
 	lastFlush, _ := s.lastFlushAt.Load().(string)
 	lastErr, _ := s.lastError.Load().(string)
+	var lastDrop string
+	if ns := s.lastDropAtUnix.Load(); ns > 0 {
+		lastDrop = time.Unix(0, ns).UTC().Format(time.RFC3339)
+	}
 	return StatsSnapshot{
 		State:            state,
 		ReceivedTotal:    s.receivedTotal.Load(),
@@ -132,6 +139,7 @@ func (s *stats) snapshot() StatsSnapshot {
 		ParseErrorsTotal: s.parseErrorsTotal.Load(),
 		BufferedLines:    s.bufferedLines.Load(),
 		DroppedTotal:     s.droppedTotal.Load(),
+		LastDropAt:       lastDrop,
 		Connections:      s.connections.Load(),
 		UDP:              s.udp.snapshot(),
 		TCP:              s.tcp.snapshot(),
