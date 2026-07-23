@@ -204,7 +204,7 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, userPublicResponse(pub))
 }
 
-// Check — GET /api/auth/check (nginx auth_request: любой залогиненный или Bearer).
+// Check — GET /api/auth/check (nginx auth_request: любой залогиненный или Bearer≥read).
 func (h *AuthHandler) Check(w http.ResponseWriter, r *http.Request) {
 	if h.authDisabled() {
 		w.WriteHeader(http.StatusOK)
@@ -226,13 +226,45 @@ func (h *AuthHandler) Check(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// CheckAdmin — GET /api/auth/check-admin (nginx auth_request: admin / Bearer admin / API_AUTH_DISABLED).
+// CheckOps — GET /api/auth/check-ops (nginx: Bearer≥ops / administrator / API_AUTH_DISABLED).
+func (h *AuthHandler) CheckOps(w http.ResponseWriter, r *http.Request) {
+	if h.authDisabled() {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	if h.cfg.APIAuthDisabled {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	if h.bearerScopeOK(r, auth.ScopeOps) {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	sess, err := SessionFromRequest(r, h.sessions)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	live, ok := auth.LiveSession(h.users, sess)
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	if !auth.IsAdmin(live.Role) {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// CheckAdmin — GET /api/auth/check-admin (nginx: administrator / Bearer admin / API_AUTH_DISABLED).
 func (h *AuthHandler) CheckAdmin(w http.ResponseWriter, r *http.Request) {
 	if h.authDisabled() {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 	// Совпадает с requireOpsMW: при API_AUTH_DISABLED ops-эндпоинты открыты.
+	// Для HTML admin-страниц тоже открываем при API_AUTH_DISABLED (как раньше).
 	if h.cfg.APIAuthDisabled {
 		w.WriteHeader(http.StatusOK)
 		return

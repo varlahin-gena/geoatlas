@@ -93,7 +93,7 @@ paths:
   /api/auth/check-admin:
     get:
       tags: [auth]
-      summary: nginx auth_request — administrator / Bearer / API_AUTH_DISABLED
+      summary: nginx auth_request — administrator / Bearer admin / API_AUTH_DISABLED
       responses:
         "200":
           description: OK
@@ -101,6 +101,17 @@ paths:
           description: Нет сессии
         "403":
           description: Не администратор
+  /api/auth/check-ops:
+    get:
+      tags: [auth]
+      summary: nginx auth_request — Bearer≥ops / administrator / API_AUTH_DISABLED
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Нет сессии / нет Bearer
+        "403":
+          description: Недостаточно прав (operator без Bearer ops)
   /api/users:
     get:
       tags: [auth]

@@ -89,6 +89,7 @@ func NewServer(
 		chain(http.HandlerFunc(authH.ChangePassword), csrf, maxBytesMW(64<<10)),
 	).Methods("POST")
 	r.HandleFunc("/api/auth/check", authH.Check).Methods("GET")
+	r.HandleFunc("/api/auth/check-ops", authH.CheckOps).Methods("GET")
 	r.HandleFunc("/api/auth/check-admin", authH.CheckAdmin).Methods("GET")
 
 	// --- Управление УЗ (только администратор) ---

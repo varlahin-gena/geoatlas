@@ -30,6 +30,7 @@ func expectedAuthMatrix() map[string]authTier {
 		"POST /api/auth/change-password":            tierPublic, // handler checks session
 		"GET /api/auth/check":                       tierPublic,
 		"GET /api/auth/check-admin":                 tierPublic,
+		"GET /api/auth/check-ops":                   tierPublic,
 		"GET /api/events":                           tierLogin,
 		"GET /api/system/status":                    tierLogin,
 		"GET /api/geo-missing":                      tierAdmin,
