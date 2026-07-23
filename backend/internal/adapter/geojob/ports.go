@@ -7,7 +7,7 @@ import (
 )
 
 // Store — порт maintenance/backfill (реализация: *clickhouse.MaintenanceStore).
-// geojob не импортирует storage/migrate.
+// geojob не импортирует migrate.
 type Store interface {
 	BackfillEdgesAgg(ctx context.Context) error
 	BackfillGeoEdgesAgg(ctx context.Context) error
@@ -15,7 +15,7 @@ type Store interface {
 	RebuildGeoEdgesLookback(ctx context.Context, lookbackDays int) error
 }
 
-// GeoResolver — минимум для EnrichLogsMissingGeo (совпадает со storage.GeoResolver).
+// GeoResolver — минимум для EnrichLogsMissingGeo (совпадает с clickhouse.GeoResolver).
 type GeoResolver interface {
 	RangeCount() int
 	Lookup(ipStr string) model.GeoLookup

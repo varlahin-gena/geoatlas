@@ -15,6 +15,7 @@ import (
 
 	"network_monitor/internal/adapter/bootstrapadapter"
 	chadapter "network_monitor/internal/adapter/clickhouse"
+	"network_monitor/internal/adapter/clickhouse/query"
 	"network_monitor/internal/adapter/geoipcodec"
 	"network_monitor/internal/adapter/geojob"
 	httpapi "network_monitor/internal/adapter/httpapi"
@@ -26,7 +27,6 @@ import (
 	"network_monitor/internal/ingest"
 	"network_monitor/internal/logging"
 	"network_monitor/internal/parser"
-	"network_monitor/internal/storage"
 	usecaseauth "network_monitor/internal/usecase/auth"
 	"network_monitor/internal/usecase/bootstrap"
 	usecaseevents "network_monitor/internal/usecase/events"
@@ -93,12 +93,12 @@ func main() {
 
 	slog.Info("network-monitor starting", "edges_agg", true, "geo_enrich_on_ingest", cfg.GeoEnrichOnIngest)
 
-	storage.ConfigureQuerySettings(cfg.CHMaxMemoryUsage, cfg.CHExternalGroupBy, cfg.CHExternalSort)
+	query.ConfigureQuerySettings(cfg.CHMaxMemoryUsage, cfg.CHExternalGroupBy, cfg.CHExternalSort)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	ingestOpts := storage.PoolOptions{MaxOpenConns: cfg.CHIngestMaxOpen, MaxIdleConns: cfg.CHIngestMaxOpen}
+	ingestOpts := chadapter.PoolOptions{MaxOpenConns: cfg.CHIngestMaxOpen, MaxIdleConns: cfg.CHIngestMaxOpen}
 	if cfg.CHIngestAsyncInsert {
 		ingestOpts.Settings = clickhouse.Settings{
 			"async_insert":          1,
@@ -107,15 +107,15 @@ func main() {
 		slog.Info("clickhouse ingest: async_insert enabled", "wait_for_async_insert", 1)
 	}
 
-	pools, err := storage.ConnectPools(ctx, cfg.ClickHouseAddr(),
-		storage.Auth{
+	pools, err := chadapter.ConnectPools(ctx, cfg.ClickHouseAddr(),
+		chadapter.Auth{
 			Database: cfg.ClickHouseDatabase,
 			Username: cfg.ClickHouseUser,
 			Password: cfg.ClickHousePassword,
 		},
 		ingestOpts,
-		storage.PoolOptions{MaxOpenConns: cfg.CHAPIMaxOpen, MaxIdleConns: cfg.CHAPIMaxOpen},
-		storage.PoolOptions{MaxOpenConns: cfg.CHBackgroundMaxOpen, MaxIdleConns: cfg.CHBackgroundMaxOpen},
+		chadapter.PoolOptions{MaxOpenConns: cfg.CHAPIMaxOpen, MaxIdleConns: cfg.CHAPIMaxOpen},
+		chadapter.PoolOptions{MaxOpenConns: cfg.CHBackgroundMaxOpen, MaxIdleConns: cfg.CHBackgroundMaxOpen},
 	)
 	if err != nil {
 		slog.Error("clickhouse connection failed", "err", err)

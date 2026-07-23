@@ -6,7 +6,6 @@ import (
 	ch "github.com/ClickHouse/clickhouse-go/v2"
 
 	"network_monitor/internal/model"
-	"network_monitor/internal/storage"
 	"network_monitor/internal/usecase/parseerrors"
 )
 
@@ -23,13 +22,13 @@ func NewParseErrorRepository(apiCH, writeCH ch.Conn) *ParseErrorRepository {
 var _ parseerrors.Repository = (*ParseErrorRepository)(nil)
 
 func (r *ParseErrorRepository) List(ctx context.Context, limit int, search string) ([]model.ParseErrorRow, error) {
-	return storage.ListParseErrors(ctx, r.apiCH, limit, search)
+	return ListParseErrors(ctx, r.apiCH, limit, search)
 }
 
 func (r *ParseErrorRepository) Delete(ctx context.Context, ids []string) error {
-	return storage.DeleteParseErrors(ctx, r.writeCH, ids)
+	return DeleteParseErrors(ctx, r.writeCH, ids)
 }
 
 func (r *ParseErrorRepository) DeleteAll(ctx context.Context) error {
-	return storage.DeleteAllParseErrors(ctx, r.writeCH)
+	return DeleteAllParseErrors(ctx, r.writeCH)
 }

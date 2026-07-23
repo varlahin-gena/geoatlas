@@ -6,7 +6,6 @@ import (
 	ch "github.com/ClickHouse/clickhouse-go/v2"
 
 	"network_monitor/internal/model"
-	"network_monitor/internal/storage"
 	"network_monitor/internal/usecase/geo"
 )
 
@@ -30,21 +29,21 @@ func (r *GeoRepository) apiConn() ch.Conn {
 }
 
 func (r *GeoRepository) Replace(ctx context.Context, ranges []model.GeoRange) (int, error) {
-	return storage.ReplaceGeoRanges(ctx, r.writeCH, ranges)
+	return ReplaceGeoRanges(ctx, r.writeCH, ranges)
 }
 
 func (r *GeoRepository) Load(ctx context.Context) ([]model.GeoRange, error) {
-	return storage.LoadGeoRanges(ctx, r.writeCH)
+	return LoadGeoRanges(ctx, r.writeCH)
 }
 
 func (r *GeoRepository) Count(ctx context.Context) (int, error) {
-	return storage.CountGeoRanges(ctx, r.apiConn())
+	return CountGeoRanges(ctx, r.apiConn())
 }
 
 func (r *GeoRepository) FindByIP(ctx context.Context, ipStr string) (model.GeoRange, bool, error) {
-	return storage.FindGeoRangeByIP(ctx, r.apiConn(), ipStr)
+	return FindGeoRangeByIP(ctx, r.apiConn(), ipStr)
 }
 
 func (r *GeoRepository) ListPage(ctx context.Context, limit int, q string) (items []model.GeoRange, total, filtered int, truncated bool, err error) {
-	return storage.ListGeoRangesPage(ctx, r.apiConn(), limit, q)
+	return ListGeoRangesPage(ctx, r.apiConn(), limit, q)
 }

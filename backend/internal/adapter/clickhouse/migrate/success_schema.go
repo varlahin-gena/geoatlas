@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	schemaComponentTrafficSuccess = "traffic_logs_success"
+	schemaComponentTrafficSuccess        = "traffic_logs_success"
 	schemaVersionTrafficSuccess   uint32 = 1
 )
 

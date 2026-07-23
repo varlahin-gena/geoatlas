@@ -1,4 +1,4 @@
-package storage
+package clickhouse
 
 import (
 	"context"

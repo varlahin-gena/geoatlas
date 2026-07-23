@@ -1,4 +1,4 @@
-package storage
+package clickhouse
 
 import (
 	"context"
@@ -15,11 +15,11 @@ type Auth = chconn.Auth
 
 // PoolOptions задаёт размер пула native-соединений clickhouse-go.
 type PoolOptions struct {
-	Name           string
-	MaxOpenConns   int
-	MaxIdleConns   int
+	Name            string
+	MaxOpenConns    int
+	MaxIdleConns    int
 	ConnMaxLifetime time.Duration
-	Settings       clickhouse.Settings
+	Settings        clickhouse.Settings
 }
 
 // Pools разделяет write / read / background пути, чтобы тяжёлые SELECT
@@ -33,11 +33,11 @@ type Pools struct {
 // ConnectWithPool подключается к ClickHouse с заданным размером пула.
 func ConnectWithPool(ctx context.Context, addr string, auth Auth, opts PoolOptions) (clickhouse.Conn, error) {
 	return chconn.Connect(ctx, addr, auth, chconn.Options{
-		Name:           opts.Name,
-		MaxOpenConns:   opts.MaxOpenConns,
-		MaxIdleConns:   opts.MaxIdleConns,
+		Name:            opts.Name,
+		MaxOpenConns:    opts.MaxOpenConns,
+		MaxIdleConns:    opts.MaxIdleConns,
 		ConnMaxLifetime: opts.ConnMaxLifetime,
-		Settings:       opts.Settings,
+		Settings:        opts.Settings,
 	})
 }
 

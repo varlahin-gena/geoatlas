@@ -145,7 +145,7 @@ jobs:
           CLICKHOUSE_TEST_DB: default
         run: |
           set +e
-          go test -tags=integration -count=1 ./internal/storage/ -run Integration -v
+          go test -tags=integration -count=1 ./internal/adapter/clickhouse/ -run Integration -v
           status=$?
           if [ "$status" -ne 0 ]; then
             echo "::group::ClickHouse diagnostics"

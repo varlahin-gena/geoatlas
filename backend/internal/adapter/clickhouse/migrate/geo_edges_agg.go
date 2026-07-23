@@ -9,9 +9,9 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
-	"network_monitor/internal/storage/aggstate"
-	"network_monitor/internal/storage/query"
-	"network_monitor/internal/storage/sqlclause"
+	"network_monitor/internal/adapter/clickhouse/aggstate"
+	"network_monitor/internal/adapter/clickhouse/query"
+	"network_monitor/internal/adapter/clickhouse/sqlclause"
 )
 
 // EnsureGeoEdgesAggSchema добавляет geo-колонки и создаёт daily-таблицы/MV без backfill.

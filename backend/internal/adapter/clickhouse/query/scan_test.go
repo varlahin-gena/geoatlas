@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"network_monitor/internal/storage/sqlclause"
+	"network_monitor/internal/adapter/clickhouse/sqlclause"
 )
 
 func TestScanGeoFromLogsSelectClauseOrder(t *testing.T) {

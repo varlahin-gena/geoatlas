@@ -585,13 +585,17 @@ Nginx: карта и смена пароля — любой залогиненн
 ```
 network_monitor/
 ├── go.work                           # workspace: backend + stats-collector + pkg/chconn
-├── backend/                          # Go: API, парсеры, geoip, ingest, storage
+├── backend/                          # Go: API, парсеры, geoip, ingest
 │   ├── cmd/network-monitor/main.go
 │   ├── Dockerfile
 │   └── internal/
 │       ├── adapter/
 │       │   ├── httpapi/              # HTTP delivery (handlers, middleware, cookies/CSRF)
-│       │   ├── clickhouse/           # CH repos + ReloadableGeoIndex + RetentionApplier
+│       │   ├── clickhouse/           # SQL/DDL SoT + repos + ReloadableGeoIndex + RetentionApplier
+│       │   │   ├── aggstate/         # Prefer* / статус edges agg
+│       │   │   ├── migrate/          # Ensure* / DDL / backfill (SoT схемы)
+│       │   │   ├── query/            # Scan* / settings
+│       │   │   └── sqlclause/        # общие SQL-выражения
 │       │   ├── geojob/               # сериализация reload GeoIP + backfill
 │       │   ├── parseradapter/        # parser port
 │       │   ├── geoipcodec/           # GeoIP CSV/CIDR helpers
@@ -607,12 +611,7 @@ network_monitor/
 │       ├── logging/                  # slog setup
 │       ├── model/                    # доменные структуры, action-списки
 │       ├── mapagg/                   # агрегация рёбер/узлов для карты
-│       ├── parser/                   # парсеры вендоров
-│       └── storage/                  # ClickHouse (facade)
-│           ├── aggstate/             # Prefer* / статус edges agg
-│           ├── migrate/              # Ensure* / DDL / backfill (SoT схемы)
-│           ├── query/                # Scan* / settings
-│           └── sqlclause/            # общие SQL-выражения
+│       └── parser/                   # парсеры вендоров
 ├── pkg/
 │   └── chconn/                       # общий ClickHouse connect
 ├── clickhouse/

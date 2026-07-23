@@ -1,4 +1,4 @@
-package storage
+package clickhouse
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 )
 
 // Сбрасываем агрегацию/сортировку на диск раньше, чем упрёмся в max_memory_usage.
-// Значения задаются через storage.ConfigureQuerySettings (env CH_*).
+// Значения задаются через query.ConfigureQuerySettings (env CH_*).
 
 // Connect — совместимая обёртка над ConnectWithPool с дефолтным размером пула.
 func Connect(ctx context.Context, addr string) (clickhouse.Conn, error) {

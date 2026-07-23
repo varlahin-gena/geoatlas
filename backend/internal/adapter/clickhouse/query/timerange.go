@@ -7,8 +7,8 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
+	"network_monitor/internal/adapter/clickhouse/sqlclause"
 	"network_monitor/internal/model"
-	"network_monitor/internal/storage/sqlclause"
 )
 
 // ScanRawAggsForTimeRange читает пары src/dst за выбранный период.

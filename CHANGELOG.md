@@ -13,7 +13,8 @@
 - `last_drop_at` и edge-triggered логи при queue drops
 - Адаптивный drain ingest при shutdown (отдельный бюджет от HTTP)
 - Классификация retry ClickHouse по `code: N` + permanent code map
-- `geojob.Store` / `MaintenanceStore` — geojob не импортирует `storage/migrate`
+- `geojob.Store` / `MaintenanceStore` — geojob не импортирует `migrate`
+- ClickHouse SQL/DDL SoT в `adapter/clickhouse` (пакет `storage` удалён)
 - CI coverage smoke (≥40% на критичных пакетах)
 
 ### Security

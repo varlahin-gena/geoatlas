@@ -30,7 +30,7 @@ func TestMigrateEdgesAggBlockedMatchesModel(t *testing.T) {
 
 func TestInitSQLDoesNotContainEdgesAggMV(t *testing.T) {
 	raw := readRepoFile(t, "clickhouse", "init.sql")
-	// Edges MV/table — SoT в storage.Ensure*; init.sql только cold bootstrap базовых таблиц.
+	// Edges MV/table — SoT в migrate.Ensure*; init.sql только cold bootstrap базовых таблиц.
 	if strings.Contains(raw, "traffic_edges_daily_mv") {
 		t.Error("init.sql must not contain traffic_edges_daily_mv")
 	}

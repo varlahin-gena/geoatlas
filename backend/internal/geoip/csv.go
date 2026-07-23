@@ -176,7 +176,7 @@ func ParseRangeEntry(network, country, region, city string, lat, lon float64) (m
 }
 
 // ReadCSV парсит GeoIP CSV в память: валидация колонок, отказ при overlapping ranges.
-// Запись в ClickHouse — storage.ReplaceGeoRanges (geoip не зависит от CH для импорта).
+// Запись в ClickHouse — clickhouse.ReplaceGeoRanges (geoip не зависит от CH для импорта).
 func ReadCSV(r io.Reader) ([]model.GeoRange, error) {
 	reader := csv.NewReader(r)
 	reader.TrimLeadingSpace = true

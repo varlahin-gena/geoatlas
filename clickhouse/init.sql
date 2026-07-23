@@ -1,5 +1,5 @@
 -- ============================================================
--- Ensure* (backend/internal/storage) is schema SoT for aggregates/MV.
+-- Ensure* (backend/internal/adapter/clickhouse/migrate) is schema SoT for aggregates/MV.
 -- This file is cold bootstrap only (empty ClickHouse volume).
 -- migrate_*.sql are ops fallback when Ensure* cannot run.
 -- ============================================================

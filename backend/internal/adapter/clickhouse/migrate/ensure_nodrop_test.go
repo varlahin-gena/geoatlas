@@ -7,7 +7,7 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
-	"network_monitor/internal/storage/aggstate"
+	"network_monitor/internal/adapter/clickhouse/aggstate"
 )
 
 func TestEnsureEdgesAggNoDropWhenSchemaVersionErrors(t *testing.T) {
@@ -90,4 +90,3 @@ func TestEnsureTrafficLogsSuccessNoDDLWhenSchemaVersionErrors(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
-

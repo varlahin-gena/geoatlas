@@ -1,10 +1,16 @@
-// Package clickhouse — adapters поверх internal/storage + собственный SQL где уместно.
+// Package clickhouse — ClickHouse adapter: SQL/DDL SoT + репозитории для usecase-портов.
 //
-// Usecase зависит от портов; SQL/DDL по умолчанию живут в storage/{query,migrate,sqlclause}.
-// Здесь:
-//   - репозитории (traffic/geo/system/parse_errors/ingest) — граница Conn → storage;
-//   - MaintenanceStore — порт geojob (backfill/enrich без прямого import migrate);
-//   - RetentionApplier, ReloadableGeoIndex — логика TTL/GeoIP в adapter.
+//	clickhouse/           — pool, Insert*, geo_ranges, metrics, parse_errors, enrich, repos
+//	clickhouse/aggstate   — EdgesAggStatus, PreferDailyEdgesAgg, PreferGeoEdgesAgg
+//	clickhouse/sqlclause  — actionWhere / sumBlocked / geo key exprs
+//	clickhouse/migrate    — schema_version, Ensure*, DDL, backfill edges/geo
+//	clickhouse/query      — ScanRawAggs*, ScanGeoEdges*, TimeRange, ConfigureQuerySettings
 //
-// Именованные API-токены — в auth.TokenStore (не в этом пакете).
+// Правила импорта: migrate и query могут импортировать aggstate и sqlclause;
+// migrate может импортировать query (AggSettings); migrate/query не импортируют parent clickhouse.
+// Parent не импортирует geoip — EnrichLogsMissingGeo принимает GeoResolver;
+// ReplaceGeoRanges пишет готовые []model.GeoRange атомарно (staging + EXCHANGE).
+//
+// Источник правды по схеме агрегатов: Go Ensure* (не clickhouse/init.sql).
+// init.sql — только cold bootstrap базовых таблиц на пустом томе.
 package clickhouse

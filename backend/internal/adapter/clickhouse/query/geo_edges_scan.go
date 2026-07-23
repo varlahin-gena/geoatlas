@@ -8,9 +8,9 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
+	"network_monitor/internal/adapter/clickhouse/aggstate"
+	"network_monitor/internal/adapter/clickhouse/sqlclause"
 	"network_monitor/internal/model"
-	"network_monitor/internal/storage/aggstate"
-	"network_monitor/internal/storage/sqlclause"
 )
 
 // ScanGeoEdgesForTimeRange читает рёбра, свёрнутые по city|country|ip|subnet.

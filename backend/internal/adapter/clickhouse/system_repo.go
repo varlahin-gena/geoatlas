@@ -6,8 +6,8 @@ import (
 
 	ch "github.com/ClickHouse/clickhouse-go/v2"
 
+	"network_monitor/internal/adapter/clickhouse/aggstate"
 	"network_monitor/internal/model"
-	"network_monitor/internal/storage"
 	"network_monitor/internal/usecase/system"
 )
 
@@ -27,19 +27,19 @@ var (
 )
 
 func (r *SystemRepository) FetchLatest(ctx context.Context) ([]model.MetricRecord, error) {
-	return storage.FetchLatestMetrics(ctx, r.conn)
+	return FetchLatestMetrics(ctx, r.conn)
 }
 
 func (r *SystemRepository) FetchHistory(ctx context.Context, keys []model.MetricKey, period, step time.Duration) (map[string][]model.HistoryPoint, error) {
-	return storage.FetchMetricHistory(ctx, r.conn, keys, period, step)
+	return FetchMetricHistory(ctx, r.conn, keys, period, step)
 }
 
 func (r *SystemRepository) CountRows(ctx context.Context, table string) (uint64, error) {
-	return storage.CountTableRows(ctx, r.conn, table)
+	return CountTableRows(ctx, r.conn, table)
 }
 
 func (r *SystemRepository) Status() system.EdgesAggStatus {
-	status := storage.GetEdgesAggStatus()
+	status := aggstate.GetEdgesAggStatus()
 	return system.EdgesAggStatus{
 		State: status.State, Phase: status.Phase, Message: status.Message,
 		RawRows: status.RawRows, AggRows: status.AggRows,
@@ -49,11 +49,11 @@ func (r *SystemRepository) Status() system.EdgesAggStatus {
 }
 
 func (r *SystemRepository) PreferDaily() bool {
-	return storage.PreferDailyEdgesAgg()
+	return aggstate.PreferDailyEdgesAgg()
 }
 
 func (r *SystemRepository) PreferGeo() bool {
-	return storage.PreferGeoEdgesAgg()
+	return aggstate.PreferGeoEdgesAgg()
 }
 
 func (r *SystemRepository) Ping(ctx context.Context) error {

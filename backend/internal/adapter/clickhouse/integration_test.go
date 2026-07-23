@@ -1,6 +1,6 @@
 //go:build integration
 
-package storage_test
+package clickhouse_test
 
 import (
 	"context"
@@ -8,13 +8,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ClickHouse/clickhouse-go/v2"
+	ch "github.com/ClickHouse/clickhouse-go/v2"
 
+	"network_monitor/internal/adapter/clickhouse"
+	"network_monitor/internal/adapter/clickhouse/aggstate"
+	"network_monitor/internal/adapter/clickhouse/query"
 	"network_monitor/internal/model"
-	"network_monitor/internal/storage"
 )
 
-func testCH(t *testing.T) clickhouse.Conn {
+func testCH(t *testing.T) ch.Conn {
 	t.Helper()
 	addr := os.Getenv("CLICKHOUSE_TEST_ADDR")
 	if addr == "" {
@@ -28,7 +30,7 @@ func testCH(t *testing.T) clickhouse.Conn {
 	if db == "" {
 		db = "default"
 	}
-	auth := storage.Auth{
+	auth := clickhouse.Auth{
 		Username: user,
 		Password: os.Getenv("CLICKHOUSE_TEST_PASSWORD"),
 		Database: db,
@@ -36,7 +38,7 @@ func testCH(t *testing.T) clickhouse.Conn {
 	// GHA service: HTTP /ping может подняться раньше native auth — даём запас на retry.
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
-	conn, err := storage.ConnectWithPool(ctx, addr, auth, storage.PoolOptions{
+	conn, err := clickhouse.ConnectWithPool(ctx, addr, auth, clickhouse.PoolOptions{
 		Name:         "test",
 		MaxOpenConns: 2,
 		MaxIdleConns: 2,
@@ -53,7 +55,7 @@ func testCH(t *testing.T) clickhouse.Conn {
 	return conn
 }
 
-func ensureSchema(t *testing.T, ch clickhouse.Conn) {
+func ensureSchema(t *testing.T, conn ch.Conn) {
 	t.Helper()
 	ctx := context.Background()
 	stmts := []string{
@@ -87,19 +89,19 @@ func ensureSchema(t *testing.T, ch clickhouse.Conn) {
 		`TRUNCATE TABLE parse_errors`,
 	}
 	for _, s := range stmts {
-		if err := ch.Exec(ctx, s); err != nil {
+		if err := conn.Exec(ctx, s); err != nil {
 			t.Fatalf("schema: %v\nSQL: %s", err, s)
 		}
 	}
 }
 
 func TestIntegrationInsertAndScan(t *testing.T) {
-	ch := testCH(t)
-	ensureSchema(t, ch)
+	conn := testCH(t)
+	ensureSchema(t, conn)
 	// ScanRawAggs читает edges_daily только при ready — в CI таблицы нет.
-	storage.SetEdgesAggStatus(storage.EdgesAggStatus{State: "idle", Message: "integration test"})
+	aggstate.SetEdgesAggStatus(aggstate.EdgesAggStatus{State: "idle", Message: "integration test"})
 	t.Cleanup(func() {
-		storage.SetEdgesAggStatus(storage.EdgesAggStatus{State: "idle", Message: "not started"})
+		aggstate.SetEdgesAggStatus(aggstate.EdgesAggStatus{State: "idle", Message: "not started"})
 	})
 	ctx := context.Background()
 
@@ -133,11 +135,11 @@ func TestIntegrationInsertAndScan(t *testing.T) {
 		DstCountry: "United States",
 		Raw:        "blocked test line",
 	}}
-	if err := storage.InsertTrafficLogs(ctx, ch, logs); err != nil {
+	if err := clickhouse.InsertTrafficLogs(ctx, conn, logs); err != nil {
 		t.Fatalf("InsertTrafficLogs: %v", err)
 	}
 
-	raws, err := storage.ScanRawAggs(ctx, ch, 1, 100, "all", time.Minute)
+	raws, err := query.ScanRawAggs(ctx, conn, 1, 100, "all", time.Minute)
 	if err != nil {
 		t.Fatalf("ScanRawAggs: %v", err)
 	}
@@ -161,11 +163,11 @@ func TestIntegrationInsertAndScan(t *testing.T) {
 }
 
 func TestIntegrationInsertParseErrors(t *testing.T) {
-	ch := testCH(t)
-	ensureSchema(t, ch)
+	conn := testCH(t)
+	ensureSchema(t, conn)
 	ctx := context.Background()
 
-	err := storage.InsertParseErrors(ctx, ch, []model.ParseError{{
+	err := clickhouse.InsertParseErrors(ctx, conn, []model.ParseError{{
 		Timestamp: time.Now().UTC(),
 		Vendor:    "test",
 		Reason:    "boom",
@@ -174,7 +176,7 @@ func TestIntegrationInsertParseErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InsertParseErrors: %v", err)
 	}
-	rows, err := storage.ListParseErrors(ctx, ch, 10, "garbage")
+	rows, err := clickhouse.ListParseErrors(ctx, conn, 10, "garbage")
 	if err != nil {
 		t.Fatalf("ListParseErrors: %v", err)
 	}

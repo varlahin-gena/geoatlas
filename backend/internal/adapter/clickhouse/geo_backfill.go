@@ -1,4 +1,4 @@
-package storage
+package clickhouse
 
 import (
 	"context"
@@ -24,7 +24,7 @@ const geoStrMaxRunes = 256
 const DefaultGeoBackfillLookbackDays = 7
 
 // GeoResolver — порт для backfill (реализация: *geoip.Index).
-// storage не импортирует geoip, чтобы не тянуть доменный индекс в слой CH.
+// Пакет не импортирует geoip, чтобы не тянуть доменный индекс в слой CH.
 type GeoResolver interface {
 	RangeCount() int
 	Lookup(ipStr string) model.GeoLookup

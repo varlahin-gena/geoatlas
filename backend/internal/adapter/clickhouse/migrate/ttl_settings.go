@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	schemaComponentTTLDropParts = "ttl_only_drop_parts"
+	schemaComponentTTLDropParts        = "ttl_only_drop_parts"
 	schemaVersionTTLDropParts   uint32 = 1
 )
 
