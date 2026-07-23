@@ -10,11 +10,11 @@ import (
 )
 
 // csrfMW — double-submit CSRF для cookie-сессий на небезопасных методах.
-// Bearer / AUTH_DISABLED пропускаются. GET/HEAD/OPTIONS — без проверки.
-func csrfMW(apiTokens []string, authDisabled bool) middleware {
+// Bearer (любой scope) / AUTH_DISABLED пропускаются. GET/HEAD/OPTIONS — без проверки.
+func csrfMW(ba bearerAuth, authDisabled bool) middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if authDisabled || safeMethod(r.Method) || bearerOK(r, apiTokens...) {
+			if authDisabled || safeMethod(r.Method) || ba.any(r) {
 				next.ServeHTTP(w, r)
 				return
 			}

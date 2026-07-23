@@ -30,6 +30,7 @@ type Deps struct {
 	authUC        *usecaseauth.Service
 	users         *auth.UserStore // middleware / LiveSession
 	sessions      *auth.SessionManager
+	apiTokens     *auth.TokenStore
 }
 
 func NewDeps(
@@ -59,13 +60,14 @@ func NewDeps(
 	return d
 }
 
-func (d *Deps) WithAuth(authUC *usecaseauth.Service, users *auth.UserStore, sessions *auth.SessionManager) *Deps {
+func (d *Deps) WithAuth(authUC *usecaseauth.Service, users *auth.UserStore, sessions *auth.SessionManager, apiTokens *auth.TokenStore) *Deps {
 	if d == nil {
 		return nil
 	}
 	d.authUC = authUC
 	d.users = users
 	d.sessions = sessions
+	d.apiTokens = apiTokens
 	return d
 }
 

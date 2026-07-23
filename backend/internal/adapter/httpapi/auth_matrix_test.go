@@ -58,6 +58,9 @@ func expectedAuthMatrix() map[string]authTier {
 		"POST /api/users/{username}/full-name":      tierAdmin,
 		"POST /api/users/{username}/reset-password": tierAdmin,
 		"DELETE /api/users/{username}":              tierAdmin,
+		"GET /api/tokens":                           tierAdmin,
+		"POST /api/tokens":                          tierAdmin,
+		"DELETE /api/tokens/{id}":                   tierAdmin,
 	}
 }
 
@@ -79,7 +82,7 @@ func TestAuthMatrixCoversServerRoutes(t *testing.T) {
 		nil,      // parseTestUC
 		nil,      // retentionUC
 		nil,      // authUC
-		nil, nil, // users, sessions
+		nil, nil, nil, // users, sessions, apiTokens
 	)
 	router, ok := srv.httpSrv.Handler.(*mux.Router)
 	if !ok {

@@ -42,7 +42,7 @@
 - Ручная загрузка логов через веб-интерфейс
 - Парсинг **UserGate, FortiGate, Cisco ASA, Cisco FTD (FirePower), Cowrie (honeypot)** и универсальный фолбэк (Generic KV).
 - **Осознанный пропуск** событий: распознанные, но несетевые строки (например, часть `cowrie.*`) не попадают в `parse_errors`
-- **Авторизация по умолчанию**: роли `administrator` / `operator`, cookie-сессии, CSRF, Bearer `API_AUTH_TOKEN`; управление УЗ в UI
+- **Авторизация по умолчанию**: роли `administrator` / `operator`, cookie-сессии, CSRF, Bearer `API_AUTH_TOKEN` (+ `API_AUTH_PREVIOUS_TOKEN`); именованные API-токены со scopes `read`/`ops`/`admin` (UI `/api-tokens.html`); управление УЗ в UI
 - Загрузка и правка **GeoIP-базы** (CSV SIEM KUMA, страница `/geo-ranges.html`, IP без координат на `/geo-missing.html`)
 - Хранение и аналитика в **ClickHouse**
 - **Настраиваемый TTL (retention)** таблиц из UI `/system.html`
@@ -575,6 +575,7 @@ Network,Country,Region,City,Latitude,Longitude
 | `/parser-test.html`    | Тест парсеров         | До 200 строк за запрос, пресеты по вендорам, статусы parsed/skipped/error                                                                          |
 | `/system.html`         | Системный мониторинг  | Вкладки: Обзор (профиль, health, контейнеры), Pipeline (EPS/drops, **TTL retention**), Безопасность (неуспешные логины), Графики; алёрты и ёмкость |
 | `/users.html`          | Учётные записи        | Список/создание УЗ                                                                                                                                 |
+| `/api-tokens.html`     | API-токены            | Именованные Bearer со scope read/ops/admin; секрет показывается один раз                                                                            |
 | `/change-password.html`| Смена пароля          | Смена своего пароля                                                                                                                                |
 
 Nginx: карта и смена пароля — любой залогиненный; system / parsers / geo / users — только **administrator**.

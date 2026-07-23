@@ -31,6 +31,8 @@ type Config struct {
 	AuthOperatorUser     string
 	AuthOperatorPassword string
 	AuthUsersFile        string
+	// APITokensFile — JSON с именованными Bearer (scope read|ops|admin).
+	APITokensFile string
 	// RetentionFile — JSON с TTL таблиц CH (том /app/data рядом с users.json).
 	RetentionFile string
 
@@ -91,6 +93,7 @@ func FromEnv() Config {
 		AuthOperatorUser:     envOr("AUTH_OPERATOR_USER", "operator"),
 		AuthOperatorPassword: envOr("AUTH_OPERATOR_PASSWORD", ""),
 		AuthUsersFile:        envOr("AUTH_USERS_FILE", "/app/data/users.json"),
+		APITokensFile:        envOr("API_TOKENS_FILE", "/app/data/api_tokens.json"),
 		RetentionFile:        envOr("RETENTION_FILE", "/app/data/retention.json"),
 		MaxLogUploadSize: envInt64("MAX_LOG_UPLOAD_SIZE", 1<<30), // 1 GiB
 		MaxGeoUploadSize: envInt64("MAX_GEO_UPLOAD_SIZE", 1<<30), // 1 GiB

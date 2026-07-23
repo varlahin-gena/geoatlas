@@ -44,9 +44,10 @@ func NewServer(
 	authUC *usecaseauth.Service,
 	users *auth.UserStore,
 	sessions *auth.SessionManager,
+	apiTokens *auth.TokenStore,
 ) *Server {
 	deps := NewDeps(cfg, ingestSvc, eventsUC, geoUC, parseErrorsUC, systemUC, systemPinger, parseTestUC, retentionUC).
-		WithAuth(authUC, users, sessions)
+		WithAuth(authUC, users, sessions, apiTokens)
 	health := &HealthHandler{deps}
 	events := &EventsHandler{deps}
 	ingestH := &IngestHandler{deps}
@@ -55,19 +56,21 @@ func NewServer(
 	parse := &ParseHandler{deps}
 	authH := &AuthHandler{deps}
 	usersH := &UsersHandler{deps}
+	tokensH := &APITokensHandler{deps}
 
-	authTokens := cfg.APIAuthTokens()
+	envTokens := cfg.APIAuthTokens()
 	if cfg.APIAuthDisabled {
-		authTokens = nil
+		envTokens = nil
 	}
+	ba := newBearerAuth(envTokens, apiTokens)
 	uiAuthOff := cfg.AuthDisabled
 	apiAuthOff := cfg.APIAuthDisabled
 
-	loginMW := requireLoginMW(authTokens, sessions, users, uiAuthOff)
-	adminMW := requireAdminMW(authTokens, sessions, users, uiAuthOff)
-	// Pipeline ops: Bearer / administrator; open if AUTH_DISABLED или API_AUTH_DISABLED.
-	opsMW := requireOpsMW(authTokens, sessions, users, apiAuthOff, uiAuthOff)
-	csrf := csrfMW(authTokens, uiAuthOff)
+	loginMW := requireLoginMW(ba, sessions, users, uiAuthOff)
+	adminMW := requireAdminMW(ba, sessions, users, uiAuthOff)
+	// Pipeline ops: Bearer≥ops / administrator; open if AUTH_DISABLED или API_AUTH_DISABLED.
+	opsMW := requireOpsMW(ba, sessions, users, apiAuthOff, uiAuthOff)
+	csrf := csrfMW(ba, uiAuthOff)
 
 	r := mux.NewRouter()
 
@@ -106,6 +109,17 @@ func NewServer(
 	).Methods("POST")
 	r.Handle("/api/users/{username}",
 		chain(http.HandlerFunc(usersH.Delete), adminMW, csrf),
+	).Methods("DELETE")
+
+	// --- API-токены (administrator) ---
+	r.Handle("/api/tokens",
+		withTimeout(chain(http.HandlerFunc(tokensH.List), adminMW), healthTimeout),
+	).Methods("GET")
+	r.Handle("/api/tokens",
+		chain(http.HandlerFunc(tokensH.Create), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
+	).Methods("POST")
+	r.Handle("/api/tokens/{id}",
+		chain(http.HandlerFunc(tokensH.Revoke), adminMW, csrf),
 	).Methods("DELETE")
 
 	// --- Health открыт (docker/k8s probes). Pipeline stats — opsMW. ---

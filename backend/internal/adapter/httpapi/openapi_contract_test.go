@@ -52,7 +52,7 @@ func TestOpenAPIPathsMatchMux(t *testing.T) {
 		nil, // parseTestUC
 		nil, // retentionUC
 		nil, // authUC
-		nil, nil, // users, sessions
+		nil, nil, nil, // users, sessions, apiTokens
 	)
 	router, ok := srv.httpSrv.Handler.(*mux.Router)
 	if !ok {

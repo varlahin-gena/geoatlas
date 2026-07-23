@@ -1,20 +1,25 @@
 openapi: 3.0.3
 info:
   title: ГеоАтлас API
-  version: "1.1.0"
+  version: "1.2.0"
   description: |
     Backend API для приёма syslog/логов МСЭ, GeoIP и карты трафика.
 
     Локальная авторизация (cookie `nm_session` после `POST /api/auth/login`):
-    - **administrator** — полный доступ (карта, загрузки, система, парсеры, УЗ);
+    - **administrator** — полный доступ (карта, загрузки, система, парсеры, УЗ, API-токены);
     - **operator** — только карта (`GET /api/events`); без загрузок, мониторинга и парсеров.
+
+    Bearer:
+    - env `API_AUTH_TOKEN` (+ опционально `API_AUTH_PREVIOUS_TOKEN`) — всегда scope **admin**;
+    - именованные токены (`/api/tokens`, файл `API_TOKENS_FILE`): scopes **read** | **ops** | **admin**
+      (admin ⊃ ops ⊃ read).
 
     Уровни доступа (backend middleware):
     - **public** — `/health`, `/api/health`, login/logout/me/change-password/check*;
-    - **login** — любой залогиненный (`GET /api/events`);
-    - **admin** — роль administrator ИЛИ `Authorization: Bearer <API_AUTH_TOKEN>`
-      (system/*, parse-*, управление УЗ);
-    - **ops** — то же, что admin, для мутаций и pipeline (`POST /api/ingest`,
+    - **login** — любой залогиненный или Bearer≥read (`GET /api/events`);
+    - **admin** — роль administrator ИЛИ Bearer scope=admin
+      (system/*, parse-*, управление УЗ/токенами);
+    - **ops** — administrator или Bearer≥ops для мутаций и pipeline (`POST /api/ingest`,
       `/upload-logs`, `/upload-geo`, `GET /api/ingest/stats`).
       При `AUTH_DISABLED=1` / `API_AUTH_DISABLED=1` ops открыты; старт только с `NM_ALLOW_INSECURE=1`.
 
@@ -151,6 +156,41 @@ paths:
       summary: Удалить УЗ
       parameters:
         - name: username
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+  /api/tokens:
+    get:
+      tags: [auth]
+      summary: Список именованных API-токенов (без секретов)
+      responses:
+        "200":
+          description: OK
+    post:
+      tags: [auth]
+      summary: Создать токен (secret возвращается один раз)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, scope]
+              properties:
+                name: { type: string }
+                scope: { type: string, enum: [read, ops, admin] }
+      responses:
+        "201":
+          description: Created (token metadata + secret)
+  /api/tokens/{id}:
+    delete:
+      tags: [auth]
+      summary: Отозвать токен
+      parameters:
+        - name: id
           in: path
           required: true
           schema: { type: string }

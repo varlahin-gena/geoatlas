@@ -210,7 +210,7 @@ func (h *AuthHandler) Check(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	if h.bearerAuthorized(r) {
+	if h.bearerScopeOK(r, auth.ScopeRead) {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
@@ -226,7 +226,7 @@ func (h *AuthHandler) Check(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// CheckAdmin — GET /api/auth/check-admin (nginx auth_request: admin / Bearer / API_AUTH_DISABLED).
+// CheckAdmin — GET /api/auth/check-admin (nginx auth_request: admin / Bearer admin / API_AUTH_DISABLED).
 func (h *AuthHandler) CheckAdmin(w http.ResponseWriter, r *http.Request) {
 	if h.authDisabled() {
 		w.WriteHeader(http.StatusOK)
@@ -237,7 +237,7 @@ func (h *AuthHandler) CheckAdmin(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	if h.bearerAuthorized(r) {
+	if h.bearerScopeOK(r, auth.ScopeAdmin) {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
@@ -262,11 +262,13 @@ func (h *AuthHandler) authDisabled() bool {
 	return h == nil || h.Deps == nil || h.cfg.AuthDisabled
 }
 
-func (h *AuthHandler) bearerAuthorized(r *http.Request) bool {
+func (h *AuthHandler) bearerScopeOK(r *http.Request, need string) bool {
 	if h == nil || h.Deps == nil || h.cfg.APIAuthDisabled {
 		return false
 	}
-	return bearerOK(r, h.cfg.APIAuthTokens()...)
+	env := h.cfg.APIAuthTokens()
+	ba := newBearerAuth(env, h.apiTokens)
+	return ba.ok(r, need)
 }
 
 // --- Users CRUD (admin) ---

@@ -54,6 +54,7 @@ func main() {
 
 	var users *auth.UserStore
 	var sessions *auth.SessionManager
+	var apiTokens *auth.TokenStore
 	if cfg.AuthDisabled {
 		slog.Warn("UI auth disabled — login and role checks are off")
 	} else {
@@ -79,6 +80,15 @@ func main() {
 		users = store
 		sessions = mgr
 		slog.Info("UI auth enabled", "users", users.Len(), "users_file", cfg.AuthUsersFile, "session_ttl", ttl.String())
+	}
+	if !cfg.APIAuthDisabled {
+		ts, err := auth.OpenOrCreateTokenStore(cfg.APITokensFile)
+		if err != nil {
+			slog.Error("api tokens file", "path", cfg.APITokensFile, "err", err)
+			os.Exit(1)
+		}
+		apiTokens = ts
+		slog.Info("API token store ready", "tokens", apiTokens.Len(), "file", cfg.APITokensFile)
 	}
 
 	slog.Info("network-monitor starting", "edges_agg", true, "geo_enrich_on_ingest", cfg.GeoEnrichOnIngest)
@@ -210,7 +220,7 @@ func main() {
 	})
 
 	authUC := usecaseauth.New(users, sessions)
-	srv := httpapi.NewServer(cfg, ingestSvc, eventsUC, geoUC, parseErrorsUC, systemUC, systemRepo, parseTestUC, retentionUC, authUC, users, sessions)
+	srv := httpapi.NewServer(cfg, ingestSvc, eventsUC, geoUC, parseErrorsUC, systemUC, systemRepo, parseTestUC, retentionUC, authUC, users, sessions, apiTokens)
 
 	go func() {
 		slog.Info("backend listening", "addr", cfg.ListenAddr)

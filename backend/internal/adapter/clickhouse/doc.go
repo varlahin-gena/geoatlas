@@ -1,13 +1,10 @@
-// Package clickhouse — thin adapters поверх internal/storage.
+// Package clickhouse — adapters поверх internal/storage + собственный SQL где уместно.
 //
-// Намеренно тонкий слой: usecase зависит от портов (InsertTrafficLogs, …),
-// а SQL/DDL живут в storage/{query,migrate,sqlclause}. Репозитории здесь
-// только держат Conn и делегируют в storage — это не «второй ORM», а
-// boundary, чтобы usecase не импортировал storage и clickhouse.Conn.
+// Usecase зависит от портов; SQL/DDL по умолчанию живут в storage/{query,migrate,sqlclause}.
+// Здесь:
+//   - репозитории (traffic/geo/system/parse_errors/ingest) — граница Conn → storage;
+//   - MaintenanceStore — порт geojob (backfill/enrich без прямого import migrate);
+//   - RetentionApplier, ReloadableGeoIndex — логика TTL/GeoIP в adapter.
 //
-// MaintenanceStore — порт для geojob (backfill/enrich); geojob не ходит
-// в storage/migrate напрямую.
-//
-// Менять SQL — в storage. Менять контракт порта — в usecase/*/ports.go
-// или geojob/ports.go. Не раздувать этот пакет бизнес-логикой.
+// Именованные API-токены — в auth.TokenStore (не в этом пакете).
 package clickhouse

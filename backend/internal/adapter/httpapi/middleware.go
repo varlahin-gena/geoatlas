@@ -165,15 +165,68 @@ func maxBytesMW(n int64) middleware {
 	}
 }
 
-// requireLoginMW требует cookie-сессию, Bearer API-токен, либо AUTH_DISABLED.
-func requireLoginMW(tokens []string, sessions *auth.SessionManager, users *auth.UserStore, authDisabled bool) middleware {
+// bearerAuth — env Bearer (всегда admin) + именованные токены из TokenStore.
+type bearerAuth struct {
+	envTokens []string
+	store     *auth.TokenStore
+}
+
+func newBearerAuth(envTokens []string, store *auth.TokenStore) bearerAuth {
+	return bearerAuth{envTokens: envTokens, store: store}
+}
+
+func (b bearerAuth) scope(r *http.Request) (string, bool) {
+	got := bearerPlain(r)
+	if got == "" {
+		return "", false
+	}
+	gotb := []byte(got)
+	for _, token := range b.envTokens {
+		if token == "" {
+			continue
+		}
+		tb := []byte(token)
+		if len(tb) != len(gotb) {
+			continue
+		}
+		if subtle.ConstantTimeCompare(gotb, tb) == 1 {
+			return auth.ScopeAdmin, true
+		}
+	}
+	if b.store != nil {
+		if scope, ok := b.store.Verify(got); ok {
+			return scope, true
+		}
+	}
+	return "", false
+}
+
+func (b bearerAuth) ok(r *http.Request, need string) bool {
+	scope, ok := b.scope(r)
+	return ok && auth.ScopeAtLeast(scope, need)
+}
+
+func (b bearerAuth) any(r *http.Request) bool {
+	_, ok := b.scope(r)
+	return ok
+}
+
+func bearerPlain(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	return strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+}
+
+// requireLoginMW требует cookie-сессию, Bearer (scope≥read), либо AUTH_DISABLED.
+func requireLoginMW(ba bearerAuth, sessions *auth.SessionManager, users *auth.UserStore, authDisabled bool) middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if authDisabled {
 				next.ServeHTTP(w, r)
 				return
 			}
-			if bearerOK(r, tokens...) {
+			if ba.ok(r, auth.ScopeRead) {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -195,15 +248,15 @@ func requireLoginMW(tokens []string, sessions *auth.SessionManager, users *auth.
 	}
 }
 
-// requireAdminMW — роль administrator (из UserStore, не из cookie), Bearer API-токен, либо AUTH_DISABLED.
-func requireAdminMW(tokens []string, sessions *auth.SessionManager, users *auth.UserStore, authDisabled bool) middleware {
+// requireAdminMW — роль administrator, Bearer scope=admin, либо AUTH_DISABLED.
+func requireAdminMW(ba bearerAuth, sessions *auth.SessionManager, users *auth.UserStore, authDisabled bool) middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if authDisabled {
 				next.ServeHTTP(w, r)
 				return
 			}
-			if bearerOK(r, tokens...) {
+			if ba.ok(r, auth.ScopeAdmin) {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -229,16 +282,16 @@ func requireAdminMW(tokens []string, sessions *auth.SessionManager, users *auth.
 	}
 }
 
-// requireOpsMW — mutate / metrics / ingest stats: Bearer или administrator.
+// requireOpsMW — mutate / metrics / ingest stats: Bearer scope≥ops или administrator.
 // API_AUTH_DISABLED или AUTH_DISABLED открывают доступ (dev / локальный контур).
-func requireOpsMW(tokens []string, sessions *auth.SessionManager, users *auth.UserStore, apiAuthDisabled, authDisabled bool) middleware {
+func requireOpsMW(ba bearerAuth, sessions *auth.SessionManager, users *auth.UserStore, apiAuthDisabled, authDisabled bool) middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if authDisabled || apiAuthDisabled {
 				next.ServeHTTP(w, r)
 				return
 			}
-			if bearerOK(r, tokens...) {
+			if ba.ok(r, auth.ScopeOps) {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -270,30 +323,6 @@ func denyIfMustReset(w http.ResponseWriter, users *auth.UserStore, username stri
 		return true
 	}
 	return false
-}
-
-// bearerOK принимает один или несколько токенов (текущий + previous при ротации).
-func bearerOK(r *http.Request, tokens ...string) bool {
-	if r == nil || len(tokens) == 0 {
-		return false
-	}
-	got := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
-	if got == "" {
-		return false
-	}
-	gotb := []byte(got)
-	ok := 0
-	for _, token := range tokens {
-		if token == "" {
-			continue
-		}
-		tb := []byte(token)
-		if len(tb) != len(gotb) {
-			continue
-		}
-		ok |= subtle.ConstantTimeCompare(gotb, tb)
-	}
-	return ok == 1
 }
 
 // withTimeout навешивает жёсткий дедлайн на быстрые read-эндпоинты.
