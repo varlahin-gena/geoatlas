@@ -2,6 +2,7 @@ package geojob
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -15,23 +16,23 @@ func (stubGeo) RangeCount() int               { return 0 }
 func (stubGeo) Lookup(string) model.GeoLookup { return model.GeoLookup{} }
 
 type stubStore struct {
-	edges, geoEdges, enrich, rebuild int
+	edges, geoEdges, enrich, rebuild atomic.Int64
 }
 
 func (s *stubStore) BackfillEdgesAgg(context.Context) error {
-	s.edges++
+	s.edges.Add(1)
 	return nil
 }
 func (s *stubStore) BackfillGeoEdgesAgg(context.Context) error {
-	s.geoEdges++
+	s.geoEdges.Add(1)
 	return nil
 }
 func (s *stubStore) EnrichLogsMissingGeo(context.Context, GeoResolver, int) (int, error) {
-	s.enrich++
+	s.enrich.Add(1)
 	return 0, nil
 }
 func (s *stubStore) RebuildGeoEdgesLookback(context.Context, int) error {
-	s.rebuild++
+	s.rebuild.Add(1)
 	return nil
 }
 
@@ -66,13 +67,13 @@ func TestSchedulerMaintenanceUsesStore(t *testing.T) {
 
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		if store.edges >= 1 && store.geoEdges >= 1 {
+		if store.edges.Load() >= 1 && store.geoEdges.Load() >= 1 {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	if store.edges < 1 || store.geoEdges < 1 {
-		t.Fatalf("store calls edges=%d geoEdges=%d", store.edges, store.geoEdges)
+	if store.edges.Load() < 1 || store.geoEdges.Load() < 1 {
+		t.Fatalf("store calls edges=%d geoEdges=%d", store.edges.Load(), store.geoEdges.Load())
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
