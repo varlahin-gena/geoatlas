@@ -119,7 +119,7 @@ func main() {
 	var bgWg sync.WaitGroup
 
 	geo := chadapter.NewReloadableGeoIndex(pools.Background)
-	geoJobs := geojob.New(geo, pools.Background, cfg.GeoBackfillLookbackDays)
+	geoJobs := geojob.New(geo, chadapter.NewMaintenanceStore(pools.Background), cfg.GeoBackfillLookbackDays)
 	if err := geo.Reload(ctx); err != nil {
 		slog.Warn("geo index not loaded", "err", err)
 	}

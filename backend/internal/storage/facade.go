@@ -20,16 +20,17 @@ var (
 // --- migrate ---
 
 var (
-	EnsureEdgesAggSchema     = migrate.EnsureEdgesAggSchema
-	EnsureEdgesAgg           = migrate.EnsureEdgesAgg
-	BackfillEdgesAgg         = migrate.BackfillEdgesAgg
-	RefreshEdgesAggReady     = migrate.RefreshEdgesAggReady
-	EnsureGeoEdgesAggSchema  = migrate.EnsureGeoEdgesAggSchema
-	EnsureGeoEdgesAgg        = migrate.EnsureGeoEdgesAgg
-	BackfillGeoEdgesAgg      = migrate.BackfillGeoEdgesAgg
-	RefreshGeoEdgesAggReady  = migrate.RefreshGeoEdgesAggReady
-	EnsureTrafficLogsSuccess = migrate.EnsureTrafficLogsSuccess
-	EnsureTTLOnlyDropParts   = migrate.EnsureTTLOnlyDropParts
+	EnsureEdgesAggSchema       = migrate.EnsureEdgesAggSchema
+	EnsureEdgesAgg             = migrate.EnsureEdgesAgg
+	BackfillEdgesAgg           = migrate.BackfillEdgesAgg
+	RefreshEdgesAggReady       = migrate.RefreshEdgesAggReady
+	EnsureGeoEdgesAggSchema    = migrate.EnsureGeoEdgesAggSchema
+	EnsureGeoEdgesAgg          = migrate.EnsureGeoEdgesAgg
+	BackfillGeoEdgesAgg        = migrate.BackfillGeoEdgesAgg
+	RefreshGeoEdgesAggReady    = migrate.RefreshGeoEdgesAggReady
+	RebuildGeoEdgesLookback    = migrate.RebuildGeoEdgesLookback
+	EnsureTrafficLogsSuccess   = migrate.EnsureTrafficLogsSuccess
+	EnsureTTLOnlyDropParts     = migrate.EnsureTTLOnlyDropParts
 )
 
 // --- query ---

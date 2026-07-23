@@ -3,10 +3,12 @@ package ingest
 import (
 	"context"
 	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"network_monitor/internal/adapter/parseradapter"
+	"network_monitor/internal/model"
 	"network_monitor/internal/parser"
 	usecaseingest "network_monitor/internal/usecase/ingest"
 )
@@ -185,3 +187,64 @@ func TestQueueBlocksUntilDrain(t *testing.T) {
 	default:
 	}
 }
+
+func TestRunDrainsDeepQueueOnCancel(t *testing.T) {
+	sink := &countingInserter{}
+	svc := NewService(Config{
+		Workers:       2,
+		BatchSize:     50,
+		QueueSize:     500,
+		FlushInterval: time.Hour,
+		QueryTimeout:  time.Second,
+	}, ProcessorDeps{
+		Parser: testLineParser(),
+		Logs:   sink,
+		Errors: sink,
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- svc.Run(ctx) }()
+
+	line := `src=10.0.0.1 dst=8.8.8.8 action=allow proto=tcp sport=1 dport=2`
+	const n = 400
+	for i := 0; i < n; i++ {
+		if !svc.TryEnqueue(line, "tcp") {
+			cancel()
+			t.Fatalf("enqueue failed at %d", i)
+		}
+	}
+
+	// Даём worker'ам стартовать, затем cancel → drainWorker должен опустошить хвост.
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("Run: %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("Run did not finish after cancel (drain hung?)")
+	}
+
+	if left := len(svc.lineCh); left != 0 {
+		t.Fatalf("queue_depth=%d want 0 after drain", left)
+	}
+	if got := sink.logs.Load(); got < 1 {
+		t.Fatalf("inserted=%d want >= 1", got)
+	}
+}
+
+type countingInserter struct {
+	logs atomic.Int64
+}
+
+func (c *countingInserter) InsertTrafficLogs(_ context.Context, logs []model.TrafficLog) error {
+	c.logs.Add(int64(len(logs)))
+	return nil
+}
+
+func (c *countingInserter) InsertParseErrors(context.Context, []model.ParseError) error {
+	return nil
+}
+

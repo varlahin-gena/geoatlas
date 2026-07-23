@@ -5,20 +5,7 @@ import (
 	"log/slog"
 	"sync"
 	"time"
-
-	"github.com/ClickHouse/clickhouse-go/v2"
-
-	"network_monitor/internal/model"
-	"network_monitor/internal/storage"
-	"network_monitor/internal/storage/migrate"
 )
-
-// GeoIndex — reload + lookup для backfill (реализация: *clickhouse.ReloadableGeoIndex).
-type GeoIndex interface {
-	Reload(ctx context.Context) error
-	RangeCount() int
-	Lookup(ipStr string) model.GeoLookup
-}
 
 type jobKind int
 
@@ -28,12 +15,15 @@ const (
 	jobMaintenanceBackfill
 )
 
+// DefaultLookbackDays — окно auto-backfill, если lookback не задан.
+const DefaultLookbackDays = 7
+
 // Scheduler сериализует reload GeoIP, agg backfill и enrich в traffic_logs.
 // Параллельные Schedule* не запускают несколько ALTER/INSERT сразу:
 // предыдущая работа отменяется по context, следующая ждёт workMu.
 type Scheduler struct {
 	geo          GeoIndex
-	ch           clickhouse.Conn
+	store        Store
 	lookbackDays int
 
 	mu     sync.Mutex
@@ -44,9 +34,12 @@ type Scheduler struct {
 }
 
 // New создаёт scheduler. lookbackDays ограничивает EnrichLogsMissingGeo
-// (storage.DefaultGeoBackfillLookbackDays; 0 = весь объём).
-func New(geo GeoIndex, ch clickhouse.Conn, lookbackDays int) *Scheduler {
-	return &Scheduler{geo: geo, ch: ch, lookbackDays: lookbackDays}
+// (0 = весь объём; <0 → DefaultLookbackDays).
+func New(geo GeoIndex, store Store, lookbackDays int) *Scheduler {
+	if lookbackDays < 0 {
+		lookbackDays = DefaultLookbackDays
+	}
+	return &Scheduler{geo: geo, store: store, lookbackDays: lookbackDays}
 }
 
 // ScheduleReloadAndEnrich ставит в очередь reload + EnrichLogsMissingGeo.
@@ -66,7 +59,7 @@ func (s *Scheduler) ScheduleMaintenanceBackfill(parent context.Context, timeout 
 }
 
 func (s *Scheduler) schedule(parent context.Context, timeout time.Duration, kind jobKind) {
-	if s == nil || s.ch == nil {
+	if s == nil || s.store == nil {
 		return
 	}
 	if kind != jobMaintenanceBackfill && s.geo == nil {
@@ -131,7 +124,7 @@ func (s *Scheduler) run(ctx context.Context, gen uint64, kind jobKind) {
 
 func (s *Scheduler) runMaintenance(ctx context.Context) {
 	slog.Info("maintenance: edges/geo backfill started")
-	if err := migrate.BackfillEdgesAgg(ctx, s.ch); err != nil {
+	if err := s.store.BackfillEdgesAgg(ctx); err != nil {
 		if ctx.Err() != nil {
 			slog.Info("maintenance: edges backfill canceled")
 			return
@@ -142,7 +135,7 @@ func (s *Scheduler) runMaintenance(ctx context.Context) {
 	if ctx.Err() != nil {
 		return
 	}
-	if err := migrate.BackfillGeoEdgesAgg(ctx, s.ch); err != nil {
+	if err := s.store.BackfillGeoEdgesAgg(ctx); err != nil {
 		if ctx.Err() != nil {
 			slog.Info("maintenance: geo-edges backfill canceled")
 			return
@@ -171,14 +164,14 @@ func (s *Scheduler) runReload(ctx context.Context) {
 }
 
 func (s *Scheduler) runEnrich(ctx context.Context) {
-	if s.geo == nil {
+	if s.geo == nil || s.store == nil {
 		return
 	}
 	if ctx.Err() != nil {
 		return
 	}
 
-	n, err := storage.EnrichLogsMissingGeo(ctx, s.ch, s.geo, s.lookbackDays)
+	n, err := s.store.EnrichLogsMissingGeo(ctx, s.geo, s.lookbackDays)
 	if err != nil {
 		if ctx.Err() != nil {
 			slog.Info("geo job: enrich canceled")
@@ -189,7 +182,7 @@ func (s *Scheduler) runEnrich(ctx context.Context) {
 	}
 	if n > 0 {
 		slog.Info("geo job: backfill done", "ips", n, "lookback_days", s.lookbackDays)
-		if err := migrate.RebuildGeoEdgesLookback(ctx, s.ch, s.lookbackDays); err != nil {
+		if err := s.store.RebuildGeoEdgesLookback(ctx, s.lookbackDays); err != nil {
 			if ctx.Err() != nil {
 				slog.Info("geo job: geo-edges rebuild canceled")
 				return
