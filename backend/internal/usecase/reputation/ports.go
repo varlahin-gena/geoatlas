@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 
+	"network_monitor/internal/config"
 	"network_monitor/internal/model"
 )
 
@@ -30,6 +31,13 @@ type Index interface {
 // FeedRefresher — фоновый/ручной fetch URL-фидов.
 type FeedRefresher interface {
 	RefreshAll(ctx context.Context, force bool) (RefreshResult, error)
+	SetFeeds(feeds []config.ReputationFeed)
+}
+
+// FeedStore — персистентный список URL-фидов (JSON-файл).
+type FeedStore interface {
+	Load() (feeds []config.ReputationFeed, ok bool, err error)
+	Save(feeds []config.ReputationFeed) error
 }
 
 // Codec — CSV / netset парсинг.

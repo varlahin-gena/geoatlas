@@ -5,13 +5,18 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/url"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
 
+	"network_monitor/internal/config"
 	"network_monitor/internal/model"
 	reppkg "network_monitor/internal/reputation"
 )
+
+var feedNameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$`)
 
 // Service — application use cases для репутационных списков.
 type Service struct {
@@ -19,17 +24,19 @@ type Service struct {
 	index     Index
 	codec     Codec
 	refresher FeedRefresher
+	feedStore FeedStore
 
 	mu      sync.Mutex
 	lastErr map[string]string // list_name → last fetch error
 }
 
-func New(store RangeStore, index Index, codec Codec, refresher FeedRefresher) *Service {
+func New(store RangeStore, index Index, codec Codec, refresher FeedRefresher, feedStore FeedStore) *Service {
 	return &Service{
 		store:     store,
 		index:     index,
 		codec:     codec,
 		refresher: refresher,
+		feedStore: feedStore,
 		lastErr:   map[string]string{},
 	}
 }
@@ -132,6 +139,19 @@ func (s *Service) DeleteList(ctx context.Context, name string) error {
 	if name == "" {
 		return clientErr{fmt.Errorf("list name is required")}
 	}
+	// Если список был URL-фидом — снимаем его из расписания, иначе вернётся при refresh.
+	if err := s.removeFeedConfig(name); err != nil {
+		return err
+	}
+	return s.DeleteListData(ctx, name)
+}
+
+// DeleteListData удаляет диапазоны из CH и индекса (без правки файла фидов).
+func (s *Service) DeleteListData(ctx context.Context, name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return clientErr{fmt.Errorf("list name is required")}
+	}
 	if err := s.store.DeleteList(ctx, name); err != nil {
 		return err
 	}
@@ -140,6 +160,126 @@ func (s *Service) DeleteList(ctx context.Context, name string) error {
 	}
 	s.SetFeedError(name, "")
 	return nil
+}
+
+func (s *Service) ListFeeds() ([]config.ReputationFeed, error) {
+	if s.feedStore == nil {
+		return nil, nil
+	}
+	feeds, ok, err := s.feedStore.Load()
+	if err != nil {
+		return nil, err
+	}
+	if !ok || feeds == nil {
+		return []config.ReputationFeed{}, nil
+	}
+	return feeds, nil
+}
+
+func (s *Service) AddFeed(ctx context.Context, feed config.ReputationFeed) error {
+	_ = ctx
+	feed, err := normalizeFeedInput(feed)
+	if err != nil {
+		return err
+	}
+	if s.feedStore == nil {
+		return fmt.Errorf("feed store not configured")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	feeds, _, err := s.feedStore.Load()
+	if err != nil {
+		return err
+	}
+	for _, f := range feeds {
+		if f.Name == feed.Name {
+			return clientErr{fmt.Errorf("feed %q already exists", feed.Name)}
+		}
+	}
+	feeds = append(feeds, feed)
+	if err := s.feedStore.Save(feeds); err != nil {
+		return err
+	}
+	if s.refresher != nil {
+		s.refresher.SetFeeds(feeds)
+	}
+	return nil
+}
+
+func (s *Service) RemoveFeed(ctx context.Context, name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return clientErr{fmt.Errorf("feed name is required")}
+	}
+	if err := s.removeFeedConfig(name); err != nil {
+		return err
+	}
+	return s.DeleteListData(ctx, name)
+}
+
+// removeFeedConfig убирает фид из JSON и scheduler (no-op если нет / не сконфигурирован).
+func (s *Service) removeFeedConfig(name string) error {
+	if s.feedStore == nil {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	feeds, ok, err := s.feedStore.Load()
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return nil
+	}
+	next := make([]config.ReputationFeed, 0, len(feeds))
+	found := false
+	for _, f := range feeds {
+		if f.Name == name {
+			found = true
+			continue
+		}
+		next = append(next, f)
+	}
+	if !found {
+		return nil
+	}
+	if err := s.feedStore.Save(next); err != nil {
+		return err
+	}
+	if s.refresher != nil {
+		s.refresher.SetFeeds(next)
+	}
+	return nil
+}
+
+func normalizeFeedInput(feed config.ReputationFeed) (config.ReputationFeed, error) {
+	feed.Name = strings.TrimSpace(feed.Name)
+	feed.URL = strings.TrimSpace(feed.URL)
+	feed.Category = strings.TrimSpace(feed.Category)
+	feed.Format = strings.ToLower(strings.TrimSpace(feed.Format))
+	if feed.Name == "" || !feedNameRe.MatchString(feed.Name) {
+		return feed, clientErr{fmt.Errorf("invalid feed name (use letters, digits, _-; max 64)")}
+	}
+	if feed.URL == "" {
+		return feed, clientErr{fmt.Errorf("url is required")}
+	}
+	u, err := url.Parse(feed.URL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return feed, clientErr{fmt.Errorf("url must be http(s)")}
+	}
+	if feed.Category == "" {
+		feed.Category = "unknown"
+	}
+	if len(feed.Category) > 64 {
+		return feed, clientErr{fmt.Errorf("category too long")}
+	}
+	if feed.Format == "" {
+		feed.Format = "netset"
+	}
+	if feed.Format != "netset" {
+		return feed, clientErr{fmt.Errorf("unsupported format %q (only netset)", feed.Format)}
+	}
+	return feed, nil
 }
 
 func (s *Service) Refresh(ctx context.Context, force bool) (RefreshResult, error) {

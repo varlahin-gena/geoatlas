@@ -162,6 +162,15 @@ func NewServer(
 	r.Handle("/api/reputation/lists/{name}",
 		chain(http.HandlerFunc(repH.DeleteList), opsMW, csrf),
 	).Methods("DELETE")
+	r.Handle("/api/reputation/feeds",
+		withTimeout(chain(http.HandlerFunc(repH.ListFeeds), adminMW), readTimeout),
+	).Methods("GET")
+	r.Handle("/api/reputation/feeds",
+		chain(http.HandlerFunc(repH.AddFeed), opsMW, csrf, maxBytesMW(maxJSONBodySize)),
+	).Methods("POST")
+	r.Handle("/api/reputation/feeds/{name}",
+		chain(http.HandlerFunc(repH.RemoveFeed), opsMW, csrf),
+	).Methods("DELETE")
 	r.Handle("/api/reputation/refresh",
 		chain(http.HandlerFunc(repH.Refresh), opsMW, csrf, maxBytesMW(maxJSONBodySize)),
 	).Methods("POST")

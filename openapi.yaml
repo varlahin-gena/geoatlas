@@ -619,7 +619,71 @@ paths:
     delete:
       tags: [reputation]
       summary: Удалить репутационный список
-      description: administrator или Bearer (ops).
+      description: |
+        administrator или Bearer (ops).
+        Если список совпадает с URL-фидом — фид тоже снимается из расписания
+        (иначе вернётся при следующем refresh).
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: deleted
+        "401":
+          description: unauthorized
+
+  /api/reputation/feeds:
+    get:
+      tags: [reputation]
+      summary: Список URL-фидов (расписание)
+      description: Только administrator или Bearer admin. Источник — REPUTATION_FEEDS_FILE.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: feeds
+        "401":
+          description: unauthorized
+    post:
+      tags: [reputation]
+      summary: Добавить URL-фид
+      description: |
+        administrator или Bearer (ops). Тело: `{name,url,category,format}`.
+        format по умолчанию `netset`. После добавления вызовите refresh.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, url]
+              properties:
+                name: { type: string }
+                url: { type: string }
+                category: { type: string }
+                format: { type: string, enum: [netset] }
+      responses:
+        "200":
+          description: added
+        "400":
+          description: invalid feed
+        "401":
+          description: unauthorized
+
+  /api/reputation/feeds/{name}:
+    delete:
+      tags: [reputation]
+      summary: Удалить URL-фид и его диапазоны
+      description: administrator или Bearer (ops). Снимает фид из файла и удаляет загруженные ranges.
       security:
         - bearerAuth: []
         - cookieAuth: []

@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/gorilla/mux"
 
+	"network_monitor/internal/config"
 	usecasereputation "network_monitor/internal/usecase/reputation"
 )
 
@@ -121,4 +123,65 @@ func (h *ReputationHandler) Lookup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "ip": ip, "hits": hits})
+}
+
+func (h *ReputationHandler) ListFeeds(w http.ResponseWriter, r *http.Request) {
+	if h.reputationUC == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "reputation service unavailable"})
+		return
+	}
+	feeds, err := h.reputationUC.ListFeeds()
+	if err != nil {
+		writeInternalError(w, "reputation feeds list failed", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "feeds": feeds})
+}
+
+func (h *ReputationHandler) AddFeed(w http.ResponseWriter, r *http.Request) {
+	if h.reputationUC == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "reputation service unavailable"})
+		return
+	}
+	var req struct {
+		Name     string `json:"name"`
+		URL      string `json:"url"`
+		Category string `json:"category"`
+		Format   string `json:"format"`
+	}
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+		return
+	}
+	err := h.reputationUC.AddFeed(r.Context(), config.ReputationFeed{
+		Name: req.Name, URL: req.URL, Category: req.Category, Format: req.Format,
+	})
+	if err != nil {
+		if usecasereputation.IsClientError(err) {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			return
+		}
+		writeInternalError(w, "reputation add feed failed", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "added": req.Name})
+}
+
+func (h *ReputationHandler) RemoveFeed(w http.ResponseWriter, r *http.Request) {
+	if h.reputationUC == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "reputation service unavailable"})
+		return
+	}
+	name := mux.Vars(r)["name"]
+	if err := h.reputationUC.RemoveFeed(r.Context(), name); err != nil {
+		if usecasereputation.IsClientError(err) {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			return
+		}
+		writeInternalError(w, "reputation remove feed failed", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "deleted": name})
 }

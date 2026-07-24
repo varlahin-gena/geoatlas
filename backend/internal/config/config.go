@@ -110,7 +110,8 @@ type Config struct {
 	MaxReputationUploadSize int64
 	ReputationFetchEnabled  bool
 	ReputationFetchInterval time.Duration
-	ReputationFeeds         []ReputationFeed // из REPUTATION_FEEDS JSON или дефолт
+	ReputationFeeds         []ReputationFeed // seed, если файла ещё нет
+	ReputationFeedsFile     string           // REPUTATION_FEEDS_FILE
 
 	LogLevel  string // debug|info|warn|error
 	LogFormat string // text|json
@@ -173,6 +174,7 @@ func FromEnv() Config {
 		ReputationFetchEnabled:  envBool("REPUTATION_FETCH_ENABLED", true),
 		ReputationFetchInterval: envDurationFlexible("REPUTATION_FETCH_INTERVAL", 6*time.Hour),
 		ReputationFeeds:         parseReputationFeeds(os.Getenv("REPUTATION_FEEDS")),
+		ReputationFeedsFile:     envOr("REPUTATION_FEEDS_FILE", "/app/data/reputation_feeds.json"),
 		LogLevel:                strings.ToLower(envOr("LOG_LEVEL", "info")),
 		LogFormat:               strings.ToLower(envOr("LOG_FORMAT", "text")),
 	}

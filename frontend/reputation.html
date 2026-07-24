@@ -24,6 +24,29 @@
   display: inline-block; padding: 1px 6px; border-radius: 4px;
   font-size: 11px; background: var(--panel-3); color: var(--text-dim);
 }
+.section-title { font-size: 1.05rem; margin: 24px 0 8px; }
+.feed-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+  align-items: end;
+  margin: 12px 0 16px;
+  max-width: 960px;
+}
+.feed-form label {
+  display: flex; flex-direction: column; gap: 4px;
+  font-size: 12px; color: var(--text-dim);
+}
+.feed-form input, .feed-form select {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+}
+.feed-form .actions { display: flex; gap: 8px; align-items: center; }
+.url-cell { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 </style>
 </head>
 <body class="page-admin">
@@ -33,11 +56,10 @@
   <div class="page-content-inner">
     <h1>Репутация IP</h1>
     <p class="hint">
-      Офлайн-фиды по умолчанию: Spamhaus DROP, DShield, Feodo (C2), Emerging Threats,
-      blocklist.de, CI Army, GreenSnow — с категориями для фильтра на карте.
-      Можно загрузить свой CSV (<code>Network,List,Category</code>) или задать
-      <code>REPUTATION_FEEDS</code>. После обновления фидов устаревший агрегат
-      <code>firehol_level1</code> удаляется автоматически.
+      URL-фиды хранятся в <code>reputation_feeds.json</code> и обновляются по расписанию.
+      Можно добавить/удалить фид здесь, загрузить свой CSV
+      (<code>Network,List,Category</code>) или задать seed через <code>REPUTATION_FEEDS</code>
+      (только если файла ещё нет). Удаление URL-списка также снимает фид из расписания.
     </p>
 
     <div class="summary" id="summary"></div>
@@ -49,6 +71,51 @@
       <input type="file" id="fileInput" accept=".csv,text/csv,text/plain" hidden />
     </div>
 
+    <h2 class="section-title">URL-фиды</h2>
+    <form class="feed-form" id="feedForm">
+      <label>Имя
+        <input name="name" required pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,63}" placeholder="spamhaus_drop" autocomplete="off" />
+      </label>
+      <label style="grid-column: span 2;">URL
+        <input name="url" type="url" required placeholder="https://…/list.netset" autocomplete="off" />
+      </label>
+      <label>Категория
+        <select name="category">
+          <option value="attacks">attacks</option>
+          <option value="c2">c2</option>
+          <option value="drop">drop</option>
+          <option value="block">block</option>
+          <option value="unknown">unknown</option>
+        </select>
+      </label>
+      <label>Формат
+        <select name="format">
+          <option value="netset">netset</option>
+        </select>
+      </label>
+      <div class="actions">
+        <button type="submit" class="btn primary">Добавить фид</button>
+      </div>
+    </form>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Имя</th>
+            <th scope="col">Категория</th>
+            <th scope="col">Формат</th>
+            <th scope="col">URL</th>
+            <th scope="col"><span class="visually-hidden">Действия</span></th>
+          </tr>
+        </thead>
+        <tbody id="feedsBody">
+          <tr><td colspan="5" class="empty">Загрузка…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 class="section-title">Загруженные списки</h2>
     <div class="table-wrap">
       <table>
         <thead>
@@ -78,6 +145,36 @@
 <script>
 (function () {
   'use strict';
+
+  async function loadFeeds() {
+    const tbody = document.getElementById('feedsBody');
+    try {
+      const res = await fetch('/api/reputation/feeds', { credentials: 'same-origin', cache: 'no-store' });
+      if (res.status === 401) {
+        location.replace(NMAuth.loginUrl(location.pathname));
+        return;
+      }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const feeds = data.feeds || [];
+      if (!feeds.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty">Нет URL-фидов — добавьте ниже или нажмите «Обновить»</td></tr>';
+        return;
+      }
+      tbody.innerHTML = feeds.map(function (f) {
+        return '<tr>' +
+          '<td>' + NMUI.escapeHTML(f.name) + '</td>' +
+          '<td>' + NMUI.escapeHTML(f.category || '') + '</td>' +
+          '<td>' + NMUI.escapeHTML(f.format || 'netset') + '</td>' +
+          '<td class="url-cell" title="' + NMUI.escapeHTML(f.url || '') + '">' + NMUI.escapeHTML(f.url || '') + '</td>' +
+          '<td><button type="button" class="btn" data-del-feed="' + NMUI.escapeHTML(f.name) + '">Удалить</button></td>' +
+          '</tr>';
+      }).join('');
+    } catch (e) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">Ошибка: ' + NMUI.escapeHTML(e.message) + '</td></tr>';
+      NMUI.toast('Не удалось загрузить фиды', 'error');
+    }
+  }
 
   async function loadLists() {
     const tbody = document.getElementById('tbody');
@@ -116,7 +213,11 @@
     }
   }
 
-  document.getElementById('refresh').addEventListener('click', loadLists);
+  async function reloadAll() {
+    await Promise.all([loadFeeds(), loadLists()]);
+  }
+
+  document.getElementById('refresh').addEventListener('click', reloadAll);
   document.getElementById('btnUpload').addEventListener('click', function () {
     document.getElementById('fileInput').click();
   });
@@ -152,16 +253,60 @@
       const upd = (data.updated || []).length;
       const fail = (data.failed || []).length;
       NMUI.toast('Обновлено: ' + upd + (fail ? ', ошибок: ' + fail : ''), fail ? 'error' : 'success');
-      loadLists();
+      reloadAll();
     } catch (e) {
       NMUI.toast(e.message || String(e), 'error');
+    }
+  });
+  document.getElementById('feedForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const body = {
+      name: String(fd.get('name') || '').trim(),
+      url: String(fd.get('url') || '').trim(),
+      category: String(fd.get('category') || 'unknown'),
+      format: String(fd.get('format') || 'netset'),
+    };
+    try {
+      const res = await fetch('/api/reputation/feeds', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: NMAuth.nmAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(function () { return {}; });
+      if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+      NMUI.toast('Фид добавлен: ' + body.name + '. Нажмите «Обновить фиды».', 'success');
+      e.target.reset();
+      await loadFeeds();
+    } catch (err) {
+      NMUI.toast(err.message || String(err), 'error');
+    }
+  });
+  document.getElementById('feedsBody').addEventListener('click', async function (e) {
+    const btn = e.target.closest('[data-del-feed]');
+    if (!btn) return;
+    const name = btn.getAttribute('data-del-feed');
+    if (!confirm('Удалить фид «' + name + '» и его диапазоны?')) return;
+    try {
+      const res = await fetch('/api/reputation/feeds/' + encodeURIComponent(name), {
+        method: 'DELETE',
+        credentials: 'same-origin',
+        headers: NMAuth.nmAuthHeaders(),
+      });
+      const data = await res.json().catch(function () { return {}; });
+      if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+      NMUI.toast('Фид удалён: ' + name, 'success');
+      reloadAll();
+    } catch (err) {
+      NMUI.toast(err.message || String(err), 'error');
     }
   });
   document.getElementById('tbody').addEventListener('click', async function (e) {
     const btn = e.target.closest('[data-del]');
     if (!btn) return;
     const name = btn.getAttribute('data-del');
-    if (!confirm('Удалить список «' + name + '»?')) return;
+    if (!confirm('Удалить список «' + name + '»? URL-фид с тем же именем тоже будет снят.')) return;
     try {
       const res = await fetch('/api/reputation/lists/' + encodeURIComponent(name), {
         method: 'DELETE',
@@ -171,7 +316,7 @@
       const data = await res.json().catch(function () { return {}; });
       if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
       NMUI.toast('Удалено: ' + name, 'success');
-      loadLists();
+      reloadAll();
     } catch (err) {
       NMUI.toast(err.message || String(err), 'error');
     }
@@ -186,7 +331,7 @@
     if (!user) return;
     NMAuth.renderUserBar(user, bar.userBarHost);
     NMUI.startSystemHealthPolling({ isAdmin: true });
-    await loadLists();
+    await reloadAll();
   })();
 })();
 </script>

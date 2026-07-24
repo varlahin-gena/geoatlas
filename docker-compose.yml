@@ -110,6 +110,7 @@ services:
       AUTH_OPERATOR_PASSWORD: ${AUTH_OPERATOR_PASSWORD:-operator}
       AUTH_USERS_FILE: /app/data/users.json
       RETENTION_FILE: /app/data/retention.json
+      REPUTATION_FEEDS_FILE: /app/data/reputation_feeds.json
       # Только local/dev: плейсхолдеры секретов и/или AUTH_DISABLED / API_AUTH_DISABLED
       NM_ALLOW_INSECURE: ${NM_ALLOW_INSECURE:-0}
       TZ: Europe/Moscow

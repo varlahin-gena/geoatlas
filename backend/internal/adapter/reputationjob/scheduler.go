@@ -21,7 +21,8 @@ type Applier interface {
 	ApplyListRanges(ctx context.Context, listName string, ranges []model.ReputationRange) (int, error)
 	SetFeedError(listName, errMsg string)
 	ListLists(ctx context.Context) ([]model.ReputationListMeta, error)
-	DeleteList(ctx context.Context, name string) error
+	// DeleteListData — только CH+индекс (без правки reputation_feeds.json).
+	DeleteListData(ctx context.Context, name string) error
 }
 
 // Scheduler периодически качает REPUTATION_FEEDS.
@@ -106,11 +107,32 @@ func (s *Scheduler) RefreshAll(ctx context.Context, force bool) (usecasereputati
 	return s.runOnce(ctx, force), nil
 }
 
+// SetFeeds подменяет набор URL-фидов (из UI / JSON-файла).
+func (s *Scheduler) SetFeeds(feeds []config.ReputationFeed) {
+	if s == nil {
+		return
+	}
+	cp := make([]config.ReputationFeed, len(feeds))
+	copy(cp, feeds)
+	s.mu.Lock()
+	s.feeds = cp
+	s.mu.Unlock()
+}
+
+func (s *Scheduler) snapshotFeeds() []config.ReputationFeed {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]config.ReputationFeed, len(s.feeds))
+	copy(out, s.feeds)
+	return out
+}
+
 func (s *Scheduler) runOnce(ctx context.Context, force bool) usecasereputation.RefreshResult {
 	res := usecasereputation.RefreshResult{
 		Errors: map[string]string{},
 	}
-	for _, feed := range s.feeds {
+	feeds := s.snapshotFeeds()
+	for _, feed := range feeds {
 		if ctx.Err() != nil {
 			break
 		}
@@ -130,18 +152,18 @@ func (s *Scheduler) runOnce(ctx context.Context, force bool) usecasereputation.R
 			}
 		}
 	}
-	s.pruneObsoleteURLLists(ctx, &res)
+	s.pruneObsoleteURLLists(ctx, feeds, &res)
 	return res
 }
 
 // pruneObsoleteURLLists удаляет URL-списки, которых больше нет в конфиге
 // (например устаревший агрегат firehol_level1). CSV upload (source=upload) не трогает.
-func (s *Scheduler) pruneObsoleteURLLists(ctx context.Context, res *usecasereputation.RefreshResult) {
+func (s *Scheduler) pruneObsoleteURLLists(ctx context.Context, feeds []config.ReputationFeed, res *usecasereputation.RefreshResult) {
 	if s == nil || s.applier == nil || res == nil {
 		return
 	}
-	keep := make(map[string]struct{}, len(s.feeds))
-	for _, f := range s.feeds {
+	keep := make(map[string]struct{}, len(feeds))
+	for _, f := range feeds {
 		keep[f.Name] = struct{}{}
 	}
 	lists, err := s.applier.ListLists(ctx)
@@ -156,7 +178,7 @@ func (s *Scheduler) pruneObsoleteURLLists(ctx context.Context, res *usecasereput
 		if _, ok := keep[m.Name]; ok {
 			continue
 		}
-		if err := s.applier.DeleteList(ctx, m.Name); err != nil {
+		if err := s.applier.DeleteListData(ctx, m.Name); err != nil {
 			slog.Warn("reputation prune: delete failed", "list", m.Name, "err", err)
 			continue
 		}

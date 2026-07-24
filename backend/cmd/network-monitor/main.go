@@ -21,6 +21,7 @@ import (
 	"network_monitor/internal/adapter/geojob"
 	httpapi "network_monitor/internal/adapter/httpapi"
 	"network_monitor/internal/adapter/parseradapter"
+	"network_monitor/internal/adapter/reputationfeedsfile"
 	"network_monitor/internal/adapter/reputationjob"
 	"network_monitor/internal/adapter/retentionfile"
 	"network_monitor/internal/adapter/systemlive"
@@ -139,8 +140,19 @@ func main() {
 
 	repIdx := chadapter.NewReloadableReputationIndex(pools.Background)
 	repRepo := chadapter.NewReputationRepository(pools.API, pools.Ingest)
-	repUC := usecasereputation.New(repRepo, repIdx, usecasereputation.DefaultCodec{}, nil)
-	repJobs := reputationjob.New(cfg.ReputationFeeds, cfg.ReputationFetchInterval, cfg.ReputationFetchEnabled, repUC)
+	repFeedStore := reputationfeedsfile.New(cfg.ReputationFeedsFile)
+	repFeeds, err := repFeedStore.LoadOrSeed(cfg.ReputationFeeds)
+	if err != nil {
+		slog.Warn("reputation feeds file load/seed failed", "err", err, "path", cfg.ReputationFeedsFile)
+		repFeeds = cfg.ReputationFeeds
+		if len(repFeeds) == 0 {
+			repFeeds = config.DefaultReputationFeeds()
+		}
+	} else {
+		slog.Info("reputation feeds loaded", "count", len(repFeeds), "path", cfg.ReputationFeedsFile)
+	}
+	repUC := usecasereputation.New(repRepo, repIdx, usecasereputation.DefaultCodec{}, nil, repFeedStore)
+	repJobs := reputationjob.New(repFeeds, cfg.ReputationFetchInterval, cfg.ReputationFetchEnabled, repUC)
 	repUC.SetRefresher(repJobs)
 
 	if err := migrate.EnsureReputationRanges(ctx, pools.Background); err != nil {
