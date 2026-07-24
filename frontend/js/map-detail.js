@@ -195,10 +195,14 @@ function showLineDetail(line) {
             zone: line.dst_zone,
             country: line.dst_country,
         }, groupBy, coarse) },
-        { title: 'Репутация', rows: [
-            { key: 'Src', value: typeof formatReputationHits === 'function' ? formatReputationHits(line.src_reputation) : '' },
-            { key: 'Dst', value: typeof formatReputationHits === 'function' ? formatReputationHits(line.dst_reputation) : '' },
-        ]},
+        { title: 'Репутация', rows: [].concat(
+            typeof reputationDetailRows === 'function'
+                ? reputationDetailRows('Src', line.src, line.src_reputation)
+                : [{ key: 'Src', value: typeof formatReputationHits === 'function' ? formatReputationHits(line.src_reputation) : '' }],
+            typeof reputationDetailRows === 'function'
+                ? reputationDetailRows('Dst', line.dst, line.dst_reputation)
+                : [{ key: 'Dst', value: typeof formatReputationHits === 'function' ? formatReputationHits(line.dst_reputation) : '' }],
+        )},
         { title: 'Параметры', rows: [
             { key: lineDetailSampleKey('Protocol', coarse), value: line.proto || '' },
             { key: lineDetailSampleKey('Rule', coarse), value: line.rule || '' },
@@ -261,9 +265,13 @@ function showPointDetail(point, key) {
             { key: 'Страна', value: ruCountry(point.country) },
             { key: 'Lat / Lon', value: `${point.lat.toFixed(4)}, ${point.lon.toFixed(4)}` },
             { key: 'Событий', value: fmtNumber(point.count) },
-            { key: 'Репутация', value: typeof formatReputationHits === 'function' ? formatReputationHits(point.reputation) : '' },
         ]},
     ];
+    if (typeof reputationDetailRows === 'function' && point.reputation && point.reputation.length) {
+        sections.push({ title: 'Репутация', rows: reputationDetailRows('IP', key, point.reputation) });
+    } else if (typeof formatReputationHits === 'function' && point.reputation && point.reputation.length) {
+        sections[0].rows.push({ key: 'Репутация', value: formatReputationHits(point.reputation) });
+    }
 
     if (conn.out.length) {
         sections.push({

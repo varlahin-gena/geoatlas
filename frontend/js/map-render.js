@@ -11,7 +11,8 @@ function monoArcRGB() {
 
 function arcRGB(status, line) {
     if (monoArcColor) return monoArcRGB();
-    if (line && typeof lineHasReputationHits === 'function' && lineHasReputationHits(line)) {
+    if (typeof repColorArcs !== 'undefined' && repColorArcs &&
+        line && typeof lineHasReputationHits === 'function' && lineHasReputationHits(line)) {
         return [210, 153, 34]; // orange — репутационный хит
     }
     return statusRGB(status);
@@ -398,8 +399,8 @@ function buildDeckLayers(mode = 'map') {
         highlightColor: [255, 255, 255, 140],
         parameters: { depthTest: isGlobe },
         updateTriggers: {
-            getSourceColor: [currentFilter, monoArcColor, typeof reputationFilterActiveCount === 'function' ? reputationFilterActiveCount() : 0],
-            getTargetColor: [currentFilter, monoArcColor, typeof reputationFilterActiveCount === 'function' ? reputationFilterActiveCount() : 0],
+            getSourceColor: [currentFilter, monoArcColor, typeof repColorArcs !== 'undefined' && repColorArcs, typeof reputationFilterActiveCount === 'function' ? reputationFilterActiveCount() : 0],
+            getTargetColor: [currentFilter, monoArcColor, typeof repColorArcs !== 'undefined' && repColorArcs, typeof reputationFilterActiveCount === 'function' ? reputationFilterActiveCount() : 0],
             getSourcePosition: [_statsCacheVersion],
             getTargetPosition: [_statsCacheVersion],
         },

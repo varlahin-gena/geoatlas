@@ -31,6 +31,9 @@ not-an-ip
 	if len(hits) != 1 || hits[0].List != "firehol_level1" {
 		t.Fatalf("lookup: %+v", hits)
 	}
+	if hits[0].Network != "1.2.3.0/24" {
+		t.Fatalf("network: %q", hits[0].Network)
+	}
 	if len(idx.Lookup("9.9.9.9")) != 0 {
 		t.Fatal("expected miss")
 	}
@@ -46,6 +49,28 @@ func TestMultiListLookup(t *testing.T) {
 	hits := idx.Lookup("1.1.1.1")
 	if len(hits) != 2 {
 		t.Fatalf("want 2 hits, got %+v", hits)
+	}
+}
+
+func TestLookupSkipsPrivate(t *testing.T) {
+	now := time.Now().UTC()
+	idx := New()
+	// fullbogons-style: покрывает 10.0.0.0/8
+	idx.ReplaceAll([]model.ReputationRange{
+		{ListName: "firehol_level1", Category: "firehol", StartIP: IPToUint32("10.0.0.0"), EndIP: IPToUint32("10.255.255.255"), Source: "url", UpdatedAt: now},
+		{ListName: "firehol_level1", Category: "firehol", StartIP: IPToUint32("1.2.3.0"), EndIP: IPToUint32("1.2.3.255"), Source: "url", UpdatedAt: now},
+	})
+	if hits := idx.Lookup("10.1.2.3"); len(hits) != 0 {
+		t.Fatalf("private should miss, got %+v", hits)
+	}
+	if hits := idx.Lookup("192.168.0.1"); len(hits) != 0 {
+		t.Fatalf("private should miss, got %+v", hits)
+	}
+	if hits := idx.Lookup("100.64.1.1"); len(hits) != 0 {
+		t.Fatalf("CGNAT should miss, got %+v", hits)
+	}
+	if hits := idx.Lookup("1.2.3.10"); len(hits) != 1 {
+		t.Fatalf("public should hit, got %+v", hits)
 	}
 }
 

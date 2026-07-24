@@ -228,6 +228,13 @@ html, body {
     flex: 1; background: var(--panel-2); color: var(--text);
     border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px; font-size: 11px;
 }
+.topbar .rep-color-toggle {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--text); margin: 0 0 8px; cursor: pointer;
+}
+.topbar .rep-menu-hint {
+    margin: 0 0 8px; font-size: 11px; line-height: 1.35; color: var(--text-muted);
+}
 .topbar .rep-cat, .topbar .rep-list {
     display: flex; align-items: center; gap: 6px;
     font-size: 12px; padding: 3px 0; cursor: pointer; color: var(--text);

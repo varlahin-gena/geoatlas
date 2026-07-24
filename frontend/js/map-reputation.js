@@ -4,6 +4,8 @@
 let repFilterCategories = new Set();
 let repFilterLists = new Set();
 let repFilterSide = 'any'; // any|src|dst|both
+/** Оранжевая подсветка дуг с хитом (по умолчанию выкл.). */
+let repColorArcs = false;
 let repMenuOpen = false;
 
 function lineHasReputationHits(line) {
@@ -50,11 +52,35 @@ function collectReputationMenuTree(lines) {
     return tree;
 }
 
+function formatOneReputationHit(h) {
+    if (!h) return '';
+    const parts = [];
+    if (h.list) parts.push(h.list);
+    if (h.category && h.category !== h.list) parts.push('[' + h.category + ']');
+    if (h.network) parts.push(h.network);
+    return parts.join(' · ');
+}
+
 function formatReputationHits(hits) {
     if (!hits || !hits.length) return '';
-    return hits.map(function (h) {
-        return (h.category || '?') + '/' + (h.list || '?');
-    }).join(', ');
+    return hits.map(formatOneReputationHit).join('; ');
+}
+
+/** Строки для detail-панели: IP + список + диапазон. */
+function reputationDetailRows(sideLabel, ip, hits) {
+    if (!hits || !hits.length) return [];
+    const rows = [];
+    hits.forEach(function (h, i) {
+        const prefix = hits.length > 1 ? (sideLabel + ' #' + (i + 1)) : sideLabel;
+        rows.push({ key: prefix + ' · список', value: (h.list || '') + (h.category ? ' (' + h.category + ')' : '') });
+        if (h.network) {
+            rows.push({ key: prefix + ' · диапазон', value: h.network });
+        }
+        if (ip) {
+            rows.push({ key: prefix + ' · IP', value: ip });
+        }
+    });
+    return rows;
 }
 
 function updateReputationMenuUI() {
@@ -62,13 +88,16 @@ function updateReputationMenuUI() {
     const panel = document.getElementById('reputationMenu');
     const badge = document.getElementById('repFilterBadge');
     const body = document.getElementById('reputationMenuBody');
+    const colorChk = document.getElementById('repColorArcsChk');
     if (!btn || !panel || !body) return;
+
+    if (colorChk) colorChk.checked = !!repColorArcs;
 
     const gb = typeof currentGroupBy === 'function' ? currentGroupBy() : 'city';
     const ipMode = gb === 'ip';
     btn.disabled = !ipMode;
     btn.title = ipMode
-        ? 'Фильтр по репутационным спискам'
+        ? 'Фильтр и подсветка по репутационным спискам'
         : 'Доступно в режиме Группа: IP';
 
     const n = reputationFilterActiveCount();
@@ -80,7 +109,7 @@ function updateReputationMenuUI() {
             badge.style.display = 'none';
         }
     }
-    btn.classList.toggle('active', n > 0 && ipMode);
+    btn.classList.toggle('active', (n > 0 || repColorArcs) && ipMode);
 
     if (!ipMode) {
         body.innerHTML = '<div class="rep-menu-empty">Переключите «Группа» на IP</div>';
@@ -115,6 +144,8 @@ function applyReputationFilterChange() {
     saveUIState();
     syncViewToURL();
     updateReputationMenuUI();
+    const leg = document.getElementById('legendRepRow');
+    if (leg) leg.style.display = (typeof repColorArcs !== 'undefined' && repColorArcs) ? '' : 'none';
     if (typeof viewMode !== 'undefined' && viewMode === 'map') updateDeck();
     else if (typeof updateGlobe === 'function') updateGlobe();
     if (typeof updateMapOverlay === 'function') updateMapOverlay();
@@ -135,6 +166,7 @@ function bindReputationMenu() {
     const body = document.getElementById('reputationMenuBody');
     const clearBtn = document.getElementById('btnRepFilterClear');
     const sideEl = document.getElementById('repFilterSide');
+    const colorChk = document.getElementById('repColorArcsChk');
     if (!btn || !panel) return;
 
     btn.addEventListener('click', function (e) {
@@ -158,6 +190,10 @@ function bindReputationMenu() {
         repFilterSide = this.value || 'any';
         applyReputationFilterChange();
     });
+    colorChk?.addEventListener('change', function () {
+        repColorArcs = !!this.checked;
+        applyReputationFilterChange();
+    });
     body?.addEventListener('change', function (e) {
         const t = e.target;
         if (!t || t.tagName !== 'INPUT') return;
@@ -175,12 +211,14 @@ function bindReputationMenu() {
     document.getElementById('groupBy')?.addEventListener('change', function () {
         updateReputationMenuUI();
         if (currentGroupBy() !== 'ip' && reputationFilterActiveCount()) {
-            // фильтр остаётся в state, но не применяется (getVisibleLines)
             if (viewMode === 'map') updateDeck();
             else updateGlobe();
             updateMapOverlay();
         }
     });
+
+    const leg = document.getElementById('legendRepRow');
+    if (leg) leg.style.display = repColorArcs ? '' : 'none';
 }
 
 function escapeHTML(v) {

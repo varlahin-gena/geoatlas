@@ -88,6 +88,7 @@ type ReputationRange struct {
 type ReputationHit struct {
 	List     string `json:"list"`
 	Category string `json:"category"`
+	Network  string `json:"network,omitempty"` // покрывающий CIDR/диапазон из списка
 }
 
 // ReputationListMeta — сводка по одному list_name.

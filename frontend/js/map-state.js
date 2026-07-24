@@ -241,6 +241,11 @@ function loadUIState() {
             const sideEl = document.getElementById('repFilterSide');
             if (sideEl) sideEl.value = s.repSide;
         }
+        if (typeof repColorArcs !== 'undefined' && typeof s.repColor === 'boolean') {
+            repColorArcs = s.repColor;
+            const colorEl = document.getElementById('repColorArcsChk');
+            if (colorEl) colorEl.checked = s.repColor;
+        }
         periodCustomOpen = false;
         updateCustomPeriodLabel();
         syncPeriodCustomPanel();
@@ -261,6 +266,7 @@ function saveUIState() {
             repCats: Array.from(typeof repFilterCategories !== 'undefined' ? repFilterCategories : []),
             repLists: Array.from(typeof repFilterLists !== 'undefined' ? repFilterLists : []),
             repSide: typeof repFilterSide !== 'undefined' ? repFilterSide : 'any',
+            repColor: typeof repColorArcs !== 'undefined' ? !!repColorArcs : false,
         }));
     } catch (e) {}
     syncViewToURL();
@@ -320,6 +326,14 @@ function applyViewFromURL() {
             if (sideEl) sideEl.value = side;
         }
     }
+    if (typeof repColorArcs !== 'undefined') {
+        const rc = params.get('rep_color');
+        if (rc === '1' || rc === 'true') {
+            repColorArcs = true;
+            const colorEl = document.getElementById('repColorArcsChk');
+            if (colorEl) colorEl.checked = true;
+        }
+    }
     const view = params.get('view');
     if (view === 'map' || view === 'globe') viewMode = view;
     periodCustomOpen = false;
@@ -354,6 +368,9 @@ function syncViewToURL() {
         }
         if (typeof repFilterSide !== 'undefined' && repFilterSide && repFilterSide !== 'any') {
             params.set('rep_side', repFilterSide);
+        }
+        if (typeof repColorArcs !== 'undefined' && repColorArcs) {
+            params.set('rep_color', '1');
         }
         if (viewMode && viewMode !== 'map') params.set('view', viewMode);
         const qs = params.toString();

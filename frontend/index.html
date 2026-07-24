@@ -120,6 +120,12 @@
                 </svg>
                 <span class="label">База GeoIP</span>
             </a>
+            <a href="/reputation.html" class="side-btn" style="text-decoration: none; color: inherit;" title="Репутация IP">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <span class="label">Репутация IP</span>
+            </a>
             <a href="/users.html" class="side-btn" style="text-decoration: none; color: inherit;" title="Управление пользователями">
                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
@@ -226,6 +232,11 @@
                             <option value="both">оба конца</option>
                         </select>
                     </div>
+                    <label class="rep-color-toggle">
+                        <input type="checkbox" id="repColorArcsChk" />
+                        Окрашивать дуги с хитом
+                    </label>
+                    <p class="rep-menu-hint">Частные и спец. сети (RFC1918, CGNAT, loopback) не учитываются. В деталях дуги смотрите «диапазон».</p>
                     <div class="rep-menu-body" id="reputationMenuBody"></div>
                 </div>
             </div>
@@ -282,7 +293,7 @@
                 <div id="legendByStatus">
                     <div class="legend-row"><span class="legend-line" style="background: var(--green);"></span> Разрешённый</div>
                     <div class="legend-row"><span class="legend-line" style="background: var(--red);"></span> Заблокированный</div>
-                    <div class="legend-row"><span class="legend-line" style="background: var(--orange);"></span> Репутационный хит</div>
+                    <div class="legend-row" id="legendRepRow" style="display:none;"><span class="legend-line" style="background: var(--orange);"></span> Репутационный хит</div>
                 </div>
                 <div id="legendMono" class="legend-row" style="display:none;">
                     <span class="legend-line" style="background: var(--accent);"></span> Связь

@@ -80,10 +80,14 @@ func (i *Index) Snapshot() []model.ReputationRange {
 	return out
 }
 
-// Lookup возвращает все хиты (разные list/category) для IPv4.
+// Lookup возвращает все хиты (разные list/category) для публичного IPv4.
+// Частные/спец. адреса (RFC1918, loopback, CGNAT и т.п.) всегда без хитов.
 func (i *Index) Lookup(ipStr string) []model.ReputationHit {
 	parsed := net.ParseIP(strings.TrimSpace(ipStr))
 	if parsed == nil || parsed.To4() == nil {
+		return nil
+	}
+	if IsNonPublicIPv4(ipStr) {
 		return nil
 	}
 	ip := IPToUint32(ipStr)
@@ -96,19 +100,36 @@ func (i *Index) Lookup(ipStr string) []model.ReputationHit {
 	pos := sort.Search(len(ranges), func(k int) bool {
 		return ranges[k].StartIP > ip
 	})
-	seen := map[string]struct{}{}
-	var hits []model.ReputationHit
+	seen := map[string]model.ReputationHit{}
 	for k := 0; k < pos; k++ {
 		r := ranges[k]
 		if ip > r.EndIP {
 			continue
 		}
 		key := r.ListName + "\x00" + r.Category
-		if _, ok := seen[key]; ok {
+		netStr := FormatNetworkPreferCIDR(r.StartIP, r.EndIP)
+		prev, ok := seen[key]
+		if !ok {
+			seen[key] = model.ReputationHit{
+				List: r.ListName, Category: r.Category, Network: netStr,
+			}
 			continue
 		}
-		seen[key] = struct{}{}
-		hits = append(hits, model.ReputationHit{List: r.ListName, Category: r.Category})
+		// Более узкий диапазон информативнее для UI.
+		span := r.EndIP - r.StartIP
+		prevStart, prevEnd, okPrev := ParseNetworkField(prev.Network)
+		if !okPrev {
+			seen[key] = model.ReputationHit{List: r.ListName, Category: r.Category, Network: netStr}
+			continue
+		}
+		prevSpan := prevEnd - prevStart
+		if span < prevSpan {
+			seen[key] = model.ReputationHit{List: r.ListName, Category: r.Category, Network: netStr}
+		}
+	}
+	hits := make([]model.ReputationHit, 0, len(seen))
+	for _, h := range seen {
+		hits = append(hits, h)
 	}
 	sort.Slice(hits, func(a, b int) bool {
 		if hits[a].Category != hits[b].Category {
