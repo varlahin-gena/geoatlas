@@ -228,13 +228,7 @@ func (s *Scheduler) fetchOne(ctx context.Context, feed config.ReputationFeed, fo
 	if format == "" {
 		format = "netset"
 	}
-	var ranges []model.ReputationRange
-	switch format {
-	case "netset":
-		ranges, err = reppkg.ParseNetset(strings.NewReader(string(body)), feed.Name, feed.Category, "url", time.Now().UTC())
-	default:
-		return "failed", fmt.Errorf("unsupported feed format %q", format)
-	}
+	ranges, err := reppkg.ParseFeedBody(format, strings.NewReader(string(body)), feed.Name, feed.Category, "url", time.Now().UTC())
 	if err != nil {
 		return "failed", err
 	}

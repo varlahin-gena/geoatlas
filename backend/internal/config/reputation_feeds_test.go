@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestDefaultReputationFeeds(t *testing.T) {
 	feeds := DefaultReputationFeeds()
@@ -19,15 +22,41 @@ func TestDefaultReputationFeeds(t *testing.T) {
 	}
 	for _, need := range []string{
 		"spamhaus_drop", "dshield", "feodo",
-		"spamhaus_edrop", "sslbl", "et_compromised",
+		"sslbl", "et_compromised",
 		"bruteforceblocker", "cruzit_web_attacks",
 	} {
 		if _, ok := names[need]; !ok {
 			t.Fatalf("missing %s in defaults", need)
 		}
 	}
+	if _, ok := names["spamhaus_edrop"]; ok {
+		t.Fatal("spamhaus_edrop should not be in defaults (merged into DROP)")
+	}
 	if names["spamhaus_drop"] != "drop" || names["feodo"] != "c2" || names["sslbl"] != "c2" {
 		t.Fatalf("categories: %+v", names)
+	}
+}
+
+func TestCatalogReputationFeeds(t *testing.T) {
+	feeds := CatalogReputationFeeds()
+	if len(feeds) < 3 {
+		t.Fatalf("want catalog presets, got %d", len(feeds))
+	}
+	seen := map[string]string{}
+	for _, f := range feeds {
+		if f.Name == "" || f.URL == "" || f.Format == "" {
+			t.Fatalf("incomplete: %+v", f)
+		}
+		if f.Name == "tor_exits" || f.Name == "fullbogons" || strings.Contains(f.Name, "anonymous") {
+			t.Fatalf("noisy list in catalog: %s", f.Name)
+		}
+		seen[f.Name] = f.Format
+	}
+	if seen["spamhaus_drop_official"] != "spamhaus_json" {
+		t.Fatalf("spamhaus official format: %q", seen["spamhaus_drop_official"])
+	}
+	if _, ok := seen["feodo_abusech"]; !ok {
+		t.Fatal("missing feodo_abusech")
 	}
 }
 

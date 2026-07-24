@@ -138,6 +138,14 @@ func (h *ReputationHandler) ListFeeds(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "feeds": feeds})
 }
 
+func (h *ReputationHandler) ListCatalog(w http.ResponseWriter, r *http.Request) {
+	if h.reputationUC == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "reputation service unavailable"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "feeds": h.reputationUC.ListCatalog()})
+}
+
 func (h *ReputationHandler) AddFeed(w http.ResponseWriter, r *http.Request) {
 	if h.reputationUC == nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "reputation service unavailable"})

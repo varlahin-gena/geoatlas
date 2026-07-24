@@ -114,5 +114,7 @@ func IsClientCSVError(err error) bool {
 	return strings.Contains(msg, "missing required columns") ||
 		strings.Contains(msg, "no valid reputation rows") ||
 		strings.Contains(msg, "error reading header") ||
-		strings.Contains(msg, "no valid IPv4 ranges")
+		strings.Contains(msg, "no valid IPv4 ranges") ||
+		strings.Contains(msg, "csv_ip") ||
+		strings.Contains(msg, "spamhaus json")
 }

@@ -176,6 +176,11 @@ func (s *Service) ListFeeds() ([]config.ReputationFeed, error) {
 	return feeds, nil
 }
 
+// ListCatalog — кураторские пресеты для UI.
+func (s *Service) ListCatalog() []config.ReputationFeed {
+	return config.CatalogReputationFeeds()
+}
+
 func (s *Service) AddFeed(ctx context.Context, feed config.ReputationFeed) error {
 	_ = ctx
 	feed, err := normalizeFeedInput(feed)
@@ -276,8 +281,9 @@ func normalizeFeedInput(feed config.ReputationFeed) (config.ReputationFeed, erro
 	if feed.Format == "" {
 		feed.Format = "netset"
 	}
-	if feed.Format != "netset" {
-		return feed, clientErr{fmt.Errorf("unsupported format %q (only netset)", feed.Format)}
+	feed.Format = reppkg.NormalizeFeedFormat(feed.Format)
+	if !reppkg.IsSupportedFeedFormat(feed.Format) {
+		return feed, clientErr{fmt.Errorf("unsupported format %q (netset|plain|spamhaus_json|csv_ip)", feed.Format)}
 	}
 	return feed, nil
 }

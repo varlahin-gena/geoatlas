@@ -45,10 +45,6 @@ func DefaultReputationFeeds() []ReputationFeed {
 			Category: "attacks", Format: "netset",
 		},
 		{
-			Name: "spamhaus_edrop", URL: fireholRawBase + "spamhaus_edrop.netset",
-			Category: "drop", Format: "netset",
-		},
-		{
 			Name: "sslbl", URL: fireholRawBase + "sslbl.ipset",
 			Category: "c2", Format: "netset",
 		},
@@ -63,6 +59,38 @@ func DefaultReputationFeeds() []ReputationFeed {
 		{
 			Name: "cruzit_web_attacks", URL: fireholRawBase + "cruzit_web_attacks.ipset",
 			Category: "attacks", Format: "netset",
+		},
+	}
+}
+
+// CatalogReputationFeeds — кураторские пресеты (официальные URL, не дублируют FireHOL-сиды).
+// Не входят в DefaultReputationFeeds; добавляются из UI «каталог».
+func CatalogReputationFeeds() []ReputationFeed {
+	return []ReputationFeed{
+		{
+			Name: "spamhaus_drop_official",
+			URL:  "https://www.spamhaus.org/drop/drop_v4.json",
+			Category: "drop", Format: "spamhaus_json",
+		},
+		{
+			Name: "feodo_abusech",
+			URL:  "https://feodotracker.abuse.ch/downloads/ipblocklist.txt",
+			Category: "c2", Format: "netset",
+		},
+		{
+			Name: "sslbl_abusech",
+			URL:  "https://sslbl.abuse.ch/blacklist/sslipblacklist.txt",
+			Category: "c2", Format: "netset",
+		},
+		{
+			Name: "blocklist_de_ssh",
+			URL:  "https://lists.blocklist.de/lists/ssh.txt",
+			Category: "attacks", Format: "netset",
+		},
+		{
+			Name: "et_block_official",
+			URL:  "https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt",
+			Category: "block", Format: "netset",
 		},
 	}
 }

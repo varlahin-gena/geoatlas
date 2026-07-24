@@ -655,7 +655,7 @@ paths:
       summary: Добавить URL-фид
       description: |
         administrator или Bearer (ops). Тело: `{name,url,category,format}`.
-        format по умолчанию `netset`. После добавления вызовите refresh.
+        format: `netset`|`plain`|`spamhaus_json`|`csv_ip` (`plain` = alias netset).
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -670,7 +670,9 @@ paths:
                 name: { type: string }
                 url: { type: string }
                 category: { type: string }
-                format: { type: string, enum: [netset] }
+                format:
+                  type: string
+                  enum: [netset, plain, spamhaus_json, csv_ip]
       responses:
         "200":
           description: added
@@ -695,6 +697,22 @@ paths:
       responses:
         "200":
           description: deleted
+        "401":
+          description: unauthorized
+
+  /api/reputation/catalog:
+    get:
+      tags: [reputation]
+      summary: Каталог рекомендуемых публичных фидов
+      description: |
+        Только administrator. Пресеты (Spamhaus JSON, Abuse.ch, blocklist.de ssh, ET) —
+        не активные фиды; добавляются через POST /api/reputation/feeds.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: catalog presets
         "401":
           description: unauthorized
 
