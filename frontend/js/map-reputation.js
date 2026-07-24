@@ -52,11 +52,22 @@ function collectReputationMenuTree(lines) {
     return tree;
 }
 
+function categoryLabel(cat) {
+    switch (String(cat || '').toLowerCase()) {
+        case 'drop': return 'DROP (hijacked/crime)';
+        case 'c2': return 'Botnet C2';
+        case 'block': return 'Threat blocklist';
+        case 'attacks': return 'Attacks / scanners';
+        case 'malware': return 'Malware';
+        default: return cat || '';
+    }
+}
+
 function formatOneReputationHit(h) {
     if (!h) return '';
     const parts = [];
     if (h.list) parts.push(h.list);
-    if (h.category && h.category !== h.list) parts.push('[' + h.category + ']');
+    if (h.category) parts.push(categoryLabel(h.category));
     if (h.network) parts.push(h.network);
     return parts.join(' · ');
 }
@@ -72,7 +83,10 @@ function reputationDetailRows(sideLabel, ip, hits) {
     const rows = [];
     hits.forEach(function (h, i) {
         const prefix = hits.length > 1 ? (sideLabel + ' #' + (i + 1)) : sideLabel;
-        rows.push({ key: prefix + ' · список', value: (h.list || '') + (h.category ? ' (' + h.category + ')' : '') });
+        rows.push({
+            key: prefix + ' · список',
+            value: (h.list || '') + (h.category ? ' — ' + categoryLabel(h.category) : ''),
+        });
         if (h.network) {
             rows.push({ key: prefix + ' · диапазон', value: h.network });
         }
@@ -129,7 +143,7 @@ function updateReputationMenuUI() {
         const catChecked = repFilterCategories.has(cat);
         html += '<label class="rep-cat"><input type="checkbox" data-rep-cat="' +
             escapeHTML(cat) + '"' + (catChecked ? ' checked' : '') + ' /> <strong>' +
-            escapeHTML(cat) + '</strong></label>';
+            escapeHTML(categoryLabel(cat)) + '</strong> <span class="rep-cat-key">(' + escapeHTML(cat) + ')</span></label>';
         lists.forEach(function (list) {
             const listChecked = repFilterLists.has(list);
             html += '<label class="rep-list"><input type="checkbox" data-rep-list="' +

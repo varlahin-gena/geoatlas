@@ -20,6 +20,8 @@ import (
 type Applier interface {
 	ApplyListRanges(ctx context.Context, listName string, ranges []model.ReputationRange) (int, error)
 	SetFeedError(listName, errMsg string)
+	ListLists(ctx context.Context) ([]model.ReputationListMeta, error)
+	DeleteList(ctx context.Context, name string) error
 }
 
 // Scheduler периодически качает REPUTATION_FEEDS.
@@ -128,7 +130,39 @@ func (s *Scheduler) runOnce(ctx context.Context, force bool) usecasereputation.R
 			}
 		}
 	}
+	s.pruneObsoleteURLLists(ctx, &res)
 	return res
+}
+
+// pruneObsoleteURLLists удаляет URL-списки, которых больше нет в конфиге
+// (например устаревший агрегат firehol_level1). CSV upload (source=upload) не трогает.
+func (s *Scheduler) pruneObsoleteURLLists(ctx context.Context, res *usecasereputation.RefreshResult) {
+	if s == nil || s.applier == nil || res == nil {
+		return
+	}
+	keep := make(map[string]struct{}, len(s.feeds))
+	for _, f := range s.feeds {
+		keep[f.Name] = struct{}{}
+	}
+	lists, err := s.applier.ListLists(ctx)
+	if err != nil {
+		slog.Warn("reputation prune: list meta failed", "err", err)
+		return
+	}
+	for _, m := range lists {
+		if m.Source != "url" {
+			continue
+		}
+		if _, ok := keep[m.Name]; ok {
+			continue
+		}
+		if err := s.applier.DeleteList(ctx, m.Name); err != nil {
+			slog.Warn("reputation prune: delete failed", "list", m.Name, "err", err)
+			continue
+		}
+		slog.Info("reputation obsolete URL list removed", "list", m.Name)
+		res.Updated = append(res.Updated, "removed:"+m.Name)
+	}
 }
 
 func (s *Scheduler) fetchOne(ctx context.Context, feed config.ReputationFeed, force bool) (string, error) {

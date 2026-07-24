@@ -4,14 +4,26 @@ import "testing"
 
 func TestDefaultReputationFeeds(t *testing.T) {
 	feeds := DefaultReputationFeeds()
-	if len(feeds) != 1 {
-		t.Fatalf("want 1 default feed, got %d", len(feeds))
+	if len(feeds) < 3 {
+		t.Fatalf("want several default feeds, got %d", len(feeds))
 	}
-	if feeds[0].Name != "firehol_level1" {
-		t.Fatalf("name: %s", feeds[0].Name)
+	names := map[string]string{}
+	for _, f := range feeds {
+		if f.Name == "" || f.URL == "" || f.Category == "" {
+			t.Fatalf("incomplete feed: %+v", f)
+		}
+		if f.Name == "firehol_level1" || f.Name == "fullbogons" {
+			t.Fatalf("aggregate/fullbogons should not be default: %s", f.Name)
+		}
+		names[f.Name] = f.Category
 	}
-	if feeds[0].URL != DefaultFireholLevel1URL {
-		t.Fatalf("url: %s", feeds[0].URL)
+	for _, need := range []string{"spamhaus_drop", "dshield", "feodo"} {
+		if _, ok := names[need]; !ok {
+			t.Fatalf("missing %s in defaults", need)
+		}
+	}
+	if names["spamhaus_drop"] != "drop" || names["feodo"] != "c2" {
+		t.Fatalf("categories: %+v", names)
 	}
 }
 
@@ -25,7 +37,7 @@ func TestParseReputationFeedsOverride(t *testing.T) {
 
 func TestParseReputationFeedsInvalidFallsBack(t *testing.T) {
 	feeds := parseReputationFeeds("not-json")
-	if len(feeds) != 1 || feeds[0].Name != "firehol_level1" {
+	if len(feeds) < 3 {
 		t.Fatalf("%+v", feeds)
 	}
 }

@@ -33,8 +33,11 @@
   <div class="page-content-inner">
     <h1>Репутация IP</h1>
     <p class="hint">
-      Офлайн-списки (по умолчанию FireHOL level1). Можно загрузить свой CSV
-      (<code>Network,List,Category</code>) или обновить URL-фиды.
+      Офлайн-фиды по умолчанию: Spamhaus DROP, DShield, Feodo (C2), Emerging Threats,
+      blocklist.de, CI Army, GreenSnow — с категориями для фильтра на карте.
+      Можно загрузить свой CSV (<code>Network,List,Category</code>) или задать
+      <code>REPUTATION_FEEDS</code>. После обновления фидов устаревший агрегат
+      <code>firehol_level1</code> удаляется автоматически.
     </p>
 
     <div class="summary" id="summary"></div>

@@ -9,16 +9,42 @@ import (
 	"time"
 )
 
-// DefaultFireholLevel1URL — raw netset FireHOL level1.
-const DefaultFireholLevel1URL = "https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset"
+const fireholRawBase = "https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/"
 
+// DefaultReputationFeeds — отдельные исходные списки (не агрегат level1),
+// чтобы в UI было видно тип угрозы: DROP / C2 / scanners и т.п.
+// fullbogons намеренно не включён (частные сети и так исключаются в Lookup).
 func DefaultReputationFeeds() []ReputationFeed {
-	return []ReputationFeed{{
-		Name:     "firehol_level1",
-		URL:      DefaultFireholLevel1URL,
-		Category: "firehol",
-		Format:   "netset",
-	}}
+	return []ReputationFeed{
+		{
+			Name: "spamhaus_drop", URL: fireholRawBase + "spamhaus_drop.netset",
+			Category: "drop", Format: "netset",
+		},
+		{
+			Name: "dshield", URL: fireholRawBase + "dshield.netset",
+			Category: "attacks", Format: "netset",
+		},
+		{
+			Name: "feodo", URL: fireholRawBase + "feodo.ipset",
+			Category: "c2", Format: "netset",
+		},
+		{
+			Name: "et_block", URL: fireholRawBase + "et_block.netset",
+			Category: "block", Format: "netset",
+		},
+		{
+			Name: "blocklist_de", URL: fireholRawBase + "blocklist_de.ipset",
+			Category: "attacks", Format: "netset",
+		},
+		{
+			Name: "ciarmy", URL: fireholRawBase + "ciarmy.ipset",
+			Category: "attacks", Format: "netset",
+		},
+		{
+			Name: "greensnow", URL: fireholRawBase + "greensnow.ipset",
+			Category: "attacks", Format: "netset",
+		},
+	}
 }
 
 type Config struct {
