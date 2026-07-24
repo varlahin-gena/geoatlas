@@ -44,6 +44,26 @@ func DefaultReputationFeeds() []ReputationFeed {
 			Name: "greensnow", URL: fireholRawBase + "greensnow.ipset",
 			Category: "attacks", Format: "netset",
 		},
+		{
+			Name: "spamhaus_edrop", URL: fireholRawBase + "spamhaus_edrop.netset",
+			Category: "drop", Format: "netset",
+		},
+		{
+			Name: "sslbl", URL: fireholRawBase + "sslbl.ipset",
+			Category: "c2", Format: "netset",
+		},
+		{
+			Name: "et_compromised", URL: fireholRawBase + "et_compromised.ipset",
+			Category: "c2", Format: "netset",
+		},
+		{
+			Name: "bruteforceblocker", URL: fireholRawBase + "bruteforceblocker.ipset",
+			Category: "attacks", Format: "netset",
+		},
+		{
+			Name: "cruzit_web_attacks", URL: fireholRawBase + "cruzit_web_attacks.ipset",
+			Category: "attacks", Format: "netset",
+		},
 	}
 }
 

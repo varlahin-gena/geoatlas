@@ -57,9 +57,11 @@
     <h1>Репутация IP</h1>
     <p class="hint">
       URL-фиды хранятся в <code>reputation_feeds.json</code> и обновляются по расписанию.
-      Можно добавить/удалить фид здесь, загрузить свой CSV
-      (<code>Network,List,Category</code>) или задать seed через <code>REPUTATION_FEEDS</code>
-      (только если файла ещё нет). Удаление URL-списка также снимает фид из расписания.
+      По умолчанию: Spamhaus DROP/EDROP, DShield, Feodo, ET block/compromised, SSLBL,
+      blocklist.de, CI Army, GreenSnow, BruteforceBlocker, CruzIT.
+      Можно добавить/удалить фид здесь, загрузить CSV (<code>Network,List,Category</code>)
+      или задать seed через <code>REPUTATION_FEEDS</code> (только если файла ещё нет).
+      Удаление URL-списка также снимает фид из расписания.
     </p>
 
     <div class="summary" id="summary"></div>

@@ -17,12 +17,16 @@ func TestDefaultReputationFeeds(t *testing.T) {
 		}
 		names[f.Name] = f.Category
 	}
-	for _, need := range []string{"spamhaus_drop", "dshield", "feodo"} {
+	for _, need := range []string{
+		"spamhaus_drop", "dshield", "feodo",
+		"spamhaus_edrop", "sslbl", "et_compromised",
+		"bruteforceblocker", "cruzit_web_attacks",
+	} {
 		if _, ok := names[need]; !ok {
 			t.Fatalf("missing %s in defaults", need)
 		}
 	}
-	if names["spamhaus_drop"] != "drop" || names["feodo"] != "c2" {
+	if names["spamhaus_drop"] != "drop" || names["feodo"] != "c2" || names["sslbl"] != "c2" {
 		t.Fatalf("categories: %+v", names)
 	}
 }
