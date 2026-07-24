@@ -22,7 +22,7 @@ func TestDefaultReputationFeeds(t *testing.T) {
 	}
 	for _, need := range []string{
 		"spamhaus_drop", "dshield", "feodo",
-		"sslbl", "et_compromised",
+		"et_compromised",
 		"bruteforceblocker", "cruzit_web_attacks",
 	} {
 		if _, ok := names[need]; !ok {
@@ -32,7 +32,10 @@ func TestDefaultReputationFeeds(t *testing.T) {
 	if _, ok := names["spamhaus_edrop"]; ok {
 		t.Fatal("spamhaus_edrop should not be in defaults (merged into DROP)")
 	}
-	if names["spamhaus_drop"] != "drop" || names["feodo"] != "c2" || names["sslbl"] != "c2" {
+	if _, ok := names["sslbl"]; ok {
+		t.Fatal("sslbl FireHOL ipset removed upstream; should not be default")
+	}
+	if names["spamhaus_drop"] != "drop" || names["feodo"] != "c2" {
 		t.Fatalf("categories: %+v", names)
 	}
 }
@@ -49,6 +52,9 @@ func TestCatalogReputationFeeds(t *testing.T) {
 		}
 		if f.Name == "tor_exits" || f.Name == "fullbogons" || strings.Contains(f.Name, "anonymous") {
 			t.Fatalf("noisy list in catalog: %s", f.Name)
+		}
+		if f.Name == "sslbl_abusech" || strings.Contains(f.URL, "sslipblacklist") {
+			t.Fatalf("deprecated SSLBL IP list in catalog: %+v", f)
 		}
 		seen[f.Name] = f.Format
 	}

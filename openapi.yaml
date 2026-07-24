@@ -705,7 +705,7 @@ paths:
       tags: [reputation]
       summary: Каталог рекомендуемых публичных фидов
       description: |
-        Только administrator. Пресеты (Spamhaus JSON, Abuse.ch, blocklist.de ssh, ET) —
+        Только administrator. Пресеты (Spamhaus JSON, Abuse.ch Feodo, blocklist.de ssh, ET) —
         не активные фиды; добавляются через POST /api/reputation/feeds.
       security:
         - bearerAuth: []

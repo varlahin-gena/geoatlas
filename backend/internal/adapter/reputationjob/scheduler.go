@@ -223,6 +223,9 @@ func (s *Scheduler) fetchOne(ctx context.Context, feed config.ReputationFeed, fo
 	if err != nil {
 		return "failed", err
 	}
+	if looksDeprecatedEmpty(body) {
+		return "failed", fmt.Errorf("feed empty or deprecated (no IPv4 entries)")
+	}
 
 	format := strings.ToLower(feed.Format)
 	if format == "" {
@@ -248,4 +251,22 @@ func (s *Scheduler) fetchOne(ctx context.Context, feed config.ReputationFeed, fo
 
 	slog.Info("reputation feed updated", "list", feed.Name, "ranges", len(ranges))
 	return "updated", nil
+}
+
+func looksDeprecatedEmpty(body []byte) bool {
+	s := strings.ToLower(string(body))
+	if !strings.Contains(s, "deprecated") {
+		return false
+	}
+	// Есть ли хоть один IPv4-токен вне комментариев — грубая проверка.
+	for _, line := range strings.Split(s, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if strings.ContainsAny(line, "0123456789") && strings.Contains(line, ".") {
+			return false
+		}
+	}
+	return true
 }

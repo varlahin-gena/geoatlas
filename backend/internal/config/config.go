@@ -45,10 +45,6 @@ func DefaultReputationFeeds() []ReputationFeed {
 			Category: "attacks", Format: "netset",
 		},
 		{
-			Name: "sslbl", URL: fireholRawBase + "sslbl.ipset",
-			Category: "c2", Format: "netset",
-		},
-		{
 			Name: "et_compromised", URL: fireholRawBase + "et_compromised.ipset",
 			Category: "c2", Format: "netset",
 		},
@@ -65,6 +61,7 @@ func DefaultReputationFeeds() []ReputationFeed {
 
 // CatalogReputationFeeds — кураторские пресеты (официальные URL, не дублируют FireHOL-сиды).
 // Не входят в DefaultReputationFeeds; добавляются из UI «каталог».
+// sslbl IP blacklist на abuse.ch deprecated 2025-01-03 (пустой файл) — не включаем.
 func CatalogReputationFeeds() []ReputationFeed {
 	return []ReputationFeed{
 		{
@@ -78,8 +75,8 @@ func CatalogReputationFeeds() []ReputationFeed {
 			Category: "c2", Format: "netset",
 		},
 		{
-			Name: "sslbl_abusech",
-			URL:  "https://sslbl.abuse.ch/blacklist/sslipblacklist.txt",
+			Name: "feodo_badips",
+			URL:  fireholRawBase + "feodo_badips.ipset",
 			Category: "c2", Format: "netset",
 		},
 		{
