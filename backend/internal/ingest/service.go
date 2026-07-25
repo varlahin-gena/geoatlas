@@ -131,7 +131,8 @@ func (s *Service) Stats() StatsSnapshot {
 }
 
 func (s *Service) Run(ctx context.Context) error {
-	drainRoot, drainCancel := context.WithCancel(context.Background())
+	// WithoutCancel: Run ctx отменяется на shutdown, но AbortDrain должен жить отдельно.
+	drainRoot, drainCancel := context.WithCancel(context.WithoutCancel(ctx))
 	s.drainMu.Lock()
 	s.drainRoot = drainRoot
 	s.drainCancel = drainCancel
@@ -314,14 +315,23 @@ func (s *Service) AbortDrain() {
 	}
 }
 
-func (s *Service) beginDrain() (context.Context, context.CancelFunc) {
+func (s *Service) beginDrain(ctx context.Context) (context.Context, context.CancelFunc) {
+	// WithoutCancel: worker ctx уже Done на shutdown; drain дописывает очередь
+	// до timeout или AbortDrain (через drainRoot).
+	base := context.WithoutCancel(ctx)
+	drainCtx, cancel := context.WithTimeout(base, s.drainTimeout())
+
 	s.drainMu.Lock()
-	parent := s.drainRoot
+	root := s.drainRoot
 	s.drainMu.Unlock()
-	if parent == nil {
-		parent = context.Background()
+	if root == nil {
+		return drainCtx, cancel
 	}
-	return context.WithTimeout(parent, s.drainTimeout())
+	stop := context.AfterFunc(root, cancel)
+	return drainCtx, func() {
+		stop()
+		cancel()
+	}
 }
 
 func (s *Service) noteQueueDrop(remote, transport string) {
@@ -446,7 +456,7 @@ func (s *Service) worker(ctx context.Context, proc *usecaseingest.Processor) {
 	for {
 		select {
 		case <-ctx.Done():
-			drainCtx, cancel := s.beginDrain()
+			drainCtx, cancel := s.beginDrain(ctx)
 			s.drainWorker(drainCtx, proc)
 			cancel()
 			return

@@ -261,7 +261,7 @@ func TestAbortDrainCancelsInFlightDrain(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	drainCtx, drainCancel := svc.beginDrain()
+	drainCtx, drainCancel := svc.beginDrain(ctx)
 	defer drainCancel()
 
 	svc.AbortDrain()
