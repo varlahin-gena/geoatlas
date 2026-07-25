@@ -60,3 +60,20 @@ func TestGeoGroupExprsIPAndSubnet(t *testing.T) {
 		t.Fatalf("subnet missing /24: %s", sk)
 	}
 }
+
+func TestGeoEdgesTableAllowlist(t *testing.T) {
+	if got := GeoEdgesTable("city"); got != "traffic_edges_city_daily" {
+		t.Fatalf("city=%q", got)
+	}
+	if got := GeoEdgesTable("country"); got != "traffic_edges_country_daily" {
+		t.Fatalf("country=%q", got)
+	}
+	for _, bad := range []string{"", "ip", "subnet", "city; DROP TABLE", "country`x"} {
+		if got := GeoEdgesTable(bad); got != "" {
+			t.Fatalf("GeoEdgesTable(%q)=%q want empty", bad, got)
+		}
+		if got := GeoEdgesMV(bad); got != "" {
+			t.Fatalf("GeoEdgesMV(%q)=%q want empty", bad, got)
+		}
+	}
+}

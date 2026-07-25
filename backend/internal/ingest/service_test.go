@@ -279,6 +279,58 @@ func TestAbortDrainCancelsInFlightDrain(t *testing.T) {
 	}
 }
 
+func TestAbortDrainStopsBlockedDrainBeforeClose(t *testing.T) {
+	// Медленный insert: drain не успеет закончить до AbortDrain.
+	block := make(chan struct{})
+	ins := &blockingInserter{block: block}
+	deps := testProcDeps()
+	deps.Logs = ins
+	deps.Errors = ins
+
+	svc := NewService(Config{
+		Workers:       1,
+		BatchSize:     2,
+		QueueSize:     64,
+		QueueMaxBytes: 1 << 20,
+		FlushInterval: time.Hour,
+		QueryTimeout:  30 * time.Second,
+	}, deps)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- svc.Run(ctx) }()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		svc.drainMu.Lock()
+		ready := svc.drainCancel != nil
+		svc.drainMu.Unlock()
+		if ready {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	line := `src=10.0.0.1 dst=8.8.8.8 action=allow proto=tcp sport=1 dport=2`
+	for i := 0; i < 10; i++ {
+		if !svc.TryEnqueue(line, "tcp") {
+			t.Fatal("enqueue failed")
+		}
+	}
+
+	cancel() // workers enter drain → ProcessLine → Flush → block on insert
+	time.Sleep(50 * time.Millisecond)
+	svc.AbortDrain()
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		close(block) // unblock so test doesn't leak goroutine forever
+		t.Fatal("Run did not finish after AbortDrain (would race pools.Close)")
+	}
+	close(block)
+}
+
 func TestIsClosedConnTyped(t *testing.T) {
 	if !isClosedConn(net.ErrClosed) {
 		t.Fatal("net.ErrClosed should match")
@@ -288,6 +340,28 @@ func TestIsClosedConnTyped(t *testing.T) {
 	}
 	if !isClosedConn(errors.New("read: connection reset by peer")) {
 		t.Fatal("connection reset fallback")
+	}
+}
+
+type blockingInserter struct {
+	block chan struct{}
+}
+
+func (b *blockingInserter) InsertTrafficLogs(ctx context.Context, _ []model.TrafficLog) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-b.block:
+		return nil
+	}
+}
+
+func (b *blockingInserter) InsertParseErrors(ctx context.Context, _ []model.ParseError) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-b.block:
+		return nil
 	}
 }
 

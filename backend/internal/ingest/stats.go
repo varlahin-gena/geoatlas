@@ -46,7 +46,8 @@ func (t *transportStats) snapshot() TransportStats {
 }
 
 type stats struct {
-	state            atomic.Value // string
+	state            atomic.Value // string: idle|running (error выводится из activeErrors)
+	activeErrors     atomic.Int64 // workers, у которых последний цикл завершился ошибкой
 	receivedTotal    atomic.Int64
 	parsedTotal      atomic.Int64
 	insertedTotal    atomic.Int64
@@ -69,6 +70,29 @@ func newStats() *stats {
 }
 
 func (s *stats) setState(v string) { s.state.Store(v) }
+
+// noteWorkerError / noteWorkerOK — агрегированный health без last-writer-wins flicker:
+// state=error, пока хотя бы один worker в ошибке.
+func (s *stats) noteWorkerError(msg string) {
+	s.activeErrors.Add(1)
+	s.setLastError(msg)
+}
+
+func (s *stats) noteWorkerOK() {
+	for {
+		cur := s.activeErrors.Load()
+		if cur <= 0 {
+			s.setLastError("")
+			return
+		}
+		if s.activeErrors.CompareAndSwap(cur, cur-1) {
+			if cur-1 == 0 {
+				s.setLastError("")
+			}
+			return
+		}
+	}
+}
 
 func (s *stats) setLastError(msg string) {
 	if msg == "" {
@@ -126,6 +150,9 @@ func (s *stats) addDropped(n int64) {
 
 func (s *stats) snapshot() StatsSnapshot {
 	state, _ := s.state.Load().(string)
+	if s.activeErrors.Load() > 0 {
+		state = "error"
+	}
 	lastFlush, _ := s.lastFlushAt.Load().(string)
 	lastErr, _ := s.lastError.Load().(string)
 	var lastDrop string

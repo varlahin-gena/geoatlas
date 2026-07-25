@@ -47,6 +47,9 @@ func ScanGeoEdgesForTimeRange(
 			return nil, false, nil
 		}
 		table := sqlclause.GeoEdgesTable(groupBy)
+		if table == "" {
+			return nil, false, nil
+		}
 		rows, err := scanGeoEdgesDays(ctx, ch, table, tr.Amount, limit, filter, timeout)
 		if err != nil {
 			return nil, false, err

@@ -3,13 +3,24 @@ package sqlclause
 import "fmt"
 
 // GeoEdgesTable возвращает имя daily-агрегата по city|country.
+// Неизвестный groupBy → "" (не интерполируем произвольные строки в SQL).
 func GeoEdgesTable(groupBy string) string {
-	return "traffic_edges_" + groupBy + "_daily"
+	switch groupBy {
+	case "city", "country":
+		return "traffic_edges_" + groupBy + "_daily"
+	default:
+		return ""
+	}
 }
 
 // GeoEdgesMV возвращает имя materialized view для geo-агрегата.
 func GeoEdgesMV(groupBy string) string {
-	return "traffic_edges_" + groupBy + "_daily_mv"
+	switch groupBy {
+	case "city", "country":
+		return "traffic_edges_" + groupBy + "_daily_mv"
+	default:
+		return ""
+	}
 }
 
 // CityKeyExpr / CountryKeyExpr — ключи по сохранённым колонкам traffic_logs

@@ -52,3 +52,15 @@ func TestOrderByMapAggFilterSQLPrefersGeo(t *testing.T) {
 		t.Fatalf("geo weight should be first via countIf: %s", got)
 	}
 }
+
+func TestActionWhereSQLRejectsUnknown(t *testing.T) {
+	// Только точные "blocked"/"allowed"; всё остальное — без WHERE (all).
+	for _, f := range []string{"", "all", "BLOCKED", "x' OR 1=1", "blocked;--", "allowed "} {
+		if got := ActionWhereSQL(f); got != "" {
+			t.Fatalf("ActionWhereSQL(%q)=%q want empty", f, got)
+		}
+	}
+	if ActionWhereSQL("blocked") == "" || ActionWhereSQL("allowed") == "" {
+		t.Fatal("blocked/allowed must produce SQL")
+	}
+}

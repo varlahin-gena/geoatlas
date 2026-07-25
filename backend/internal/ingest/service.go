@@ -453,6 +453,22 @@ func (s *Service) worker(ctx context.Context, proc *usecaseingest.Processor) {
 	t := time.NewTicker(s.cfg.FlushInterval)
 	defer t.Stop()
 
+	inErr := false
+	noteErr := func(err error) {
+		if !inErr {
+			inErr = true
+			s.stats.noteWorkerError(err.Error())
+		} else {
+			s.stats.setLastError(err.Error())
+		}
+	}
+	noteOK := func() {
+		if inErr {
+			inErr = false
+			s.stats.noteWorkerOK()
+		}
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -464,22 +480,18 @@ func (s *Service) worker(ctx context.Context, proc *usecaseingest.Processor) {
 			s.releaseQueueBytes(item.line)
 			transport, line := ResolveTransport(item.line, item.transport)
 			if _, _, err := proc.ProcessLine(ctx, line, transport); err != nil {
-				s.stats.setState("error")
-				s.stats.setLastError(err.Error())
+				noteErr(err)
 				slog.Error("ingest: process error", "err", err)
 				continue
 			}
-			s.stats.setState("running")
-			s.stats.setLastError("")
+			noteOK()
 		case <-t.C:
 			if _, err := proc.Flush(ctx); err != nil {
-				s.stats.setState("error")
-				s.stats.setLastError(err.Error())
+				noteErr(err)
 				slog.Error("ingest: flush error", "err", err)
 				continue
 			}
-			s.stats.setState("running")
-			s.stats.setLastError("")
+			noteOK()
 		}
 	}
 }
