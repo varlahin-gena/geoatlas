@@ -14,8 +14,9 @@
 # Без перезапуска (нужен реальный backpressure workers/CH):
 #   API_AUTH_TOKEN="$TOKEN" SOAK_LINES=500000 SOAK_CONCURRENCY=8 ./scripts/soak-queue-drops.sh
 #
-# Напрямую в backend (минуя nginx), если через :80 мало received:
-#   SOAK_BASE_URL=http://127.0.0.1:8080 API_AUTH_TOKEN="$TOKEN" ./scripts/soak-queue-drops.sh
+# Напрямую в backend из контейнера (с хоста :8080 обычно не проброшен — только nginx :80):
+#   docker compose exec backend wget -qO- http://127.0.0.1:8080/health
+# Soak с хоста всегда через nginx: SOAK_BASE_URL=http://127.0.0.1
 
 set -euo pipefail
 
@@ -44,6 +45,7 @@ echo "== soak-queue-drops: lines=$LINES concurrency=$CONCURRENCY per_req=$PER_RE
 before=$(curl -sf "${AUTH_HEADER[@]}" "$BASE/api/ingest/stats" || true)
 if [[ -z "$before" || "$before" == "{}" ]]; then
   echo "ERROR: cannot read $BASE/api/ingest/stats (auth? stack up?)" >&2
+  echo "    From host use http://127.0.0.1 (nginx). Port 8080 is internal to the backend container." >&2
   exit 1
 fi
 dropped_before=$(echo "$before" | jq -r '.dropped_total // 0')
@@ -69,8 +71,8 @@ rm -f /tmp/soak-smoke-body.$$
 tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT
 body="$tmpdir/payload.txt"
-# Быстрее bash-цикла: yes обрезает по числу строк.
-yes "$SAMPLE_LINE" | head -n "$PER_REQ" >"$body"
+# Не yes|head: при pipefail SIGPIPE от yes роняет скрипт сразу после smoke.
+awk -v n="$PER_REQ" -v line="$SAMPLE_LINE" 'BEGIN{for(i=0;i<n;i++) print line}' >"$body"
 bytes=$(wc -c <"$body" | tr -d ' ')
 lines_in_file=$(wc -l <"$body" | tr -d ' ')
 echo "payload: $lines_in_file lines, $bytes bytes (~$(awk "BEGIN{printf \"%.1f\", $bytes/1048576}") MiB) × $CONCURRENCY POSTs"
@@ -132,8 +134,8 @@ echo "$sys" | jq '.alerts // [] | map(select(.code|test("ingest_drop|ingest_queu
 min_recv=$((EXPECTED / 2))
 if (( recv_delta < min_recv )); then
   echo "ERROR: flood barely reached ingest (received_delta=$recv_delta, want ≥ $min_recv)." >&2
-  echo "    Try: SOAK_BASE_URL=http://127.0.0.1:8080 (bypass nginx)" >&2
-  echo "    Or check: curl -sS -D- -H \"Authorization: Bearer \$TOKEN\" -H 'Expect:' -X POST --data-binary @/etc/hosts $BASE/api/ingest | head" >&2
+  echo "    Stay on http://127.0.0.1 (nginx). Backend :8080 is not published on the host." >&2
+  echo "    Check: curl -sS -D- -H \"Authorization: Bearer \$TOKEN\" -H 'Expect:' -X POST --data-binary \$'line\\n' $BASE/api/ingest | head" >&2
   exit 1
 fi
 
