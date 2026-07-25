@@ -232,6 +232,7 @@ func (s *Service) Health(ctx context.Context, pinger ClickHousePinger) (HealthRe
 			body["status"] = status
 			ingestInfo := map[string]any{
 				"state": snap.State, "queue_depth": snap.QueueDepth, "queue_capacity": snap.QueueCapacity,
+				"queue_bytes": snap.QueueBytes, "queue_bytes_capacity": snap.QueueBytesCapacity,
 				"queue_ratio": queueRatio(snap), "dropped_total": snap.DroppedTotal, "drops_per_sec": dropsPerSec,
 			}
 			if snap.LastError != "" {
@@ -263,6 +264,8 @@ func mergeLiveIngestStats(resp *SystemStatsResponse, ingestStats IngestSnapshot)
 	p["buffered_lines"] = float64(ingestStats.BufferedLines)
 	p["queue_depth"] = float64(ingestStats.QueueDepth)
 	p["queue_capacity"] = float64(ingestStats.QueueCapacity)
+	p["queue_bytes"] = float64(ingestStats.QueueBytes)
+	p["queue_bytes_capacity"] = float64(ingestStats.QueueBytesCapacity)
 	p["dropped_total"] = float64(ingestStats.DroppedTotal)
 	p["skipped_total"] = float64(ingestStats.SkippedTotal)
 	p["parse_errors_total"] = float64(ingestStats.ParseErrorsTotal)
@@ -405,10 +408,17 @@ func defaultDashboardMetrics() []model.MetricKey {
 }
 
 func queueRatio(snap IngestSnapshot) float64 {
-	if snap.QueueCapacity <= 0 {
-		return 0
+	var depthRatio, bytesRatio float64
+	if snap.QueueCapacity > 0 {
+		depthRatio = float64(snap.QueueDepth) / float64(snap.QueueCapacity)
 	}
-	return float64(snap.QueueDepth) / float64(snap.QueueCapacity)
+	if snap.QueueBytesCapacity > 0 {
+		bytesRatio = float64(snap.QueueBytes) / float64(snap.QueueBytesCapacity)
+	}
+	if bytesRatio > depthRatio {
+		return bytesRatio
+	}
+	return depthRatio
 }
 
 func classifyIngest(snap IngestSnapshot) (status string, reasons []string, dropsPerSec float64) {
@@ -422,10 +432,18 @@ func classifyIngest(snap IngestSnapshot) (status string, reasons []string, drops
 		status, reasons = "degraded", append(reasons, "last_flush_error")
 	}
 	if ratio >= 0.9 {
-		return "overloaded", append(reasons, "queue_critical"), dropsPerSec
+		reason := "queue_critical"
+		if snap.QueueBytesCapacity > 0 && float64(snap.QueueBytes)/float64(snap.QueueBytesCapacity) >= 0.9 {
+			reason = "queue_bytes_critical"
+		}
+		return "overloaded", append(reasons, reason), dropsPerSec
 	}
 	if ratio >= 0.75 {
-		status, reasons = "degraded", append(reasons, "queue_high")
+		reason := "queue_high"
+		if snap.QueueBytesCapacity > 0 && float64(snap.QueueBytes)/float64(snap.QueueBytesCapacity) >= 0.75 {
+			reason = "queue_bytes_high"
+		}
+		status, reasons = "degraded", append(reasons, reason)
 	}
 	if dropsPerSec >= 100 {
 		return "overloaded", append(reasons, "dropping_critical"), dropsPerSec

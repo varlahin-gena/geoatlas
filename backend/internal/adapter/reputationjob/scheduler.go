@@ -1,6 +1,8 @@
 package reputationjob
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -231,7 +233,7 @@ func (s *Scheduler) fetchOne(ctx context.Context, feed config.ReputationFeed, fo
 	if format == "" {
 		format = "netset"
 	}
-	ranges, err := reppkg.ParseFeedBody(format, strings.NewReader(string(body)), feed.Name, feed.Category, "url", time.Now().UTC())
+	ranges, err := reppkg.ParseFeedBody(format, bytes.NewReader(body), feed.Name, feed.Category, "url", time.Now().UTC())
 	if err != nil {
 		return "failed", err
 	}
@@ -254,19 +256,48 @@ func (s *Scheduler) fetchOne(ctx context.Context, feed config.ReputationFeed, fo
 }
 
 func looksDeprecatedEmpty(body []byte) bool {
-	s := strings.ToLower(string(body))
-	if !strings.Contains(s, "deprecated") {
+	if !containsASCIIFold(body, "deprecated") {
 		return false
 	}
 	// Есть ли хоть один IPv4-токен вне комментариев — грубая проверка.
-	for _, line := range strings.Split(s, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
+	sc := bufio.NewScanner(bytes.NewReader(body))
+	for sc.Scan() {
+		line := bytes.TrimSpace(sc.Bytes())
+		if len(line) == 0 || line[0] == '#' {
 			continue
 		}
-		if strings.ContainsAny(line, "0123456789") && strings.Contains(line, ".") {
+		if bytes.ContainsAny(line, "0123456789") && bytes.IndexByte(line, '.') >= 0 {
 			return false
 		}
 	}
 	return true
+}
+
+// containsASCIIFold ищет ASCII-подстроку без аллокации ToLower всего body.
+func containsASCIIFold(haystack []byte, needle string) bool {
+	n := len(needle)
+	if n == 0 || len(haystack) < n {
+		return false
+	}
+	for i := 0; i+n <= len(haystack); i++ {
+		ok := true
+		for j := 0; j < n; j++ {
+			a := haystack[i+j]
+			b := needle[j]
+			if a >= 'A' && a <= 'Z' {
+				a += 'a' - 'A'
+			}
+			if b >= 'A' && b <= 'Z' {
+				b += 'a' - 'A'
+			}
+			if a != b {
+				ok = false
+				break
+			}
+		}
+		if ok {
+			return true
+		}
+	}
+	return false
 }

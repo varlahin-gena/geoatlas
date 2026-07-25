@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"network_monitor/internal/geoip"
 	"network_monitor/internal/model"
 )
 
@@ -84,13 +85,14 @@ func (i *Index) Snapshot() []model.ReputationRange {
 // Частные/спец. адреса (RFC1918, loopback, CGNAT и т.п.) всегда без хитов.
 func (i *Index) Lookup(ipStr string) []model.ReputationHit {
 	parsed := net.ParseIP(strings.TrimSpace(ipStr))
-	if parsed == nil || parsed.To4() == nil {
+	v4 := parsed.To4()
+	if v4 == nil {
 		return nil
 	}
-	if IsNonPublicIPv4(ipStr) {
+	if IsNonPublicIPv4IP(v4) {
 		return nil
 	}
-	ip := IPToUint32(ipStr)
+	ip := geoip.IPv4ToUint32(v4)
 	ranges := i.load()
 	if len(ranges) == 0 {
 		return nil

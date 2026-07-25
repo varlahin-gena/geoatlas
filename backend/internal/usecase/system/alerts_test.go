@@ -93,6 +93,41 @@ func TestClassifyIngestQueueCritical(t *testing.T) {
 	}
 }
 
+func TestClassifyIngestQueueBytesCritical(t *testing.T) {
+	st, reasons, _ := classifyIngest(IngestSnapshot{
+		State: "running", QueueDepth: 10, QueueCapacity: 1000,
+		QueueBytes: 95 << 20, QueueBytesCapacity: 100 << 20,
+	})
+	if st != "overloaded" {
+		t.Fatalf("status=%s want overloaded", st)
+	}
+	if !containsReason(reasons, "queue_bytes_critical") {
+		t.Fatalf("reasons=%v", reasons)
+	}
+}
+
+func TestComputeAlertsQueueBytes(t *testing.T) {
+	base := SystemStatsResponse{
+		Pipeline: map[string]map[string]float64{
+			"ingest": {
+				"queue_depth": 0, "queue_capacity": 1000,
+				"queue_bytes": 80, "queue_bytes_capacity": 100,
+				"dropped_total": 0,
+			},
+			"rate": {"drops_per_sec": 0},
+		},
+		Health: map[string]map[string]any{}, Containers: map[string]map[string]float64{}, Storage: map[string]map[string]float64{},
+	}
+	alerts := computeAlerts(base)
+	if !hasAlertCode(alerts, "ingest_queue_bytes_high") {
+		t.Fatalf("expected ingest_queue_bytes_high, got %#v", alerts)
+	}
+	base.Pipeline["ingest"]["queue_bytes"] = 95
+	if alerts = computeAlerts(base); !hasAlertCode(alerts, "ingest_queue_bytes_critical") {
+		t.Fatalf("expected ingest_queue_bytes_critical, got %#v", alerts)
+	}
+}
+
 func TestClassifyIngestHealthy(t *testing.T) {
 	st, reasons, _ := classifyIngest(IngestSnapshot{
 		State: "running", QueueDepth: 10, QueueCapacity: 1000,

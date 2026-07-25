@@ -9,6 +9,11 @@ func IsNonPublicIPv4(ipStr string) bool {
 	if ip == nil {
 		return true
 	}
+	return IsNonPublicIPv4IP(ip)
+}
+
+// IsNonPublicIPv4IP — тот же тест без повторного ParseIP (hot path Lookup).
+func IsNonPublicIPv4IP(ip net.IP) bool {
 	ip4 := ip.To4()
 	if ip4 == nil {
 		return true

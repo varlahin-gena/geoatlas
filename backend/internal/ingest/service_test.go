@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"context"
+	"errors"
 	"net"
 	"sync/atomic"
 	"testing"
@@ -235,6 +236,61 @@ func TestRunDrainsDeepQueueOnCancel(t *testing.T) {
 	}
 }
 
+func TestAbortDrainCancelsInFlightDrain(t *testing.T) {
+	svc := NewService(Config{
+		Workers:       1,
+		BatchSize:     10,
+		QueueSize:     8,
+		FlushInterval: time.Hour,
+		QueryTimeout:  time.Second,
+	}, testProcDeps())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- svc.Run(ctx) }()
+
+	// Дождаться готовности drainRoot.
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		svc.drainMu.Lock()
+		ready := svc.drainCancel != nil
+		svc.drainMu.Unlock()
+		if ready {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	drainCtx, drainCancel := svc.beginDrain()
+	defer drainCancel()
+
+	svc.AbortDrain()
+	select {
+	case <-drainCtx.Done():
+	case <-time.After(time.Second):
+		t.Fatal("AbortDrain did not cancel drain context")
+	}
+
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Run hung after AbortDrain+cancel")
+	}
+}
+
+func TestIsClosedConnTyped(t *testing.T) {
+	if !isClosedConn(net.ErrClosed) {
+		t.Fatal("net.ErrClosed should match")
+	}
+	if isClosedConn(errors.New("something else")) {
+		t.Fatal("unrelated error must not match")
+	}
+	if !isClosedConn(errors.New("read: connection reset by peer")) {
+		t.Fatal("connection reset fallback")
+	}
+}
+
 type countingInserter struct {
 	logs atomic.Int64
 }
@@ -247,4 +303,3 @@ func (c *countingInserter) InsertTrafficLogs(_ context.Context, logs []model.Tra
 func (c *countingInserter) InsertParseErrors(context.Context, []model.ParseError) error {
 	return nil
 }
-

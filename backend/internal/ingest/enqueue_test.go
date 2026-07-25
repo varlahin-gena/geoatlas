@@ -144,3 +144,55 @@ func TestEnqueueFloodDropsUnderTinyQueue(t *testing.T) {
 		t.Fatalf("Stats().DroppedTotal=%d want %d", snap.DroppedTotal, dropped)
 	}
 }
+
+func TestEnqueueDropsWhenByteBudgetFull(t *testing.T) {
+	svc := &Service{
+		cfg:    Config{QueueMaxBytes: 20},
+		lineCh: make(chan ingestedLine, 100), // depth intentionally large
+		stats:  newStats(),
+	}
+
+	if !svc.TryEnqueue("abcdefghij", "tcp") { // 10 bytes
+		t.Fatal("first enqueue should succeed")
+	}
+	if !svc.TryEnqueue("1234567890", "tcp") { // 10 bytes → exactly 20
+		t.Fatal("second enqueue should succeed")
+	}
+	if svc.TryEnqueue("x", "tcp") {
+		t.Fatal("third enqueue should drop on byte budget")
+	}
+	if got := svc.stats.droppedTotal.Load(); got != 1 {
+		t.Fatalf("dropped=%d want 1", got)
+	}
+	if got := svc.queueBytes.Load(); got != 20 {
+		t.Fatalf("queue_bytes=%d want 20", got)
+	}
+	snap := svc.Stats()
+	if snap.QueueBytes != 20 || snap.QueueBytesCapacity != 20 {
+		t.Fatalf("stats bytes=%d cap=%d", snap.QueueBytes, snap.QueueBytesCapacity)
+	}
+
+	// Dequeue releases budget.
+	item := <-svc.lineCh
+	svc.releaseQueueBytes(item.line)
+	if !svc.TryEnqueue("abcdefghij", "tcp") {
+		t.Fatal("enqueue after release should succeed")
+	}
+	if got := svc.queueBytes.Load(); got != 20 {
+		t.Fatalf("after release+enqueue queue_bytes=%d want 20", got)
+	}
+}
+
+func TestEnqueueDropsOversizedLine(t *testing.T) {
+	svc := &Service{
+		cfg:    Config{QueueMaxBytes: 8},
+		lineCh: make(chan ingestedLine, 10),
+		stats:  newStats(),
+	}
+	if svc.TryEnqueue("0123456789", "udp") {
+		t.Fatal("line larger than budget must drop")
+	}
+	if len(svc.lineCh) != 0 || svc.queueBytes.Load() != 0 {
+		t.Fatal("oversized drop must not reserve bytes or occupy queue")
+	}
+}

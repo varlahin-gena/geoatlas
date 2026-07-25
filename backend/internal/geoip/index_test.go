@@ -1,11 +1,30 @@
 package geoip
 
 import (
+	"net"
 	"strings"
 	"testing"
 
 	"network_monitor/internal/model"
 )
+
+func TestIPv4ToUint32MatchesIPToUint32(t *testing.T) {
+	for _, s := range []string{"10.0.0.1", "192.168.1.255", "8.8.8.8", "0.0.0.0"} {
+		parsed := mustParseIPv4(t, s)
+		if IPv4ToUint32(parsed) != IPToUint32(s) {
+			t.Fatalf("%s: IPv4ToUint32 != IPToUint32", s)
+		}
+	}
+}
+
+func mustParseIPv4(t *testing.T, s string) net.IP {
+	t.Helper()
+	ip := net.ParseIP(s)
+	if ip == nil || ip.To4() == nil {
+		t.Fatalf("bad ip %q", s)
+	}
+	return ip
+}
 
 func TestFindContainingRange(t *testing.T) {
 	ranges := []model.GeoRange{

@@ -57,4 +57,6 @@ type Deps struct {
 	EnrichCountry bool
 	BatchSize     int
 	QueryTimeout  time.Duration
+	// Circuit — общий breaker для workers; nil → NewProcessor создаёт приватный.
+	Circuit *CircuitBreaker
 }

@@ -35,6 +35,7 @@ type IngestSnapshot struct {
 	State                                                                     string
 	ReceivedTotal, ParsedTotal, InsertedTotal, SkippedTotal, ParseErrorsTotal int64
 	BufferedLines, QueueDepth, QueueCapacity, DroppedTotal, Connections       int64
+	QueueBytes, QueueBytesCapacity                                            int64
 	UDPReceived, UDPConnections, TCPReceived, TCPConnections                  int64
 	LastError                                                                 string
 	LastDropAt                                                                string // RFC3339; empty if never dropped

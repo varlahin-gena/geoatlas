@@ -13,22 +13,24 @@ type TransportStats struct {
 
 // StatsSnapshot — снимок метрик live-ingest для API и мониторинга.
 type StatsSnapshot struct {
-	State            string         `json:"state"`
-	ReceivedTotal    int64          `json:"received_total"`
-	ParsedTotal      int64          `json:"parsed_total"`
-	InsertedTotal    int64          `json:"inserted_total"`
-	SkippedTotal     int64          `json:"skipped_total"`
-	ParseErrorsTotal int64          `json:"parse_errors_total"`
-	BufferedLines    int64          `json:"buffered_lines"`
-	QueueDepth       int64          `json:"queue_depth"`
-	QueueCapacity    int64          `json:"queue_capacity"`
-	DroppedTotal     int64          `json:"dropped_total"`
-	LastDropAt       string         `json:"last_drop_at,omitempty"`
-	Connections      int64          `json:"connections"`
-	UDP              TransportStats `json:"udp"`
-	TCP              TransportStats `json:"tcp"`
-	LastFlushAt      string         `json:"last_flush_at,omitempty"`
-	LastError        string         `json:"last_error,omitempty"`
+	State              string         `json:"state"`
+	ReceivedTotal      int64          `json:"received_total"`
+	ParsedTotal        int64          `json:"parsed_total"`
+	InsertedTotal      int64          `json:"inserted_total"`
+	SkippedTotal       int64          `json:"skipped_total"`
+	ParseErrorsTotal   int64          `json:"parse_errors_total"`
+	BufferedLines      int64          `json:"buffered_lines"`
+	QueueDepth         int64          `json:"queue_depth"`
+	QueueCapacity      int64          `json:"queue_capacity"`
+	QueueBytes         int64          `json:"queue_bytes"`
+	QueueBytesCapacity int64          `json:"queue_bytes_capacity"`
+	DroppedTotal       int64          `json:"dropped_total"`
+	LastDropAt         string         `json:"last_drop_at,omitempty"`
+	Connections        int64          `json:"connections"`
+	UDP                TransportStats `json:"udp"`
+	TCP                TransportStats `json:"tcp"`
+	LastFlushAt        string         `json:"last_flush_at,omitempty"`
+	LastError          string         `json:"last_error,omitempty"`
 }
 
 type transportStats struct {

@@ -124,6 +124,7 @@ type Config struct {
 	MaxGeoUploadSize     int64
 	IngestBatchSize      int
 	IngestQueueSize      int
+	IngestQueueMaxBytes  int
 	IngestWorkers        int
 	IngestFlushSec       int
 	IngestMaxConnections int
@@ -198,6 +199,7 @@ func FromEnv() Config {
 		MaxGeoUploadSize:     envInt64("MAX_GEO_UPLOAD_SIZE", 1<<30), // 1 GiB
 		IngestBatchSize:      envInt("INGEST_BATCH_SIZE", 10000),
 		IngestQueueSize:      envInt("INGEST_QUEUE_SIZE", 300000),
+		IngestQueueMaxBytes:  envInt("INGEST_QUEUE_MAX_BYTES", 256<<20), // 256 MiB
 		IngestWorkers:        envInt("INGEST_WORKERS", 4),
 		IngestFlushSec:       envInt("INGEST_FLUSH_SEC", 3),
 		IngestMaxConnections: envInt("INGEST_MAX_CONNECTIONS", 256),

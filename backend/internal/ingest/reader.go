@@ -79,50 +79,55 @@ func (fr *frameReader) discardThrough(delim byte) {
 	}
 }
 
+// tryOctetCounting распознаёт RFC6587 через Peek — без потребления байт,
+// пока формат не подтверждён. Логи с IP ("10.0.0.1 …") не платят MultiReader.
 func (fr *frameReader) tryOctetCounting() (string, bool, error) {
-	// Ограничиваем поле длины: без пробела ReadString(' ') рос бы безлимитно.
 	const maxLenDigits = 10 // "1048576" и запас
-	var lenField strings.Builder
-	lenField.Grow(8)
-	sawSpace := false
-	for i := 0; i < maxLenDigits+1; i++ {
-		b, err := fr.r.ReadByte()
-		if err != nil {
-			if lenField.Len() > 0 {
-				fr.unreadPrefix(lenField.String())
-			}
-			return "", false, err
-		}
+	peek, err := fr.r.Peek(maxLenDigits + 1)
+	if len(peek) == 0 {
+		return "", false, err
+	}
+
+	spaceIdx := -1
+	for i, b := range peek {
 		if b == ' ' {
-			sawSpace = true
+			spaceIdx = i
 			break
 		}
 		if b < '0' || b > '9' {
-			fr.unreadPrefix(lenField.String() + string(b))
+			// Не octet-counting (напр. IP) — байты остаются в буфере для LF-пути.
 			return "", false, nil
 		}
-		lenField.WriteByte(b)
-		if lenField.Len() > maxLenDigits {
-			fr.unreadPrefix(lenField.String())
+		if i+1 > maxLenDigits {
 			return "", false, nil
 		}
 	}
-	if !sawSpace {
-		fr.unreadPrefix(lenField.String())
+	if spaceIdx < 0 {
+		// Нет пробела в peek: при EOF/ошибке — как раньше (неполный кадр).
+		if err != nil {
+			return "", false, err
+		}
+		// Слишком много цифр без пробела — LF fallback.
+		return "", false, nil
+	}
+	if spaceIdx == 0 {
 		return "", false, nil
 	}
 
-	n, err := strconv.Atoi(lenField.String())
-	if err != nil || n <= 0 || n > maxFrameBytes {
-		// Не octet-counting (лог начинается с цифр, напр. IP). Вернём
-		// потреблённые байты в поток и пусть ReadLine читает как LF-строку.
-		fr.unreadPrefix(lenField.String() + " ")
+	n, convErr := strconv.Atoi(string(peek[:spaceIdx]))
+	if convErr != nil || n <= 0 || n > maxFrameBytes {
+		// Невалидная длина — оставляем байты, читаем как LF-строку.
 		return "", false, nil
+	}
+
+	// Подтвердили framing: снимаем "N " и читаем ровно n байт payload.
+	if _, discErr := fr.r.Discard(spaceIdx + 1); discErr != nil {
+		return "", true, discErr
 	}
 
 	buf := make([]byte, n)
-	if _, err := io.ReadFull(fr.r, buf); err != nil {
-		return "", true, err
+	if _, readErr := io.ReadFull(fr.r, buf); readErr != nil {
+		return "", true, readErr
 	}
 
 	// syslog-ng иногда добавляет LF после payload
@@ -131,8 +136,4 @@ func (fr *frameReader) tryOctetCounting() (string, bool, error) {
 	}
 
 	return string(buf), true, nil
-}
-
-func (fr *frameReader) unreadPrefix(prefix string) {
-	fr.r = bufio.NewReader(io.MultiReader(strings.NewReader(prefix), fr.r))
 }

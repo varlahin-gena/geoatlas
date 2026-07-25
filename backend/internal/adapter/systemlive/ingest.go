@@ -27,6 +27,7 @@ func (a *IngestAdapter) Snapshot() (system.IngestSnapshot, bool) {
 		InsertedTotal: snapshot.InsertedTotal, SkippedTotal: snapshot.SkippedTotal,
 		ParseErrorsTotal: snapshot.ParseErrorsTotal, BufferedLines: snapshot.BufferedLines,
 		QueueDepth: snapshot.QueueDepth, QueueCapacity: snapshot.QueueCapacity,
+		QueueBytes: snapshot.QueueBytes, QueueBytesCapacity: snapshot.QueueBytesCapacity,
 		DroppedTotal: snapshot.DroppedTotal, Connections: snapshot.Connections,
 		UDPReceived: snapshot.UDP.ReceivedTotal, UDPConnections: snapshot.UDP.Connections,
 		TCPReceived: snapshot.TCP.ReceivedTotal, TCPConnections: snapshot.TCP.Connections,

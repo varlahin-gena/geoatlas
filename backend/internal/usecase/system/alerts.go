@@ -50,6 +50,15 @@ func computeAlerts(stats SystemStatsResponse) []Alert {
 				alerts = append(alerts, Alert{Level: "warn", Code: "ingest_queue_high", Target: "ingest", Message: "Ingest queue is filling up (>=75% capacity)"})
 			}
 		}
+		bytesUsed, bytesCap := pipeline["queue_bytes"], pipeline["queue_bytes_capacity"]
+		if bytesCap > 0 {
+			br := bytesUsed / bytesCap
+			if br >= 0.9 {
+				alerts = append(alerts, Alert{Level: "error", Code: "ingest_queue_bytes_critical", Target: "ingest", Message: "Ingest queue byte budget critically full (>=90%)"})
+			} else if br >= 0.75 {
+				alerts = append(alerts, Alert{Level: "warn", Code: "ingest_queue_bytes_high", Target: "ingest", Message: "Ingest queue byte budget filling up (>=75%)"})
+			}
+		}
 		dropsPerSec := 0.0
 		if rate, ok := stats.Pipeline["rate"]; ok {
 			dropsPerSec = rate["drops_per_sec"]

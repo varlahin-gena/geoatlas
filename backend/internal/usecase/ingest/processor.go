@@ -29,14 +29,17 @@ type Processor struct {
 	errBuf      []model.ParseError
 	errBufBytes int
 
-	insertFails      int
-	circuitOpenUntil time.Time
+	circuit *CircuitBreaker
 }
 
 func NewProcessor(d Deps, stats LineStats) *Processor {
 	batch := d.BatchSize
 	if batch <= 0 {
 		batch = 10000
+	}
+	circuit := d.Circuit
+	if circuit == nil {
+		circuit = NewCircuitBreaker()
 	}
 	return &Processor{
 		logs:          d.Logs,
@@ -49,6 +52,7 @@ func NewProcessor(d Deps, stats LineStats) *Processor {
 		enrichCountry: d.EnrichCountry,
 		buf:           make([]model.TrafficLog, 0, batch),
 		errBuf:        make([]model.ParseError, 0, 256),
+		circuit:       circuit,
 	}
 }
 
@@ -215,24 +219,21 @@ func (p *Processor) checkInsertCircuit() error {
 	if p == nil {
 		return nil
 	}
-	if time.Now().Before(p.circuitOpenUntil) {
-		return errInsertCircuitOpen
-	}
-	return nil
+	return p.circuit.Check()
 }
 
 func (p *Processor) noteInsertSuccess() {
-	p.insertFails = 0
-	p.circuitOpenUntil = time.Time{}
+	if p == nil {
+		return
+	}
+	p.circuit.NoteSuccess()
 }
 
 func (p *Processor) noteInsertFailure() {
-	p.insertFails++
-	if p.insertFails >= circuitFailThreshold {
-		p.circuitOpenUntil = time.Now().Add(circuitCooldown)
-		slog.Warn("ingest: insert circuit open",
-			"failures", p.insertFails, "cooldown", circuitCooldown.String())
+	if p == nil {
+		return
 	}
+	p.circuit.NoteFailure()
 }
 
 func (p *Processor) maxIngestBuf() int {

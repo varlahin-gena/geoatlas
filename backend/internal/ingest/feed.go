@@ -10,7 +10,7 @@ import (
 )
 
 // TryEnqueue кладёт строку в общую очередь (тот же путь, что TCP ingest).
-// false — очередь полна, строка дропнута (non-blocking).
+// false — очередь полна по depth или bytes, строка дропнута (non-blocking).
 func (s *Service) TryEnqueue(line, transport string) bool {
 	if s == nil || s.lineCh == nil {
 		return false
@@ -19,11 +19,36 @@ func (s *Service) TryEnqueue(line, transport string) bool {
 	if line == "" {
 		return true // пустые не считаем drop
 	}
+	n := int64(len(line))
+	maxBytes := int64(s.cfg.QueueMaxBytes)
+
+	if maxBytes > 0 && n > maxBytes {
+		s.stats.addDropped(1)
+		return false
+	}
+
+	// Резервируем байты до send; при полном канале — откат.
+	if maxBytes > 0 {
+		for {
+			cur := s.queueBytes.Load()
+			if cur+n > maxBytes {
+				s.stats.addDropped(1)
+				return false
+			}
+			if s.queueBytes.CompareAndSwap(cur, cur+n) {
+				break
+			}
+		}
+	}
+
 	item := ingestedLine{line: line, transport: transport}
 	select {
 	case s.lineCh <- item:
 		return true
 	default:
+		if maxBytes > 0 {
+			s.queueBytes.Add(-n)
+		}
 		s.stats.addDropped(1)
 		return false
 	}

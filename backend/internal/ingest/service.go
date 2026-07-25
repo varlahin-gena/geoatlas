@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	usecaseingest "network_monitor/internal/usecase/ingest"
@@ -25,6 +26,9 @@ type Config struct {
 	BatchSize     int
 	FlushInterval time.Duration
 	QueueSize     int
+	// QueueMaxBytes — лимит суммы len(line) в очереди (default 256 MiB).
+	// Drop при переполнении depth ИЛИ bytes.
+	QueueMaxBytes int
 	Workers       int
 	QueryTimeout  time.Duration
 
@@ -51,12 +55,19 @@ type Service struct {
 	procDeps   ProcessorDeps
 	stats      *stats
 	processors []*usecaseingest.Processor
+	circuit    *usecaseingest.CircuitBreaker
 
-	lineCh       chan ingestedLine
-	connSem      chan struct{}
-	activeConn   atomic.Int64
-	lastDropLog  atomic.Int64 // unix nano of last drop warn log
-	wg           sync.WaitGroup
+	lineCh      chan ingestedLine
+	queueBytes  atomic.Int64
+	connSem     chan struct{}
+	activeConn  atomic.Int64
+	lastDropLog atomic.Int64 // unix nano of last drop warn log
+	wg          sync.WaitGroup
+
+	// drainRoot отменяет in-flight drain при AbortDrain (до pools.Close).
+	drainMu     sync.Mutex
+	drainRoot   context.Context
+	drainCancel context.CancelFunc
 }
 
 func NewService(cfg Config, deps ProcessorDeps) *Service {
@@ -68,6 +79,9 @@ func NewService(cfg Config, deps ProcessorDeps) *Service {
 	}
 	if cfg.QueueSize <= 0 {
 		cfg.QueueSize = 300000
+	}
+	if cfg.QueueMaxBytes <= 0 {
+		cfg.QueueMaxBytes = 256 << 20 // 256 MiB
 	}
 	if cfg.Workers <= 0 {
 		cfg.Workers = 4
@@ -83,10 +97,12 @@ func NewService(cfg Config, deps ProcessorDeps) *Service {
 	}
 
 	st := newStats()
+	circuit := usecaseingest.NewCircuitBreaker()
 	s := &Service{
 		cfg:      cfg,
 		procDeps: deps,
 		stats:    st,
+		circuit:  circuit,
 		lineCh:   make(chan ingestedLine, cfg.QueueSize),
 		connSem:  make(chan struct{}, cfg.MaxConnections),
 	}
@@ -94,6 +110,7 @@ func NewService(cfg Config, deps ProcessorDeps) *Service {
 		Logs: deps.Logs, Errors: deps.Errors, Parser: deps.Parser,
 		Geo: deps.Geo, EnrichCountry: deps.EnrichCountry,
 		BatchSize: cfg.BatchSize, QueryTimeout: cfg.QueryTimeout,
+		Circuit: circuit,
 	}
 	s.processors = make([]*usecaseingest.Processor, cfg.Workers)
 	for i := range s.processors {
@@ -108,10 +125,25 @@ func (s *Service) Stats() StatsSnapshot {
 		snap.QueueDepth = int64(len(s.lineCh))
 		snap.QueueCapacity = int64(cap(s.lineCh))
 	}
+	snap.QueueBytes = s.queueBytes.Load()
+	snap.QueueBytesCapacity = int64(s.cfg.QueueMaxBytes)
 	return snap
 }
 
 func (s *Service) Run(ctx context.Context) error {
+	drainRoot, drainCancel := context.WithCancel(context.Background())
+	s.drainMu.Lock()
+	s.drainRoot = drainRoot
+	s.drainCancel = drainCancel
+	s.drainMu.Unlock()
+	defer func() {
+		drainCancel()
+		s.drainMu.Lock()
+		s.drainRoot = nil
+		s.drainCancel = nil
+		s.drainMu.Unlock()
+	}()
+
 	for i := range s.processors {
 		s.wg.Add(1)
 		go s.worker(ctx, s.processors[i])
@@ -151,6 +183,7 @@ func (s *Service) Run(ctx context.Context) error {
 			"workers", s.cfg.Workers,
 			"batch", s.cfg.BatchSize,
 			"queue", s.cfg.QueueSize,
+			"queue_max_bytes", s.cfg.QueueMaxBytes,
 			"max_connections", s.cfg.MaxConnections,
 			"conn_idle", s.cfg.ConnIdleTimeout.String(),
 		)
@@ -193,6 +226,8 @@ func (s *Service) Run(ctx context.Context) error {
 	slog.Info("ingest: shutting down",
 		"queue_depth", snap.QueueDepth,
 		"queue_capacity", snap.QueueCapacity,
+		"queue_bytes", snap.QueueBytes,
+		"queue_bytes_capacity", snap.QueueBytesCapacity,
 		"drain_timeout", s.drainTimeout().String(),
 		"dropped_total", snap.DroppedTotal,
 	)
@@ -265,8 +300,28 @@ func (s *Service) ShutdownWaitTimeout() time.Duration {
 	return wait
 }
 
-func detachTimeout(_ context.Context, d time.Duration) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), d)
+// AbortDrain отменяет in-flight drain contexts (после таймаута ожидания в main),
+// чтобы workers не держали CH-соединения к моменту pools.Close.
+func (s *Service) AbortDrain() {
+	if s == nil {
+		return
+	}
+	s.drainMu.Lock()
+	cancel := s.drainCancel
+	s.drainMu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+}
+
+func (s *Service) beginDrain() (context.Context, context.CancelFunc) {
+	s.drainMu.Lock()
+	parent := s.drainRoot
+	s.drainMu.Unlock()
+	if parent == nil {
+		parent = context.Background()
+	}
+	return context.WithTimeout(parent, s.drainTimeout())
 }
 
 func (s *Service) noteQueueDrop(remote, transport string) {
@@ -287,6 +342,8 @@ func (s *Service) noteQueueDrop(remote, transport string) {
 		"transport", transportOrUnknown(transport),
 		"queue_depth", len(s.lineCh),
 		"queue_capacity", cap(s.lineCh),
+		"queue_bytes", s.queueBytes.Load(),
+		"queue_bytes_capacity", s.cfg.QueueMaxBytes,
 		"dropped_total", total,
 	)
 }
@@ -349,19 +406,35 @@ func isClosedConn(err error) bool {
 	if err == nil {
 		return false
 	}
-	s := err.Error()
-	return strings.Contains(s, "use of closed network connection") ||
-		strings.Contains(s, "connection reset")
+	if errors.Is(err, net.ErrClosed) {
+		return true
+	}
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		if errors.Is(opErr.Err, net.ErrClosed) {
+			return true
+		}
+		err = opErr.Err
+	}
+	var errno syscall.Errno
+	if errors.As(err, &errno) {
+		return errno == syscall.ECONNRESET || errno == syscall.EPIPE
+	}
+	// Fallback: WSAECONNRESET / обёртки без typed Errno.
+	msg := err.Error()
+	return strings.Contains(msg, "connection reset") ||
+		strings.Contains(msg, "use of closed network connection")
 }
 
 func isTimeout(err error) bool {
 	if err == nil {
 		return false
 	}
-	if ne, ok := err.(net.Error); ok && ne.Timeout() {
+	var ne net.Error
+	if errors.As(err, &ne) && ne.Timeout() {
 		return true
 	}
-	return strings.Contains(err.Error(), "i/o timeout")
+	return errors.Is(err, context.DeadlineExceeded)
 }
 
 func (s *Service) worker(ctx context.Context, proc *usecaseingest.Processor) {
@@ -373,11 +446,12 @@ func (s *Service) worker(ctx context.Context, proc *usecaseingest.Processor) {
 	for {
 		select {
 		case <-ctx.Done():
-			drainCtx, cancel := detachTimeout(ctx, s.drainTimeout())
+			drainCtx, cancel := s.beginDrain()
 			s.drainWorker(drainCtx, proc)
 			cancel()
 			return
 		case item := <-s.lineCh:
+			s.releaseQueueBytes(item.line)
 			transport, line := ResolveTransport(item.line, item.transport)
 			if _, _, err := proc.ProcessLine(ctx, line, transport); err != nil {
 				s.stats.setState("error")
@@ -402,8 +476,14 @@ func (s *Service) worker(ctx context.Context, proc *usecaseingest.Processor) {
 
 func (s *Service) drainWorker(ctx context.Context, proc *usecaseingest.Processor) {
 	for {
+		if ctx.Err() != nil {
+			return
+		}
 		select {
+		case <-ctx.Done():
+			return
 		case item := <-s.lineCh:
+			s.releaseQueueBytes(item.line)
 			transport, line := ResolveTransport(item.line, item.transport)
 			if _, _, err := proc.ProcessLine(ctx, line, transport); err != nil {
 				slog.Error("ingest: drain process error", "err", err)
@@ -414,5 +494,11 @@ func (s *Service) drainWorker(ctx context.Context, proc *usecaseingest.Processor
 			}
 			return
 		}
+	}
+}
+
+func (s *Service) releaseQueueBytes(line string) {
+	if n := int64(len(line)); n > 0 {
+		s.queueBytes.Add(-n)
 	}
 }

@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ClickHouse/clickhouse-go/v2"
 )
 
 // Параметры retry (переопределяются в тестах).
@@ -47,7 +49,7 @@ var permanentCHCodes = map[int32]struct{}{
 	497: {}, // ACCESS_DENIED
 }
 
-// reCHCode ловит "code: 60" из *clickhouse.Exception.Error() и строковых обёрток.
+// reCHCode — fallback, если Exception обёрнут в строку без errors.As.
 var reCHCode = regexp.MustCompile(`(?i)\bcode:\s*(\d+)\b`)
 
 func insertBackoff(attempt int) time.Duration {
@@ -96,6 +98,10 @@ func isRetryableInsertError(err error) bool {
 	if errors.As(err, &ne) {
 		return true
 	}
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		return true
+	}
 
 	msg := strings.ToLower(err.Error())
 	permanent := []string{
@@ -142,6 +148,10 @@ func isRetryableInsertError(err error) bool {
 }
 
 func extractCHCode(err error) (int32, bool) {
+	var ex *clickhouse.Exception
+	if errors.As(err, &ex) && ex != nil {
+		return ex.Code, true
+	}
 	for e := err; e != nil; e = errors.Unwrap(e) {
 		if m := reCHCode.FindStringSubmatch(e.Error()); len(m) == 2 {
 			n, convErr := strconv.ParseInt(m[1], 10, 32)

@@ -212,6 +212,7 @@ func main() {
 		BatchSize:       cfg.IngestBatchSize,
 		FlushInterval:   time.Duration(cfg.IngestFlushSec) * time.Second,
 		QueueSize:       cfg.IngestQueueSize,
+		QueueMaxBytes:   cfg.IngestQueueMaxBytes,
 		Workers:         cfg.IngestWorkers,
 		QueryTimeout:    cfg.QueryTimeout,
 		MaxConnections:  cfg.IngestMaxConnections,
@@ -301,6 +302,13 @@ func main() {
 		case <-ingestWaitCtx.Done():
 			left := ingestSvc.Stats().QueueDepth
 			slog.Warn("ingest drain timeout", "queue_depth_left", left, "budget", ingestWait.String())
+			ingestSvc.AbortDrain()
+			// Даём workers выйти после AbortDrain до pools.Close.
+			select {
+			case <-ingestDone:
+			case <-time.After(3 * time.Second):
+				slog.Warn("ingest workers still draining after AbortDrain")
+			}
 		}
 	}
 

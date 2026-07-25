@@ -60,10 +60,11 @@ func (i *Index) Snapshot() []model.GeoRange {
 // LookupRange — O(log n) поиск покрывающего диапазона без копии всего индекса.
 func (i *Index) LookupRange(ipStr string) (model.GeoRange, bool) {
 	parsed := net.ParseIP(strings.TrimSpace(ipStr))
-	if parsed == nil || parsed.To4() == nil {
+	v4 := parsed.To4()
+	if v4 == nil {
 		return model.GeoRange{}, false
 	}
-	return findContainingRangeLocked(i.loadRanges(), IPToUint32(ipStr))
+	return findContainingRangeLocked(i.loadRanges(), IPv4ToUint32(v4))
 }
 
 // CollectRanges отдаёт до limit диапазонов (опционально с текстовым фильтром).
@@ -129,10 +130,11 @@ func findContainingRangeLocked(ranges []model.GeoRange, ip uint32) (model.GeoRan
 
 func (i *Index) Lookup(ipStr string) model.GeoLookup {
 	parsed := net.ParseIP(strings.TrimSpace(ipStr))
-	if parsed == nil || parsed.To4() == nil {
+	v4 := parsed.To4()
+	if v4 == nil {
 		return model.GeoLookup{Country: "Неизвестно"}
 	}
-	ip := IPToUint32(ipStr)
+	ip := IPv4ToUint32(v4)
 	ranges := i.loadRanges()
 
 	pos := sort.Search(len(ranges), func(k int) bool {
@@ -152,6 +154,15 @@ func (i *Index) Lookup(ipStr string) model.GeoLookup {
 	return model.GeoLookup{Country: "Неизвестно"}
 }
 
+// IPv4ToUint32 кодирует net.IP (уже IPv4) в uint32 без повторного ParseIP.
+func IPv4ToUint32(ip net.IP) uint32 {
+	ip4 := ip.To4()
+	if ip4 == nil {
+		return 0
+	}
+	return uint32(ip4[0])<<24 | uint32(ip4[1])<<16 | uint32(ip4[2])<<8 | uint32(ip4[3])
+}
+
 func IPToUint32(ipStr string) uint32 {
 	ipStr = strings.TrimSpace(ipStr)
 	if ipStr == "" {
@@ -161,11 +172,7 @@ func IPToUint32(ipStr string) uint32 {
 	if ip == nil {
 		return 0
 	}
-	ip = ip.To4()
-	if ip == nil {
-		return 0
-	}
-	return uint32(ip[0])<<24 | uint32(ip[1])<<16 | uint32(ip[2])<<8 | uint32(ip[3])
+	return IPv4ToUint32(ip)
 }
 
 // Uint32ToIP форматирует IPv4 из UInt32 в dotted-quad.
@@ -176,8 +183,9 @@ func Uint32ToIP(v uint32) string {
 // FindContainingRange ищет диапазон, покрывающий IPv4. ok=false если IP невалиден или не найден.
 func FindContainingRange(ranges []model.GeoRange, ipStr string) (model.GeoRange, bool) {
 	parsed := net.ParseIP(strings.TrimSpace(ipStr))
-	if parsed == nil || parsed.To4() == nil {
+	v4 := parsed.To4()
+	if v4 == nil {
 		return model.GeoRange{}, false
 	}
-	return findContainingRangeLocked(ranges, IPToUint32(ipStr))
+	return findContainingRangeLocked(ranges, IPv4ToUint32(v4))
 }
