@@ -21,8 +21,8 @@ prev_ins=0
 prev_drop=0
 prev_ts=$(date +%s)
 
-printf "%-19s %10s %10s %10s %10s %10s %8s %s\n" \
-    "time" "recv/s" "ins/s" "drop/s" "dropped" "buffered" "conn" "state"
+printf "%-19s %10s %10s %10s %10s %10s %8s %-10s %s\n" \
+    "time" "recv/s" "ins/s" "drop/s" "dropped" "buffered" "conn" "state" "queue"
 while true; do
     json=$(curl -sf "${AUTH_HEADER[@]}" "$URL" || echo '{}')
     recv=$(echo "$json" | jq -r '.received_total // 0')
@@ -31,6 +31,8 @@ while true; do
     buf=$(echo "$json" | jq -r '.buffered_lines // 0')
     depth=$(echo "$json" | jq -r '.queue_depth // 0')
     cap=$(echo "$json" | jq -r '.queue_capacity // 0')
+    qbytes=$(echo "$json" | jq -r '.queue_bytes // 0')
+    qbytes_cap=$(echo "$json" | jq -r '.queue_bytes_capacity // 0')
     conn=$(echo "$json" | jq -r '.connections // 0')
     state=$(echo "$json" | jq -r '.state // "?"')
 
@@ -42,12 +44,13 @@ while true; do
     ins_rate=$(awk "BEGIN {printf \"%.0f\", ($ins - $prev_ins) / $dt}")
     drop_rate=$(awk "BEGIN {printf \"%.0f\", ($drop - $prev_drop) / $dt}")
 
-    printf "%-19s %10s %10s %10s %10s %10s %8s %s" \
-        "$(date '+%H:%M:%S')" "$recv_rate" "$ins_rate" "$drop_rate" "$drop" "$buf" "$conn" "$state"
-    if [[ "$cap" != "0" && "$cap" != "null" ]]; then
-        printf " q=%s/%s" "$depth" "$cap"
+    qinfo="q=${depth}/${cap}"
+    if [[ "$qbytes_cap" != "0" && "$qbytes_cap" != "null" ]]; then
+        qinfo="${qinfo} b=${qbytes}/${qbytes_cap}"
     fi
-    printf "\n"
+
+    printf "%-19s %10s %10s %10s %10s %10s %8s %-10s %s\n" \
+        "$(date '+%H:%M:%S')" "$recv_rate" "$ins_rate" "$drop_rate" "$drop" "$buf" "$conn" "$state" "$qinfo"
 
     prev_recv=$recv
     prev_ins=$ins

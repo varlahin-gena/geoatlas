@@ -3,9 +3,13 @@
 #
 # Требования: поднятый стек (./start.sh), curl, jq.
 #
-# Пример (малая очередь → быстрые drops):
+# Пример (малая очередь → быстрые drops по depth):
 #   INGEST_QUEUE_SIZE=500 docker compose up -d backend
 #   ./scripts/soak-queue-drops.sh
+#
+# Byte-cap (P1): маленький бюджет байт при большом depth:
+#   INGEST_QUEUE_SIZE=300000 INGEST_QUEUE_MAX_BYTES=1048576 docker compose up -d backend
+#   SOAK_LINES=200000 SOAK_CONCURRENCY=8 ./scripts/soak-queue-drops.sh
 #
 # Или без перезапуска (надежда на реальную перегрузку worker/CH):
 #   SOAK_LINES=500000 SOAK_CONCURRENCY=8 ./scripts/soak-queue-drops.sh
@@ -31,6 +35,7 @@ if [[ -z "$before" || "$before" == "{}" ]]; then
 fi
 dropped_before=$(echo "$before" | jq -r '.dropped_total // 0')
 echo "dropped_total before: $dropped_before"
+echo "$before" | jq '{state, queue_depth, queue_capacity, queue_bytes, queue_bytes_capacity, dropped_total}'
 
 # Flood POST /api/ingest (ops) — попадает в ту же очередь, что syslog TCP.
 # При полной очереди API отвечает 503 + stats.dropped (не 200) — это ожидаемо.
@@ -61,10 +66,21 @@ sleep 2
 after=$(curl -sf "${AUTH_HEADER[@]}" "$BASE/api/ingest/stats")
 dropped_after=$(echo "$after" | jq -r '.dropped_total // 0')
 echo "dropped_total after:  $dropped_after"
-echo "$after" | jq '{state, received_total, inserted_total, dropped_total, queue_depth, queue_capacity}'
+echo "$after" | jq '{
+  state, received_total, inserted_total, dropped_total,
+  queue_depth, queue_capacity, queue_bytes, queue_bytes_capacity
+}'
+
+delta=$((dropped_after - dropped_before))
+echo "dropped delta: $delta"
 
 sys=$(curl -sf "${AUTH_HEADER[@]}" "$BASE/api/system/stats" || echo '{}')
 echo "$sys" | jq '.alerts // [] | map(select(.code|test("ingest_drop|ingest_queue")))'
 
-echo "OK: soak finished. For forced TCP queue drops set INGEST_QUEUE_SIZE low and flood :514."
-echo "    Unit coverage: go test ./internal/ingest/ -run EnqueueFlood"
+if (( delta > 0 )); then
+  echo "OK: soak saw drops (queue pressure confirmed)."
+else
+  echo "WARN: no new drops — queue absorbed the flood (raise SOAK_LINES or lower INGEST_QUEUE_*)."
+fi
+echo "    For forced TCP queue drops set INGEST_QUEUE_SIZE / INGEST_QUEUE_MAX_BYTES low and flood :514."
+echo "    Unit coverage: go test ./internal/ingest/ -run 'EnqueueFlood|ByteBudget|Concurrent'"

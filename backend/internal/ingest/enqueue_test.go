@@ -3,15 +3,16 @@ package ingest
 import (
 	"context"
 	"net"
+	"sync"
 	"testing"
 	"time"
 )
 
 func TestEnqueueDropsWhenQueueFull(t *testing.T) {
 	svc := &Service{
-		cfg:    Config{ConnIdleTimeout: time.Second},
-		lineCh: make(chan ingestedLine, 1),
-		stats:  newStats(),
+		cfg:     Config{ConnIdleTimeout: time.Second},
+		lineCh:  make(chan ingestedLine, 1),
+		stats:   newStats(),
 		connSem: make(chan struct{}, 1),
 	}
 	svc.lineCh <- ingestedLine{line: "already-buffered", transport: "tcp"}
@@ -194,5 +195,74 @@ func TestEnqueueDropsOversizedLine(t *testing.T) {
 	}
 	if len(svc.lineCh) != 0 || svc.queueBytes.Load() != 0 {
 		t.Fatal("oversized drop must not reserve bytes or occupy queue")
+	}
+}
+
+func TestEnqueueConcurrentByteBudget(t *testing.T) {
+	const (
+		workers   = 8
+		perWorker = 5000
+		line      = "src=10.0.0.1 dst=8.8.8.8 action=allow" // 35 bytes
+		budget    = 35 * 200                                // ~200 lines worth
+	)
+	svc := &Service{
+		cfg:    Config{QueueMaxBytes: budget},
+		lineCh: make(chan ingestedLine, 10000), // depth >> byte budget
+		stats:  newStats(),
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(workers)
+	for w := 0; w < workers; w++ {
+		go func() {
+			defer wg.Done()
+			for i := 0; i < perWorker; i++ {
+				_ = svc.TryEnqueue(line, "tcp")
+			}
+		}()
+	}
+	wg.Wait()
+
+	snap := svc.Stats()
+	if snap.QueueBytes > int64(budget) {
+		t.Fatalf("queue_bytes=%d exceeds budget=%d", snap.QueueBytes, budget)
+	}
+	if snap.DroppedTotal < 1 {
+		t.Fatal("expected concurrent flood to drop on byte budget")
+	}
+	// Depth can be at most budget/len(line); allow +1 race slack none — exact cap.
+	maxDepth := budget / len(line)
+	if snap.QueueDepth > int64(maxDepth) {
+		t.Fatalf("queue_depth=%d want <= %d under byte budget", snap.QueueDepth, maxDepth)
+	}
+	t.Logf("concurrent soak: depth=%d bytes=%d/%d dropped=%d",
+		snap.QueueDepth, snap.QueueBytes, snap.QueueBytesCapacity, snap.DroppedTotal)
+}
+
+func BenchmarkTryEnqueueByteBudget(b *testing.B) {
+	svc := &Service{
+		cfg:    Config{QueueMaxBytes: 1 << 20}, // 1 MiB
+		lineCh: make(chan ingestedLine, 100000),
+		stats:  newStats(),
+	}
+	line := "src=10.0.0.1 dst=8.8.8.8 action=allow proto=tcp sport=1 dport=443"
+	// Drain in background so enqueue doesn't always hit depth first.
+	done := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case item := <-svc.lineCh:
+				svc.releaseQueueBytes(item.line)
+			}
+		}
+	}()
+	b.Cleanup(func() { close(done) })
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = svc.TryEnqueue(line, "tcp")
 	}
 }
