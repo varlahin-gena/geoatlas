@@ -16,7 +16,10 @@
 })();
 </script>
 
+<link rel="stylesheet" href="/vendor/maplibre-gl.css" />
+<script src="/vendor/maplibre-gl.js"></script>
 <script src="/vendor/deck.gl.min.js"></script>
+<script src="/vendor/deck.gl-mapbox.min.js"></script>
 <link rel="stylesheet" href="/theme.css" />
 <link rel="stylesheet" href="/common.css" />
 <link rel="stylesheet" href="/index.css" />
@@ -154,6 +157,20 @@
         </div>
 
         <div class="sidebar-section collapse-hide">
+            <div class="sidebar-section-title">Раскладка дуг</div>
+            <div class="mode-switch" id="arcLayoutSwitch">
+                <button type="button" id="arcLayout-hub" class="active" title="Только связи через top-K хабов">Hub–spoke</button>
+                <button type="button" id="arcLayout-mesh" title="Все связи (mesh)">Все связи</button>
+            </div>
+            <div id="hubCountWrap" style="margin-top:8px;">
+                <input type="range" id="hubCount" class="side-range" min="3" max="30" step="1" value="8" />
+                <div class="side-range-label">
+                    <span>хабов: <b id="hubCountVal">8</b></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar-section collapse-hide">
             <div class="sidebar-section-title">Отображение</div>
             <label class="side-toggle">
                 <input type="checkbox" id="toggleLegendChk" checked />
@@ -166,6 +183,10 @@
             <label class="side-toggle" title="Работает только при группировке «Страна»">
                 <input type="checkbox" id="toggleHeatmapChk" checked />
                 <span>Heatmap стран</span>
+            </label>
+            <label class="side-toggle" title="Плотность узлов (hex). На глобусе отключена">
+                <input type="checkbox" id="toggleDensityChk" checked />
+                <span>Плотность (hex)</span>
             </label>
             <label class="side-toggle">
                 <input type="checkbox" id="toggleCountryLabelsChk" checked />
@@ -274,7 +295,6 @@
 
         <div class="viz-area">
             <div id="map-host" class="viz-host"></div>
-            <div id="globe-host" class="viz-host hidden"></div>
 
             <div class="viz-hint warn" id="arcsTruncHint" style="display:none;"></div>
             <div class="viz-overlay" id="vizOverlay">
@@ -297,6 +317,9 @@
                 </div>
                 <div id="legendMono" class="legend-row" style="display:none;">
                     <span class="legend-line" style="background: var(--accent);"></span> Связь
+                </div>
+                <div class="legend-row" id="legendHubRow" style="margin-top:4px;">
+                    <span class="legend-dot" style="background: var(--purple);"></span> Хаб (top-K связей)
                 </div>
                 <div class="legend-row" style="margin-top:6px;color:var(--text-muted);font-size:11px">Толщина линии / размер точки — кол-во событий</div>
             </div>

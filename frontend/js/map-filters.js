@@ -58,12 +58,8 @@ async function fetchData(opts) {
         updateMapOverlay();
         NMUI.fetchSystemHealth();
 
-        if (viewMode === 'map') {
-            updateDeck();
-            if (autoFitPending) { fitDeckToData(); autoFitPending = false; }
-        } else {
-            updateGlobe();
-        }
+        refreshMapLayers();
+        if (autoFitPending) { fitDeckToData(); autoFitPending = false; }
     } catch (err) {
         if (gen !== dataFetchGen) return;
         console.error(err);
@@ -111,9 +107,7 @@ function setFilter(f) {
     currentFilter = f;
     applyFilterUI();
     saveUIState();
-    // Локальная фильтрация без запроса в backend
-    if (viewMode === 'map') updateDeck();
-    else updateGlobe();
+    refreshMapLayers();
     updateMapOverlay();
 }
 
@@ -122,8 +116,7 @@ function onMinCountChange() {
     minCount = parseInt(el.value, 10) || 1;
     document.getElementById('minCountVal').textContent = minCount;
     saveUIState();
-    if (viewMode === 'map') updateDeck();
-    else updateGlobe();
+    refreshMapLayers();
     updateMapOverlay();
 }
 
@@ -132,8 +125,7 @@ function onMaxArcsChange() {
     maxArcs = parseInt(el.value, 10) || MAX_ARCS_DEFAULT;
     document.getElementById('maxArcsVal').textContent = fmtNumber(maxArcs);
     saveUIState();
-    if (viewMode === 'map') updateDeck();
-    else updateGlobe();
+    refreshMapLayers();
     updateMapOverlay();
 }
 
@@ -145,6 +137,10 @@ function resetView() {
     currentSearch = '';
     minCount = 1;
     maxArcs = MAX_ARCS_DEFAULT;
+    arcLayout = 'hub';
+    hubCount = HUB_COUNT_DEFAULT;
+    showDensity = true;
+    focusedCountry = null;
     document.getElementById('searchInput').value = '';
     document.getElementById('groupBy').value = 'city';
     document.getElementById('periodPreset').value = '1d';
@@ -158,7 +154,6 @@ function resetView() {
     document.getElementById('maxArcs').value = MAX_ARCS_DEFAULT;
     document.getElementById('maxArcsVal').textContent = fmtNumber(MAX_ARCS_DEFAULT);
     if (typeof clearReputationFilters === 'function') {
-        // clearReputationFilters already redraws; avoid double refresh below by only clearing state here
         repFilterCategories.clear();
         repFilterLists.clear();
         repFilterSide = 'any';
@@ -167,13 +162,18 @@ function resetView() {
         if (typeof updateReputationMenuUI === 'function') updateReputationMenuUI();
     }
     applyFilterUI();
+    syncArcLayoutUI();
     mapViewState = { longitude: 37.6, latitude: 55.7, zoom: 2.5, pitch: 0, bearing: 0 };
-    globeViewState = { longitude: 30, latitude: 30, zoom: 0.85, pitch: 0, bearing: 0 };
-    if (viewMode === 'map' && deckInstance) {
-        deckInstance.setProps({ initialViewState: mapViewState, viewState: mapViewState });
-    } else if (viewMode === 'globe' && deckInstance) {
-        deckInstance.setProps({ initialViewState: globeViewState, viewState: globeViewState });
-        startGlobeAutoRotate();
+    globeViewState = { longitude: 30, latitude: 30, zoom: 1.2, pitch: 0, bearing: 0 };
+    if (maplibreMap) {
+        const vs = viewMode === 'globe' ? globeViewState : mapViewState;
+        maplibreMap.jumpTo({
+            center: [vs.longitude, vs.latitude],
+            zoom: vs.zoom,
+            bearing: vs.bearing || 0,
+            pitch: vs.pitch || 0,
+        });
+        if (viewMode === 'globe' && autoRotate) startGlobeAutoRotate();
     }
     saveUIState();
     refreshMap();
@@ -190,14 +190,12 @@ function onToggleStats() {
 function onToggleHeatmap() {
     showHeatmap = document.getElementById('toggleHeatmapChk').checked;
     saveUIState();
-    if (viewMode === 'map') updateDeck();
-    else updateGlobe();
+    refreshMapLayers();
 }
 function onToggleCountryLabels() {
     showCountryLabels = document.getElementById('toggleCountryLabelsChk').checked;
     saveUIState();
-    if (viewMode === 'map') updateDeck();
-    else updateGlobe();
+    refreshMapLayers();
 }
 function syncLegendMode() {
     const byStatus = document.getElementById('legendByStatus');
@@ -212,6 +210,5 @@ function onToggleMonoArcs() {
     monoArcColor = document.getElementById('toggleMonoArcsChk').checked;
     syncLegendMode();
     saveUIState();
-    if (viewMode === 'map') updateDeck();
-    else updateGlobe();
+    refreshMapLayers();
 }

@@ -333,6 +333,9 @@ func (stubTraffic) ScanRawAggsForTimeRange(context.Context, model.TimeRange, int
 func (stubTraffic) ScanGeoEdgesForTimeRange(context.Context, model.TimeRange, string, int, string, time.Duration) ([]model.GeoEdgeAgg, bool, error) {
 	return nil, false, nil
 }
+func (stubTraffic) ScanCountrySeries(context.Context, model.TimeRange, string, time.Duration) ([]usecaseevents.SeriesPoint, int, error) {
+	return nil, 3600, nil
+}
 
 type stubMissing struct{}
 

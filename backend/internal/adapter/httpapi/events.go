@@ -196,3 +196,53 @@ func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, resp)
 }
+
+func (h *EventsHandler) GetEventsSeries(w http.ResponseWriter, r *http.Request) {
+	if h.eventsUC == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "events service unavailable"})
+		return
+	}
+	q := r.URL.Query()
+	country := strings.TrimSpace(q.Get("country"))
+	if country == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "country is required"})
+		return
+	}
+	tr, err := parseEventTimeRange(q)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid time range"})
+		return
+	}
+	result, err := h.eventsUC.GetSeries(r.Context(), usecaseevents.GetSeriesInput{
+		TimeRange: model.TimeRange{Mode: tr.Mode, Amount: tr.Amount, From: tr.From, To: tr.To},
+		Country:   country,
+		Timeout:   h.cfg.QueryTimeout,
+	})
+	if err != nil {
+		writeInternalError(w, "events: get series failed", err)
+		return
+	}
+	points := make([]map[string]any, 0, len(result.Points))
+	for _, p := range result.Points {
+		points = append(points, map[string]any{
+			"t":       p.T.UTC().Format(time.RFC3339),
+			"allowed": p.Allowed,
+			"blocked": p.Blocked,
+			"total":   p.Total,
+		})
+	}
+	resp := map[string]any{
+		"country":    result.Country,
+		"bucket_sec": result.BucketSec,
+		"period":     result.Period,
+		"points":     points,
+	}
+	switch result.Period {
+	case "absolute":
+		resp["from"] = result.From.Format(time.RFC3339)
+		resp["to"] = result.To.Format(time.RFC3339)
+	case "minutes", "hours", "days":
+		resp[result.Period] = result.Amount
+	}
+	writeJSON(w, http.StatusOK, resp)
+}

@@ -14,24 +14,30 @@ function bindUI() {
     $('btnResetView')?.addEventListener('click', () => resetView());
     $('btnExportPng')?.addEventListener('click', () => exportPNG());
     $('btnToggleSidebar')?.addEventListener('click', () => toggleSidebar());
-    $('btnCloseDetail')?.addEventListener('click', () => closeDetail());
+    $('btnCloseDetail')?.addEventListener('click', () => {
+        clearFocusedCountry();
+        closeDetail();
+    });
     $('btnPeriodApply')?.addEventListener('click', () => applyCustomPeriod());
 
     $('minCount')?.addEventListener('input', () => onMinCountChange());
     $('maxArcs')?.addEventListener('input', () => onMaxArcsChange());
+    $('hubCount')?.addEventListener('input', () => onHubCountChange());
+    $('arcLayout-hub')?.addEventListener('click', () => setArcLayout('hub'));
+    $('arcLayout-mesh')?.addEventListener('click', () => setArcLayout('mesh'));
 
     $('toggleLegendChk')?.addEventListener('change', () => onToggleLegend());
     $('toggleStatsChk')?.addEventListener('change', () => onToggleStats());
     $('toggleHeatmapChk')?.addEventListener('change', () => onToggleHeatmap());
     $('toggleCountryLabelsChk')?.addEventListener('change', () => onToggleCountryLabels());
     $('toggleMonoArcsChk')?.addEventListener('change', () => onToggleMonoArcs());
+    $('toggleDensityChk')?.addEventListener('change', () => onToggleDensity());
 
     $('groupBy')?.addEventListener('change', () => {
         saveUIState();
         refreshMap();
     });
     $('periodPreset')?.addEventListener('change', () => onPeriodPresetChange());
-    // Повторный клик по уже выбранному «свой диапазон» снова открывает редактор
     $('periodPreset')?.addEventListener('mousedown', function () {
         this.dataset.periodPrev = this.value;
     });
@@ -61,8 +67,7 @@ function bindUI() {
         searchDebounceTimer = setTimeout(() => {
             currentSearch = normalizeText(val);
             saveUIState();
-            if (viewMode === 'map') updateDeck();
-            else updateGlobe();
+            refreshMapLayers();
             updateMapOverlay();
         }, SEARCH_DEBOUNCE_MS);
     });
@@ -74,9 +79,11 @@ function bindUI() {
         }
     });
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') closeDetail();
+        if (e.key === 'Escape') {
+            clearFocusedCountry();
+            closeDetail();
+        }
     });
-    // ????? ????-???????? ???????, ????? ??????? ?? ???????
     document.addEventListener('visibilitychange', () => {
         if (viewMode !== 'globe') return;
         if (document.hidden) stopGlobeAutoRotate();
@@ -95,9 +102,11 @@ async function init() {
     loadUIState();
     applyViewFromURL();
     applyFilterUI();
+    syncArcLayoutUI();
     document.getElementById('toggleHeatmapChk').checked = showHeatmap;
     document.getElementById('toggleCountryLabelsChk').checked = showCountryLabels;
     document.getElementById('toggleMonoArcsChk').checked = monoArcColor;
+    document.getElementById('toggleDensityChk').checked = showDensity;
     document.getElementById('autoRotate').checked = autoRotate;
     syncLegendMode();
 
@@ -111,26 +120,7 @@ async function init() {
     syncViewToURL();
 
     await loadCountries();
-
-    if (viewMode === 'map') {
-        document.getElementById('globe-host').classList.add('hidden');
-        initDeck();
-    } else {
-        document.getElementById('map-host').classList.add('hidden');
-        initGlobe();
-        if (!deckInstance) {
-            viewMode = 'map';
-            document.getElementById('mode-map').classList.add('active');
-            document.getElementById('mode-globe').classList.remove('active');
-            document.getElementById('mode-map-icon').classList.add('active');
-            document.getElementById('mode-globe-icon').classList.remove('active');
-            document.getElementById('autoRotateWrap').style.display = 'none';
-            document.getElementById('map-host').classList.remove('hidden');
-            document.getElementById('globe-host').classList.add('hidden');
-            initDeck();
-            saveUIState();
-        }
-    }
+    initMapView();
 
     await fetchData();
     NMUI.startSystemHealthPolling({ isAdmin: nmIsAdmin });

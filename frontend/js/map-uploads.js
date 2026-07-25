@@ -52,12 +52,29 @@ async function uploadGeo() {
 
 async function exportPNG() {
     try {
-        if (!deckInstance) throw new Error('View not initialized');
-        deckInstance.redraw(true);
+        if (!maplibreMap) throw new Error('View not initialized');
+        // Composite MapLibre basemap + deck overlay canvases
         await new Promise(r => requestAnimationFrame(() => r()));
-        const canvas = deckInstance.getCanvas();
-        if (!canvas) throw new Error('Canvas not found');
-        const dataURL = canvas.toDataURL('image/png');
+        const mapCanvas = maplibreMap.getCanvas();
+        let deckCanvas = null;
+        if (deckOverlay && typeof deckOverlay.getCanvas === 'function') {
+            deckCanvas = deckOverlay.getCanvas();
+        }
+        if (!mapCanvas) throw new Error('Canvas not found');
+
+        const w = mapCanvas.width;
+        const h = mapCanvas.height;
+        const out = document.createElement('canvas');
+        out.width = w;
+        out.height = h;
+        const ctx = out.getContext('2d');
+        ctx.fillStyle = mapBaseCss();
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(mapCanvas, 0, 0);
+        if (deckCanvas && deckCanvas.width && deckCanvas.height) {
+            ctx.drawImage(deckCanvas, 0, 0, w, h);
+        }
+        const dataURL = out.toDataURL('image/png');
         const a = document.createElement('a');
         a.href = dataURL;
         a.download = `geoatlas-${viewMode}-${new Date().toISOString().replace(/[:.]/g, '-')}.png`;

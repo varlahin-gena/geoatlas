@@ -59,8 +59,7 @@ function applySearchFilter(value) {
     const input = document.getElementById('searchInput');
     input.value = value;
     currentSearch = normalizeText(value);
-    if (viewMode === 'map') updateDeck();
-    else updateGlobe();
+    refreshMapLayers();
     updateMapOverlay();
 }
 
@@ -309,4 +308,157 @@ function showPointDetail(point, key) {
     }
 
     openDetail(point.label || key, sections, actions);
+}
+
+function renderSparklineSVG(points) {
+    if (!points || !points.length) {
+        return '<div class="detail-sparkline"><div style="color:var(--text-muted);font-size:11px">Нет данных ряда</div></div>';
+    }
+    const w = 280, h = 48, pad = 2;
+    let max = 1;
+    points.forEach(p => {
+        const t = (p.allowed || 0) + (p.blocked || 0) || (p.total || 0);
+        if (t > max) max = t;
+    });
+    const n = points.length;
+    const step = n <= 1 ? w : (w - pad * 2) / (n - 1);
+    function poly(key, color) {
+        const coords = points.map((p, i) => {
+            const v = p[key] || 0;
+            const x = pad + i * step;
+            const y = h - pad - (v / max) * (h - pad * 2);
+            return x.toFixed(1) + ',' + y.toFixed(1);
+        }).join(' ');
+        return `<polyline fill="none" stroke="${color}" stroke-width="1.5" points="${coords}" />`;
+    }
+    return `<div class="detail-sparkline">
+      <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+        ${poly('allowed', 'var(--green, #3fb950)')}
+        ${poly('blocked', 'var(--red, #f85149)')}
+      </svg>
+      <div class="detail-sparkline-legend">
+        <span><i style="background:var(--green)"></i>Allowed</span>
+        <span><i style="background:var(--red)"></i>Blocked</span>
+      </div>
+    </div>`;
+}
+
+async function fetchCountrySeries(country) {
+    const periodQuery = buildPeriodQuery();
+    const url = `${API_BASE}/api/events/series?country=${encodeURIComponent(country)}${periodQuery}`;
+    const res = await fetch(url, { cache: 'no-store', credentials: 'same-origin' });
+    if (res.status === 401) {
+        location.replace(NMAuth.loginUrl(location.pathname));
+        return null;
+    }
+    if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+    return res.json();
+}
+
+function linesForCountry(country) {
+    const target = String(country || '').toLowerCase();
+    const aliases = new Set([target]);
+    Object.entries(countryNamesRu).forEach(([en, ru]) => {
+        if (en.toLowerCase() === target || String(ru).toLowerCase() === target) {
+            aliases.add(en.toLowerCase());
+            aliases.add(String(ru).toLowerCase());
+        }
+    });
+    return getVisibleLines().filter(l => {
+        const src = String(l.src_country || '').toLowerCase();
+        const dst = String(l.dst_country || '').toLowerCase();
+        if (aliases.has(src) || aliases.has(dst)) return true;
+        const sp = allPoints[l.src], dp = allPoints[l.dst];
+        if (sp && aliases.has(String(sp.country || '').toLowerCase())) return true;
+        if (dp && aliases.has(String(dp.country || '').toLowerCase())) return true;
+        return false;
+    }).sort((a, b) => (b.count || 0) - (a.count || 0));
+}
+
+async function showCountryDetail(countryKey, feature) {
+    if (!countryKey) return;
+    focusedCountry = countryKey;
+    _statsCacheVersion++;
+    refreshMapLayers();
+
+    const { stats } = getStatsCache();
+    const events = stats[countryKey] || 0;
+    const topLines = linesForCountry(countryKey).slice(0, 20);
+    const colorByStatus = { allowed: 'green', blocked: 'red', unknown: '' };
+
+    const sections = [
+        { title: 'Страна', rows: [
+            { key: 'Название', value: ruCountry(countryKey) },
+            { key: 'Ключ', value: countryKey },
+            { key: 'События (узлы)', value: fmtNumber(events) },
+            { key: 'Связей на карте', value: fmtNumber(topLines.length) },
+        ]},
+    ];
+    if (topLines.length) {
+        sections.push({
+            title: 'Топ связей · ' + topLines.length,
+            rows: topLines.map(function (line) {
+                return {
+                    key: line.status || '—',
+                    value: (line.src_label || line.src) + ' → ' + (line.dst_label || line.dst)
+                        + ' (' + fmtNumber(line.count) + ')',
+                    color: colorByStatus[line.status] || '',
+                    hint: 'Открыть связь',
+                    onClick: function () { showLineDetail(line); },
+                };
+            }),
+        });
+    }
+
+    const actions = [
+        { label: 'Сбросить фокус', onClick: function () { clearFocusedCountry(); closeDetail(); } },
+        { label: 'Искать страну', onClick: function () { applySearchFilter(ruCountry(countryKey)); } },
+    ];
+    openDetail(ruCountry(countryKey), sections, actions);
+
+    // Sparkline async append
+    const body = document.getElementById('detailBody');
+    const sparkHost = document.createElement('div');
+    sparkHost.innerHTML = '<div class="detail-sparkline"><div style="color:var(--text-muted);font-size:11px">Загрузка ряда…</div></div>';
+    body.insertBefore(sparkHost, body.firstChild);
+    try {
+        const data = await fetchCountrySeries(countryKey);
+        if (!data) return;
+        // If user clicked another country meanwhile
+        if (focusedCountry !== countryKey) return;
+        sparkHost.innerHTML = renderSparklineSVG(data.points || []);
+        const title = document.createElement('div');
+        title.className = 'detail-section-title';
+        title.textContent = 'Динамика (bucket ' + (data.bucket_sec || '?') + 's)';
+        sparkHost.insertBefore(title, sparkHost.firstChild);
+    } catch (e) {
+        sparkHost.innerHTML = '<div class="detail-sparkline"><div style="color:var(--red);font-size:11px">Ряд недоступен: '
+            + escapeHTML(e.message || e) + '</div></div>';
+    }
+}
+
+function showHexDetail(hexObj) {
+    const pts = hexObj.points || [];
+    const list = Array.isArray(pts) ? pts : [];
+    let sum = 0;
+    list.forEach(p => { sum += (p.count || 0); });
+    const top = [...list].sort((a, b) => (b.count || 0) - (a.count || 0)).slice(0, 25);
+    const sections = [
+        { title: 'Ячейка плотности', rows: [
+            { key: 'Узлов', value: fmtNumber(list.length) },
+            { key: 'Событий', value: fmtNumber(sum || hexObj.colorValue || hexObj.elevationValue || 0) },
+        ]},
+    ];
+    if (top.length) {
+        sections.push({
+            title: 'Топ узлов',
+            rows: top.map(p => ({
+                key: p.label || p.key,
+                value: fmtNumber(p.count) + (p.country ? ' · ' + ruCountry(p.country) : ''),
+                hint: 'Открыть узел',
+                onClick: function () { showPointDetail(p, p.key); },
+            })),
+        });
+    }
+    openDetail('Плотность', sections, []);
 }

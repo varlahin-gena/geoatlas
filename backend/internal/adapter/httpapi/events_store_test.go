@@ -36,6 +36,10 @@ func (s *stubTraffic) ScanGeoEdgesForTimeRange(ctx context.Context, tr model.Tim
 	}}, true, nil
 }
 
+func (s *stubTraffic) ScanCountrySeries(ctx context.Context, tr model.TimeRange, country string, timeout time.Duration) ([]usecaseevents.SeriesPoint, int, error) {
+	return nil, 3600, nil
+}
+
 func TestGetEventsUsesTrafficStoreForHoursGeo(t *testing.T) {
 	stub := &stubTraffic{}
 	h := &EventsHandler{Deps: &Deps{

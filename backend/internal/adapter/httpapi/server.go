@@ -137,6 +137,9 @@ func NewServer(
 	r.Handle("/api/events",
 		withTimeout(chain(http.HandlerFunc(events.GetEvents), loginMW), readTimeout),
 	).Methods("GET")
+	r.Handle("/api/events/series",
+		withTimeout(chain(http.HandlerFunc(events.GetEventsSeries), loginMW), readTimeout),
+	).Methods("GET")
 	r.Handle("/api/system/status",
 		withTimeout(chain(http.HandlerFunc(system.GetSystemStatus), loginMW), readTimeout),
 	).Methods("GET")

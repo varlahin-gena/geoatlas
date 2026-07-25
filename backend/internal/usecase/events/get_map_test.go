@@ -22,6 +22,10 @@ func (s *stubRepo) ScanGeoEdgesForTimeRange(ctx context.Context, tr model.TimeRa
 	return s.geoRows, s.geoOK, nil
 }
 
+func (s *stubRepo) ScanCountrySeries(ctx context.Context, tr model.TimeRange, country string, timeout time.Duration) ([]SeriesPoint, int, error) {
+	return nil, 3600, nil
+}
+
 type stubGeo map[string]model.GeoLookup
 
 func (s stubGeo) Lookup(ipStr string) model.GeoLookup {

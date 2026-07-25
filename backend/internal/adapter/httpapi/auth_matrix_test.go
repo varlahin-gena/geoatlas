@@ -32,6 +32,7 @@ func expectedAuthMatrix() map[string]authTier {
 		"GET /api/auth/check-admin":                 tierPublic,
 		"GET /api/auth/check-ops":                   tierPublic,
 		"GET /api/events":                           tierLogin,
+		"GET /api/events/series":                    tierLogin,
 		"GET /api/system/status":                    tierLogin,
 		"GET /api/geo-missing":                      tierAdmin,
 		"GET /api/geo-ranges/export":                tierOps,

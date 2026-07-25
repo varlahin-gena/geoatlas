@@ -13,15 +13,14 @@ function arcRGB(status, line) {
     if (monoArcColor) return monoArcRGB();
     if (typeof repColorArcs !== 'undefined' && repColorArcs &&
         line && typeof lineHasReputationHits === 'function' && lineHasReputationHits(line)) {
-        return [210, 153, 34]; // orange — репутационный хит
+        return [210, 153, 34];
     }
     return statusRGB(status);
 }
 
-// Приглушённая палитра: страны без трафика = цвет суши, гамма мягче,
-// чтобы мелкие значения не заливали полкарты.
+// Приглушённая палитра: страны без трафика = цвет суши, гамма мягче.
 function heatmapColorRGB(value, max) {
-    if (!max || value <= 0) return cssRgb('--map-land-rgb', 255);   // цвет суши
+    if (!max || value <= 0) return cssRgb('--map-land-rgb', mapTilesFailed ? 255 : 0);
     const t = Math.pow(value / max, 0.7);
     const stops = [
         { p: 0.0, c: [40, 60, 90]   },
@@ -56,6 +55,15 @@ function matchCountryFeature(feature, country) {
     return ruToEn.some(en => candidates.includes(en));
 }
 
+function resolveCountryKeyFromFeature(feature) {
+    if (!feature) return '';
+    const stats = getStatsCache().stats || {};
+    for (const country of Object.keys(stats)) {
+        if (matchCountryFeature(feature, country)) return country;
+    }
+    return featureCountryName(feature);
+}
+
 function buildCountryStats() {
     const stats = {};
     getVisiblePoints().forEach(p => {
@@ -83,7 +91,7 @@ function precomputeFeatureHeat(features, stats) {
 }
 
 function statsSignature() {
-    return `${_statsCacheVersion}|${currentGroupBy()}|${currentFilter}|${currentSearch}|${minCount}`;
+    return `${_statsCacheVersion}|${currentGroupBy()}|${currentFilter}|${currentSearch}|${minCount}|${focusedCountry || ''}`;
 }
 
 function getStatsCache() {
@@ -158,17 +166,14 @@ function buildCountryCentroids() {
     return result;
 }
 
-/** Подпись на лицевой полусфере глобуса относительно центра камеры. */
 function isOnVisibleGlobeHemisphere(lon, lat, viewLon, viewLat) {
     const toRad = Math.PI / 180;
     const φ1 = (viewLat || 0) * toRad;
     const λ1 = (viewLon || 0) * toRad;
     const φ2 = lat * toRad;
     const λ2 = lon * toRad;
-    // cos(углового расстояния); > 0 — передняя полусфера
     const cosC = Math.sin(φ1) * Math.sin(φ2)
         + Math.cos(φ1) * Math.cos(φ2) * Math.cos(λ2 - λ1);
-    // небольшой запас, чтобы не показывать подписи у самого лимба
     return cosC > 0.12;
 }
 
@@ -181,15 +186,14 @@ function visibleGlobeCentroids() {
 
 let lastGlobeLabelCullKey = '';
 
-/** Обновить слой подписей при повороте камеры (не каждый кадр). */
 function maybeRefreshGlobeLabels(force) {
-    if (!deckInstance || viewMode !== 'globe' || !showCountryLabels) return;
+    if (viewMode !== 'globe' || !showCountryLabels) return;
     const lon = Math.round((globeViewState.longitude || 0) * 2) / 2;
     const lat = Math.round((globeViewState.latitude || 0) * 2) / 2;
     const key = lon + ':' + lat;
     if (!force && key === lastGlobeLabelCullKey) return;
     lastGlobeLabelCullKey = key;
-    deckInstance.setProps({ layers: buildDeckLayers('globe') });
+    refreshMapLayers();
 }
 
 function lineMatchesSearch(line, pointMap) {
@@ -213,6 +217,23 @@ function pointMatchesSearch(key, point) {
         .some(v => normalizeText(v).includes(currentSearch));
 }
 
+function lineMatchesFocusedCountry(line) {
+    if (!focusedCountry) return true;
+    const target = String(focusedCountry).toLowerCase();
+    const src = String(line.src_country || '').toLowerCase();
+    const dst = String(line.dst_country || '').toLowerCase();
+    if (src === target || dst === target) return true;
+    const ru = Object.entries(countryNamesRu)
+        .filter(([en]) => en.toLowerCase() === target)
+        .map(([, ruName]) => ruName.toLowerCase());
+    if (ru.some(r => src === r || dst === r)) return true;
+    // Also match via point countries
+    const sp = allPoints[line.src], dp = allPoints[line.dst];
+    if (sp && String(sp.country || '').toLowerCase() === target) return true;
+    if (dp && String(dp.country || '').toLowerCase() === target) return true;
+    return false;
+}
+
 function getVisibleLines() {
     const ipMode = typeof currentGroupBy === 'function' && currentGroupBy() === 'ip';
     const repActive = ipMode && typeof reputationFilterActiveCount === 'function' && reputationFilterActiveCount() > 0;
@@ -220,9 +241,9 @@ function getVisibleLines() {
         if (currentFilter === 'allowed' && line.status !== 'allowed') return false;
         if (currentFilter === 'blocked' && line.status !== 'blocked') return false;
         if ((line.count || 0) < minCount) return false;
-        // Self-loop (оба конца схлопнулись в один ключ) — дуга нулевой длины, не рисуем.
         if (line.src && line.src === line.dst) return false;
         if (!lineMatchesSearch(line, allPoints)) return false;
+        if (!lineMatchesFocusedCountry(line)) return false;
         if (repActive && typeof lineMatchesReputation === 'function' && !lineMatchesReputation(line)) return false;
         return hasCoords(line);
     });
@@ -236,9 +257,6 @@ function getVisiblePoints(visibleLines) {
     const result = [];
     Object.entries(allPoints).forEach(([key, p]) => {
         if (!p) return;
-        // Только концы отрисованных дуг. Раньше при поиске добавляли ещё и
-        // совпавшие узлы вне top-N — получались «осиротевшие» маркеры
-        // (например центр Канады) без дуги из этой точки.
         if (fromDrawnArcs) {
             if (!active.has(key)) return;
         } else {
@@ -251,83 +269,148 @@ function getVisiblePoints(visibleLines) {
     return result;
 }
 
-// ============================================================
-// Map (deck.gl)
-// ============================================================
+/** Top-K узлов по числу инцидентных рёбер. */
+function computeHubKeys(lines, k) {
+    const degree = new Map();
+    lines.forEach(l => {
+        if (!l.src || !l.dst || l.src === l.dst) return;
+        degree.set(l.src, (degree.get(l.src) || 0) + 1);
+        degree.set(l.dst, (degree.get(l.dst) || 0) + 1);
+    });
+    return new Set(
+        [...degree.entries()]
+            .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])))
+            .slice(0, Math.max(1, k || HUB_COUNT_DEFAULT))
+            .map(([key]) => key)
+    );
+}
 
-// Детерминированный «разброс» дуги по паре узлов —
-// чтобы параллельные линии между одними регионами не сливались в пучок.
+function filterHubSpokeLines(lines, hubs) {
+    if (!hubs || !hubs.size) return lines;
+    return lines.filter(l => hubs.has(l.src) || hubs.has(l.dst));
+}
+
+/** Rank-based alpha + corridor tilt for country pairs. */
+function decorateFlowLines(lines) {
+    if (!lines.length) return lines;
+    const sorted = [...lines].sort((a, b) => (b.count || 0) - (a.count || 0));
+    const n = sorted.length;
+    const corridorTilt = new Map();
+    return sorted.map((line, idx) => {
+        const rankT = n <= 1 ? 1 : 1 - idx / (n - 1);
+        const alpha = Math.round(60 + rankT * 150);
+        const pairKey = [
+            String(line.src_country || ''),
+            String(line.dst_country || ''),
+        ].sort().join('>');
+        let tilt = corridorTilt.get(pairKey);
+        if (tilt === undefined) {
+            let h = 0;
+            for (let i = 0; i < pairKey.length; i++) h = (h * 31 + pairKey.charCodeAt(i)) | 0;
+            tilt = ((h % 7) - 3) * 2;
+            corridorTilt.set(pairKey, tilt);
+        }
+        return Object.assign({}, line, { _flowAlpha: alpha, _flowTilt: tilt, _flowRank: idx });
+    });
+}
+
 function arcTilt(d) {
+    if (typeof d._flowTilt === 'number') return d._flowTilt;
     let h = 0;
     const s = (d.src || '') + '>' + (d.dst || '');
     for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-    return ((h % 7) - 3) * 2; // -6..+6 градусов (было -15..+15)
+    return ((h % 7) - 3) * 2;
 }
 
-// Непрозрачная подложка сферы — официальный способ для GlobeView (без BitmapLayer)
-const GLOBE_SURFACE = [
-    [[-180, 90], [0, 90], [180, 90], [180, -90], [0, -90], [-180, -90]],
-];
-
-function buildGlobeBaseLayer() {
-    if (!deck.SolidPolygonLayer) return null;
-    return new deck.SolidPolygonLayer({
-        id: 'globe-base',
-        data: GLOBE_SURFACE,
-        getPolygon: d => d,
-        stroked: false,
-        filled: true,
-        pickable: false,
-        getFillColor: cssRgb('--map-base-rgb', 255),
-    });
+function densityLayerActive(isGlobe) {
+    if (isGlobe) return false;
+    if (!showDensity) return false;
+    if (currentGroupBy() === 'country') return false;
+    return currentMapZoom < DENSITY_ZOOM_THRESHOLD;
 }
 
 function buildDeckLayers(mode = 'map') {
     const isGlobe = mode === 'globe';
     let lines = getVisibleLines();
-    const totalLines = lines.length;
+    const totalBeforeLayout = lines.length;
     lines = topByCount(lines, maxArcs);
-    const points = getVisiblePoints(lines);
-    updateArcCountInfo(lines.length, totalLines);
-    const layers = [];
-    const landColor = cssRgb('--map-land-rgb', 255);
-    const outlineColor = cssRgb('--map-outline-rgb', 255);
-    const outlineSoft = cssRgb('--map-outline-rgb', 160);
 
-    if (isGlobe) {
-        const base = buildGlobeBaseLayer();
-        if (base) layers.push(base);
+    currentHubKeys = computeHubKeys(lines, hubCount);
+    if (arcLayout === 'hub') {
+        lines = filterHubSpokeLines(lines, currentHubKeys);
     }
+    lines = decorateFlowLines(lines);
 
-    if (countriesGeoJSON) {
+    const points = getVisiblePoints(lines).map(p =>
+        Object.assign({}, p, { isHub: currentHubKeys.has(p.key) })
+    );
+    updateArcCountInfo(lines.length, totalBeforeLayout);
+
+    const layers = [];
+    const landColor = cssRgb('--map-land-rgb', mapTilesFailed ? 220 : 0);
+    const outlineColor = cssRgb('--map-outline-rgb', mapTilesFailed ? 255 : 140);
+    const outlineSoft = cssRgb('--map-outline-rgb', 160);
+    const useHeat = heatmapEnabled();
+    const countriesPickable = useHeat || currentGroupBy() === 'country';
+
+    // Fallback land fill when basemap tiles unavailable; otherwise transparent unless heatmap.
+    if (countriesGeoJSON && (mapTilesFailed || useHeat)) {
         const { max, heat } = getStatsCache();
         layers.push(new deck.GeoJsonLayer({
             id: 'countries',
             data: countriesGeoJSON,
-            pickable: false,
+            pickable: countriesPickable,
             stroked: !isGlobe,
             filled: true,
-            wrapLongitude: isGlobe,
+            wrapLongitude: true,
             getFillColor: f => {
-                const c = heatmapEnabled()
-                    ? heatmapColorRGB(heat.get(f) || 0, max)
-                    : landColor;
-                // На глобусе полная непрозрачность — иначе видны щели между треугольниками сетки
-                return isGlobe ? [c[0], c[1], c[2], 255] : c;
+                if (useHeat) {
+                    const c = heatmapColorRGB(heat.get(f) || 0, max);
+                    if (focusedCountry && matchCountryFeature(f, focusedCountry)) {
+                        return [c[0], c[1], c[2], 255];
+                    }
+                    return c;
+                }
+                return landColor;
             },
             getLineColor: outlineColor,
             getLineWidth: 1,
             lineWidthMinPixels: 0.5,
             updateTriggers: {
-                getFillColor: [showHeatmap, currentGroupBy(), statsSignature(), isGlobe, NMAuth.getTheme()],
-                getLineColor: [NMAuth.getTheme()],
+                getFillColor: [showHeatmap, currentGroupBy(), statsSignature(), isGlobe, NMAuth.getTheme(), focusedCountry, mapTilesFailed],
+                getLineColor: [NMAuth.getTheme(), mapTilesFailed],
+            },
+            onClick: info => {
+                if (!info.object || !countriesPickable) return;
+                if (typeof showCountryDetail === 'function') {
+                    showCountryDetail(resolveCountryKeyFromFeature(info.object), info.object);
+                }
+            },
+        }));
+    } else if (countriesGeoJSON && countriesPickable) {
+        // Invisible pick layer for country clicks when basemap is present.
+        layers.push(new deck.GeoJsonLayer({
+            id: 'countries-pick',
+            data: countriesGeoJSON,
+            pickable: true,
+            stroked: false,
+            filled: true,
+            wrapLongitude: true,
+            getFillColor: [0, 0, 0, 1],
+            updateTriggers: {
+                getFillColor: [focusedCountry],
+            },
+            onClick: info => {
+                if (!info.object) return;
+                if (typeof showCountryDetail === 'function') {
+                    showCountryDetail(resolveCountryKeyFromFeature(info.object), info.object);
+                }
             },
         }));
     }
 
     if (showCountryLabels) {
         const centroids = isGlobe ? visibleGlobeCentroids() : buildCountryCentroids();
-        // Небольшой altitude на глобусе — иначе подписи z-fight с полигонами стран
         const labelAlt = isGlobe ? 8e4 : 0;
         const labelColor = NMAuth.getTheme() === 'light'
             ? [31, 35, 40, 230]
@@ -354,8 +437,6 @@ function buildDeckLayers(mode = 'map') {
             fontWeight: 700,
             getTextAnchor: 'middle',
             getAlignmentBaseline: 'center',
-            // GlobeView: billboard ошибочно cull'ится (deck.gl#9777) —
-            // depthTest выключен, видимость с обратной стороны режем фильтром полусферы.
             parameters: isGlobe ? { cullMode: 'none', depthTest: false } : undefined,
             updateTriggers: {
                 getText: centroids.map(c => c.label).join('|'),
@@ -367,42 +448,70 @@ function buildDeckLayers(mode = 'map') {
         }));
     }
 
+    const showHex = densityLayerActive(isGlobe);
+    if (showHex && deck.HexagonLayer) {
+        const hexOpacity = currentMapZoom < 2.5 ? 180 : 110;
+        layers.push(new deck.HexagonLayer({
+            id: 'density-hex',
+            data: points,
+            pickable: true,
+            extruded: false,
+            radius: 80000,
+            coverage: 0.85,
+            colorRange: [
+                [22, 60, 100, hexOpacity],
+                [40, 100, 150, hexOpacity],
+                [70, 140, 180, hexOpacity],
+                [214, 158, 46, hexOpacity],
+                [220, 100, 50, hexOpacity],
+                [220, 50, 40, hexOpacity],
+            ],
+            getPosition: d => [d.lon, d.lat],
+            getColorWeight: d => d.count || 1,
+            colorAggregation: 'SUM',
+            onClick: info => {
+                if (info.object && typeof showHexDetail === 'function') {
+                    showHexDetail(info.object);
+                }
+            },
+            updateTriggers: {
+                getColorWeight: [statsSignature(), currentMapZoom],
+            },
+        }));
+    }
+
+    const nodeOpacity = showHex ? 90 : 150;
     layers.push(new deck.ArcLayer({
         id: 'arcs',
         data: lines,
         pickable: true,
         greatCircle: isGlobe,
-        // Позиции дуг берём из узлов — иначе при расхождении
-        // line.src_* и point.lat/lon (avg по ребру vs avg по узлу)
-        // дуга стартует «в стороне» от маркера.
         getSourcePosition: d => nodeLonLat(d.src, d.src_lon, d.src_lat),
         getTargetPosition: d => nodeLonLat(d.dst, d.dst_lon, d.dst_lat),
-        getSourceColor: d => [...arcRGB(d.status, d), 210],
-        getTargetColor: d => [...arcRGB(d.status, d), 210],
-        getWidth: d => Math.max(1, Math.min(6, 1 + Math.log2((d.count || 1) + 1))),
+        getSourceColor: d => [...arcRGB(d.status, d), d._flowAlpha || 210],
+        getTargetColor: d => [...arcRGB(d.status, d), d._flowAlpha || 210],
+        getWidth: d => Math.max(1.2, Math.min(7, 1.2 + Math.log2((d.count || 1) + 1) * 0.9)),
         widthUnits: 'pixels',
-        getHeight: isGlobe
-            ? d => {
-                const [sLon, sLat] = nodeLonLat(d.src, d.src_lon, d.src_lat);
-                const [tLon, tLat] = nodeLonLat(d.dst, d.dst_lon, d.dst_lat);
-                const dist = Math.max(1, Math.hypot(Math.abs(tLon - sLon), Math.abs(tLat - sLat)));
-                return Math.max(0.05, Math.min(0.35, 10 / dist));
-            }
-            : d => {
-                const [sLon, sLat] = nodeLonLat(d.src, d.src_lon, d.src_lat);
-                const [tLon, tLat] = nodeLonLat(d.dst, d.dst_lon, d.dst_lat);
-                const dist = Math.max(1, Math.hypot(Math.abs(tLon - sLon), Math.abs(tLat - sLat)));
-                return Math.max(0.07, Math.min(0.35, 14 / dist));
-            },
+        getHeight: d => {
+            const [sLon, sLat] = nodeLonLat(d.src, d.src_lon, d.src_lat);
+            const [tLon, tLat] = nodeLonLat(d.dst, d.dst_lon, d.dst_lat);
+            const dist = Math.max(1, Math.hypot(Math.abs(tLon - sLon), Math.abs(tLat - sLat)));
+            const base = isGlobe ? 10 : 14;
+            return Math.max(0.07, Math.min(0.4, base / dist));
+        },
         getTilt: isGlobe ? 0 : arcTilt,
         autoHighlight: true,
         highlightColor: [255, 255, 255, 140],
-        parameters: { depthTest: isGlobe },
+        parameters: isGlobe
+            ? { depthCompare: 'always', cullMode: 'back' }
+            : { depthTest: false },
         updateTriggers: {
-            getSourceColor: [currentFilter, monoArcColor, typeof repColorArcs !== 'undefined' && repColorArcs, typeof reputationFilterActiveCount === 'function' ? reputationFilterActiveCount() : 0],
-            getTargetColor: [currentFilter, monoArcColor, typeof repColorArcs !== 'undefined' && repColorArcs, typeof reputationFilterActiveCount === 'function' ? reputationFilterActiveCount() : 0],
+            getSourceColor: [currentFilter, monoArcColor, typeof repColorArcs !== 'undefined' && repColorArcs, typeof reputationFilterActiveCount === 'function' ? reputationFilterActiveCount() : 0, arcLayout, hubCount, focusedCountry],
+            getTargetColor: [currentFilter, monoArcColor, typeof repColorArcs !== 'undefined' && repColorArcs, typeof reputationFilterActiveCount === 'function' ? reputationFilterActiveCount() : 0, arcLayout, hubCount, focusedCountry],
             getSourcePosition: [_statsCacheVersion],
             getTargetPosition: [_statsCacheVersion],
+            getTilt: [arcLayout],
+            getWidth: [arcLayout, maxArcs],
         },
         onClick: info => { if (info.object) showLineDetail(info.object); },
     }));
@@ -415,15 +524,25 @@ function buildDeckLayers(mode = 'map') {
         filled: true,
         radiusUnits: 'pixels',
         getPosition: d => [d.lon, d.lat],
-        getRadius: d => Math.max(1.5, Math.min(8, 1.5 + Math.sqrt(d.count || 1) * 0.6)),
-        getFillColor: [88, 166, 255, 150],
+        getRadius: d => {
+            const base = Math.max(1.5, Math.min(8, 1.5 + Math.sqrt(d.count || 1) * 0.6));
+            return d.isHub ? Math.min(14, base * 1.7) : base;
+        },
+        getFillColor: d => d.isHub
+            ? [188, 140, 255, Math.min(230, nodeOpacity + 40)]
+            : [88, 166, 255, nodeOpacity],
         getLineColor: outlineSoft,
         lineWidthUnits: 'pixels',
-        getLineWidth: 0.7,
+        getLineWidth: d => d.isHub ? 1.4 : 0.7,
         radiusMinPixels: 1.5,
-        radiusMaxPixels: 9,
+        radiusMaxPixels: 14,
+        parameters: isGlobe
+            ? { depthCompare: 'always', cullMode: 'back' }
+            : undefined,
         updateTriggers: {
             getLineColor: [NMAuth.getTheme()],
+            getFillColor: [arcLayout, hubCount, showHex, nodeOpacity],
+            getRadius: [arcLayout, hubCount],
         },
         onClick: info => { if (info.object) showPointDetail(info.object, info.object.key); },
     }));
@@ -433,21 +552,41 @@ function buildDeckLayers(mode = 'map') {
 
 function getDeckTooltip({ object, layer }) {
     if (!object) return null;
+    const tipStyle = {
+        background: 'rgba(22,27,34,0.95)', color: '#c9d1d9', border: '1px solid #30363d',
+        borderRadius: '6px', padding: '6px 10px', fontSize: '11px',
+    };
     if (layer && layer.id === 'arcs') {
         return {
             html: `<b>${escapeHTML(object.src_label || object.src)} → ${escapeHTML(object.dst_label || object.dst)}</b><br>
                    Статус: ${escapeHTML(object.status)} · События: ${fmtNumber(object.count)}`,
-            style: { background: 'rgba(22,27,34,0.95)', color: '#c9d1d9', border: '1px solid #30363d',
-                     borderRadius: '6px', padding: '6px 10px', fontSize: '11px' }
+            style: tipStyle,
         };
     }
     if (layer && layer.id === 'nodes') {
+        const hub = object.isHub ? ' · хаб' : '';
         return {
-            html: `<b>${escapeHTML(object.label || object.key)}</b><br>
+            html: `<b>${escapeHTML(object.label || object.key)}</b>${hub}<br>
                    ${escapeHTML(object.city || '')} · ${escapeHTML(ruCountry(object.country))}<br>
                    События: ${fmtNumber(object.count)}`,
-            style: { background: 'rgba(22,27,34,0.95)', color: '#c9d1d9', border: '1px solid #30363d',
-                     borderRadius: '6px', padding: '6px 10px', fontSize: '11px' }
+            style: tipStyle,
+        };
+    }
+    if (layer && (layer.id === 'countries' || layer.id === 'countries-pick')) {
+        const name = resolveCountryKeyFromFeature(object);
+        const { stats } = getStatsCache();
+        const cnt = stats[name] || 0;
+        return {
+            html: `<b>${escapeHTML(ruCountry(name))}</b><br>События: ${fmtNumber(cnt)}`,
+            style: tipStyle,
+        };
+    }
+    if (layer && layer.id === 'density-hex') {
+        const pts = object.points || object;
+        const n = Array.isArray(pts) ? pts.length : (object.elevationValue || object.colorValue || 0);
+        return {
+            html: `<b>Плотность</b><br>Узлов/вес: ${fmtNumber(n)}`,
+            style: tipStyle,
         };
     }
     return null;
@@ -466,61 +605,36 @@ function updateArcCountInfo(shown, total) {
     updateArcsTruncHint(shown, total);
 }
 
-function initDeck() {
-    if (deckInstance) return;
-    deckInstance = new deck.Deck({
-        parent: document.getElementById('map-host'),
-        views: new deck.MapView(),
-        initialViewState: mapViewState,
-        controller: true,
-        layers: buildDeckLayers('map'),
+function syncViewStateFromMap() {
+    if (!maplibreMap) return;
+    const c = maplibreMap.getCenter();
+    const vs = {
+        longitude: ((c.lng + 540) % 360) - 180,
+        latitude: c.lat,
+        zoom: maplibreMap.getZoom(),
+        bearing: maplibreMap.getBearing(),
+        pitch: maplibreMap.getPitch(),
+    };
+    currentMapZoom = vs.zoom;
+    if (viewMode === 'globe') {
+        globeViewState = vs;
+    } else {
+        mapViewState = vs;
+    }
+}
+
+function refreshMapLayers() {
+    if (!deckOverlay) return;
+    const layers = buildDeckLayers(viewMode);
+    deckOverlay.setProps({
+        layers,
         getTooltip: getDeckTooltip,
-        onViewStateChange: ({ viewState }) => {
-            mapViewState = viewState;
-            deckInstance.setProps({ viewState });
-        },
-        parameters: { preserveDrawingBuffer: true }
     });
 }
 
-function updateDeck() {
-    if (!deckInstance) return;
-    deckInstance.setProps({ layers: buildDeckLayers('map') });
-}
-
-function destroyDeck() {
-    stopGlobeAutoRotate();
-    if (!deckInstance) return;
-    deckInstance.finalize();
-    deckInstance = null;
-    document.getElementById('map-host').innerHTML = '';
-}
-
-function fitDeckToData() {
-    const lines = allLines.filter(hasCoords);
-    if (!lines.length) return;
-    let minLon = 180, maxLon = -180, minLat = 90, maxLat = -90;
-    lines.forEach(l => {
-        minLon = Math.min(minLon, l.src_lon, l.dst_lon);
-        maxLon = Math.max(maxLon, l.src_lon, l.dst_lon);
-        minLat = Math.min(minLat, l.src_lat, l.dst_lat);
-        maxLat = Math.max(maxLat, l.src_lat, l.dst_lat);
-    });
-    if (minLon === 180) return;
-    const lonSpan = maxLon - minLon, latSpan = maxLat - minLat;
-    const zoom = Math.min(6, Math.max(1, 8 - Math.log2(Math.max(lonSpan, latSpan, 1) + 1)));
-    mapViewState = { ...mapViewState, longitude: (minLon + maxLon) / 2, latitude: (minLat + maxLat) / 2, zoom };
-    if (deckInstance) deckInstance.setProps({ initialViewState: mapViewState });
-}
-
-// ============================================================
-// Globe (deck.gl GlobeView)
-// ============================================================
-
-function getGlobeViewClass() {
-    // В standalone bundle экспортируется как _GlobeView (experimental API)
-    return deck._GlobeView || deck.GlobeView || null;
-}
+// Aliases used across older call sites
+function updateDeck() { refreshMapLayers(); }
+function updateGlobe() { refreshMapLayers(); }
 
 function stopGlobeAutoRotate() {
     if (globeRotateRAF) {
@@ -532,121 +646,278 @@ function stopGlobeAutoRotate() {
 
 function startGlobeAutoRotate() {
     stopGlobeAutoRotate();
-    if (!autoRotate || viewMode !== 'globe' || !deckInstance) return;
+    if (!autoRotate || viewMode !== 'globe' || !maplibreMap) return;
 
     function tick(ts) {
-        if (!deckInstance || viewMode !== 'globe' || !autoRotate) {
+        if (!maplibreMap || viewMode !== 'globe' || !autoRotate || mapUserInteracting || document.hidden) {
             stopGlobeAutoRotate();
             return;
         }
         if (!globeRotateLastTs) globeRotateLastTs = ts;
         const dt = Math.min(ts - globeRotateLastTs, 50);
         globeRotateLastTs = ts;
-        globeViewState = {
-            ...globeViewState,
-            longitude: ((globeViewState.longitude || 0) + dt * 0.008) % 360,
-        };
-        deckInstance.setProps({ viewState: globeViewState });
+        const lng = maplibreMap.getCenter().lng + dt * 0.008;
+        maplibreMap.jumpTo({ center: [lng, maplibreMap.getCenter().lat] });
+        syncViewStateFromMap();
         maybeRefreshGlobeLabels(false);
         globeRotateRAF = requestAnimationFrame(tick);
     }
     globeRotateRAF = requestAnimationFrame(tick);
 }
 
-function initGlobe() {
-    if (deckInstance) return;
-    const GlobeView = getGlobeViewClass();
-    if (!GlobeView) {
-        toast('GlobeView недоступен в этой версии deck.gl', 'error');
+function applyMapProjection(mode) {
+    if (!maplibreMap || typeof maplibreMap.setProjection !== 'function') return false;
+    try {
+        maplibreMap.setProjection({ type: mode === 'globe' ? 'globe' : 'mercator' });
+        return true;
+    } catch (e) {
+        console.warn('setProjection failed:', e);
+        return false;
+    }
+}
+
+function emptyStyleFallback() {
+    const bg = mapBaseCss();
+    return {
+        version: 8,
+        sources: {},
+        layers: [
+            { id: 'background', type: 'background', paint: { 'background-color': bg } },
+        ],
+    };
+}
+
+function initMapView() {
+    if (maplibreMap) return;
+    const host = document.getElementById('map-host');
+    if (!host) return;
+    host.innerHTML = '';
+
+    if (typeof maplibregl === 'undefined') {
+        toast('MapLibre GL не загружен', 'error');
         return;
     }
+    if (typeof deck === 'undefined' || !deck.MapboxOverlay) {
+        toast('deck.gl MapboxOverlay недоступен', 'error');
+        return;
+    }
+
+    const theme = (typeof NMAuth !== 'undefined' && NMAuth.getTheme()) || 'dark';
+    const styleUrl = theme === 'light' ? MAP_STYLE_LIGHT : MAP_STYLE_DARK;
+    const vs = viewMode === 'globe' ? globeViewState : mapViewState;
+
     try {
-        deckInstance = new deck.Deck({
-            parent: document.getElementById('globe-host'),
-            views: new GlobeView({ resolution: 2 }),
-            initialViewState: globeViewState,
-            controller: true,
-            layers: buildDeckLayers('globe'),
-            getTooltip: getDeckTooltip,
-            onViewStateChange: ({ viewState }) => {
-                globeViewState = viewState;
-                deckInstance.setProps({ viewState });
-                maybeRefreshGlobeLabels(false);
-            },
-            style: { background: mapBaseCss(), position: 'absolute', inset: '0' },
-            parameters: {
-                preserveDrawingBuffer: true,
-                clearColor: mapClearColor(),
-                cullMode: 'back',
-            },
+        maplibreMap = new maplibregl.Map({
+            container: host,
+            style: styleUrl,
+            center: [vs.longitude || 37.6, vs.latitude || 55.7],
+            zoom: vs.zoom || 2.5,
+            bearing: vs.bearing || 0,
+            pitch: vs.pitch || 0,
+            attributionControl: true,
+            preserveDrawingBuffer: true,
+            fadeDuration: 0,
         });
-        startGlobeAutoRotate();
     } catch (e) {
-        console.error('initGlobe failed:', e);
-        deckInstance = null;
-        toast('Ошибка инициализации глобуса: ' + e.message, 'error');
+        console.error('MapLibre init failed:', e);
+        toast('Ошибка инициализации карты: ' + e.message, 'error');
+        maplibreMap = null;
+        return;
+    }
+
+    maplibreMap.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
+
+    maplibreMap.on('error', (e) => {
+        const msg = (e && e.error && e.error.message) || String(e.error || '');
+        if (/Failed to fetch|NetworkError|AJAX|tile|style|load/i.test(msg) || e.error) {
+            if (!mapTilesFailed) {
+                mapTilesFailed = true;
+                console.warn('Basemap tiles/style failed, using geojson fallback', e.error || e);
+                try {
+                    maplibreMap.setStyle(emptyStyleFallback());
+                } catch (err) {}
+                refreshMapLayers();
+            }
+        }
+    });
+
+    let readyOnce = false;
+    const onReady = () => {
+        if (readyOnce) return;
+        readyOnce = true;
+        if (viewMode === 'globe') {
+            if (!applyMapProjection('globe')) {
+                toast('Globe projection недоступен — остаёмся в 2D', 'error');
+                viewMode = 'map';
+            }
+        } else {
+            applyMapProjection('map');
+        }
+
+        deckOverlay = new deck.MapboxOverlay({
+            interleaved: false,
+            layers: buildDeckLayers(viewMode),
+            getTooltip: getDeckTooltip,
+            parameters: { preserveDrawingBuffer: true },
+        });
+        maplibreMap.addControl(deckOverlay);
+        deckInstance = deckOverlay;
+
+        syncViewStateFromMap();
+        refreshMapLayers();
+        if (viewMode === 'globe' && autoRotate) startGlobeAutoRotate();
+    };
+
+    if (maplibreMap.isStyleLoaded()) onReady();
+    else maplibreMap.once('load', onReady);
+    // If remote style never loads (offline), still initialize overlay on fallback style.
+    setTimeout(() => {
+        if (readyOnce || !maplibreMap) return;
+        if (!mapTilesFailed) {
+            mapTilesFailed = true;
+            try { maplibreMap.setStyle(emptyStyleFallback()); } catch (e) {}
+        }
+        maplibreMap.once('load', onReady);
+        // empty style usually loads sync/quick
+        setTimeout(onReady, 200);
+    }, 8000);
+
+    maplibreMap.on('move', () => {
+        syncViewStateFromMap();
+        if (viewMode === 'globe') maybeRefreshGlobeLabels(false);
+    });
+    maplibreMap.on('zoomend', () => {
+        syncViewStateFromMap();
+        refreshMapLayers();
+    });
+    maplibreMap.on('mousedown', () => {
+        mapUserInteracting = true;
+        stopGlobeAutoRotate();
+    });
+    maplibreMap.on('mouseup', () => {
+        mapUserInteracting = false;
+        if (viewMode === 'globe' && autoRotate) startGlobeAutoRotate();
+    });
+    maplibreMap.on('dragstart', () => {
+        mapUserInteracting = true;
+        stopGlobeAutoRotate();
+    });
+    maplibreMap.on('dragend', () => {
+        mapUserInteracting = false;
+        if (viewMode === 'globe' && autoRotate) startGlobeAutoRotate();
+    });
+    maplibreMap.on('touchstart', () => {
+        mapUserInteracting = true;
+        stopGlobeAutoRotate();
+    });
+    maplibreMap.on('touchend', () => {
+        mapUserInteracting = false;
+        if (viewMode === 'globe' && autoRotate) startGlobeAutoRotate();
+    });
+}
+
+function destroyMapView() {
+    stopGlobeAutoRotate();
+    if (deckOverlay && maplibreMap) {
+        try { maplibreMap.removeControl(deckOverlay); } catch (e) {}
+    }
+    deckOverlay = null;
+    deckInstance = null;
+    if (maplibreMap) {
+        try { maplibreMap.remove(); } catch (e) {}
+        maplibreMap = null;
+    }
+    const host = document.getElementById('map-host');
+    if (host) host.innerHTML = '';
+}
+
+function fitDeckToData() {
+    const lines = allLines.filter(hasCoords);
+    if (!lines.length || !maplibreMap) return;
+    let minLon = 180, maxLon = -180, minLat = 90, maxLat = -90;
+    lines.forEach(l => {
+        minLon = Math.min(minLon, l.src_lon, l.dst_lon);
+        maxLon = Math.max(maxLon, l.src_lon, l.dst_lon);
+        minLat = Math.min(minLat, l.src_lat, l.dst_lat);
+        maxLat = Math.max(maxLat, l.src_lat, l.dst_lat);
+    });
+    if (minLon === 180) return;
+    const pad = 0.15;
+    const lonPad = Math.max(1, (maxLon - minLon) * pad);
+    const latPad = Math.max(1, (maxLat - minLat) * pad);
+    try {
+        maplibreMap.fitBounds(
+            [[minLon - lonPad, minLat - latPad], [maxLon + lonPad, maxLat + latPad]],
+            { padding: 40, maxZoom: 6, duration: 0 }
+        );
+        syncViewStateFromMap();
+    } catch (e) {
+        const lonSpan = maxLon - minLon, latSpan = maxLat - minLat;
+        const zoom = Math.min(6, Math.max(1, 8 - Math.log2(Math.max(lonSpan, latSpan, 1) + 1)));
+        maplibreMap.jumpTo({
+            center: [(minLon + maxLon) / 2, (minLat + maxLat) / 2],
+            zoom,
+        });
+        syncViewStateFromMap();
     }
 }
 
-function updateGlobe() {
-    if (!deckInstance) return;
-    lastGlobeLabelCullKey = '';
-    deckInstance.setProps({ layers: buildDeckLayers('globe') });
-}
-
-function destroyGlobe() {
-    stopGlobeAutoRotate();
-    if (!deckInstance) return;
-    deckInstance.finalize();
-    deckInstance = null;
-    document.getElementById('globe-host').innerHTML = '';
-}
-
-// ============================================================
-// View mode
-// ============================================================
-
 function setViewMode(mode) {
-    if (mode === viewMode) return;
+    if (mode === viewMode && maplibreMap) {
+        // still update chrome
+    }
+    const prev = viewMode;
     viewMode = mode;
 
-    document.getElementById('mode-map').classList.toggle('active', mode === 'map');
-    document.getElementById('mode-globe').classList.toggle('active', mode === 'globe');
-    document.getElementById('mode-map-icon').classList.toggle('active', mode === 'map');
-    document.getElementById('mode-globe-icon').classList.toggle('active', mode === 'globe');
-
+    document.getElementById('mode-map')?.classList.toggle('active', mode === 'map');
+    document.getElementById('mode-globe')?.classList.toggle('active', mode === 'globe');
+    document.getElementById('mode-map-icon')?.classList.toggle('active', mode === 'map');
+    document.getElementById('mode-globe-icon')?.classList.toggle('active', mode === 'globe');
     document.getElementById('autoRotateWrap').style.display = (mode === 'globe') ? '' : 'none';
 
-    document.getElementById('map-host').classList.toggle('hidden', mode !== 'map');
-    document.getElementById('globe-host').classList.toggle('hidden', mode !== 'globe');
+    if (!maplibreMap) {
+        initMapView();
+        saveUIState();
+        return;
+    }
 
-    if (mode === 'map') {
-        destroyGlobe();
-        initDeck();
-        updateDeck();
-        if (autoFitPending) { fitDeckToData(); autoFitPending = false; }
-    } else {
-        destroyDeck();
-        initGlobe();
-        if (!deckInstance) {
+    stopGlobeAutoRotate();
+    if (mode === 'globe') {
+        if (!applyMapProjection('globe')) {
+            toast('Globe projection недоступен', 'error');
             viewMode = 'map';
-            document.getElementById('mode-map').classList.add('active');
-            document.getElementById('mode-globe').classList.remove('active');
-            document.getElementById('mode-map-icon').classList.add('active');
-            document.getElementById('mode-globe-icon').classList.remove('active');
+            document.getElementById('mode-map')?.classList.add('active');
+            document.getElementById('mode-globe')?.classList.remove('active');
+            document.getElementById('mode-map-icon')?.classList.add('active');
+            document.getElementById('mode-globe-icon')?.classList.remove('active');
             document.getElementById('autoRotateWrap').style.display = 'none';
-            document.getElementById('map-host').classList.remove('hidden');
-            document.getElementById('globe-host').classList.add('hidden');
-            initDeck();
-            updateDeck();
+            applyMapProjection('map');
+            refreshMapLayers();
             saveUIState();
             return;
         }
-        updateGlobe();
+        maplibreMap.jumpTo({
+            center: [globeViewState.longitude || 30, globeViewState.latitude || 30],
+            zoom: globeViewState.zoom || 1.2,
+            bearing: globeViewState.bearing || 0,
+            pitch: 0,
+        });
         if (autoRotate) startGlobeAutoRotate();
+    } else {
+        applyMapProjection('map');
+        maplibreMap.jumpTo({
+            center: [mapViewState.longitude || 37.6, mapViewState.latitude || 55.7],
+            zoom: mapViewState.zoom || 2.5,
+            bearing: mapViewState.bearing || 0,
+            pitch: mapViewState.pitch || 0,
+        });
     }
+    syncViewStateFromMap();
+    lastGlobeLabelCullKey = '';
+    refreshMapLayers();
     saveUIState();
     setTimeout(() => resizeCurrentView(), 100);
+    if (prev !== mode) { /* mode changed */ }
 }
 
 async function loadCountries() {
@@ -661,4 +932,50 @@ async function loadCountries() {
         countriesGeoJSON = null;
         countryCentroidsCache = null;
     }
+}
+
+function syncArcLayoutUI() {
+    document.getElementById('arcLayout-hub')?.classList.toggle('active', arcLayout === 'hub');
+    document.getElementById('arcLayout-mesh')?.classList.toggle('active', arcLayout === 'mesh');
+    const wrap = document.getElementById('hubCountWrap');
+    if (wrap) wrap.style.display = arcLayout === 'hub' ? '' : 'none';
+    const hubEl = document.getElementById('hubCount');
+    const hubVal = document.getElementById('hubCountVal');
+    if (hubEl) hubEl.value = hubCount;
+    if (hubVal) hubVal.textContent = String(hubCount);
+    const dens = document.getElementById('toggleDensityChk');
+    if (dens) dens.checked = showDensity;
+    const hubRow = document.getElementById('legendHubRow');
+    if (hubRow) hubRow.style.display = arcLayout === 'hub' ? '' : 'none';
+}
+
+function setArcLayout(layout) {
+    if (layout !== 'hub' && layout !== 'mesh') return;
+    arcLayout = layout;
+    syncArcLayoutUI();
+    saveUIState();
+    refreshMapLayers();
+    updateMapOverlay();
+}
+
+function onHubCountChange() {
+    const el = document.getElementById('hubCount');
+    hubCount = Math.min(HUB_COUNT_MAX, Math.max(HUB_COUNT_MIN, parseInt(el.value, 10) || HUB_COUNT_DEFAULT));
+    document.getElementById('hubCountVal').textContent = String(hubCount);
+    saveUIState();
+    refreshMapLayers();
+    updateMapOverlay();
+}
+
+function onToggleDensity() {
+    showDensity = document.getElementById('toggleDensityChk').checked;
+    saveUIState();
+    refreshMapLayers();
+}
+
+function clearFocusedCountry() {
+    if (!focusedCountry) return;
+    focusedCountry = null;
+    _statsCacheVersion++;
+    refreshMapLayers();
 }

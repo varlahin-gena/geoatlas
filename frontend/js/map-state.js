@@ -16,6 +16,13 @@ const SEARCH_DEBOUNCE_MS = 250;
 const MAX_ARCS_DEFAULT = 5000;
 const MAX_ARCS_MIN     = 100;
 const MAX_ARCS_MAX     = 20000;
+const HUB_COUNT_DEFAULT = 8;
+const HUB_COUNT_MIN = 3;
+const HUB_COUNT_MAX = 30;
+const DENSITY_ZOOM_THRESHOLD = 4;
+
+const MAP_STYLE_DARK = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
+const MAP_STYLE_LIGHT = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
 
 const LABEL_CHARSET = (
     'абвгдеёжзийклмнопрстуфхцчшщъыьэюя' +
@@ -33,8 +40,12 @@ let countryCentroidsCache = null;
 
 let viewMode = 'map';
 let deckInstance = null;
+let maplibreMap = null;
+let deckOverlay = null;
+let mapTilesFailed = false;
 let globeRotateRAF = null;
 let globeRotateLastTs = 0;
+let mapUserInteracting = false;
 
 let currentFilter = 'all';
 let currentSearch = '';
@@ -44,9 +55,15 @@ let showLegend = true;
 let showStats = true;
 let showHeatmap = true;
 let showCountryLabels = true;
+let showDensity = true;
 let monoArcColor = false;
 let autoRotate = true;
 let autoFitPending = true;
+let arcLayout = 'hub'; // hub | mesh
+let hubCount = HUB_COUNT_DEFAULT;
+let focusedCountry = null; // English/raw country name from geojson match
+let currentHubKeys = new Set();
+let currentMapZoom = 2.5;
 
 let lastStats = {};
 let lastPeriodInfo = {};
@@ -124,7 +141,7 @@ const countryNamesRu = {
 };
 
 let mapViewState = { longitude: 37.6, latitude: 55.7, zoom: 2.5, pitch: 0, bearing: 0 };
-let globeViewState = { longitude: 30, latitude: 30, zoom: 0.85, pitch: 0, bearing: 0 };
+let globeViewState = { longitude: 30, latitude: 30, zoom: 1.2, pitch: 0, bearing: 0 };
 
 function normalizeText(v) { return (v || '').toString().toLowerCase().trim(); }
 function ruCountry(name) { if (!name) return 'Неизвестно'; return countryNamesRu[name] || name; }
@@ -144,23 +161,26 @@ function mapClearColor() {
     return [rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, 1];
 }
 function applyMapTheme() {
-    if (!deckInstance) return;
-    if (viewMode === 'globe') {
-        deckInstance.setProps({
-            layers: buildDeckLayers('globe'),
-            style: { background: mapBaseCss(), position: 'absolute', inset: '0' },
-            parameters: {
-                preserveDrawingBuffer: true,
-                clearColor: mapClearColor(),
-                cullMode: 'back',
-            },
+    if (!maplibreMap) return;
+    const styleUrl = NMAuth.getTheme() === 'light' ? MAP_STYLE_LIGHT : MAP_STYLE_DARK;
+    const center = maplibreMap.getCenter();
+    const zoom = maplibreMap.getZoom();
+    const bearing = maplibreMap.getBearing();
+    const pitch = maplibreMap.getPitch();
+    try {
+        maplibreMap.setStyle(styleUrl);
+        maplibreMap.once('style.load', () => {
+            try {
+                maplibreMap.jumpTo({ center, zoom, bearing, pitch });
+                if (viewMode === 'globe' && maplibreMap.setProjection) {
+                    maplibreMap.setProjection({ type: 'globe' });
+                }
+            } catch (e) {}
+            refreshMapLayers();
         });
-    } else {
-        deckInstance.setProps({ layers: buildDeckLayers('map') });
-        const canvas = document.querySelector('#map-host canvas');
-        if (canvas && canvas.parentElement) {
-            canvas.parentElement.style.background = mapBaseCss();
-        }
+    } catch (e) {
+        console.warn('applyMapTheme:', e);
+        refreshMapLayers();
     }
 }
 function currentGroupBy() {
@@ -203,6 +223,11 @@ function loadUIState() {
         if (typeof s.showHeatmap === 'boolean') showHeatmap = s.showHeatmap;
         if (typeof s.showCountryLabels === 'boolean') showCountryLabels = s.showCountryLabels;
         if (typeof s.monoArcColor === 'boolean') monoArcColor = s.monoArcColor;
+        if (typeof s.showDensity === 'boolean') showDensity = s.showDensity;
+        if (s.arcLayout === 'hub' || s.arcLayout === 'mesh') arcLayout = s.arcLayout;
+        if (typeof s.hubCount === 'number') {
+            hubCount = Math.min(HUB_COUNT_MAX, Math.max(HUB_COUNT_MIN, s.hubCount));
+        }
         const savedMaxArcs = typeof s.maxArcs === 'number' ? s.maxArcs : s.globeMaxArcs;
         if (typeof savedMaxArcs === 'number') {
             maxArcs = Math.min(MAX_ARCS_MAX, Math.max(MAX_ARCS_MIN, savedMaxArcs));
@@ -256,6 +281,7 @@ function saveUIState() {
         localStorage.setItem(LS_KEY, JSON.stringify({
             sidebarCollapsed: document.getElementById('app').classList.contains('sidebar-collapsed'),
             viewMode, showHeatmap, showCountryLabels, monoArcColor, maxArcs,
+            showDensity, arcLayout, hubCount,
             periodPreset: document.getElementById('periodPreset').value,
             periodFrom: document.getElementById('periodFrom').value,
             periodTo: document.getElementById('periodTo').value,
@@ -336,6 +362,14 @@ function applyViewFromURL() {
     }
     const view = params.get('view');
     if (view === 'map' || view === 'globe') viewMode = view;
+    const arcs = params.get('arcs');
+    if (arcs === 'hub' || arcs === 'mesh') arcLayout = arcs;
+    if (params.get('hubs')) {
+        const n = parseInt(params.get('hubs'), 10);
+        if (Number.isFinite(n)) hubCount = Math.min(HUB_COUNT_MAX, Math.max(HUB_COUNT_MIN, n));
+    }
+    if (params.get('density') === '0' || params.get('density') === 'false') showDensity = false;
+    if (params.get('density') === '1' || params.get('density') === 'true') showDensity = true;
     periodCustomOpen = false;
     updateCustomPeriodLabel();
     syncPeriodCustomPanel();
@@ -373,6 +407,9 @@ function syncViewToURL() {
             params.set('rep_color', '1');
         }
         if (viewMode && viewMode !== 'map') params.set('view', viewMode);
+        if (arcLayout && arcLayout !== 'hub') params.set('arcs', arcLayout);
+        if (hubCount !== HUB_COUNT_DEFAULT) params.set('hubs', String(hubCount));
+        if (!showDensity) params.set('density', '0');
         const qs = params.toString();
         const next = qs ? (location.pathname + '?' + qs) : location.pathname;
         const cur = location.pathname + location.search;
@@ -488,6 +525,12 @@ function toggleSidebar() {
     setTimeout(() => { resizeCurrentView(); }, 220);
 }
 function resizeCurrentView() {
-    if (deckInstance) deckInstance.redraw(true);
+    if (maplibreMap) maplibreMap.resize();
+    if (deckOverlay && typeof deckOverlay.setProps === 'function') {
+        // MapboxOverlay listens to map resize; force redraw
+        try { deckOverlay._deck && deckOverlay._deck.redraw(true); } catch (e) {}
+    } else if (deckInstance) {
+        deckInstance.redraw(true);
+    }
 }
 window.addEventListener('resize', () => resizeCurrentView());

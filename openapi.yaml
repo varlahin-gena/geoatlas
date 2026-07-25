@@ -290,6 +290,43 @@ paths:
         "400":
           description: Невалидный диапазон времени
 
+  /api/events/series:
+    get:
+      tags: [events]
+      summary: Временной ряд по стране (sparkline)
+      description: |
+        Allowed/blocked counts по интервалам для src_country или dst_country.
+        Требует сессию или Bearer≥read.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: country
+          in: query
+          required: true
+          schema: { type: string }
+          description: Имя страны как в traffic_logs (например Russia)
+        - name: days
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 30 }
+        - name: hours
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: minutes
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: from
+          in: query
+          schema: { type: string }
+        - name: to
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: points [{t, allowed, blocked, total}] + bucket_sec
+        "400":
+          description: Нет country или невалидный диапазон
+
   /api/geo-missing:
     get:
       tags: [geo]

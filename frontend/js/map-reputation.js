@@ -160,8 +160,7 @@ function applyReputationFilterChange() {
     updateReputationMenuUI();
     const leg = document.getElementById('legendRepRow');
     if (leg) leg.style.display = (typeof repColorArcs !== 'undefined' && repColorArcs) ? '' : 'none';
-    if (typeof viewMode !== 'undefined' && viewMode === 'map') updateDeck();
-    else if (typeof updateGlobe === 'function') updateGlobe();
+    if (typeof viewMode !== 'undefined') refreshMapLayers();
     if (typeof updateMapOverlay === 'function') updateMapOverlay();
 }
 
@@ -225,8 +224,7 @@ function bindReputationMenu() {
     document.getElementById('groupBy')?.addEventListener('change', function () {
         updateReputationMenuUI();
         if (currentGroupBy() !== 'ip' && reputationFilterActiveCount()) {
-            if (viewMode === 'map') updateDeck();
-            else updateGlobe();
+            refreshMapLayers();
             updateMapOverlay();
         }
     });
