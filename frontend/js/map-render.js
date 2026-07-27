@@ -481,11 +481,15 @@ function buildDeckLayers(mode = 'map') {
     }
 
     const nodeOpacity = showHex ? 90 : 150;
+    // На MapLibre globe НЕ ставить cullMode:'back' / depthCompare:'always' —
+    // трубки ArcLayer вырезаются до обрывков по лимбу (см. deck.gl maplibre example:
+    // parameters: { cullMode: 'none' }).
     layers.push(new deck.ArcLayer({
         id: 'arcs',
         data: lines,
         pickable: true,
-        greatCircle: isGlobe,
+        // greatCircle нужен на mercator; на GlobeView дуги уже в 3D-сфере.
+        greatCircle: !isGlobe,
         getSourcePosition: d => nodeLonLat(d.src, d.src_lon, d.src_lat),
         getTargetPosition: d => nodeLonLat(d.dst, d.dst_lon, d.dst_lat),
         getSourceColor: d => [...arcRGB(d.status, d), d._flowAlpha || 210],
@@ -493,24 +497,33 @@ function buildDeckLayers(mode = 'map') {
         getWidth: d => Math.max(1.2, Math.min(7, 1.2 + Math.log2((d.count || 1) + 1) * 0.9)),
         widthUnits: 'pixels',
         getHeight: d => {
+            if (isGlobe) {
+                // Стабильная высота как в официальном globe-примере (~0.2–0.35).
+                const [sLon, sLat] = nodeLonLat(d.src, d.src_lon, d.src_lat);
+                const [tLon, tLat] = nodeLonLat(d.dst, d.dst_lon, d.dst_lat);
+                let dLon = Math.abs(tLon - sLon);
+                if (dLon > 180) dLon = 360 - dLon;
+                const dist = Math.max(1, Math.hypot(dLon, Math.abs(tLat - sLat)));
+                return Math.max(0.15, Math.min(0.45, 0.12 + dist / 180));
+            }
             const [sLon, sLat] = nodeLonLat(d.src, d.src_lon, d.src_lat);
             const [tLon, tLat] = nodeLonLat(d.dst, d.dst_lon, d.dst_lat);
             const dist = Math.max(1, Math.hypot(Math.abs(tLon - sLon), Math.abs(tLat - sLat)));
-            const base = isGlobe ? 10 : 14;
-            return Math.max(0.07, Math.min(0.4, base / dist));
+            return Math.max(0.07, Math.min(0.4, 14 / dist));
         },
         getTilt: isGlobe ? 0 : arcTilt,
         autoHighlight: true,
         highlightColor: [255, 255, 255, 140],
         parameters: isGlobe
-            ? { depthCompare: 'always', cullMode: 'back' }
+            ? { cullMode: 'none' }
             : { depthTest: false },
         updateTriggers: {
             getSourceColor: [currentFilter, monoArcColor, typeof repColorArcs !== 'undefined' && repColorArcs, typeof reputationFilterActiveCount === 'function' ? reputationFilterActiveCount() : 0, arcLayout, hubCount, focusedCountry],
             getTargetColor: [currentFilter, monoArcColor, typeof repColorArcs !== 'undefined' && repColorArcs, typeof reputationFilterActiveCount === 'function' ? reputationFilterActiveCount() : 0, arcLayout, hubCount, focusedCountry],
             getSourcePosition: [_statsCacheVersion],
             getTargetPosition: [_statsCacheVersion],
-            getTilt: [arcLayout],
+            getHeight: [isGlobe],
+            getTilt: [arcLayout, isGlobe],
             getWidth: [arcLayout, maxArcs],
         },
         onClick: info => { if (info.object) showLineDetail(info.object); },
@@ -536,9 +549,8 @@ function buildDeckLayers(mode = 'map') {
         getLineWidth: d => d.isHub ? 1.4 : 0.7,
         radiusMinPixels: 1.5,
         radiusMaxPixels: 14,
-        parameters: isGlobe
-            ? { depthCompare: 'always', cullMode: 'back' }
-            : undefined,
+        // Billboard-точки на глобусе тоже ломает back-face culling.
+        parameters: isGlobe ? { cullMode: 'none' } : undefined,
         updateTriggers: {
             getLineColor: [NMAuth.getTheme()],
             getFillColor: [arcLayout, hubCount, showHex, nodeOpacity],
@@ -914,7 +926,12 @@ function setViewMode(mode) {
     }
     syncViewStateFromMap();
     lastGlobeLabelCullKey = '';
-    refreshMapLayers();
+    // Сброс views у overlay — чтобы подхватить GlobeView после setProjection.
+    if (deckOverlay && typeof deckOverlay.setProps === 'function') {
+        deckOverlay.setProps({ views: undefined, layers: buildDeckLayers(viewMode) });
+    } else {
+        refreshMapLayers();
+    }
     saveUIState();
     setTimeout(() => resizeCurrentView(), 100);
     if (prev !== mode) { /* mode changed */ }
