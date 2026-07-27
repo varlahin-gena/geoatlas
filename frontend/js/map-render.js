@@ -519,12 +519,19 @@ function buildDeckLayers(mode = 'map') {
                 const dist = Math.max(1, Math.hypot(dLon, Math.abs(tLat - sLat)));
                 return Math.max(0.15, Math.min(0.45, 0.12 + dist / 180));
             }
+            // На mercator высокая дуга в перспективе уезжает за край viewport
+            // (особенно на север от хаба). Держим пик скромным.
             const [sLon, sLat] = nodeLonLat(d.src, d.src_lon, d.src_lat);
             const [tLon, tLat] = nodeLonLat(d.dst, d.dst_lon, d.dst_lat);
-            const dist = Math.max(1, Math.hypot(Math.abs(tLon - sLon), Math.abs(tLat - sLat)));
-            return Math.max(0.07, Math.min(0.4, 14 / dist));
+            let dLon = Math.abs(tLon - sLon);
+            if (dLon > 180) dLon = 360 - dLon;
+            const dist = Math.max(1, Math.hypot(dLon, Math.abs(tLat - sLat)));
+            const midLat = Math.abs((sLat + tLat) / 2);
+            // Чем севернее и длиннее маршрут — тем ниже дуга, чтобы не клипалась.
+            const northScale = 1 - Math.min(0.65, Math.max(0, (midLat - 25) / 80));
+            return Math.max(0.025, Math.min(0.1, (4 / dist) * northScale));
         },
-        getTilt: isGlobe ? 0 : arcTilt,
+        getTilt: isGlobe ? 0 : d => arcTilt(d) * 0.4,
         autoHighlight: true,
         highlightColor: [255, 255, 255, 140],
         parameters: isGlobe
@@ -856,29 +863,69 @@ function destroyMapView() {
     if (host) host.innerHTML = '';
 }
 
+/** Intermediate point on a great-circle, t ∈ [0, 1]. */
+function greatCirclePoint(lon1, lat1, lon2, lat2, t) {
+    const φ1 = lat1 * Math.PI / 180;
+    const λ1 = lon1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    let dλ = (lon2 - lon1) * Math.PI / 180;
+    if (dλ > Math.PI) dλ -= 2 * Math.PI;
+    if (dλ < -Math.PI) dλ += 2 * Math.PI;
+    const λ2 = λ1 + dλ;
+    const x1 = Math.cos(φ1) * Math.cos(λ1);
+    const y1 = Math.cos(φ1) * Math.sin(λ1);
+    const z1 = Math.sin(φ1);
+    const x2 = Math.cos(φ2) * Math.cos(λ2);
+    const y2 = Math.cos(φ2) * Math.sin(λ2);
+    const z2 = Math.sin(φ2);
+    const ω = Math.acos(Math.max(-1, Math.min(1, x1 * x2 + y1 * y2 + z1 * z2)));
+    if (!(ω > 1e-6)) return [lon1, lat1];
+    const a = Math.sin((1 - t) * ω) / Math.sin(ω);
+    const b = Math.sin(t * ω) / Math.sin(ω);
+    const x = a * x1 + b * x2;
+    const y = a * y1 + b * y2;
+    const z = a * z1 + b * z2;
+    return [
+        Math.atan2(y, x) * 180 / Math.PI,
+        Math.atan2(z, Math.hypot(x, y)) * 180 / Math.PI,
+    ];
+}
+
 function fitDeckToData() {
     const lines = allLines.filter(hasCoords);
     if (!lines.length || !maplibreMap) return;
     let minLon = 180, maxLon = -180, minLat = 90, maxLat = -90;
+    const expand = (lon, lat) => {
+        if (!Number.isFinite(lon) || !Number.isFinite(lat)) return;
+        minLon = Math.min(minLon, lon);
+        maxLon = Math.max(maxLon, lon);
+        minLat = Math.min(minLat, lat);
+        maxLat = Math.max(maxLat, lat);
+    };
     lines.forEach(l => {
-        minLon = Math.min(minLon, l.src_lon, l.dst_lon);
-        maxLon = Math.max(maxLon, l.src_lon, l.dst_lon);
-        minLat = Math.min(minLat, l.src_lat, l.dst_lat);
-        maxLat = Math.max(maxLat, l.src_lat, l.dst_lat);
+        expand(l.src_lon, l.src_lat);
+        expand(l.dst_lon, l.dst_lat);
+        // Учитываем северный «горб» great-circle, иначе fitBounds режет дуги сверху.
+        for (let i = 1; i <= 3; i++) {
+            const [lon, lat] = greatCirclePoint(l.src_lon, l.src_lat, l.dst_lon, l.dst_lat, i / 4);
+            expand(lon, lat);
+        }
     });
     if (minLon === 180) return;
-    const pad = 0.15;
+    const pad = 0.18;
     const lonPad = Math.max(1, (maxLon - minLon) * pad);
-    const latPad = Math.max(1, (maxLat - minLat) * pad);
+    const latPad = Math.max(1.5, (maxLat - minLat) * pad);
+    // Чуть больше запаса на север — туда уходят дуги в перспективе.
+    const northPad = latPad * 1.35;
     try {
         maplibreMap.fitBounds(
-            [[minLon - lonPad, minLat - latPad], [maxLon + lonPad, maxLat + latPad]],
-            { padding: 40, maxZoom: 6, duration: 0 }
+            [[minLon - lonPad, minLat - latPad], [maxLon + lonPad, Math.min(85, maxLat + northPad)]],
+            { padding: { top: 72, bottom: 48, left: 48, right: 48 }, maxZoom: 5.5, duration: 0 }
         );
         syncViewStateFromMap();
     } catch (e) {
         const lonSpan = maxLon - minLon, latSpan = maxLat - minLat;
-        const zoom = Math.min(6, Math.max(1, 8 - Math.log2(Math.max(lonSpan, latSpan, 1) + 1)));
+        const zoom = Math.min(5.5, Math.max(1, 8 - Math.log2(Math.max(lonSpan, latSpan, 1) + 1)));
         maplibreMap.jumpTo({
             center: [(minLon + maxLon) / 2, (minLat + maxLat) / 2],
             zoom,
