@@ -63,12 +63,23 @@ function bindUI() {
         const val = this.value;
         clearTimeout(searchDebounceTimer);
         searchDebounceTimer = setTimeout(() => {
-            currentSearch = normalizeText(val);
-            saveUIState();
-            refreshMapLayers();
-            updateMapOverlay();
+            if (typeof setSearchQuery === 'function') {
+                setSearchQuery(val, {
+                    syncInput: false,
+                    save: true,
+                    refresh: true,
+                    updateOverlay: true,
+                    keepBuilderOpen: true,
+                });
+            } else {
+                currentSearch = normalizeText(val);
+                saveUIState();
+                refreshMapLayers();
+                updateMapOverlay();
+            }
         }, SEARCH_DEBOUNCE_MS);
     });
+    if (typeof bindSearchBuilderUI === 'function') bindSearchBuilderUI();
     $('autoRotate')?.addEventListener('change', function () {
         autoRotate = this.checked;
         if (viewMode === 'globe') {
@@ -78,6 +89,10 @@ function bindUI() {
     });
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
+            if (typeof searchBuilderPanelOpen === 'function' && searchBuilderPanelOpen()) {
+                searchBuilderForceOpen = false;
+                syncSearchBuilderUI();
+            }
             clearFocusedCountry();
             closeDetail();
         }

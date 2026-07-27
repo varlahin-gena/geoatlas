@@ -62,6 +62,14 @@ let mapUserInteracting = false;
 
 let currentFilter = 'all';
 let currentSearch = '';
+let currentSearchMode = 'empty';
+let currentSearchMatcher = null;
+let currentSearchAst = null;
+let currentSearchParseError = '';
+let currentSearchBuilderRows = [];
+let currentSearchBuilderEditable = true;
+let currentSearchBuilderReason = '';
+let searchBuilderForceOpen = false;
 let minCount = 1;
 let maxArcs = MAX_ARCS_DEFAULT;
 let showLegend = true;
@@ -251,9 +259,13 @@ function loadUIState() {
             minCount = s.minCount;
         }
         if (typeof s.search === 'string') {
-            currentSearch = normalizeText(s.search);
-            const searchEl = document.getElementById('searchInput');
-            if (searchEl) searchEl.value = s.search;
+            if (typeof setSearchQuery === 'function') {
+                setSearchQuery(s.search, { syncInput: true });
+            } else {
+                currentSearch = String(s.search || '').trim();
+                const searchEl = document.getElementById('searchInput');
+                if (searchEl) searchEl.value = s.search;
+            }
         }
         if (typeof repFilterCategories !== 'undefined' && Array.isArray(s.repCats)) {
             repFilterCategories = new Set(s.repCats);
@@ -333,9 +345,13 @@ function applyViewFromURL() {
         if (Number.isFinite(n) && n >= 1) minCount = n;
     }
     if (params.has('q')) {
-        currentSearch = normalizeText(params.get('q') || '');
-        const searchEl = document.getElementById('searchInput');
-        if (searchEl) searchEl.value = params.get('q') || '';
+        if (typeof setSearchQuery === 'function') {
+            setSearchQuery(params.get('q') || '', { syncInput: true });
+        } else {
+            currentSearch = String(params.get('q') || '').trim();
+            const searchEl = document.getElementById('searchInput');
+            if (searchEl) searchEl.value = params.get('q') || '';
+        }
     }
     if (typeof repFilterCategories !== 'undefined' && params.get('rep_cat')) {
         repFilterCategories = new Set(params.getAll('rep_cat').filter(Boolean));

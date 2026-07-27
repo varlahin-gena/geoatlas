@@ -200,7 +200,23 @@
         <header class="topbar">
             <div class="search-box">
                 <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-                <input type="text" id="searchInput" placeholder="Поиск: IP, страна, город, правило…" />
+                <input type="text" id="searchInput" placeholder="Поиск: IP, страна, city:Москва, rule:block…" />
+                <button type="button" id="btnSearchBuilder" class="search-builder-toggle" aria-label="Открыть расширенный поиск" aria-expanded="false" aria-controls="searchBuilderPanel" title="Расширенный поиск">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18"/><path d="M6 12h12"/><path d="M10 19h4"/></svg>
+                </button>
+                <div class="search-builder-panel" id="searchBuilderPanel">
+                    <div class="search-builder-head">
+                        <div class="search-builder-title">Конструктор запроса</div>
+                        <div class="search-builder-actions">
+                            <button type="button" id="btnSearchBuilderAdd">Добавить условие</button>
+                            <button type="button" id="btnSearchBuilderApply">Применить</button>
+                            <button type="button" id="btnSearchBuilderClear">Сбросить</button>
+                        </div>
+                    </div>
+                    <div class="search-builder-hint" id="searchBuilderHint"></div>
+                    <div class="search-builder-notice" id="searchBuilderNotice" style="display:none;"></div>
+                    <div class="search-builder-rows" id="searchBuilderRows"></div>
+                </div>
             </div>
             <div class="group-control">
                 <span>Группа:</span>
@@ -331,6 +347,7 @@
 <script src="/auth.js?v=20260727s"></script>
 <script src="/common.js?v=20260727s"></script>
 <script src="/js/map-state.js?v=20260727s"></script>
+<script src="/js/map-search.js?v=20260727s"></script>
 <script src="/js/map-reputation.js?v=20260727s"></script>
 <script src="/js/map-detail.js?v=20260727s"></script>
 <script src="/js/map-render.js?v=20260727s"></script>

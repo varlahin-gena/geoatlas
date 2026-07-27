@@ -273,24 +273,13 @@ function maybeRefreshGlobeLabels(force) {
 }
 
 function lineMatchesSearch(line, pointMap) {
-    if (!currentSearch) return true;
-    const fields = [
-        line.src, line.dst, line.src_label, line.dst_label,
-        line.rule, line.proto, line.device, line.last_action,
-        line.src_zone, line.dst_zone, line.src_country, line.dst_country
-    ];
-    if (fields.some(f => normalizeText(f).includes(currentSearch))) return true;
-    const srcP = pointMap[line.src], dstP = pointMap[line.dst];
-    const ext = [];
-    if (srcP) ext.push(srcP.city, srcP.country, srcP.region, srcP.label);
-    if (dstP) ext.push(dstP.city, dstP.country, dstP.region, dstP.label);
-    return ext.some(v => normalizeText(v).includes(currentSearch));
+    if (!currentSearchMatcher) return true;
+    return currentSearchMatcher.matchesLine(line, pointMap || allPoints);
 }
 
 function pointMatchesSearch(key, point) {
-    if (!currentSearch) return true;
-    return [key, point.label, point.city, point.region, point.country]
-        .some(v => normalizeText(v).includes(currentSearch));
+    if (!currentSearchMatcher) return true;
+    return currentSearchMatcher.matchesPoint(key, point);
 }
 
 function lineMatchesFocusedCountry(line) {

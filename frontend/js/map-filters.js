@@ -141,11 +141,15 @@ function refreshMap() { fetchData(); }
 function resetView() {
     currentFilter = 'all';
     autoFitPending = true;
-    currentSearch = '';
     minCount = 1;
     maxArcs = MAX_ARCS_DEFAULT;
     focusedCountry = null;
-    document.getElementById('searchInput').value = '';
+    if (typeof setSearchQuery === 'function') {
+        setSearchQuery('', { syncInput: true });
+    } else {
+        currentSearch = '';
+        document.getElementById('searchInput').value = '';
+    }
     document.getElementById('groupBy').value = 'city';
     if (typeof requestGlobeViewResync === 'function') requestGlobeViewResync();
     document.getElementById('periodPreset').value = '1d';

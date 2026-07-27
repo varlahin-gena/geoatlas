@@ -56,6 +56,16 @@ async function copyToClipboard(text) {
 }
 
 function applySearchFilter(value) {
+    if (typeof clearFocusedCountry === 'function') clearFocusedCountry();
+    if (typeof setSearchQuery === 'function') {
+        setSearchQuery(value, {
+            syncInput: true,
+            save: true,
+            refresh: true,
+            updateOverlay: true,
+        });
+        return;
+    }
     const input = document.getElementById('searchInput');
     input.value = value;
     currentSearch = normalizeText(value);
