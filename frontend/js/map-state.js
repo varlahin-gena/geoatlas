@@ -17,6 +17,22 @@ const MAX_ARCS_DEFAULT = 5000;
 const MAX_ARCS_MIN     = 100;
 const MAX_ARCS_MAX     = 20000;
 
+/** Стартовый вид 2D-карты: весь мир, без наклона. */
+const DEFAULT_MAP_VIEW = Object.freeze({
+    longitude: 20,
+    latitude: 18,
+    zoom: 1.5,
+    pitch: 0,
+    bearing: 0,
+});
+const DEFAULT_GLOBE_VIEW = Object.freeze({
+    longitude: 30,
+    latitude: 30,
+    zoom: 1.2,
+    pitch: 0,
+    bearing: 0,
+});
+
 const MAP_STYLE_DARK = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 const MAP_STYLE_LIGHT = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
 
@@ -131,8 +147,8 @@ const countryNamesRu = {
     "Unknown":"Неизвестно","Неизвестно":"Неизвестно"
 };
 
-let mapViewState = { longitude: 37.6, latitude: 55.7, zoom: 2.5, pitch: 20, bearing: 0 };
-let globeViewState = { longitude: 30, latitude: 30, zoom: 1.2, pitch: 0, bearing: 0 };
+let mapViewState = { ...DEFAULT_MAP_VIEW };
+let globeViewState = { ...DEFAULT_GLOBE_VIEW };
 
 function normalizeText(v) { return (v || '').toString().toLowerCase().trim(); }
 function ruCountry(name) { if (!name) return 'Неизвестно'; return countryNamesRu[name] || name; }

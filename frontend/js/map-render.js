@@ -301,16 +301,6 @@ function arcTilt(d) {
     return ((h % 7) - 3) * 2;
 }
 
-/** Max latitude along a great-circle between two endpoints. */
-function greatCircleMaxLat(lon1, lat1, lon2, lat2) {
-    let maxLat = Math.max(lat1, lat2);
-    for (let i = 1; i < 9; i++) {
-        const [, lat] = greatCirclePoint(lon1, lat1, lon2, lat2, i / 10);
-        maxLat = Math.max(maxLat, lat);
-    }
-    return maxLat;
-}
-
 /** Arc height for 2D flat (non–great-circle) ArcLayer. */
 function mapArcHeight(d) {
     const [sLon, sLat] = nodeLonLat(d.src, d.src_lon, d.src_lat);
@@ -318,7 +308,7 @@ function mapArcHeight(d) {
     let dLon = Math.abs(tLon - sLon);
     if (dLon > 180) dLon = 360 - dLon;
     const dist = Math.max(1, Math.hypot(dLon, Math.abs(tLat - sLat)));
-    // Без greatCircle дуга идёт по хорде; лёгкий pitch карты поднимает «горб» в кадр.
+    // Без greatCircle дуга идёт по хорде между точками.
     return Math.max(0.15, Math.min(0.35, 0.1 + dist / 160));
 }
 
@@ -658,10 +648,10 @@ function initMapView() {
         maplibreMap = new maplibregl.Map({
             container: host,
             style: styleUrl,
-            center: [vs.longitude || 37.6, vs.latitude || 55.7],
-            zoom: vs.zoom || 2.5,
-            bearing: vs.bearing || 0,
-            pitch: vs.pitch || 0,
+            center: [vs.longitude ?? DEFAULT_MAP_VIEW.longitude, vs.latitude ?? DEFAULT_MAP_VIEW.latitude],
+            zoom: vs.zoom ?? DEFAULT_MAP_VIEW.zoom,
+            bearing: vs.bearing ?? DEFAULT_MAP_VIEW.bearing,
+            pitch: vs.pitch ?? DEFAULT_MAP_VIEW.pitch,
             attributionControl: true,
             preserveDrawingBuffer: true,
             fadeDuration: 0,
@@ -779,81 +769,19 @@ function destroyMapView() {
     if (host) host.innerHTML = '';
 }
 
-/** Intermediate point on a great-circle, t ∈ [0, 1]. */
-function greatCirclePoint(lon1, lat1, lon2, lat2, t) {
-    const φ1 = lat1 * Math.PI / 180;
-    const λ1 = lon1 * Math.PI / 180;
-    const φ2 = lat2 * Math.PI / 180;
-    let dλ = (lon2 - lon1) * Math.PI / 180;
-    if (dλ > Math.PI) dλ -= 2 * Math.PI;
-    if (dλ < -Math.PI) dλ += 2 * Math.PI;
-    const λ2 = λ1 + dλ;
-    const x1 = Math.cos(φ1) * Math.cos(λ1);
-    const y1 = Math.cos(φ1) * Math.sin(λ1);
-    const z1 = Math.sin(φ1);
-    const x2 = Math.cos(φ2) * Math.cos(λ2);
-    const y2 = Math.cos(φ2) * Math.sin(λ2);
-    const z2 = Math.sin(φ2);
-    const ω = Math.acos(Math.max(-1, Math.min(1, x1 * x2 + y1 * y2 + z1 * z2)));
-    if (!(ω > 1e-6)) return [lon1, lat1];
-    const a = Math.sin((1 - t) * ω) / Math.sin(ω);
-    const b = Math.sin(t * ω) / Math.sin(ω);
-    const x = a * x1 + b * x2;
-    const y = a * y1 + b * y2;
-    const z = a * z1 + b * z2;
-    return [
-        Math.atan2(y, x) * 180 / Math.PI,
-        Math.atan2(z, Math.hypot(x, y)) * 180 / Math.PI,
-    ];
-}
-
 function fitDeckToData() {
-    const lines = allLines.filter(hasCoords);
-    if (!lines.length || !maplibreMap) return;
-    let minLon = 180, maxLon = -180, minLat = 90, maxLat = -90;
-    const expand = (lon, lat) => {
-        if (!Number.isFinite(lon) || !Number.isFinite(lat)) return;
-        minLon = Math.min(minLon, lon);
-        maxLon = Math.max(maxLon, lon);
-        minLat = Math.min(minLat, lat);
-        maxLat = Math.max(maxLat, lat);
-    };
-    lines.forEach(l => {
-        expand(l.src_lon, l.src_lat);
-        expand(l.dst_lon, l.dst_lat);
-        // Учитываем северный «горб» great-circle, иначе fitBounds режет дуги сверху.
-        const peakLat = greatCircleMaxLat(l.src_lon, l.src_lat, l.dst_lon, l.dst_lat);
-        expand((l.src_lon + l.dst_lon) / 2, peakLat);
-        for (let i = 1; i <= 7; i++) {
-            const [lon, lat] = greatCirclePoint(l.src_lon, l.src_lat, l.dst_lon, l.dst_lat, i / 8);
-            expand(lon, lat);
-        }
+    if (!maplibreMap) return;
+    // Фиксированный мировой обзор вместо fitBounds — иначе центр/zoom
+    // «прыгают» к плотности данных (часто Европа) и не совпадают со стартовым видом.
+    const vs = DEFAULT_MAP_VIEW;
+    mapViewState = { ...vs };
+    maplibreMap.jumpTo({
+        center: [vs.longitude, vs.latitude],
+        zoom: vs.zoom,
+        bearing: vs.bearing,
+        pitch: vs.pitch,
     });
-    if (minLon === 180) return;
-    const pad = 0.2;
-    const lonPad = Math.max(1.5, (maxLon - minLon) * pad);
-    const latPad = Math.max(2, (maxLat - minLat) * pad);
-    // Чуть больше запаса на север — туда уходят дуги в перспективе.
-    const northPad = Math.max(3, latPad * 1.6);
-    try {
-        maplibreMap.fitBounds(
-            [[minLon - lonPad, minLat - latPad], [maxLon + lonPad, Math.min(82, maxLat + northPad)]],
-            { padding: { top: 80, bottom: 52, left: 52, right: 52 }, maxZoom: 5, duration: 0 }
-        );
-        // Небольшой pitch, чтобы плоские дуги читались как «горбы», а не как прямые.
-        if ((maplibreMap.getPitch() || 0) < 12) {
-            maplibreMap.jumpTo({ pitch: 20 });
-        }
-        syncViewStateFromMap();
-    } catch (e) {
-        const lonSpan = maxLon - minLon, latSpan = maxLat - minLat;
-        const zoom = Math.min(5.5, Math.max(1, 8 - Math.log2(Math.max(lonSpan, latSpan, 1) + 1)));
-        maplibreMap.jumpTo({
-            center: [(minLon + maxLon) / 2, (minLat + maxLat) / 2],
-            zoom,
-        });
-        syncViewStateFromMap();
-    }
+    syncViewStateFromMap();
 }
 
 function setViewMode(mode) {
@@ -900,10 +828,10 @@ function setViewMode(mode) {
     } else {
         applyMapProjection('map');
         maplibreMap.jumpTo({
-            center: [mapViewState.longitude || 37.6, mapViewState.latitude || 55.7],
-            zoom: mapViewState.zoom || 2.5,
-            bearing: mapViewState.bearing || 0,
-            pitch: mapViewState.pitch || 0,
+            center: [mapViewState.longitude ?? DEFAULT_MAP_VIEW.longitude, mapViewState.latitude ?? DEFAULT_MAP_VIEW.latitude],
+            zoom: mapViewState.zoom ?? DEFAULT_MAP_VIEW.zoom,
+            bearing: mapViewState.bearing ?? DEFAULT_MAP_VIEW.bearing,
+            pitch: mapViewState.pitch ?? DEFAULT_MAP_VIEW.pitch,
         });
     }
     syncViewStateFromMap();

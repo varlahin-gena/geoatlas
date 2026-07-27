@@ -162,8 +162,8 @@ function resetView() {
         if (typeof updateReputationMenuUI === 'function') updateReputationMenuUI();
     }
     applyFilterUI();
-    mapViewState = { longitude: 37.6, latitude: 55.7, zoom: 2.5, pitch: 20, bearing: 0 };
-    globeViewState = { longitude: 30, latitude: 30, zoom: 1.2, pitch: 0, bearing: 0 };
+    mapViewState = { ...DEFAULT_MAP_VIEW };
+    globeViewState = { ...DEFAULT_GLOBE_VIEW };
     if (maplibreMap) {
         const vs = viewMode === 'globe' ? globeViewState : mapViewState;
         maplibreMap.jumpTo({
