@@ -897,6 +897,11 @@ function setViewMode(mode) {
     document.getElementById('mode-globe-icon')?.classList.toggle('active', mode === 'globe');
     document.getElementById('autoRotateWrap').style.display = (mode === 'globe') ? '' : 'none';
 
+    // Heatmap стран на глобусе отключён (тормозит анимацию), поэтому скрываем переключатель в 3D.
+    const heatChkEl = document.getElementById('toggleHeatmapChk');
+    const heatLabelEl = heatChkEl?.closest('label.side-toggle');
+    if (heatLabelEl) heatLabelEl.style.display = (mode === 'globe') ? 'none' : '';
+
     if (!maplibreMap) {
         initMapView();
         saveUIState();
