@@ -174,7 +174,35 @@ function isOnVisibleGlobeHemisphere(lon, lat, viewLon, viewLat) {
     const λ2 = lon * toRad;
     const cosC = Math.sin(φ1) * Math.sin(φ2)
         + Math.cos(φ1) * Math.cos(φ2) * Math.cos(λ2 - λ1);
-    return cosC > 0.12;
+    // Чуть строже порог — у лимба дуги и так почти в ребре.
+    return cosC > 0.08;
+}
+
+/** Скрыть дуги, уходящие на обратную сторону глобуса (нет шейдерной окклюзии в нашем deck.gl). */
+function isArcVisibleOnGlobe(line, viewLon, viewLat) {
+    const [sLon, sLat] = nodeLonLat(line.src, line.src_lon, line.src_lat);
+    const [tLon, tLat] = nodeLonLat(line.dst, line.dst_lon, line.dst_lat);
+    const srcVis = isOnVisibleGlobeHemisphere(sLon, sLat, viewLon, viewLat);
+    const dstVis = isOnVisibleGlobeHemisphere(tLon, tLat, viewLon, viewLat);
+    if (!srcVis && !dstVis) return false;
+
+    let dLon = tLon - sLon;
+    if (dLon > 180) dLon -= 360;
+    if (dLon < -180) dLon += 360;
+
+    // Если середина пути за горизонтом — дуга уходит «сквозь» планету.
+    let behind = 0;
+    for (let i = 1; i <= 3; i++) {
+        const t = i / 4;
+        const lon = sLon + dLon * t;
+        const lat = sLat + (tLat - sLat) * t;
+        if (!isOnVisibleGlobeHemisphere(lon, lat, viewLon, viewLat)) behind++;
+    }
+    return behind < 2;
+}
+
+function filterGlobeVisibleLines(lines, viewLon, viewLat) {
+    return lines.filter(l => isArcVisibleOnGlobe(l, viewLon, viewLat));
 }
 
 function visibleGlobeCentroids() {
@@ -184,15 +212,16 @@ function visibleGlobeCentroids() {
     return all.filter((c) => isOnVisibleGlobeHemisphere(c.lon, c.lat, viewLon, viewLat));
 }
 
-let lastGlobeLabelCullKey = '';
+let lastGlobeCullKey = '';
 
 function maybeRefreshGlobeLabels(force) {
-    if (viewMode !== 'globe' || !showCountryLabels) return;
+    if (viewMode !== 'globe') return;
     const lon = Math.round((globeViewState.longitude || 0) * 2) / 2;
     const lat = Math.round((globeViewState.latitude || 0) * 2) / 2;
     const key = lon + ':' + lat;
-    if (!force && key === lastGlobeLabelCullKey) return;
-    lastGlobeLabelCullKey = key;
+    if (!force && key === lastGlobeCullKey) return;
+    lastGlobeCullKey = key;
+    // Пересчитываем и подписи, и отсечение дуг/узлов за горизонтом.
     refreshMapLayers();
 }
 
@@ -324,13 +353,22 @@ function globeArcHeight(d) {
 
 function buildDeckLayers(mode = 'map') {
     const isGlobe = mode === 'globe';
+    const viewLon = isGlobe ? (globeViewState.longitude || 0) : 0;
+    const viewLat = isGlobe ? (globeViewState.latitude || 0) : 0;
     let lines = getVisibleLines();
     const totalBeforeLimit = lines.length;
     lines = topByCount(lines, maxArcs);
     lines = decorateFlowLines(lines);
+    const drawnForCount = lines.length;
+    if (isGlobe) {
+        lines = filterGlobeVisibleLines(lines, viewLon, viewLat);
+    }
 
-    const points = getVisiblePoints(lines);
-    updateArcCountInfo(lines.length, totalBeforeLimit);
+    let points = getVisiblePoints(lines);
+    if (isGlobe) {
+        points = points.filter(p => isOnVisibleGlobeHemisphere(p.lon, p.lat, viewLon, viewLat));
+    }
+    updateArcCountInfo(drawnForCount, totalBeforeLimit);
 
     const layers = [];
     const landColor = cssRgb('--map-land-rgb', mapTilesFailed ? 220 : 0);
@@ -339,8 +377,10 @@ function buildDeckLayers(mode = 'map') {
     const useHeat = heatmapEnabled();
     const countriesPickable = useHeat || currentGroupBy() === 'country';
 
-    // Fallback land fill when basemap tiles unavailable; otherwise transparent unless heatmap.
-    if (countriesGeoJSON && (mapTilesFailed || useHeat)) {
+    // На глобусе GeoJson-заливка стран даёт артефакты (серый «диск» / ломаный wrap).
+    // Heatmap оставляем для 2D; на globe — только basemap (+ fallback при отсутствии тайлов).
+    const showCountryFills = countriesGeoJSON && (mapTilesFailed || (useHeat && !isGlobe));
+    if (showCountryFills) {
         const { max, heat } = getStatsCache();
         layers.push(new deck.GeoJsonLayer({
             id: 'countries',
@@ -348,7 +388,7 @@ function buildDeckLayers(mode = 'map') {
             pickable: countriesPickable,
             stroked: !isGlobe,
             filled: true,
-            wrapLongitude: true,
+            wrapLongitude: !isGlobe,
             getFillColor: f => {
                 if (useHeat) {
                     const c = heatmapColorRGB(heat.get(f) || 0, max);
@@ -373,7 +413,7 @@ function buildDeckLayers(mode = 'map') {
                 }
             },
         }));
-    } else if (countriesGeoJSON && countriesPickable) {
+    } else if (countriesGeoJSON && countriesPickable && !isGlobe) {
         // Invisible pick layer for country clicks when basemap is present.
         layers.push(new deck.GeoJsonLayer({
             id: 'countries-pick',
@@ -401,8 +441,6 @@ function buildDeckLayers(mode = 'map') {
         const labelColor = NMAuth.getTheme() === 'light'
             ? [31, 35, 40, 230]
             : [220, 226, 234, 230];
-        const viewLon = isGlobe ? (globeViewState.longitude || 0) : 0;
-        const viewLat = isGlobe ? (globeViewState.latitude || 0) : 0;
         layers.push(new deck.TextLayer({
             id: 'country-labels',
             data: centroids,
@@ -437,7 +475,7 @@ function buildDeckLayers(mode = 'map') {
     const nodeOpacity = 150;
     // На MapLibre globe НЕ ставить cullMode:'back' / depthCompare:'always' —
     // трубки ArcLayer вырезаются до обрывков по лимбу (см. deck.gl maplibre example:
-    // parameters: { cullMode: 'none' }).
+    // parameters: { cullMode: 'none' }). Обратную сторону скрываем фильтром выше.
     layers.push(new deck.ArcLayer({
         id: 'arcs',
         data: lines,
@@ -445,7 +483,7 @@ function buildDeckLayers(mode = 'map') {
         // greatCircle на mercator гонит трансатлантику через Арктику — дуги
         // обрезаются сверху. На карте рисуем плоские дуги по хорде; на глобусе — 3D.
         greatCircle: false,
-        wrapLongitude: true,
+        wrapLongitude: !isGlobe,
         getSourcePosition: d => nodeLonLat(d.src, d.src_lon, d.src_lat),
         getTargetPosition: d => nodeLonLat(d.dst, d.dst_lon, d.dst_lat),
         getSourceColor: d => [...arcRGB(d.status, d), d._flowAlpha || 210],
@@ -462,11 +500,12 @@ function buildDeckLayers(mode = 'map') {
         updateTriggers: {
             getSourceColor: [currentFilter, monoArcColor, typeof repColorArcs !== 'undefined' && repColorArcs, typeof reputationFilterActiveCount === 'function' ? reputationFilterActiveCount() : 0, focusedCountry],
             getTargetColor: [currentFilter, monoArcColor, typeof repColorArcs !== 'undefined' && repColorArcs, typeof reputationFilterActiveCount === 'function' ? reputationFilterActiveCount() : 0, focusedCountry],
-            getSourcePosition: [_statsCacheVersion],
-            getTargetPosition: [_statsCacheVersion],
+            getSourcePosition: [_statsCacheVersion, viewLon, viewLat],
+            getTargetPosition: [_statsCacheVersion, viewLon, viewLat],
             getHeight: [isGlobe],
             getTilt: [isGlobe],
             getWidth: [maxArcs],
+            data: [viewLon, viewLat, isGlobe],
         },
         onClick: info => { if (info.object) showLineDetail(info.object); },
     }));
@@ -491,6 +530,7 @@ function buildDeckLayers(mode = 'map') {
         updateTriggers: {
             getLineColor: [NMAuth.getTheme()],
             getFillColor: [nodeOpacity],
+            data: [viewLon, viewLat, isGlobe],
         },
         onClick: info => { if (info.object) showPointDetail(info.object, info.object.key); },
     }));
@@ -607,6 +647,21 @@ function applyMapProjection(mode) {
     if (!maplibreMap || typeof maplibreMap.setProjection !== 'function') return false;
     try {
         maplibreMap.setProjection({ type: mode === 'globe' ? 'globe' : 'mercator' });
+        // Атмосфера MapLibre на тёмной теме часто выглядит как серый «блин» —
+        // задаём спокойный space/fog под наш фон.
+        if (typeof maplibreMap.setFog === 'function') {
+            if (mode === 'globe') {
+                maplibreMap.setFog({
+                    color: 'rgba(13, 17, 23, 0.65)',
+                    'high-color': 'rgba(20, 28, 40, 0.25)',
+                    'horizon-blend': 0.015,
+                    'space-color': 'rgb(5, 8, 12)',
+                    'star-intensity': 0,
+                });
+            } else {
+                maplibreMap.setFog(null);
+            }
+        }
         return true;
     } catch (e) {
         console.warn('setProjection failed:', e);
@@ -835,7 +890,7 @@ function setViewMode(mode) {
         });
     }
     syncViewStateFromMap();
-    lastGlobeLabelCullKey = '';
+    lastGlobeCullKey = '';
     // Сброс views у overlay — чтобы подхватить GlobeView после setProjection.
     if (deckOverlay && typeof deckOverlay.setProps === 'function') {
         deckOverlay.setProps({ views: undefined, layers: buildDeckLayers(viewMode) });
