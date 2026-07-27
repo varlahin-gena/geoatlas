@@ -114,8 +114,12 @@ function updateArcsTruncHint(shown, total) {
     if (!el) return;
     if (total > shown) {
         el.style.display = 'block';
+        let reason = 'увеличьте лимит дуг или сузьте период';
+        if (arcLayout === 'hub') {
+            reason = 'режим Hub–spoke (увеличьте число хабов / лимит дуг) или «Все связи»';
+        }
         el.textContent = 'Показано ' + fmtNumber(shown) + ' из ' + fmtNumber(total)
-            + ' связей — увеличьте лимит дуг или сузьте период';
+            + ' связей — ' + reason;
     } else {
         el.style.display = 'none';
         el.textContent = '';

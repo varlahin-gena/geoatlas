@@ -269,17 +269,27 @@ function getVisiblePoints(visibleLines) {
     return result;
 }
 
-/** Top-K узлов по числу инцидентных рёбер. */
+/** Top-K узлов по числу инцидентных рёбер (и при равенстве — по сумме count). */
 function computeHubKeys(lines, k) {
     const degree = new Map();
+    const weight = new Map();
     lines.forEach(l => {
         if (!l.src || !l.dst || l.src === l.dst) return;
+        const c = l.count || 0;
         degree.set(l.src, (degree.get(l.src) || 0) + 1);
         degree.set(l.dst, (degree.get(l.dst) || 0) + 1);
+        weight.set(l.src, (weight.get(l.src) || 0) + c);
+        weight.set(l.dst, (weight.get(l.dst) || 0) + c);
     });
     return new Set(
         [...degree.entries()]
-            .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])))
+            .sort((a, b) => {
+                const d = b[1] - a[1];
+                if (d) return d;
+                const w = (weight.get(b[0]) || 0) - (weight.get(a[0]) || 0);
+                if (w) return w;
+                return String(a[0]).localeCompare(String(b[0]));
+            })
             .slice(0, Math.max(1, k || HUB_COUNT_DEFAULT))
             .map(([key]) => key)
     );
@@ -333,12 +343,15 @@ function buildDeckLayers(mode = 'map') {
     const isGlobe = mode === 'globe';
     let lines = getVisibleLines();
     const totalBeforeLayout = lines.length;
-    lines = topByCount(lines, maxArcs);
 
+    // Хабы считаем по ВСЕМ видимым рёбрам, иначе при group_by=ip
+    // topByCount сначала оставляет разрозненные «тяжёлые» пары, и у top-K
+    // хабов внутри урезанного набора почти нет общих спиц.
     currentHubKeys = computeHubKeys(lines, hubCount);
     if (arcLayout === 'hub') {
         lines = filterHubSpokeLines(lines, currentHubKeys);
     }
+    lines = topByCount(lines, maxArcs);
     lines = decorateFlowLines(lines);
 
     const points = getVisiblePoints(lines).map(p =>

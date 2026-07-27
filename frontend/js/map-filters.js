@@ -18,10 +18,14 @@ async function fetchData(opts) {
     try {
         const groupBy = document.getElementById('groupBy').value;
         const periodQuery = buildPeriodQuery();
+        // IP/subnet дают больше уникальных рёбер — берём верхний лимит API,
+        // иначе hub–spoke видит только «верхушку» пар и рисует мало спиц.
+        const apiLimit = (groupBy === 'ip' || groupBy === 'subnet') ? 50000 : 10000;
 
         // ВАЖНО: filter не передаём в backend — фильтруем локально на клиенте
         const url = `${API_BASE}/api/events`
             + `?group_by=${encodeURIComponent(groupBy)}`
+            + `&limit=${apiLimit}`
             + periodQuery;
 
         const res = await fetch(url, { cache: 'no-store', credentials: 'same-origin' });
