@@ -14,7 +14,14 @@ const SEARCH_FIELD_DEFS = Object.freeze({
 });
 
 const SEARCH_BUILDER_FIELDS = ['all', 'ip', 'country', 'city', 'rule', 'device'];
-const SEARCH_COMPLEXITY_MESSAGE = 'Этот запрос использует группировку или смешанные AND/OR. Его можно выполнять, но удобнее редактировать прямо в строке.';
+const SEARCH_COMPLEXITY_MESSAGE = 'Этот запрос слишком вложенный для конструктора. Его можно выполнять, но удобнее редактировать прямо в строке.';
+const SEARCH_EXAMPLE_CHIPS = Object.freeze([
+    { label: 'country:Россия', query: 'country:Россия' },
+    { label: 'rule:block', query: 'rule:block' },
+    { label: 'NOT city:Москва', query: 'NOT city:Москва' },
+    { label: 'country AND device', query: 'country:Россия AND device:fw1' },
+    { label: '(A OR B) AND NOT', query: '(country:Россия OR country:Казахстан) AND NOT rule:allow' },
+]);
 
 let searchFieldAliasMap = null;
 
@@ -374,79 +381,205 @@ function searchBuilderTermToRow(node, joinWith) {
     }
     if (!term || term.type !== 'TERM') return null;
     return {
+        kind: 'term',
         joinWith: joinWith || 'AND',
         negate: negate,
         field: term.field || 'all',
         value: term.value || '',
+        op: 'AND',
+        children: [],
+    };
+}
+
+function flattenOpChain(node, op) {
+    if (!node) return [];
+    if (node.type === op) {
+        return flattenOpChain(node.left, op).concat(flattenOpChain(node.right, op));
+    }
+    return [node];
+}
+
+function nodeToBuilderItem(node, joinWith) {
+    let negate = false;
+    let n = node;
+    if (n && n.type === 'NOT') {
+        negate = true;
+        n = n.expr;
+    }
+    const term = searchBuilderTermToRow(n, joinWith);
+    if (term) {
+        term.negate = negate || term.negate;
+        return term;
+    }
+    if (!n || (n.type !== 'AND' && n.type !== 'OR')) return null;
+    const parts = flattenOpChain(n, n.type);
+    const children = [];
+    for (let i = 0; i < parts.length; i++) {
+        let childNeg = false;
+        let child = parts[i];
+        if (child && child.type === 'NOT') {
+            childNeg = true;
+            child = child.expr;
+        }
+        if (!child || child.type !== 'TERM') return null;
+        children.push({
+            negate: childNeg,
+            field: child.field || 'all',
+            value: child.value || '',
+        });
+    }
+    if (!children.length) return null;
+    return {
+        kind: 'group',
+        joinWith: joinWith || 'AND',
+        negate: negate,
+        field: 'all',
+        value: '',
+        op: n.type,
+        children: children,
     };
 }
 
 function searchBuilderRowsFromAst(ast) {
     if (!ast) return { editable: true, rows: [] };
-    const single = searchBuilderTermToRow(ast, 'AND');
-    if (single) return { editable: true, rows: [single] };
-
-    function walk(node, currentOp, acc) {
-        if (!node) return false;
-        const row = searchBuilderTermToRow(node, currentOp || 'AND');
-        if (row) {
-            acc.push(row);
-            return true;
+    if (ast.type === 'AND' || ast.type === 'OR') {
+        const parts = flattenOpChain(ast, ast.type);
+        const rows = [];
+        for (let i = 0; i < parts.length; i++) {
+            const item = nodeToBuilderItem(parts[i], i === 0 ? 'AND' : ast.type);
+            if (!item) {
+                return { editable: false, rows: [], reason: SEARCH_COMPLEXITY_MESSAGE };
+            }
+            rows.push(item);
         }
-        if (node.type !== 'AND' && node.type !== 'OR') return false;
-        const op = node.type;
-        if (currentOp && currentOp !== op) return false;
-        return walk(node.left, op, acc) && walk(node.right, op, acc);
+        if (!rows.length) {
+            return { editable: false, rows: [], reason: SEARCH_COMPLEXITY_MESSAGE };
+        }
+        return { editable: true, rows: rows };
     }
-
-    const rows = [];
-    if (!walk(ast, null, rows) || !rows.length) {
-        return { editable: false, rows: [], reason: SEARCH_COMPLEXITY_MESSAGE };
-    }
-    rows[0].joinWith = 'AND';
-    return { editable: true, rows: rows };
+    const single = nodeToBuilderItem(ast, 'AND');
+    if (single) return { editable: true, rows: [single] };
+    return { editable: false, rows: [], reason: SEARCH_COMPLEXITY_MESSAGE };
 }
 
 function createDefaultBuilderRow() {
-    return { joinWith: 'AND', negate: false, field: 'all', value: '' };
+    return {
+        kind: 'term',
+        joinWith: 'AND',
+        negate: false,
+        field: 'all',
+        value: '',
+        op: 'AND',
+        children: [],
+    };
+}
+
+function createDefaultBuilderGroup() {
+    return {
+        kind: 'group',
+        joinWith: 'AND',
+        negate: false,
+        field: 'all',
+        value: '',
+        op: 'OR',
+        children: [
+            { negate: false, field: 'all', value: '' },
+            { negate: false, field: 'all', value: '' },
+        ],
+    };
+}
+
+function cloneBuilderRows(rows) {
+    return (rows || []).map(function (row) {
+        return {
+            kind: row.kind === 'group' ? 'group' : 'term',
+            joinWith: row.joinWith === 'OR' ? 'OR' : 'AND',
+            negate: !!row.negate,
+            field: SEARCH_FIELD_DEFS[row.field] ? row.field : 'all',
+            value: row.value || '',
+            op: row.op === 'OR' ? 'OR' : 'AND',
+            children: Array.isArray(row.children)
+                ? row.children.map(function (child) {
+                    return {
+                        negate: !!child.negate,
+                        field: SEARCH_FIELD_DEFS[child.field] ? child.field : 'all',
+                        value: child.value || '',
+                    };
+                })
+                : [],
+        };
+    });
+}
+
+function normalizeBuilderItem(row, idx) {
+    const kind = row && row.kind === 'group' ? 'group' : 'term';
+    const item = {
+        kind: kind,
+        joinWith: idx === 0 ? 'AND' : (row.joinWith === 'OR' ? 'OR' : 'AND'),
+        negate: !!(row && row.negate),
+        field: SEARCH_FIELD_DEFS[row && row.field] ? row.field : 'all',
+        value: (row && row.value) || '',
+        op: row && row.op === 'OR' ? 'OR' : 'AND',
+        children: [],
+    };
+    if (kind === 'group') {
+        const children = Array.isArray(row.children) && row.children.length
+            ? row.children
+            : [{ negate: false, field: 'all', value: '' }];
+        item.children = children.map(function (child) {
+            return {
+                negate: !!child.negate,
+                field: SEARCH_FIELD_DEFS[child.field] ? child.field : 'all',
+                value: child.value || '',
+            };
+        });
+    }
+    return item;
 }
 
 function currentSearchBuilderState() {
     if (!currentSearchBuilderEditable && currentSearch) return [];
     if (currentSearchBuilderEditable && Array.isArray(currentSearchBuilderRows) && currentSearchBuilderRows.length) {
-        return currentSearchBuilderRows.map(function (row, idx) {
-            return {
-                joinWith: idx === 0 ? 'AND' : (row.joinWith === 'OR' ? 'OR' : 'AND'),
-                negate: !!row.negate,
-                field: SEARCH_FIELD_DEFS[row.field] ? row.field : 'all',
-                value: row.value || '',
-            };
-        });
+        return currentSearchBuilderRows.map(normalizeBuilderItem);
     }
     if (currentSearchMode === 'simple' && currentSearch) {
-        return [{ joinWith: 'AND', negate: false, field: 'all', value: currentSearch }];
+        return [normalizeBuilderItem({
+            kind: 'term',
+            joinWith: 'AND',
+            negate: false,
+            field: 'all',
+            value: currentSearch,
+        }, 0)];
     }
     return [createDefaultBuilderRow()];
+}
+
+function serializeBuilderTerm(term) {
+    const value = String(term && term.value || '').trim();
+    if (!value) return null;
+    const field = SEARCH_FIELD_DEFS[term.field] ? term.field : 'all';
+    const prefix = field === 'all' ? '' : field + ':';
+    return (term.negate ? 'NOT ' : '') + prefix + quoteSearchValue(value);
 }
 
 function serializeSearchBuilderRows(rows) {
     const prepared = (rows || [])
         .map(function (row, idx) {
-            const value = String(row && row.value || '').trim();
-            if (!value) return null;
-            const field = SEARCH_FIELD_DEFS[row.field] ? row.field : 'all';
-            const prefix = field === 'all' ? '' : field + ':';
-            const expr = prefix + quoteSearchValue(value);
-            return {
-                joinWith: idx === 0 ? '' : ((row.joinWith === 'OR') ? 'OR ' : 'AND '),
-                negate: row.negate ? 'NOT ' : '',
-                expr: expr,
-            };
+            const joinWith = idx === 0 ? '' : ((row.joinWith === 'OR') ? 'OR ' : 'AND ');
+            if (row.kind === 'group') {
+                const inner = (row.children || [])
+                    .map(serializeBuilderTerm)
+                    .filter(Boolean)
+                    .join(row.op === 'OR' ? ' OR ' : ' AND ');
+                if (!inner) return null;
+                return joinWith + (row.negate ? 'NOT ' : '') + '(' + inner + ')';
+            }
+            const expr = serializeBuilderTerm(row);
+            if (!expr) return null;
+            return joinWith + expr;
         })
         .filter(Boolean);
-    return prepared.map(function (row) {
-        return row.joinWith + row.negate + row.expr;
-    }).join(' ');
+    return prepared.join(' ');
 }
 
 function setSearchQuery(raw, options) {
@@ -466,9 +599,10 @@ function setSearchQuery(raw, options) {
     currentSearchBuilderEditable = compiled.builderEditable;
     currentSearchBuilderReason = compiled.builderReason || '';
     if (compiled.builderRows) {
-        currentSearchBuilderRows = compiled.builderRows.map(function (row) { return Object.assign({}, row); });
+        currentSearchBuilderRows = cloneBuilderRows(compiled.builderRows);
     } else if (compiled.mode === 'simple' && compiled.raw) {
-        currentSearchBuilderRows = [{ joinWith: 'AND', negate: false, field: 'all', value: compiled.raw }];
+        currentSearchBuilderRows = [createDefaultBuilderRow()];
+        currentSearchBuilderRows[0].value = compiled.raw;
     } else {
         currentSearchBuilderRows = [createDefaultBuilderRow()];
     }
@@ -492,11 +626,124 @@ function searchBuilderStatusText() {
     if (currentSearchMode === 'advanced') {
         return 'Расширенный запрос активен. Поддерживаются AND, OR, NOT, скобки и поля.';
     }
-    return 'Подсказка: country:Россия AND device:fw1, NOT rule:block, ip:1.2.3.4';
+    return 'Подсказка: country:Россия AND device:fw1, NOT rule:block, (A OR B)';
 }
 
 function searchBuilderPanelOpen() {
     return !!searchBuilderForceOpen;
+}
+
+function searchEventInsideSearchBox(event, searchBox) {
+    if (!searchBox || !event) return false;
+    if (typeof event.composedPath === 'function') {
+        const path = event.composedPath();
+        if (path && path.indexOf(searchBox) !== -1) return true;
+    }
+    const target = event.target;
+    if (target && typeof searchBox.contains === 'function' && searchBox.contains(target)) return true;
+    return false;
+}
+
+function appendBuilderJoinSelect(parent, row, idx, onChange) {
+    const join = document.createElement('select');
+    join.className = 'search-builder-join';
+    join.disabled = idx === 0 || !currentSearchBuilderEditable;
+    [['AND', 'И'], ['OR', 'ИЛИ']].forEach(function (entry) {
+        const option = document.createElement('option');
+        option.value = entry[0];
+        option.textContent = entry[1];
+        if ((row.joinWith || 'AND') === entry[0]) option.selected = true;
+        join.appendChild(option);
+    });
+    join.addEventListener('change', onChange);
+    parent.appendChild(join);
+}
+
+function appendBuilderNegate(parent, checked, onChange) {
+    const negWrap = document.createElement('label');
+    negWrap.className = 'search-builder-negate';
+    const neg = document.createElement('input');
+    neg.type = 'checkbox';
+    neg.checked = !!checked;
+    neg.disabled = !currentSearchBuilderEditable;
+    neg.addEventListener('change', onChange);
+    negWrap.appendChild(neg);
+    negWrap.appendChild(document.createTextNode('НЕ'));
+    parent.appendChild(negWrap);
+}
+
+function appendBuilderFieldSelect(parent, selected, onChange) {
+    const field = document.createElement('select');
+    field.className = 'search-builder-field';
+    field.disabled = !currentSearchBuilderEditable;
+    SEARCH_BUILDER_FIELDS.forEach(function (key) {
+        const option = document.createElement('option');
+        option.value = key;
+        option.textContent = SEARCH_FIELD_DEFS[key].label;
+        if ((selected || 'all') === key) option.selected = true;
+        field.appendChild(option);
+    });
+    field.addEventListener('change', onChange);
+    parent.appendChild(field);
+}
+
+function appendBuilderValueInput(parent, value, onInput) {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'search-builder-value';
+    input.placeholder = 'Значение';
+    input.value = value || '';
+    input.disabled = !currentSearchBuilderEditable;
+    input.addEventListener('input', onInput);
+    parent.appendChild(input);
+}
+
+function appendBuilderButton(parent, className, text, disabled, onClick) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = className;
+    btn.textContent = text;
+    btn.disabled = !!disabled;
+    btn.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        searchBuilderForceOpen = true;
+        onClick(event);
+    });
+    parent.appendChild(btn);
+    return btn;
+}
+
+function ensureBuilderRowsMutable() {
+    if (!Array.isArray(currentSearchBuilderRows) || !currentSearchBuilderRows.length) {
+        currentSearchBuilderRows = [createDefaultBuilderRow()];
+    }
+}
+
+function syncSearchExampleChips() {
+    const host = document.getElementById('searchBuilderChips');
+    if (!host) return;
+    host.innerHTML = '';
+    SEARCH_EXAMPLE_CHIPS.forEach(function (chip) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'search-example-chip';
+        btn.textContent = chip.label;
+        btn.title = chip.query;
+        btn.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            searchBuilderForceOpen = true;
+            setSearchQuery(chip.query, {
+                syncInput: true,
+                save: true,
+                refresh: true,
+                updateOverlay: true,
+                keepBuilderOpen: true,
+            });
+        });
+        host.appendChild(btn);
+    });
 }
 
 function syncSearchBuilderUI() {
@@ -506,6 +753,7 @@ function syncSearchBuilderUI() {
     const toggle = document.getElementById('btnSearchBuilder');
     const notice = document.getElementById('searchBuilderNotice');
     const add = document.getElementById('btnSearchBuilderAdd');
+    const addGroup = document.getElementById('btnSearchBuilderAddGroup');
     const apply = document.getElementById('btnSearchBuilderApply');
     const clear = document.getElementById('btnSearchBuilderClear');
     if (!panel || !rowsHost || !hint || !toggle || !notice) return;
@@ -515,82 +763,131 @@ function syncSearchBuilderUI() {
     toggle.classList.toggle('active', open);
     toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     hint.textContent = searchBuilderStatusText();
+    syncSearchExampleChips();
 
     const rows = currentSearchBuilderState();
     if (add) add.disabled = !currentSearchBuilderEditable;
+    if (addGroup) addGroup.disabled = !currentSearchBuilderEditable;
     if (apply) apply.disabled = !currentSearchBuilderEditable;
     if (clear) clear.disabled = false;
     rowsHost.innerHTML = '';
     rows.forEach(function (row, idx) {
+        if (row.kind === 'group') {
+            const group = document.createElement('div');
+            group.className = 'search-builder-group';
+
+            const head = document.createElement('div');
+            head.className = 'search-builder-group-head';
+            appendBuilderJoinSelect(head, row, idx, function () {
+                ensureBuilderRowsMutable();
+                currentSearchBuilderRows[idx].joinWith = this.value;
+            });
+            appendBuilderNegate(head, row.negate, function () {
+                ensureBuilderRowsMutable();
+                currentSearchBuilderRows[idx].negate = this.checked;
+            });
+
+            const opWrap = document.createElement('label');
+            opWrap.className = 'search-builder-group-op';
+            opWrap.appendChild(document.createTextNode('внутри '));
+            const op = document.createElement('select');
+            op.disabled = !currentSearchBuilderEditable;
+            [['OR', 'ИЛИ'], ['AND', 'И']].forEach(function (entry) {
+                const option = document.createElement('option');
+                option.value = entry[0];
+                option.textContent = entry[1];
+                if ((row.op || 'OR') === entry[0]) option.selected = true;
+                op.appendChild(option);
+            });
+            op.addEventListener('change', function () {
+                ensureBuilderRowsMutable();
+                currentSearchBuilderRows[idx].op = this.value;
+            });
+            opWrap.appendChild(op);
+            head.appendChild(opWrap);
+
+            appendBuilderButton(head, 'search-builder-remove', 'Удалить группу', !currentSearchBuilderEditable || rows.length === 1, function () {
+                ensureBuilderRowsMutable();
+                currentSearchBuilderRows.splice(idx, 1);
+                if (!currentSearchBuilderRows.length) currentSearchBuilderRows.push(createDefaultBuilderRow());
+                syncSearchBuilderUI();
+            });
+            group.appendChild(head);
+
+            const childrenHost = document.createElement('div');
+            childrenHost.className = 'search-builder-group-children';
+            (row.children || []).forEach(function (child, childIdx) {
+                const childRow = document.createElement('div');
+                childRow.className = 'search-builder-row search-builder-row-nested';
+                appendBuilderNegate(childRow, child.negate, function () {
+                    ensureBuilderRowsMutable();
+                    currentSearchBuilderRows[idx].children[childIdx].negate = this.checked;
+                });
+                appendBuilderFieldSelect(childRow, child.field, function () {
+                    ensureBuilderRowsMutable();
+                    currentSearchBuilderRows[idx].children[childIdx].field = this.value;
+                });
+                appendBuilderValueInput(childRow, child.value, function () {
+                    ensureBuilderRowsMutable();
+                    currentSearchBuilderRows[idx].children[childIdx].value = this.value;
+                });
+                appendBuilderButton(
+                    childRow,
+                    'search-builder-remove',
+                    'Удалить',
+                    !currentSearchBuilderEditable || row.children.length <= 1,
+                    function () {
+                        ensureBuilderRowsMutable();
+                        currentSearchBuilderRows[idx].children.splice(childIdx, 1);
+                        if (!currentSearchBuilderRows[idx].children.length) {
+                            currentSearchBuilderRows[idx].children.push({ negate: false, field: 'all', value: '' });
+                        }
+                        syncSearchBuilderUI();
+                    }
+                );
+                childrenHost.appendChild(childRow);
+            });
+            group.appendChild(childrenHost);
+
+            const groupActions = document.createElement('div');
+            groupActions.className = 'search-builder-group-actions';
+            appendBuilderButton(groupActions, 'search-builder-remove', 'Условие в группу', !currentSearchBuilderEditable, function () {
+                ensureBuilderRowsMutable();
+                if (!Array.isArray(currentSearchBuilderRows[idx].children)) {
+                    currentSearchBuilderRows[idx].children = [];
+                }
+                currentSearchBuilderRows[idx].children.push({ negate: false, field: 'all', value: '' });
+                syncSearchBuilderUI();
+            });
+            group.appendChild(groupActions);
+            rowsHost.appendChild(group);
+            return;
+        }
+
         const item = document.createElement('div');
         item.className = 'search-builder-row';
-
-        const join = document.createElement('select');
-        join.className = 'search-builder-join';
-        join.disabled = idx === 0 || !currentSearchBuilderEditable;
-        [['AND', 'И'], ['OR', 'ИЛИ']].forEach(function (entry) {
-            const option = document.createElement('option');
-            option.value = entry[0];
-            option.textContent = entry[1];
-            if ((row.joinWith || 'AND') === entry[0]) option.selected = true;
-            join.appendChild(option);
-        });
-        join.addEventListener('change', function () {
+        appendBuilderJoinSelect(item, row, idx, function () {
+            ensureBuilderRowsMutable();
             currentSearchBuilderRows[idx].joinWith = this.value;
         });
-        item.appendChild(join);
-
-        const negWrap = document.createElement('label');
-        negWrap.className = 'search-builder-negate';
-        const neg = document.createElement('input');
-        neg.type = 'checkbox';
-        neg.checked = !!row.negate;
-        neg.disabled = !currentSearchBuilderEditable;
-        neg.addEventListener('change', function () {
+        appendBuilderNegate(item, row.negate, function () {
+            ensureBuilderRowsMutable();
             currentSearchBuilderRows[idx].negate = this.checked;
         });
-        negWrap.appendChild(neg);
-        negWrap.appendChild(document.createTextNode('НЕ'));
-        item.appendChild(negWrap);
-
-        const field = document.createElement('select');
-        field.className = 'search-builder-field';
-        field.disabled = !currentSearchBuilderEditable;
-        SEARCH_BUILDER_FIELDS.forEach(function (key) {
-            const option = document.createElement('option');
-            option.value = key;
-            option.textContent = SEARCH_FIELD_DEFS[key].label;
-            if ((row.field || 'all') === key) option.selected = true;
-            field.appendChild(option);
-        });
-        field.addEventListener('change', function () {
+        appendBuilderFieldSelect(item, row.field, function () {
+            ensureBuilderRowsMutable();
             currentSearchBuilderRows[idx].field = this.value;
         });
-        item.appendChild(field);
-
-        const value = document.createElement('input');
-        value.type = 'text';
-        value.className = 'search-builder-value';
-        value.placeholder = 'Значение';
-        value.value = row.value || '';
-        value.disabled = !currentSearchBuilderEditable;
-        value.addEventListener('input', function () {
+        appendBuilderValueInput(item, row.value, function () {
+            ensureBuilderRowsMutable();
             currentSearchBuilderRows[idx].value = this.value;
         });
-        item.appendChild(value);
-
-        const remove = document.createElement('button');
-        remove.type = 'button';
-        remove.className = 'search-builder-remove';
-        remove.textContent = 'Удалить';
-        remove.disabled = !currentSearchBuilderEditable || rows.length === 1;
-        remove.addEventListener('click', function () {
+        appendBuilderButton(item, 'search-builder-remove', 'Удалить', !currentSearchBuilderEditable || rows.length === 1, function () {
+            ensureBuilderRowsMutable();
             currentSearchBuilderRows.splice(idx, 1);
             if (!currentSearchBuilderRows.length) currentSearchBuilderRows.push(createDefaultBuilderRow());
             syncSearchBuilderUI();
         });
-        item.appendChild(remove);
-
         rowsHost.appendChild(item);
     });
 
@@ -603,12 +900,15 @@ function syncSearchBuilderUI() {
 function bindSearchBuilderUI() {
     const toggle = document.getElementById('btnSearchBuilder');
     const add = document.getElementById('btnSearchBuilderAdd');
+    const addGroup = document.getElementById('btnSearchBuilderAddGroup');
     const apply = document.getElementById('btnSearchBuilderApply');
     const clear = document.getElementById('btnSearchBuilderClear');
     const searchInput = document.getElementById('searchInput');
     const searchBox = document.querySelector('.topbar .search-box');
 
-    toggle?.addEventListener('click', function () {
+    toggle?.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
         searchBuilderForceOpen = !searchBuilderPanelOpen();
         if (searchBuilderForceOpen && (!Array.isArray(currentSearchBuilderRows) || !currentSearchBuilderRows.length)) {
             currentSearchBuilderRows = [createDefaultBuilderRow()];
@@ -616,18 +916,29 @@ function bindSearchBuilderUI() {
         syncSearchBuilderUI();
     });
 
-    add?.addEventListener('click', function () {
+    add?.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
         if (!currentSearchBuilderEditable) return;
-        currentSearchBuilderRows.push({
-            joinWith: currentSearchBuilderRows.length ? 'AND' : 'AND',
-            negate: false,
-            field: 'all',
-            value: '',
-        });
+        searchBuilderForceOpen = true;
+        ensureBuilderRowsMutable();
+        currentSearchBuilderRows.push(createDefaultBuilderRow());
         syncSearchBuilderUI();
     });
 
-    apply?.addEventListener('click', function () {
+    addGroup?.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!currentSearchBuilderEditable) return;
+        searchBuilderForceOpen = true;
+        ensureBuilderRowsMutable();
+        currentSearchBuilderRows.push(createDefaultBuilderGroup());
+        syncSearchBuilderUI();
+    });
+
+    apply?.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
         const query = serializeSearchBuilderRows(currentSearchBuilderRows);
         searchBuilderForceOpen = true;
         setSearchQuery(query, {
@@ -640,7 +951,9 @@ function bindSearchBuilderUI() {
         if (searchInput) searchInput.focus();
     });
 
-    clear?.addEventListener('click', function () {
+    clear?.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
         currentSearchBuilderRows = [createDefaultBuilderRow()];
         searchBuilderForceOpen = true;
         setSearchQuery('', {
@@ -654,7 +967,7 @@ function bindSearchBuilderUI() {
 
     document.addEventListener('click', function (event) {
         if (!searchBox || !searchBuilderPanelOpen()) return;
-        if (searchBox.contains(event.target)) return;
+        if (searchEventInsideSearchBox(event, searchBox)) return;
         searchBuilderForceOpen = false;
         syncSearchBuilderUI();
     });
