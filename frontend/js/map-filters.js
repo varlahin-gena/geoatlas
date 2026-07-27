@@ -140,7 +140,6 @@ function resetView() {
     currentSearch = '';
     minCount = 1;
     maxArcs = MAX_ARCS_DEFAULT;
-    showDensity = true;
     focusedCountry = null;
     document.getElementById('searchInput').value = '';
     document.getElementById('groupBy').value = 'city';
@@ -163,7 +162,6 @@ function resetView() {
         if (typeof updateReputationMenuUI === 'function') updateReputationMenuUI();
     }
     applyFilterUI();
-    document.getElementById('toggleDensityChk').checked = showDensity;
     mapViewState = { longitude: 37.6, latitude: 55.7, zoom: 2.5, pitch: 20, bearing: 0 };
     globeViewState = { longitude: 30, latitude: 30, zoom: 1.2, pitch: 0, bearing: 0 };
     if (maplibreMap) {

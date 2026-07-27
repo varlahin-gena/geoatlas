@@ -16,7 +16,6 @@ const SEARCH_DEBOUNCE_MS = 250;
 const MAX_ARCS_DEFAULT = 5000;
 const MAX_ARCS_MIN     = 100;
 const MAX_ARCS_MAX     = 20000;
-const DENSITY_ZOOM_THRESHOLD = 4;
 
 const MAP_STYLE_DARK = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 const MAP_STYLE_LIGHT = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
@@ -52,12 +51,10 @@ let showLegend = true;
 let showStats = true;
 let showHeatmap = true;
 let showCountryLabels = true;
-let showDensity = true;
 let monoArcColor = false;
 let autoRotate = true;
 let autoFitPending = true;
 let focusedCountry = null; // English/raw country name from geojson match
-let currentMapZoom = 2.5;
 
 let lastStats = {};
 let lastPeriodInfo = {};
@@ -217,7 +214,6 @@ function loadUIState() {
         if (typeof s.showHeatmap === 'boolean') showHeatmap = s.showHeatmap;
         if (typeof s.showCountryLabels === 'boolean') showCountryLabels = s.showCountryLabels;
         if (typeof s.monoArcColor === 'boolean') monoArcColor = s.monoArcColor;
-        if (typeof s.showDensity === 'boolean') showDensity = s.showDensity;
         const savedMaxArcs = typeof s.maxArcs === 'number' ? s.maxArcs : s.globeMaxArcs;
         if (typeof savedMaxArcs === 'number') {
             maxArcs = Math.min(MAX_ARCS_MAX, Math.max(MAX_ARCS_MIN, savedMaxArcs));
@@ -271,7 +267,6 @@ function saveUIState() {
         localStorage.setItem(LS_KEY, JSON.stringify({
             sidebarCollapsed: document.getElementById('app').classList.contains('sidebar-collapsed'),
             viewMode, showHeatmap, showCountryLabels, monoArcColor, maxArcs,
-            showDensity,
             periodPreset: document.getElementById('periodPreset').value,
             periodFrom: document.getElementById('periodFrom').value,
             periodTo: document.getElementById('periodTo').value,
@@ -352,8 +347,6 @@ function applyViewFromURL() {
     }
     const view = params.get('view');
     if (view === 'map' || view === 'globe') viewMode = view;
-    if (params.get('density') === '0' || params.get('density') === 'false') showDensity = false;
-    if (params.get('density') === '1' || params.get('density') === 'true') showDensity = true;
     periodCustomOpen = false;
     updateCustomPeriodLabel();
     syncPeriodCustomPanel();
@@ -391,7 +384,6 @@ function syncViewToURL() {
             params.set('rep_color', '1');
         }
         if (viewMode && viewMode !== 'map') params.set('view', viewMode);
-        if (!showDensity) params.set('density', '0');
         const qs = params.toString();
         const next = qs ? (location.pathname + '?' + qs) : location.pathname;
         const cur = location.pathname + location.search;

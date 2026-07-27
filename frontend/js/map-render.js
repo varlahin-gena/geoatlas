@@ -332,13 +332,6 @@ function globeArcHeight(d) {
     return Math.max(0.06, Math.min(0.18, 0.04 + dist / 380));
 }
 
-function densityLayerActive(isGlobe) {
-    if (isGlobe) return false;
-    if (!showDensity) return false;
-    if (currentGroupBy() === 'country') return false;
-    return currentMapZoom < DENSITY_ZOOM_THRESHOLD;
-}
-
 function buildDeckLayers(mode = 'map') {
     const isGlobe = mode === 'globe';
     let lines = getVisibleLines();
@@ -451,39 +444,7 @@ function buildDeckLayers(mode = 'map') {
         }));
     }
 
-    const showHex = densityLayerActive(isGlobe);
-    if (showHex && deck.HexagonLayer) {
-        const hexOpacity = currentMapZoom < 2.5 ? 180 : 110;
-        layers.push(new deck.HexagonLayer({
-            id: 'density-hex',
-            data: points,
-            pickable: true,
-            extruded: false,
-            radius: 80000,
-            coverage: 0.85,
-            colorRange: [
-                [22, 60, 100, hexOpacity],
-                [40, 100, 150, hexOpacity],
-                [70, 140, 180, hexOpacity],
-                [214, 158, 46, hexOpacity],
-                [220, 100, 50, hexOpacity],
-                [220, 50, 40, hexOpacity],
-            ],
-            getPosition: d => [d.lon, d.lat],
-            getColorWeight: d => d.count || 1,
-            colorAggregation: 'SUM',
-            onClick: info => {
-                if (info.object && typeof showHexDetail === 'function') {
-                    showHexDetail(info.object);
-                }
-            },
-            updateTriggers: {
-                getColorWeight: [statsSignature(), currentMapZoom],
-            },
-        }));
-    }
-
-    const nodeOpacity = showHex ? 90 : 150;
+    const nodeOpacity = 150;
     // На MapLibre globe НЕ ставить cullMode:'back' / depthCompare:'always' —
     // трубки ArcLayer вырезаются до обрывков по лимбу (см. deck.gl maplibre example:
     // parameters: { cullMode: 'none' }).
@@ -539,7 +500,7 @@ function buildDeckLayers(mode = 'map') {
         parameters: isGlobe ? { cullMode: 'none' } : undefined,
         updateTriggers: {
             getLineColor: [NMAuth.getTheme()],
-            getFillColor: [showHex, nodeOpacity],
+            getFillColor: [nodeOpacity],
         },
         onClick: info => { if (info.object) showPointDetail(info.object, info.object.key); },
     }));
@@ -577,14 +538,6 @@ function getDeckTooltip({ object, layer }) {
             style: tipStyle,
         };
     }
-    if (layer && layer.id === 'density-hex') {
-        const pts = object.points || object;
-        const n = Array.isArray(pts) ? pts.length : (object.elevationValue || object.colorValue || 0);
-        return {
-            html: `<b>Плотность</b><br>Узлов/вес: ${fmtNumber(n)}`,
-            style: tipStyle,
-        };
-    }
     return null;
 }
 
@@ -611,7 +564,6 @@ function syncViewStateFromMap() {
         bearing: maplibreMap.getBearing(),
         pitch: maplibreMap.getPitch(),
     };
-    currentMapZoom = vs.zoom;
     if (viewMode === 'globe') {
         globeViewState = vs;
     } else {
@@ -979,12 +931,6 @@ async function loadCountries() {
         countriesGeoJSON = null;
         countryCentroidsCache = null;
     }
-}
-
-function onToggleDensity() {
-    showDensity = document.getElementById('toggleDensityChk').checked;
-    saveUIState();
-    refreshMapLayers();
 }
 
 function clearFocusedCountry() {

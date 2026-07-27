@@ -28,7 +28,6 @@ function bindUI() {
     $('toggleHeatmapChk')?.addEventListener('change', () => onToggleHeatmap());
     $('toggleCountryLabelsChk')?.addEventListener('change', () => onToggleCountryLabels());
     $('toggleMonoArcsChk')?.addEventListener('change', () => onToggleMonoArcs());
-    $('toggleDensityChk')?.addEventListener('change', () => onToggleDensity());
 
     $('groupBy')?.addEventListener('change', () => {
         saveUIState();
@@ -102,7 +101,6 @@ async function init() {
     document.getElementById('toggleHeatmapChk').checked = showHeatmap;
     document.getElementById('toggleCountryLabelsChk').checked = showCountryLabels;
     document.getElementById('toggleMonoArcsChk').checked = monoArcColor;
-    document.getElementById('toggleDensityChk').checked = showDensity;
     document.getElementById('autoRotate').checked = autoRotate;
     syncLegendMode();
 

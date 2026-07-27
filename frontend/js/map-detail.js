@@ -436,29 +436,3 @@ async function showCountryDetail(countryKey, feature) {
             + escapeHTML(e.message || e) + '</div></div>';
     }
 }
-
-function showHexDetail(hexObj) {
-    const pts = hexObj.points || [];
-    const list = Array.isArray(pts) ? pts : [];
-    let sum = 0;
-    list.forEach(p => { sum += (p.count || 0); });
-    const top = [...list].sort((a, b) => (b.count || 0) - (a.count || 0)).slice(0, 25);
-    const sections = [
-        { title: 'Ячейка плотности', rows: [
-            { key: 'Узлов', value: fmtNumber(list.length) },
-            { key: 'Событий', value: fmtNumber(sum || hexObj.colorValue || hexObj.elevationValue || 0) },
-        ]},
-    ];
-    if (top.length) {
-        sections.push({
-            title: 'Топ узлов',
-            rows: top.map(p => ({
-                key: p.label || p.key,
-                value: fmtNumber(p.count) + (p.country ? ' · ' + ruCountry(p.country) : ''),
-                hint: 'Открыть узел',
-                onClick: function () { showPointDetail(p, p.key); },
-            })),
-        });
-    }
-    openDetail('Плотность', sections, []);
-}
