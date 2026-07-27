@@ -662,16 +662,32 @@ function syncViewStateFromMap() {
 }
 
 let _refreshMapLayersBusy = false;
+/** Тяжёлый сброс GlobeView — только после смены group_by (иначе мерцание при вращении). */
+let _pendingGlobeViewResync = false;
 
-function refreshMapLayers() {
+function requestGlobeViewResync() {
+    _pendingGlobeViewResync = true;
+}
+
+function takePendingGlobeViewResync() {
+    if (!_pendingGlobeViewResync) return false;
+    _pendingGlobeViewResync = false;
+    return true;
+}
+
+/**
+ * @param {{ resyncGlobeView?: boolean }} [opts]
+ */
+function refreshMapLayers(opts) {
     if (!deckOverlay || _refreshMapLayersBusy) return;
     _refreshMapLayersBusy = true;
     try {
         const layers = buildDeckLayers(viewMode);
-        if (viewMode === 'globe') {
-            // После смены данных MapboxOverlay иногда теряет GlobeView.
-            // Сброс views (как в setViewMode) без jumpTo: микро-zoom давал
-            // zoomend → refreshMapLayers → вечный цикл и зависание «Обновление карты…».
+        const resyncGlobe = viewMode === 'globe' && !!(opts && opts.resyncGlobeView);
+
+        if (resyncGlobe) {
+            // После смены группировки MapboxOverlay иногда теряет GlobeView —
+            // дуги рисуются «плоско», пока не сбросишь views.
             deckOverlay.setProps({
                 views: undefined,
                 layers,
@@ -681,6 +697,7 @@ function refreshMapLayers() {
                 try { maplibreMap.triggerRepaint(); } catch (e) {}
             }
         } else {
+            // Обычное обновление (вращение / cull / фильтры) — без сброса views.
             deckOverlay.setProps({
                 layers,
                 getTooltip: getDeckTooltip,

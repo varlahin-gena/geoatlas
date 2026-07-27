@@ -31,6 +31,8 @@ function bindUI() {
 
     $('groupBy')?.addEventListener('change', () => {
         saveUIState();
+        // На глобусе после смены группировки нужен однократный resync GlobeView.
+        if (typeof requestGlobeViewResync === 'function') requestGlobeViewResync();
         refreshMap();
     });
     $('periodPreset')?.addEventListener('change', () => onPeriodPresetChange());

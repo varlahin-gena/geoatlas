@@ -61,7 +61,11 @@ async function fetchData(opts) {
         updateMapOverlay();
         NMUI.fetchSystemHealth();
 
-        refreshMapLayers();
+        refreshMapLayers(
+            (typeof takePendingGlobeViewResync === 'function' && takePendingGlobeViewResync())
+                ? { resyncGlobeView: true }
+                : undefined
+        );
         if (autoFitPending) { fitDeckToData(); autoFitPending = false; }
     } catch (err) {
         if (gen !== dataFetchGen) return;
@@ -143,6 +147,7 @@ function resetView() {
     focusedCountry = null;
     document.getElementById('searchInput').value = '';
     document.getElementById('groupBy').value = 'city';
+    if (typeof requestGlobeViewResync === 'function') requestGlobeViewResync();
     document.getElementById('periodPreset').value = '1d';
     document.getElementById('periodFrom').value = '';
     document.getElementById('periodTo').value = '';
