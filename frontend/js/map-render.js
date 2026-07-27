@@ -550,12 +550,12 @@ function buildDeckLayers(mode = 'map') {
         updateTriggers: {
             getSourceColor: [currentFilter, monoArcColor, typeof repColorArcs !== 'undefined' && repColorArcs, typeof reputationFilterActiveCount === 'function' ? reputationFilterActiveCount() : 0, focusedCountry],
             getTargetColor: [currentFilter, monoArcColor, typeof repColorArcs !== 'undefined' && repColorArcs, typeof reputationFilterActiveCount === 'function' ? reputationFilterActiveCount() : 0, focusedCountry],
-            getSourcePosition: [_statsCacheVersion, viewLon, viewLat],
-            getTargetPosition: [_statsCacheVersion, viewLon, viewLat],
-            getHeight: [isGlobe],
+            getSourcePosition: [_statsCacheVersion, viewLon, viewLat, currentGroupBy()],
+            getTargetPosition: [_statsCacheVersion, viewLon, viewLat, currentGroupBy()],
+            getHeight: [isGlobe, _statsCacheVersion],
             getTilt: [isGlobe],
             getWidth: [maxArcs],
-            data: [viewLon, viewLat, isGlobe],
+            data: [viewLon, viewLat, isGlobe, _statsCacheVersion, currentGroupBy()],
         },
         onClick: info => { if (info.object) showLineDetail(info.object); },
     }));
@@ -580,7 +580,7 @@ function buildDeckLayers(mode = 'map') {
         updateTriggers: {
             getLineColor: [NMAuth.getTheme()],
             getFillColor: [nodeOpacity],
-            data: [viewLon, viewLat, isGlobe],
+            data: [viewLon, viewLat, isGlobe, _statsCacheVersion, currentGroupBy()],
         },
         onClick: info => { if (info.object) showPointDetail(info.object, info.object.key); },
     }));
@@ -664,6 +664,27 @@ function syncViewStateFromMap() {
 function refreshMapLayers() {
     if (!deckOverlay) return;
     const layers = buildDeckLayers(viewMode);
+    if (viewMode === 'globe') {
+        // После смены данных (group_by и т.п.) MapboxOverlay иногда рисует дуги
+        // в «плоской» проекции — линии улетают за сферу, пока не сдвинешь zoom.
+        // Сброс views + sync камеры заставляет снова подхватить GlobeView.
+        lastGlobeCullKey = '';
+        deckOverlay.setProps({
+            views: undefined,
+            layers,
+            getTooltip: getDeckTooltip,
+        });
+        if (maplibreMap) {
+            try {
+                const zoom = maplibreMap.getZoom();
+                // Микросдвиг zoom — no-op для глаза, но триггерит sync overlay↔map.
+                maplibreMap.jumpTo({ zoom: zoom + 1e-6 });
+                maplibreMap.jumpTo({ zoom });
+                if (typeof maplibreMap.triggerRepaint === 'function') maplibreMap.triggerRepaint();
+            } catch (e) {}
+        }
+        return;
+    }
     deckOverlay.setProps({
         layers,
         getTooltip: getDeckTooltip,
