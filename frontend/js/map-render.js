@@ -182,10 +182,20 @@ function buildCountryHeatCentroids() {
             lat: c.lat,
             lon: c.lon,
             label: ruCountry(name),
+            feature: f,
         });
     }
     countryHeatCentroidsCache = result;
     return result;
+}
+
+/** Heat value for a GeoJSON country feature — same matching as 2D heatmap. */
+function featureHeatValue(feature, stats) {
+    if (!feature || !stats) return 0;
+    for (const country of Object.keys(stats)) {
+        if (matchCountryFeature(feature, country)) return stats[country] || 0;
+    }
+    return 0;
 }
 
 function isOnVisibleGlobeHemisphere(lon, lat, viewLon, viewLat) {
@@ -460,29 +470,52 @@ function buildDeckLayers(mode = 'map') {
     // На глобусе нельзя безопасно делать GeoJson заливку полигонов (артефакты).
     // Вместо этого рисуем «точечную» heatmap по центроидам стран.
     if (isGlobe && useHeat && countriesGeoJSON) {
-        const { stats, max } = getStatsCache();
-        const centroids = buildCountryHeatCentroids();
-        const heatPoints = centroids
-            .map(c => Object.assign({}, c, { heat: stats[c.name] || 0 }))
+        const { stats, max, heat } = getStatsCache();
+        const heatPoints = buildCountryHeatCentroids()
+            .map(c => {
+                // Сначала Map из precomputeFeatureHeat, иначе тот же matchCountryFeature, что на 2D.
+                const v = (c.feature && heat.get(c.feature)) || featureHeatValue(c.feature, stats);
+                return Object.assign({}, c, { heat: v || 0 });
+            })
             .filter(d => d.heat > 0 && isOnVisibleGlobeHemisphere(d.lon, d.lat, viewLon, viewLat));
 
         layers.push(new deck.ScatterplotLayer({
             id: 'country-heat-globe',
             data: heatPoints,
-            pickable: false,
-            stroked: false,
+            pickable: true,
+            stroked: true,
             filled: true,
             radiusUnits: 'pixels',
-            getPosition: d => [d.lon, d.lat],
+            radiusMinPixels: 6,
+            radiusMaxPixels: 48,
+            getPosition: d => [d.lon, d.lat, 5e4],
             getRadius: d => {
                 const t = max > 0 ? d.heat / max : 0;
-                return 4 + Math.sqrt(Math.max(0, t)) * 18;
+                return 8 + Math.sqrt(Math.max(0, t)) * 28;
             },
             getFillColor: d => {
                 const c = heatmapColorRGB(d.heat, max);
-                return [c[0], c[1], c[2], 125];
+                const focused = focusedCountry && matchCountryFeature(d.feature, focusedCountry);
+                return [c[0], c[1], c[2], focused ? 220 : 170];
             },
-            parameters: { cullMode: 'none' },
+            getLineColor: [255, 255, 255, 90],
+            getLineWidth: 1,
+            lineWidthUnits: 'pixels',
+            parameters: { cullMode: 'none', depthTest: false },
+            updateTriggers: {
+                data: [statsSignature(), viewLon, viewLat, focusedCountry],
+                getFillColor: [statsSignature(), focusedCountry, NMAuth.getTheme()],
+                getRadius: [statsSignature()],
+            },
+            onClick: info => {
+                if (!info.object) return;
+                if (typeof showCountryDetail === 'function') {
+                    const key = resolveCountryKeyFromFeature(info.object.feature)
+                        || info.object.name
+                        || info.object.label;
+                    showCountryDetail(key, info.object.feature);
+                }
+            },
         }));
     }
 
@@ -620,7 +653,9 @@ function getDeckTooltip({ object, layer }) {
         };
     }
     if (layer && layer.id === 'country-heat-globe') {
-        const name = object && (object.name || object.label);
+        const name = (object && object.feature && resolveCountryKeyFromFeature(object.feature))
+            || (object && (object.name || object.label))
+            || '';
         const cnt = (object && typeof object.heat === 'number') ? object.heat : 0;
         return {
             html: `<b>${escapeHTML(ruCountry(name))}</b><br>События: ${fmtNumber(cnt)}`,
