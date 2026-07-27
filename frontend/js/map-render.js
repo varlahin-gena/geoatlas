@@ -467,57 +467,8 @@ function buildDeckLayers(mode = 'map') {
         }));
     }
 
-    // На глобусе нельзя безопасно делать GeoJson заливку полигонов (артефакты).
-    // Вместо этого рисуем «точечную» heatmap по центроидам стран.
-    if (isGlobe && useHeat && countriesGeoJSON) {
-        const { stats, max, heat } = getStatsCache();
-        const heatPoints = buildCountryHeatCentroids()
-            .map(c => {
-                // Сначала Map из precomputeFeatureHeat, иначе тот же matchCountryFeature, что на 2D.
-                const v = (c.feature && heat.get(c.feature)) || featureHeatValue(c.feature, stats);
-                return Object.assign({}, c, { heat: v || 0 });
-            })
-            .filter(d => d.heat > 0 && isOnVisibleGlobeHemisphere(d.lon, d.lat, viewLon, viewLat));
-
-        layers.push(new deck.ScatterplotLayer({
-            id: 'country-heat-globe',
-            data: heatPoints,
-            pickable: true,
-            stroked: true,
-            filled: true,
-            radiusUnits: 'pixels',
-            radiusMinPixels: 6,
-            radiusMaxPixels: 48,
-            getPosition: d => [d.lon, d.lat, 5e4],
-            getRadius: d => {
-                const t = max > 0 ? d.heat / max : 0;
-                return 8 + Math.sqrt(Math.max(0, t)) * 28;
-            },
-            getFillColor: d => {
-                const c = heatmapColorRGB(d.heat, max);
-                const focused = focusedCountry && matchCountryFeature(d.feature, focusedCountry);
-                return [c[0], c[1], c[2], focused ? 220 : 170];
-            },
-            getLineColor: [255, 255, 255, 90],
-            getLineWidth: 1,
-            lineWidthUnits: 'pixels',
-            parameters: { cullMode: 'none', depthTest: false },
-            updateTriggers: {
-                data: [statsSignature(), viewLon, viewLat, focusedCountry],
-                getFillColor: [statsSignature(), focusedCountry, NMAuth.getTheme()],
-                getRadius: [statsSignature()],
-            },
-            onClick: info => {
-                if (!info.object) return;
-                if (typeof showCountryDetail === 'function') {
-                    const key = resolveCountryKeyFromFeature(info.object.feature)
-                        || info.object.name
-                        || info.object.label;
-                    showCountryDetail(key, info.object.feature);
-                }
-            },
-        }));
-    }
+    // Heatmap на глобусе отключаем по производительности:
+    // ScatterplotLayer по центроидам заметно тормозит анимацию при вращении.
 
     if (showCountryLabels) {
         const centroids = isGlobe ? visibleGlobeCentroids() : buildCountryCentroids();
