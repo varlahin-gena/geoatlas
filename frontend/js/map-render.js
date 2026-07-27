@@ -884,6 +884,12 @@ function fitDeckToData() {
     syncViewStateFromMap();
 }
 
+function syncHeatmapToggleVisibility(mode) {
+    const heatChkEl = document.getElementById('toggleHeatmapChk');
+    const heatLabelEl = heatChkEl?.closest('label.side-toggle');
+    if (heatLabelEl) heatLabelEl.style.display = (mode === 'globe') ? 'none' : '';
+}
+
 function setViewMode(mode) {
     if (mode === viewMode && maplibreMap) {
         // still update chrome
@@ -896,11 +902,7 @@ function setViewMode(mode) {
     document.getElementById('mode-map-icon')?.classList.toggle('active', mode === 'map');
     document.getElementById('mode-globe-icon')?.classList.toggle('active', mode === 'globe');
     document.getElementById('autoRotateWrap').style.display = (mode === 'globe') ? '' : 'none';
-
-    // Heatmap стран на глобусе отключён (тормозит анимацию), поэтому скрываем переключатель в 3D.
-    const heatChkEl = document.getElementById('toggleHeatmapChk');
-    const heatLabelEl = heatChkEl?.closest('label.side-toggle');
-    if (heatLabelEl) heatLabelEl.style.display = (mode === 'globe') ? 'none' : '';
+    syncHeatmapToggleVisibility(mode);
 
     if (!maplibreMap) {
         initMapView();
@@ -924,9 +926,12 @@ function setViewMode(mode) {
             return;
         }
         maplibreMap.jumpTo({
-            center: [globeViewState.longitude || 30, globeViewState.latitude || 30],
-            zoom: globeViewState.zoom || 1.2,
-            bearing: globeViewState.bearing || 0,
+            center: [
+                globeViewState.longitude ?? DEFAULT_GLOBE_VIEW.longitude,
+                globeViewState.latitude ?? DEFAULT_GLOBE_VIEW.latitude,
+            ],
+            zoom: globeViewState.zoom ?? DEFAULT_GLOBE_VIEW.zoom,
+            bearing: globeViewState.bearing ?? DEFAULT_GLOBE_VIEW.bearing,
             pitch: 0,
         });
         if (autoRotate) startGlobeAutoRotate();

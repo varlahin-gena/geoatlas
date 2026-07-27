@@ -109,6 +109,7 @@ async function init() {
     document.getElementById('mode-map-icon').classList.toggle('active', viewMode === 'map');
     document.getElementById('mode-globe-icon').classList.toggle('active', viewMode === 'globe');
     document.getElementById('autoRotateWrap').style.display = (viewMode === 'globe') ? '' : 'none';
+    if (typeof syncHeatmapToggleVisibility === 'function') syncHeatmapToggleVisibility(viewMode);
     document.getElementById('maxArcs').value = maxArcs;
     document.getElementById('maxArcsVal').textContent = fmtNumber(maxArcs);
     syncViewToURL();

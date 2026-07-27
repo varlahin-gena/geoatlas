@@ -28,7 +28,7 @@ const DEFAULT_MAP_VIEW = Object.freeze({
 const DEFAULT_GLOBE_VIEW = Object.freeze({
     longitude: 30,
     latitude: 30,
-    zoom: 1.2,
+    zoom: 0.9,
     pitch: 0,
     bearing: 0,
 });
