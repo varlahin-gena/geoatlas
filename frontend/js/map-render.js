@@ -661,34 +661,34 @@ function syncViewStateFromMap() {
     }
 }
 
+let _refreshMapLayersBusy = false;
+
 function refreshMapLayers() {
-    if (!deckOverlay) return;
-    const layers = buildDeckLayers(viewMode);
-    if (viewMode === 'globe') {
-        // После смены данных (group_by и т.п.) MapboxOverlay иногда рисует дуги
-        // в «плоской» проекции — линии улетают за сферу, пока не сдвинешь zoom.
-        // Сброс views + sync камеры заставляет снова подхватить GlobeView.
-        lastGlobeCullKey = '';
-        deckOverlay.setProps({
-            views: undefined,
-            layers,
-            getTooltip: getDeckTooltip,
-        });
-        if (maplibreMap) {
-            try {
-                const zoom = maplibreMap.getZoom();
-                // Микросдвиг zoom — no-op для глаза, но триггерит sync overlay↔map.
-                maplibreMap.jumpTo({ zoom: zoom + 1e-6 });
-                maplibreMap.jumpTo({ zoom });
-                if (typeof maplibreMap.triggerRepaint === 'function') maplibreMap.triggerRepaint();
-            } catch (e) {}
+    if (!deckOverlay || _refreshMapLayersBusy) return;
+    _refreshMapLayersBusy = true;
+    try {
+        const layers = buildDeckLayers(viewMode);
+        if (viewMode === 'globe') {
+            // После смены данных MapboxOverlay иногда теряет GlobeView.
+            // Сброс views (как в setViewMode) без jumpTo: микро-zoom давал
+            // zoomend → refreshMapLayers → вечный цикл и зависание «Обновление карты…».
+            deckOverlay.setProps({
+                views: undefined,
+                layers,
+                getTooltip: getDeckTooltip,
+            });
+            if (maplibreMap && typeof maplibreMap.triggerRepaint === 'function') {
+                try { maplibreMap.triggerRepaint(); } catch (e) {}
+            }
+        } else {
+            deckOverlay.setProps({
+                layers,
+                getTooltip: getDeckTooltip,
+            });
         }
-        return;
+    } finally {
+        _refreshMapLayersBusy = false;
     }
-    deckOverlay.setProps({
-        layers,
-        getTooltip: getDeckTooltip,
-    });
 }
 
 // Aliases used across older call sites
@@ -867,6 +867,7 @@ function initMapView() {
         if (viewMode === 'globe') maybeRefreshGlobeLabels(false);
     });
     maplibreMap.on('zoomend', () => {
+        if (_refreshMapLayersBusy) return;
         syncViewStateFromMap();
         refreshMapLayers();
     });
