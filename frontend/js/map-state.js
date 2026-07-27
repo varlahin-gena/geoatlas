@@ -177,11 +177,8 @@ function applyMapTheme() {
 function currentGroupBy() {
     return document.getElementById('groupBy')?.value || 'city';
 }
-// Heatmap стран осмыслен только при группировке по странам —
-// в режиме «Город» заливка полигонов по сумме узлов рисует
-// чужие страны (peer endpoints) ярче искомой.
 function heatmapEnabled() {
-    return showHeatmap && currentGroupBy() === 'country';
+    return !!showHeatmap;
 }
 function nodeLonLat(key, fallbackLon, fallbackLat) {
     const p = allPoints[key];
