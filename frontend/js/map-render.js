@@ -166,6 +166,28 @@ function buildCountryCentroids() {
     return result;
 }
 
+let countryHeatCentroidsCache = null;
+
+function buildCountryHeatCentroids() {
+    if (countryHeatCentroidsCache) return countryHeatCentroidsCache;
+    if (!countriesGeoJSON || !countriesGeoJSON.features) return [];
+    const result = [];
+    for (const f of countriesGeoJSON.features) {
+        const name = featureCountryName(f);
+        if (!name) continue;
+        const c = featureCentroid(f);
+        if (!c) continue;
+        result.push({
+            name,
+            lat: c.lat,
+            lon: c.lon,
+            label: ruCountry(name),
+        });
+    }
+    countryHeatCentroidsCache = result;
+    return result;
+}
+
 function isOnVisibleGlobeHemisphere(lon, lat, viewLon, viewLat) {
     const toRad = Math.PI / 180;
     const φ1 = (viewLat || 0) * toRad;
@@ -435,6 +457,35 @@ function buildDeckLayers(mode = 'map') {
         }));
     }
 
+    // На глобусе нельзя безопасно делать GeoJson заливку полигонов (артефакты).
+    // Вместо этого рисуем «точечную» heatmap по центроидам стран.
+    if (isGlobe && useHeat && countriesGeoJSON) {
+        const { stats, max } = getStatsCache();
+        const centroids = buildCountryHeatCentroids();
+        const heatPoints = centroids
+            .map(c => Object.assign({}, c, { heat: stats[c.name] || 0 }))
+            .filter(d => d.heat > 0 && isOnVisibleGlobeHemisphere(d.lon, d.lat, viewLon, viewLat));
+
+        layers.push(new deck.ScatterplotLayer({
+            id: 'country-heat-globe',
+            data: heatPoints,
+            pickable: false,
+            stroked: false,
+            filled: true,
+            radiusUnits: 'pixels',
+            getPosition: d => [d.lon, d.lat],
+            getRadius: d => {
+                const t = max > 0 ? d.heat / max : 0;
+                return 4 + Math.sqrt(Math.max(0, t)) * 18;
+            },
+            getFillColor: d => {
+                const c = heatmapColorRGB(d.heat, max);
+                return [c[0], c[1], c[2], 125];
+            },
+            parameters: { cullMode: 'none' },
+        }));
+    }
+
     if (showCountryLabels) {
         const centroids = isGlobe ? visibleGlobeCentroids() : buildCountryCentroids();
         const labelAlt = isGlobe ? 8e4 : 0;
@@ -563,6 +614,14 @@ function getDeckTooltip({ object, layer }) {
         const name = resolveCountryKeyFromFeature(object);
         const { stats } = getStatsCache();
         const cnt = stats[name] || 0;
+        return {
+            html: `<b>${escapeHTML(ruCountry(name))}</b><br>События: ${fmtNumber(cnt)}`,
+            style: tipStyle,
+        };
+    }
+    if (layer && layer.id === 'country-heat-globe') {
+        const name = object && (object.name || object.label);
+        const cnt = (object && typeof object.heat === 'number') ? object.heat : 0;
         return {
             html: `<b>${escapeHTML(ruCountry(name))}</b><br>События: ${fmtNumber(cnt)}`,
             style: tipStyle,
@@ -908,11 +967,13 @@ async function loadCountries() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         countriesGeoJSON = await res.json();
         countryCentroidsCache = null;
+        countryHeatCentroidsCache = null;
         _statsCacheVersion++;
     } catch (e) {
         console.warn('countries.geojson not loaded:', e);
         countriesGeoJSON = null;
         countryCentroidsCache = null;
+        countryHeatCentroidsCache = null;
     }
 }
 
