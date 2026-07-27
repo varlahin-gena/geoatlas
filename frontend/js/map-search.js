@@ -656,7 +656,8 @@ async function loadSearchTemplatesMine() {
         searchTemplatesMineCache = Array.isArray(data.templates) ? data.templates : [];
         renderSearchTemplatesMine();
     } catch (e) {
-        host.innerHTML = '<div class="search-templates-empty">Не удалось загрузить шаблоны</div>';
+        const detail = e && e.message ? ' (' + e.message + ')' : '';
+        host.innerHTML = '<div class="search-templates-empty">Не удалось загрузить шаблоны' + detail + '</div>';
     }
 }
 
