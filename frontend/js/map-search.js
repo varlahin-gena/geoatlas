@@ -784,6 +784,20 @@ function renderSearchTemplatesMine() {
     });
 }
 
+function groupSearchTemplatesByAuthor(list) {
+    const groups = {};
+    (list || []).forEach(function (tpl) {
+        const user = tpl.username || '—';
+        if (!groups[user]) groups[user] = [];
+        groups[user].push(tpl);
+    });
+    return Object.keys(groups).sort(function (a, b) {
+        return a.toLowerCase().localeCompare(b.toLowerCase(), 'ru');
+    }).map(function (username) {
+        return { username: username, templates: groups[username] };
+    });
+}
+
 function renderSearchTemplatesAll() {
     const host = document.getElementById('searchTemplatesAll');
     if (!host) return;
@@ -792,31 +806,50 @@ function renderSearchTemplatesAll() {
         host.innerHTML = '<div class="search-templates-empty">Шаблонов пока нет.</div>';
         return;
     }
-    searchTemplatesAllCache.forEach(function (tpl) {
-        const card = document.createElement('div');
-        card.className = 'search-template-card';
-        const head = document.createElement('div');
-        head.className = 'search-template-card-head';
-        const name = document.createElement('div');
-        name.className = 'search-template-name';
-        name.textContent = tpl.name || 'Без названия';
-        const author = document.createElement('div');
-        author.className = 'search-template-author';
-        author.textContent = tpl.username || '—';
-        head.appendChild(name);
-        head.appendChild(author);
-        card.appendChild(head);
-        const query = document.createElement('div');
-        query.className = 'search-template-query';
-        query.textContent = tpl.query || '';
-        card.appendChild(query);
-        const actions = document.createElement('div');
-        actions.className = 'search-template-actions';
-        appendBuilderButton(actions, 'search-builder-remove', 'Применить', false, function () {
-            applySearchTemplateQuery(tpl.query);
+    const currentUser = (nmCurrentUser && nmCurrentUser.username) || '';
+    groupSearchTemplatesByAuthor(searchTemplatesAllCache).forEach(function (group) {
+        const details = document.createElement('details');
+        details.className = 'search-template-group';
+        if (currentUser && group.username === currentUser) details.open = true;
+
+        const summary = document.createElement('summary');
+        summary.className = 'search-template-group-summary';
+        const title = document.createElement('span');
+        title.className = 'search-template-group-title';
+        title.textContent = group.username;
+        const count = document.createElement('span');
+        count.className = 'search-template-group-count';
+        count.textContent = String(group.templates.length);
+        summary.appendChild(title);
+        summary.appendChild(count);
+        details.appendChild(summary);
+
+        const body = document.createElement('div');
+        body.className = 'search-template-group-body';
+        group.templates.forEach(function (tpl) {
+            const card = document.createElement('div');
+            card.className = 'search-template-card';
+            const head = document.createElement('div');
+            head.className = 'search-template-card-head';
+            const name = document.createElement('div');
+            name.className = 'search-template-name';
+            name.textContent = tpl.name || 'Без названия';
+            head.appendChild(name);
+            card.appendChild(head);
+            const query = document.createElement('div');
+            query.className = 'search-template-query';
+            query.textContent = tpl.query || '';
+            card.appendChild(query);
+            const actions = document.createElement('div');
+            actions.className = 'search-template-actions';
+            appendBuilderButton(actions, 'search-builder-remove', 'Применить', false, function () {
+                applySearchTemplateQuery(tpl.query);
+            });
+            card.appendChild(actions);
+            body.appendChild(card);
         });
-        card.appendChild(actions);
-        host.appendChild(card);
+        details.appendChild(body);
+        host.appendChild(details);
     });
 }
 
