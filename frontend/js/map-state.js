@@ -140,7 +140,7 @@ const countryNamesRu = {
     "Unknown":"Неизвестно","Неизвестно":"Неизвестно"
 };
 
-let mapViewState = { longitude: 37.6, latitude: 55.7, zoom: 2.5, pitch: 0, bearing: 0 };
+let mapViewState = { longitude: 37.6, latitude: 55.7, zoom: 2.5, pitch: 20, bearing: 0 };
 let globeViewState = { longitude: 30, latitude: 30, zoom: 1.2, pitch: 0, bearing: 0 };
 
 function normalizeText(v) { return (v || '').toString().toLowerCase().trim(); }

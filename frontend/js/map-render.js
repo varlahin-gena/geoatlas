@@ -342,20 +342,15 @@ function greatCircleMaxLat(lon1, lat1, lon2, lat2) {
     return maxLat;
 }
 
-/** Arc paraboloid height for 2D mercator — keep peaks inside the viewport. */
+/** Arc height for 2D flat (non–great-circle) ArcLayer. */
 function mapArcHeight(d) {
     const [sLon, sLat] = nodeLonLat(d.src, d.src_lon, d.src_lat);
     const [tLon, tLat] = nodeLonLat(d.dst, d.dst_lon, d.dst_lat);
     let dLon = Math.abs(tLon - sLon);
     if (dLon > 180) dLon = 360 - dLon;
     const dist = Math.max(1, Math.hypot(dLon, Math.abs(tLat - sLat)));
-    const peakLat = greatCircleMaxLat(sLon, sLat, tLon, tLat);
-    // Трансатлантические дуги «выгибаются» к полюсу — чем выше пик, тем ниже Z.
-    const northPenalty = 1 - Math.min(0.8, Math.max(0, (peakLat - 30) / 65));
-    const spanPenalty = 1 - Math.min(0.45, dLon / 160);
-    const zoomPenalty = Math.min(1, Math.max(0.5, (currentMapZoom || 2.5) / 3.2));
-    const base = (3 / dist) * northPenalty * spanPenalty * zoomPenalty;
-    return Math.max(0.018, Math.min(0.075, base));
+    // Без greatCircle дуга идёт по хорде; лёгкий pitch карты поднимает «горб» в кадр.
+    return Math.max(0.15, Math.min(0.35, 0.1 + dist / 160));
 }
 
 function densityLayerActive(isGlobe) {
@@ -527,8 +522,10 @@ function buildDeckLayers(mode = 'map') {
         id: 'arcs',
         data: lines,
         pickable: true,
-        // greatCircle нужен на mercator; на GlobeView дуги уже в 3D-сфере.
-        greatCircle: !isGlobe,
+        // greatCircle на mercator гонит трансатлантику через Арктику — дуги
+        // обрезаются сверху. На карте рисуем плоские дуги по хорде; на глобусе — 3D.
+        greatCircle: false,
+        wrapLongitude: true,
         getSourcePosition: d => nodeLonLat(d.src, d.src_lon, d.src_lat),
         getTargetPosition: d => nodeLonLat(d.dst, d.dst_lon, d.dst_lat),
         getSourceColor: d => [...arcRGB(d.status, d), d._flowAlpha || 210],
@@ -545,11 +542,9 @@ function buildDeckLayers(mode = 'map') {
                 const dist = Math.max(1, Math.hypot(dLon, Math.abs(tLat - sLat)));
                 return Math.max(0.15, Math.min(0.45, 0.12 + dist / 180));
             }
-            // На mercator высокая дуга в перспективе уезжает за край viewport
-            // (особенно на север от хаба). Держим пик скромным.
             return mapArcHeight(d);
         },
-        getTilt: isGlobe ? 0 : d => arcTilt(d) * 0.35,
+        getTilt: isGlobe ? 0 : d => arcTilt(d) * 0.5,
         autoHighlight: true,
         highlightColor: [255, 255, 255, 140],
         parameters: isGlobe
@@ -560,7 +555,7 @@ function buildDeckLayers(mode = 'map') {
             getTargetColor: [currentFilter, monoArcColor, typeof repColorArcs !== 'undefined' && repColorArcs, typeof reputationFilterActiveCount === 'function' ? reputationFilterActiveCount() : 0, arcLayout, hubCount, focusedCountry],
             getSourcePosition: [_statsCacheVersion],
             getTargetPosition: [_statsCacheVersion],
-            getHeight: [isGlobe, currentMapZoom],
+            getHeight: [isGlobe],
             getTilt: [arcLayout, isGlobe],
             getWidth: [arcLayout, maxArcs],
         },
@@ -940,10 +935,12 @@ function fitDeckToData() {
     try {
         maplibreMap.fitBounds(
             [[minLon - lonPad, minLat - latPad], [maxLon + lonPad, Math.min(82, maxLat + northPad)]],
-            { padding: { top: 110, bottom: 52, left: 52, right: 52 }, maxZoom: 5, duration: 0 }
+            { padding: { top: 80, bottom: 52, left: 52, right: 52 }, maxZoom: 5, duration: 0 }
         );
-        // Сдвигаем карту вниз, чтобы оставить «воздух» над дугами.
-        maplibreMap.panBy([0, 48], { duration: 0 });
+        // Небольшой pitch, чтобы плоские дуги читались как «горбы», а не как прямые.
+        if ((maplibreMap.getPitch() || 0) < 12) {
+            maplibreMap.jumpTo({ pitch: 20 });
+        }
         syncViewStateFromMap();
     } catch (e) {
         const lonSpan = maxLon - minLon, latSpan = maxLat - minLat;
