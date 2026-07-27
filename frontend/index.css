@@ -138,7 +138,6 @@ html, body {
 .app.sidebar-collapsed .side-select { display: none; }
 .app.sidebar-collapsed .side-range,
 .app.sidebar-collapsed .side-range-label { display: none; }
-.app.sidebar-collapsed #hubCountWrap { display: none !important; }
 
 .sidebar-collapse-btn {
     margin-top: auto;

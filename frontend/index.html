@@ -157,20 +157,6 @@
         </div>
 
         <div class="sidebar-section collapse-hide">
-            <div class="sidebar-section-title">Раскладка дуг</div>
-            <div class="mode-switch" id="arcLayoutSwitch">
-                <button type="button" id="arcLayout-hub" class="active" title="Только связи через top-K хабов">Hub–spoke</button>
-                <button type="button" id="arcLayout-mesh" title="Все связи (mesh)">Все связи</button>
-            </div>
-            <div id="hubCountWrap" style="margin-top:8px;">
-                <input type="range" id="hubCount" class="side-range" min="3" max="30" step="1" value="8" />
-                <div class="side-range-label">
-                    <span>хабов: <b id="hubCountVal">8</b></span>
-                </div>
-            </div>
-        </div>
-
-        <div class="sidebar-section collapse-hide">
             <div class="sidebar-section-title">Отображение</div>
             <label class="side-toggle">
                 <input type="checkbox" id="toggleLegendChk" checked />
@@ -318,9 +304,6 @@
                 <div id="legendMono" class="legend-row" style="display:none;">
                     <span class="legend-line" style="background: var(--accent);"></span> Связь
                 </div>
-                <div class="legend-row" id="legendHubRow" style="margin-top:4px;">
-                    <span class="legend-dot" style="background: var(--purple);"></span> Хаб (top-K связей)
-                </div>
                 <div class="legend-row" style="margin-top:6px;color:var(--text-muted);font-size:11px">Толщина линии / размер точки — кол-во событий</div>
             </div>
 
@@ -348,15 +331,15 @@
 
 <div class="toast-host" id="toastHost" aria-live="polite"></div>
 
-<script src="/config.js?v=20260727b"></script>
-<script src="/auth.js?v=20260727b"></script>
-<script src="/common.js?v=20260727b"></script>
-<script src="/js/map-state.js?v=20260727b"></script>
-<script src="/js/map-reputation.js?v=20260727b"></script>
-<script src="/js/map-detail.js?v=20260727b"></script>
-<script src="/js/map-render.js?v=20260727b"></script>
-<script src="/js/map-filters.js?v=20260727b"></script>
-<script src="/js/map-uploads.js?v=20260727b"></script>
-<script src="/js/map-app.js?v=20260727b"></script>
+<script src="/config.js?v=20260727c"></script>
+<script src="/auth.js?v=20260727c"></script>
+<script src="/common.js?v=20260727c"></script>
+<script src="/js/map-state.js?v=20260727c"></script>
+<script src="/js/map-reputation.js?v=20260727c"></script>
+<script src="/js/map-detail.js?v=20260727c"></script>
+<script src="/js/map-render.js?v=20260727c"></script>
+<script src="/js/map-filters.js?v=20260727c"></script>
+<script src="/js/map-uploads.js?v=20260727c"></script>
+<script src="/js/map-app.js?v=20260727c"></script>
 </body>
 </html>

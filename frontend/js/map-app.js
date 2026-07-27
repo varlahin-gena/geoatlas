@@ -22,9 +22,6 @@ function bindUI() {
 
     $('minCount')?.addEventListener('input', () => onMinCountChange());
     $('maxArcs')?.addEventListener('input', () => onMaxArcsChange());
-    $('hubCount')?.addEventListener('input', () => onHubCountChange());
-    $('arcLayout-hub')?.addEventListener('click', () => setArcLayout('hub'));
-    $('arcLayout-mesh')?.addEventListener('click', () => setArcLayout('mesh'));
 
     $('toggleLegendChk')?.addEventListener('change', () => onToggleLegend());
     $('toggleStatsChk')?.addEventListener('change', () => onToggleStats());
@@ -102,7 +99,6 @@ async function init() {
     loadUIState();
     applyViewFromURL();
     applyFilterUI();
-    syncArcLayoutUI();
     document.getElementById('toggleHeatmapChk').checked = showHeatmap;
     document.getElementById('toggleCountryLabelsChk').checked = showCountryLabels;
     document.getElementById('toggleMonoArcsChk').checked = monoArcColor;

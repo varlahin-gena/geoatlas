@@ -18,8 +18,7 @@ async function fetchData(opts) {
     try {
         const groupBy = document.getElementById('groupBy').value;
         const periodQuery = buildPeriodQuery();
-        // IP/subnet дают больше уникальных рёбер — берём верхний лимит API,
-        // иначе hub–spoke видит только «верхушку» пар и рисует мало спиц.
+        // IP/subnet дают больше уникальных рёбер — берём верхний лимит API.
         const apiLimit = (groupBy === 'ip' || groupBy === 'subnet') ? 50000 : 10000;
 
         // ВАЖНО: filter не передаём в backend — фильтруем локально на клиенте
@@ -141,8 +140,6 @@ function resetView() {
     currentSearch = '';
     minCount = 1;
     maxArcs = MAX_ARCS_DEFAULT;
-    arcLayout = 'hub';
-    hubCount = HUB_COUNT_DEFAULT;
     showDensity = true;
     focusedCountry = null;
     document.getElementById('searchInput').value = '';
@@ -166,7 +163,7 @@ function resetView() {
         if (typeof updateReputationMenuUI === 'function') updateReputationMenuUI();
     }
     applyFilterUI();
-    syncArcLayoutUI();
+    document.getElementById('toggleDensityChk').checked = showDensity;
     mapViewState = { longitude: 37.6, latitude: 55.7, zoom: 2.5, pitch: 20, bearing: 0 };
     globeViewState = { longitude: 30, latitude: 30, zoom: 1.2, pitch: 0, bearing: 0 };
     if (maplibreMap) {

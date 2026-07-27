@@ -16,9 +16,6 @@ const SEARCH_DEBOUNCE_MS = 250;
 const MAX_ARCS_DEFAULT = 5000;
 const MAX_ARCS_MIN     = 100;
 const MAX_ARCS_MAX     = 20000;
-const HUB_COUNT_DEFAULT = 8;
-const HUB_COUNT_MIN = 3;
-const HUB_COUNT_MAX = 30;
 const DENSITY_ZOOM_THRESHOLD = 4;
 
 const MAP_STYLE_DARK = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
@@ -59,10 +56,7 @@ let showDensity = true;
 let monoArcColor = false;
 let autoRotate = true;
 let autoFitPending = true;
-let arcLayout = 'hub'; // hub | mesh
-let hubCount = HUB_COUNT_DEFAULT;
 let focusedCountry = null; // English/raw country name from geojson match
-let currentHubKeys = new Set();
 let currentMapZoom = 2.5;
 
 let lastStats = {};
@@ -224,10 +218,6 @@ function loadUIState() {
         if (typeof s.showCountryLabels === 'boolean') showCountryLabels = s.showCountryLabels;
         if (typeof s.monoArcColor === 'boolean') monoArcColor = s.monoArcColor;
         if (typeof s.showDensity === 'boolean') showDensity = s.showDensity;
-        if (s.arcLayout === 'hub' || s.arcLayout === 'mesh') arcLayout = s.arcLayout;
-        if (typeof s.hubCount === 'number') {
-            hubCount = Math.min(HUB_COUNT_MAX, Math.max(HUB_COUNT_MIN, s.hubCount));
-        }
         const savedMaxArcs = typeof s.maxArcs === 'number' ? s.maxArcs : s.globeMaxArcs;
         if (typeof savedMaxArcs === 'number') {
             maxArcs = Math.min(MAX_ARCS_MAX, Math.max(MAX_ARCS_MIN, savedMaxArcs));
@@ -281,7 +271,7 @@ function saveUIState() {
         localStorage.setItem(LS_KEY, JSON.stringify({
             sidebarCollapsed: document.getElementById('app').classList.contains('sidebar-collapsed'),
             viewMode, showHeatmap, showCountryLabels, monoArcColor, maxArcs,
-            showDensity, arcLayout, hubCount,
+            showDensity,
             periodPreset: document.getElementById('periodPreset').value,
             periodFrom: document.getElementById('periodFrom').value,
             periodTo: document.getElementById('periodTo').value,
@@ -362,12 +352,6 @@ function applyViewFromURL() {
     }
     const view = params.get('view');
     if (view === 'map' || view === 'globe') viewMode = view;
-    const arcs = params.get('arcs');
-    if (arcs === 'hub' || arcs === 'mesh') arcLayout = arcs;
-    if (params.get('hubs')) {
-        const n = parseInt(params.get('hubs'), 10);
-        if (Number.isFinite(n)) hubCount = Math.min(HUB_COUNT_MAX, Math.max(HUB_COUNT_MIN, n));
-    }
     if (params.get('density') === '0' || params.get('density') === 'false') showDensity = false;
     if (params.get('density') === '1' || params.get('density') === 'true') showDensity = true;
     periodCustomOpen = false;
@@ -407,8 +391,6 @@ function syncViewToURL() {
             params.set('rep_color', '1');
         }
         if (viewMode && viewMode !== 'map') params.set('view', viewMode);
-        if (arcLayout && arcLayout !== 'hub') params.set('arcs', arcLayout);
-        if (hubCount !== HUB_COUNT_DEFAULT) params.set('hubs', String(hubCount));
         if (!showDensity) params.set('density', '0');
         const qs = params.toString();
         const next = qs ? (location.pathname + '?' + qs) : location.pathname;

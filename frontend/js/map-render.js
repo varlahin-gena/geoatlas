@@ -269,37 +269,6 @@ function getVisiblePoints(visibleLines) {
     return result;
 }
 
-/** Top-K узлов по числу инцидентных рёбер (и при равенстве — по сумме count). */
-function computeHubKeys(lines, k) {
-    const degree = new Map();
-    const weight = new Map();
-    lines.forEach(l => {
-        if (!l.src || !l.dst || l.src === l.dst) return;
-        const c = l.count || 0;
-        degree.set(l.src, (degree.get(l.src) || 0) + 1);
-        degree.set(l.dst, (degree.get(l.dst) || 0) + 1);
-        weight.set(l.src, (weight.get(l.src) || 0) + c);
-        weight.set(l.dst, (weight.get(l.dst) || 0) + c);
-    });
-    return new Set(
-        [...degree.entries()]
-            .sort((a, b) => {
-                const d = b[1] - a[1];
-                if (d) return d;
-                const w = (weight.get(b[0]) || 0) - (weight.get(a[0]) || 0);
-                if (w) return w;
-                return String(a[0]).localeCompare(String(b[0]));
-            })
-            .slice(0, Math.max(1, k || HUB_COUNT_DEFAULT))
-            .map(([key]) => key)
-    );
-}
-
-function filterHubSpokeLines(lines, hubs) {
-    if (!hubs || !hubs.size) return lines;
-    return lines.filter(l => hubs.has(l.src) || hubs.has(l.dst));
-}
-
 /** Rank-based alpha + corridor tilt for country pairs. */
 function decorateFlowLines(lines) {
     if (!lines.length) return lines;
@@ -373,22 +342,12 @@ function densityLayerActive(isGlobe) {
 function buildDeckLayers(mode = 'map') {
     const isGlobe = mode === 'globe';
     let lines = getVisibleLines();
-    const totalBeforeLayout = lines.length;
-
-    // Хабы считаем по ВСЕМ видимым рёбрам, иначе при group_by=ip
-    // topByCount сначала оставляет разрозненные «тяжёлые» пары, и у top-K
-    // хабов внутри урезанного набора почти нет общих спиц.
-    currentHubKeys = computeHubKeys(lines, hubCount);
-    if (arcLayout === 'hub') {
-        lines = filterHubSpokeLines(lines, currentHubKeys);
-    }
+    const totalBeforeLimit = lines.length;
     lines = topByCount(lines, maxArcs);
     lines = decorateFlowLines(lines);
 
-    const points = getVisiblePoints(lines).map(p =>
-        Object.assign({}, p, { isHub: currentHubKeys.has(p.key) })
-    );
-    updateArcCountInfo(lines.length, totalBeforeLayout);
+    const points = getVisiblePoints(lines);
+    updateArcCountInfo(lines.length, totalBeforeLimit);
 
     const layers = [];
     const landColor = cssRgb('--map-land-rgb', mapTilesFailed ? 220 : 0);
@@ -550,13 +509,13 @@ function buildDeckLayers(mode = 'map') {
             ? { cullMode: 'none' }
             : { depthTest: false },
         updateTriggers: {
-            getSourceColor: [currentFilter, monoArcColor, typeof repColorArcs !== 'undefined' && repColorArcs, typeof reputationFilterActiveCount === 'function' ? reputationFilterActiveCount() : 0, arcLayout, hubCount, focusedCountry],
-            getTargetColor: [currentFilter, monoArcColor, typeof repColorArcs !== 'undefined' && repColorArcs, typeof reputationFilterActiveCount === 'function' ? reputationFilterActiveCount() : 0, arcLayout, hubCount, focusedCountry],
+            getSourceColor: [currentFilter, monoArcColor, typeof repColorArcs !== 'undefined' && repColorArcs, typeof reputationFilterActiveCount === 'function' ? reputationFilterActiveCount() : 0, focusedCountry],
+            getTargetColor: [currentFilter, monoArcColor, typeof repColorArcs !== 'undefined' && repColorArcs, typeof reputationFilterActiveCount === 'function' ? reputationFilterActiveCount() : 0, focusedCountry],
             getSourcePosition: [_statsCacheVersion],
             getTargetPosition: [_statsCacheVersion],
             getHeight: [isGlobe],
-            getTilt: [arcLayout, isGlobe],
-            getWidth: [arcLayout, maxArcs],
+            getTilt: [isGlobe],
+            getWidth: [maxArcs],
         },
         onClick: info => { if (info.object) showLineDetail(info.object); },
     }));
@@ -569,24 +528,18 @@ function buildDeckLayers(mode = 'map') {
         filled: true,
         radiusUnits: 'pixels',
         getPosition: d => [d.lon, d.lat],
-        getRadius: d => {
-            const base = Math.max(1.5, Math.min(8, 1.5 + Math.sqrt(d.count || 1) * 0.6));
-            return d.isHub ? Math.min(14, base * 1.7) : base;
-        },
-        getFillColor: d => d.isHub
-            ? [188, 140, 255, Math.min(230, nodeOpacity + 40)]
-            : [88, 166, 255, nodeOpacity],
+        getRadius: d => Math.max(1.5, Math.min(8, 1.5 + Math.sqrt(d.count || 1) * 0.6)),
+        getFillColor: [88, 166, 255, nodeOpacity],
         getLineColor: outlineSoft,
         lineWidthUnits: 'pixels',
-        getLineWidth: d => d.isHub ? 1.4 : 0.7,
+        getLineWidth: 0.7,
         radiusMinPixels: 1.5,
         radiusMaxPixels: 14,
         // Billboard-точки на глобусе тоже ломает back-face culling.
         parameters: isGlobe ? { cullMode: 'none' } : undefined,
         updateTriggers: {
             getLineColor: [NMAuth.getTheme()],
-            getFillColor: [arcLayout, hubCount, showHex, nodeOpacity],
-            getRadius: [arcLayout, hubCount],
+            getFillColor: [showHex, nodeOpacity],
         },
         onClick: info => { if (info.object) showPointDetail(info.object, info.object.key); },
     }));
@@ -608,9 +561,8 @@ function getDeckTooltip({ object, layer }) {
         };
     }
     if (layer && layer.id === 'nodes') {
-        const hub = object.isHub ? ' · хаб' : '';
         return {
-            html: `<b>${escapeHTML(object.label || object.key)}</b>${hub}<br>
+            html: `<b>${escapeHTML(object.label || object.key)}</b><br>
                    ${escapeHTML(object.city || '')} · ${escapeHTML(ruCountry(object.country))}<br>
                    События: ${fmtNumber(object.count)}`,
             style: tipStyle,
@@ -1027,39 +979,6 @@ async function loadCountries() {
         countriesGeoJSON = null;
         countryCentroidsCache = null;
     }
-}
-
-function syncArcLayoutUI() {
-    document.getElementById('arcLayout-hub')?.classList.toggle('active', arcLayout === 'hub');
-    document.getElementById('arcLayout-mesh')?.classList.toggle('active', arcLayout === 'mesh');
-    const wrap = document.getElementById('hubCountWrap');
-    if (wrap) wrap.style.display = arcLayout === 'hub' ? '' : 'none';
-    const hubEl = document.getElementById('hubCount');
-    const hubVal = document.getElementById('hubCountVal');
-    if (hubEl) hubEl.value = hubCount;
-    if (hubVal) hubVal.textContent = String(hubCount);
-    const dens = document.getElementById('toggleDensityChk');
-    if (dens) dens.checked = showDensity;
-    const hubRow = document.getElementById('legendHubRow');
-    if (hubRow) hubRow.style.display = arcLayout === 'hub' ? '' : 'none';
-}
-
-function setArcLayout(layout) {
-    if (layout !== 'hub' && layout !== 'mesh') return;
-    arcLayout = layout;
-    syncArcLayoutUI();
-    saveUIState();
-    refreshMapLayers();
-    updateMapOverlay();
-}
-
-function onHubCountChange() {
-    const el = document.getElementById('hubCount');
-    hubCount = Math.min(HUB_COUNT_MAX, Math.max(HUB_COUNT_MIN, parseInt(el.value, 10) || HUB_COUNT_DEFAULT));
-    document.getElementById('hubCountVal').textContent = String(hubCount);
-    saveUIState();
-    refreshMapLayers();
-    updateMapOverlay();
 }
 
 function onToggleDensity() {
