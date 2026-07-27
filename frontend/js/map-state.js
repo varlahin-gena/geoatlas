@@ -17,19 +17,19 @@ const MAX_ARCS_DEFAULT = 5000;
 const MAX_ARCS_MIN     = 100;
 const MAX_ARCS_MAX     = 20000;
 
-/** Стартовый вид 2D-карты: весь мир, без наклона. */
+/** Стартовый вид 2D-карты: центр мира; zoom подгоняется в applyMapFitZoom(). */
 const DEFAULT_MAP_VIEW = Object.freeze({
     longitude: 20,
     latitude: 18,
-    zoom: 1.5,
+    zoom: 1.8,
     pitch: 0,
     bearing: 0,
 });
 const DEFAULT_GLOBE_VIEW = Object.freeze({
     longitude: 30,
     latitude: 20,
-    // На globe чем выше zoom — тем крупнее сфера в кадре (вписать без больших полей).
-    zoom: 2.05,
+    // Фактический zoom для «вписать в экран» считается в applyGlobeFitZoom().
+    zoom: 2.5,
     pitch: 0,
     bearing: 0,
 });
@@ -510,7 +510,11 @@ function onPeriodPresetChange() {
 function toggleSidebar() {
     document.getElementById('app').classList.toggle('sidebar-collapsed');
     saveUIState();
-    setTimeout(() => { resizeCurrentView(); }, 220);
+    setTimeout(() => {
+        resizeCurrentView();
+        if (viewMode === 'globe' && typeof applyGlobeFitZoom === 'function') applyGlobeFitZoom();
+        else if (viewMode === 'map' && typeof applyMapFitZoom === 'function') applyMapFitZoom();
+    }, 220);
 }
 function resizeCurrentView() {
     if (maplibreMap) maplibreMap.resize();

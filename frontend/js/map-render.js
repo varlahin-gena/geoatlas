@@ -788,16 +788,10 @@ function initMapView() {
                 toast('Globe projection недоступен — остаёмся в 2D', 'error');
                 viewMode = 'map';
             } else {
-                // После смены projection заново ставим «вписанный» zoom.
-                globeViewState = { ...globeViewState, zoom: DEFAULT_GLOBE_VIEW.zoom, pitch: 0 };
-                maplibreMap.jumpTo({
-                    center: [
-                        globeViewState.longitude ?? DEFAULT_GLOBE_VIEW.longitude,
-                        globeViewState.latitude ?? DEFAULT_GLOBE_VIEW.latitude,
-                    ],
-                    zoom: DEFAULT_GLOBE_VIEW.zoom,
-                    bearing: globeViewState.bearing || 0,
-                    pitch: 0,
+                applyGlobeFitZoom({
+                    longitude: globeViewState.longitude ?? DEFAULT_GLOBE_VIEW.longitude,
+                    latitude: globeViewState.latitude ?? DEFAULT_GLOBE_VIEW.latitude,
+                    bearing: globeViewState.bearing ?? DEFAULT_GLOBE_VIEW.bearing,
                 });
             }
         } else {
@@ -881,19 +875,114 @@ function destroyMapView() {
     if (host) host.innerHTML = '';
 }
 
-function fitDeckToData() {
+/**
+ * Zoom, при котором диаметр глобуса ≈ меньшей стороне viewport.
+ * MapLibre масштабирует сферу с учётом mercator (cos lat) — это нужно компенсировать.
+ * @see https://ashk.au/2026/02/12/fit-a-maplibre-3d-globe-to-the-available-screen-size/
+ */
+function computeGlobeFitZoom(lat, width, height) {
+    const padding = 6; // небольшой зазор от края; отрицательный = слегка «вылезает»
+    const w = Math.max(1, width || 1);
+    const h = Math.max(1, height || 1);
+    const targetDiameterPx = Math.max(64, Math.min(w, h) - padding * 2);
+    const latClamped = Math.max(-60, Math.min(60, lat || 0));
+    const mercatorScaleCorrection = Math.max(0.25, Math.cos((latClamped * Math.PI) / 180));
+    const requiredWorldCircumferencePx = targetDiameterPx * Math.PI * mercatorScaleCorrection;
+    return Math.log2(requiredWorldCircumferencePx / 512);
+}
+
+/**
+ * Zoom 2D-карты: заполнить viewport мировой проекцией без больших полей сверху/снизу.
+ * Берём max(width, height), чтобы на широких экранах подрезать полярные «пустые» зоны.
+ */
+function computeMapFitZoom(width, height) {
+    const padding = 8;
+    const w = Math.max(1, width || 1);
+    const h = Math.max(1, height || 1);
+    const targetPx = Math.max(64, Math.max(w, h) - padding * 2);
+    return Math.log2(targetPx / 512);
+}
+
+function applyGlobeFitZoom(opts) {
     if (!maplibreMap) return;
-    // Фиксированный мировой обзор вместо fitBounds — иначе центр/zoom
-    // «прыгают» к плотности данных (часто Европа) и не совпадают со стартовым видом.
-    const vs = DEFAULT_MAP_VIEW;
-    mapViewState = { ...vs };
+    try { maplibreMap.resize(); } catch (e) {}
+    const container = maplibreMap.getContainer();
+    const cur = maplibreMap.getCenter();
+    const lat = (opts && opts.latitude != null)
+        ? opts.latitude
+        : (globeViewState.latitude ?? cur.lat ?? DEFAULT_GLOBE_VIEW.latitude);
+    const lon = (opts && opts.longitude != null)
+        ? opts.longitude
+        : (globeViewState.longitude ?? cur.lng ?? DEFAULT_GLOBE_VIEW.longitude);
+    const bearing = (opts && opts.bearing != null)
+        ? opts.bearing
+        : (globeViewState.bearing ?? DEFAULT_GLOBE_VIEW.bearing);
+    const zoom = computeGlobeFitZoom(lat, container.clientWidth, container.clientHeight);
+    globeViewState = {
+        ...globeViewState,
+        longitude: lon,
+        latitude: lat,
+        zoom,
+        pitch: 0,
+        bearing: bearing || 0,
+    };
     maplibreMap.jumpTo({
-        center: [vs.longitude, vs.latitude],
-        zoom: vs.zoom,
-        bearing: vs.bearing,
-        pitch: vs.pitch,
+        center: [lon, lat],
+        zoom,
+        bearing: bearing || 0,
+        pitch: 0,
     });
     syncViewStateFromMap();
+}
+
+function applyMapFitZoom(opts) {
+    if (!maplibreMap) return;
+    try { maplibreMap.resize(); } catch (e) {}
+    const container = maplibreMap.getContainer();
+    const lon = (opts && opts.longitude != null)
+        ? opts.longitude
+        : (mapViewState.longitude ?? DEFAULT_MAP_VIEW.longitude);
+    const lat = (opts && opts.latitude != null)
+        ? opts.latitude
+        : (mapViewState.latitude ?? DEFAULT_MAP_VIEW.latitude);
+    const bearing = (opts && opts.bearing != null)
+        ? opts.bearing
+        : (mapViewState.bearing ?? DEFAULT_MAP_VIEW.bearing);
+    const zoom = computeMapFitZoom(container.clientWidth, container.clientHeight);
+    mapViewState = {
+        ...mapViewState,
+        longitude: lon,
+        latitude: lat,
+        zoom,
+        pitch: 0,
+        bearing: bearing || 0,
+    };
+    maplibreMap.jumpTo({
+        center: [lon, lat],
+        zoom,
+        bearing: bearing || 0,
+        pitch: 0,
+    });
+    syncViewStateFromMap();
+}
+
+function fitDeckToData() {
+    if (!maplibreMap) return;
+    // Фиксированный мировой обзор вместо fitBounds по данным —
+    // иначе центр/zoom «прыгают» к плотности (часто Европа).
+    if (viewMode === 'globe') {
+        applyGlobeFitZoom({
+            longitude: globeViewState.longitude ?? DEFAULT_GLOBE_VIEW.longitude,
+            latitude: globeViewState.latitude ?? DEFAULT_GLOBE_VIEW.latitude,
+            bearing: globeViewState.bearing ?? DEFAULT_GLOBE_VIEW.bearing,
+        });
+        return;
+    }
+    applyMapFitZoom({
+        longitude: DEFAULT_MAP_VIEW.longitude,
+        latitude: DEFAULT_MAP_VIEW.latitude,
+        bearing: DEFAULT_MAP_VIEW.bearing,
+    });
 }
 
 function syncHeatmapToggleVisibility(mode) {
@@ -937,29 +1026,18 @@ function setViewMode(mode) {
             saveUIState();
             return;
         }
-        // Всегда стартуем с «вписанного» zoom: старый 0.9/1.2 оставлял огромные поля.
-        globeViewState = {
-            ...globeViewState,
-            zoom: DEFAULT_GLOBE_VIEW.zoom,
-            latitude: globeViewState.latitude ?? DEFAULT_GLOBE_VIEW.latitude,
+        applyGlobeFitZoom({
             longitude: globeViewState.longitude ?? DEFAULT_GLOBE_VIEW.longitude,
-            pitch: 0,
+            latitude: globeViewState.latitude ?? DEFAULT_GLOBE_VIEW.latitude,
             bearing: globeViewState.bearing ?? DEFAULT_GLOBE_VIEW.bearing,
-        };
-        maplibreMap.jumpTo({
-            center: [globeViewState.longitude, globeViewState.latitude],
-            zoom: globeViewState.zoom,
-            bearing: globeViewState.bearing || 0,
-            pitch: 0,
         });
         if (autoRotate) startGlobeAutoRotate();
     } else {
         applyMapProjection('map');
-        maplibreMap.jumpTo({
-            center: [mapViewState.longitude ?? DEFAULT_MAP_VIEW.longitude, mapViewState.latitude ?? DEFAULT_MAP_VIEW.latitude],
-            zoom: mapViewState.zoom ?? DEFAULT_MAP_VIEW.zoom,
+        applyMapFitZoom({
+            longitude: mapViewState.longitude ?? DEFAULT_MAP_VIEW.longitude,
+            latitude: mapViewState.latitude ?? DEFAULT_MAP_VIEW.latitude,
             bearing: mapViewState.bearing ?? DEFAULT_MAP_VIEW.bearing,
-            pitch: mapViewState.pitch ?? DEFAULT_MAP_VIEW.pitch,
         });
     }
     syncViewStateFromMap();
@@ -971,7 +1049,12 @@ function setViewMode(mode) {
         refreshMapLayers();
     }
     saveUIState();
-    setTimeout(() => resizeCurrentView(), 100);
+    setTimeout(() => {
+        resizeCurrentView();
+        // После resize контейнера пересчитываем fit — иначе zoom от старого размера.
+        if (viewMode === 'globe') applyGlobeFitZoom();
+        else applyMapFitZoom();
+    }, 100);
     if (prev !== mode) { /* mode changed */ }
 }
 

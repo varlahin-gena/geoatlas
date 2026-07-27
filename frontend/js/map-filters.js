@@ -165,14 +165,28 @@ function resetView() {
     mapViewState = { ...DEFAULT_MAP_VIEW };
     globeViewState = { ...DEFAULT_GLOBE_VIEW };
     if (maplibreMap) {
-        const vs = viewMode === 'globe' ? globeViewState : mapViewState;
-        maplibreMap.jumpTo({
-            center: [vs.longitude, vs.latitude],
-            zoom: vs.zoom,
-            bearing: vs.bearing || 0,
-            pitch: vs.pitch || 0,
-        });
-        if (viewMode === 'globe' && autoRotate) startGlobeAutoRotate();
+        if (viewMode === 'globe' && typeof applyGlobeFitZoom === 'function') {
+            applyGlobeFitZoom({
+                longitude: DEFAULT_GLOBE_VIEW.longitude,
+                latitude: DEFAULT_GLOBE_VIEW.latitude,
+                bearing: DEFAULT_GLOBE_VIEW.bearing,
+            });
+            if (autoRotate) startGlobeAutoRotate();
+        } else if (typeof applyMapFitZoom === 'function') {
+            applyMapFitZoom({
+                longitude: DEFAULT_MAP_VIEW.longitude,
+                latitude: DEFAULT_MAP_VIEW.latitude,
+                bearing: DEFAULT_MAP_VIEW.bearing,
+            });
+        } else {
+            const vs = mapViewState;
+            maplibreMap.jumpTo({
+                center: [vs.longitude, vs.latitude],
+                zoom: vs.zoom,
+                bearing: vs.bearing || 0,
+                pitch: vs.pitch || 0,
+            });
+        }
     }
     saveUIState();
     refreshMap();
