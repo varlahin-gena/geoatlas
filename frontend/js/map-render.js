@@ -787,6 +787,18 @@ function initMapView() {
             if (!applyMapProjection('globe')) {
                 toast('Globe projection недоступен — остаёмся в 2D', 'error');
                 viewMode = 'map';
+            } else {
+                // После смены projection заново ставим «вписанный» zoom.
+                globeViewState = { ...globeViewState, zoom: DEFAULT_GLOBE_VIEW.zoom, pitch: 0 };
+                maplibreMap.jumpTo({
+                    center: [
+                        globeViewState.longitude ?? DEFAULT_GLOBE_VIEW.longitude,
+                        globeViewState.latitude ?? DEFAULT_GLOBE_VIEW.latitude,
+                    ],
+                    zoom: DEFAULT_GLOBE_VIEW.zoom,
+                    bearing: globeViewState.bearing || 0,
+                    pitch: 0,
+                });
             }
         } else {
             applyMapProjection('map');
@@ -925,13 +937,19 @@ function setViewMode(mode) {
             saveUIState();
             return;
         }
-        maplibreMap.jumpTo({
-            center: [
-                globeViewState.longitude ?? DEFAULT_GLOBE_VIEW.longitude,
-                globeViewState.latitude ?? DEFAULT_GLOBE_VIEW.latitude,
-            ],
-            zoom: globeViewState.zoom ?? DEFAULT_GLOBE_VIEW.zoom,
+        // Всегда стартуем с «вписанного» zoom: старый 0.9/1.2 оставлял огромные поля.
+        globeViewState = {
+            ...globeViewState,
+            zoom: DEFAULT_GLOBE_VIEW.zoom,
+            latitude: globeViewState.latitude ?? DEFAULT_GLOBE_VIEW.latitude,
+            longitude: globeViewState.longitude ?? DEFAULT_GLOBE_VIEW.longitude,
+            pitch: 0,
             bearing: globeViewState.bearing ?? DEFAULT_GLOBE_VIEW.bearing,
+        };
+        maplibreMap.jumpTo({
+            center: [globeViewState.longitude, globeViewState.latitude],
+            zoom: globeViewState.zoom,
+            bearing: globeViewState.bearing || 0,
             pitch: 0,
         });
         if (autoRotate) startGlobeAutoRotate();

@@ -27,8 +27,9 @@ const DEFAULT_MAP_VIEW = Object.freeze({
 });
 const DEFAULT_GLOBE_VIEW = Object.freeze({
     longitude: 30,
-    latitude: 30,
-    zoom: 0.9,
+    latitude: 20,
+    // На globe чем выше zoom — тем крупнее сфера в кадре (вписать без больших полей).
+    zoom: 2.05,
     pitch: 0,
     bearing: 0,
 });
