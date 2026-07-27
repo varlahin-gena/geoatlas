@@ -332,6 +332,32 @@ function arcTilt(d) {
     return ((h % 7) - 3) * 2;
 }
 
+/** Max latitude along a great-circle between two endpoints. */
+function greatCircleMaxLat(lon1, lat1, lon2, lat2) {
+    let maxLat = Math.max(lat1, lat2);
+    for (let i = 1; i < 9; i++) {
+        const [, lat] = greatCirclePoint(lon1, lat1, lon2, lat2, i / 10);
+        maxLat = Math.max(maxLat, lat);
+    }
+    return maxLat;
+}
+
+/** Arc paraboloid height for 2D mercator — keep peaks inside the viewport. */
+function mapArcHeight(d) {
+    const [sLon, sLat] = nodeLonLat(d.src, d.src_lon, d.src_lat);
+    const [tLon, tLat] = nodeLonLat(d.dst, d.dst_lon, d.dst_lat);
+    let dLon = Math.abs(tLon - sLon);
+    if (dLon > 180) dLon = 360 - dLon;
+    const dist = Math.max(1, Math.hypot(dLon, Math.abs(tLat - sLat)));
+    const peakLat = greatCircleMaxLat(sLon, sLat, tLon, tLat);
+    // Трансатлантические дуги «выгибаются» к полюсу — чем выше пик, тем ниже Z.
+    const northPenalty = 1 - Math.min(0.8, Math.max(0, (peakLat - 30) / 65));
+    const spanPenalty = 1 - Math.min(0.45, dLon / 160);
+    const zoomPenalty = Math.min(1, Math.max(0.5, (currentMapZoom || 2.5) / 3.2));
+    const base = (3 / dist) * northPenalty * spanPenalty * zoomPenalty;
+    return Math.max(0.018, Math.min(0.075, base));
+}
+
 function densityLayerActive(isGlobe) {
     if (isGlobe) return false;
     if (!showDensity) return false;
@@ -521,17 +547,9 @@ function buildDeckLayers(mode = 'map') {
             }
             // На mercator высокая дуга в перспективе уезжает за край viewport
             // (особенно на север от хаба). Держим пик скромным.
-            const [sLon, sLat] = nodeLonLat(d.src, d.src_lon, d.src_lat);
-            const [tLon, tLat] = nodeLonLat(d.dst, d.dst_lon, d.dst_lat);
-            let dLon = Math.abs(tLon - sLon);
-            if (dLon > 180) dLon = 360 - dLon;
-            const dist = Math.max(1, Math.hypot(dLon, Math.abs(tLat - sLat)));
-            const midLat = Math.abs((sLat + tLat) / 2);
-            // Чем севернее и длиннее маршрут — тем ниже дуга, чтобы не клипалась.
-            const northScale = 1 - Math.min(0.65, Math.max(0, (midLat - 25) / 80));
-            return Math.max(0.025, Math.min(0.1, (4 / dist) * northScale));
+            return mapArcHeight(d);
         },
-        getTilt: isGlobe ? 0 : d => arcTilt(d) * 0.4,
+        getTilt: isGlobe ? 0 : d => arcTilt(d) * 0.35,
         autoHighlight: true,
         highlightColor: [255, 255, 255, 140],
         parameters: isGlobe
@@ -542,7 +560,7 @@ function buildDeckLayers(mode = 'map') {
             getTargetColor: [currentFilter, monoArcColor, typeof repColorArcs !== 'undefined' && repColorArcs, typeof reputationFilterActiveCount === 'function' ? reputationFilterActiveCount() : 0, arcLayout, hubCount, focusedCountry],
             getSourcePosition: [_statsCacheVersion],
             getTargetPosition: [_statsCacheVersion],
-            getHeight: [isGlobe],
+            getHeight: [isGlobe, currentMapZoom],
             getTilt: [arcLayout, isGlobe],
             getWidth: [arcLayout, maxArcs],
         },
@@ -906,22 +924,26 @@ function fitDeckToData() {
         expand(l.src_lon, l.src_lat);
         expand(l.dst_lon, l.dst_lat);
         // Учитываем северный «горб» great-circle, иначе fitBounds режет дуги сверху.
-        for (let i = 1; i <= 3; i++) {
-            const [lon, lat] = greatCirclePoint(l.src_lon, l.src_lat, l.dst_lon, l.dst_lat, i / 4);
+        const peakLat = greatCircleMaxLat(l.src_lon, l.src_lat, l.dst_lon, l.dst_lat);
+        expand((l.src_lon + l.dst_lon) / 2, peakLat);
+        for (let i = 1; i <= 7; i++) {
+            const [lon, lat] = greatCirclePoint(l.src_lon, l.src_lat, l.dst_lon, l.dst_lat, i / 8);
             expand(lon, lat);
         }
     });
     if (minLon === 180) return;
-    const pad = 0.18;
-    const lonPad = Math.max(1, (maxLon - minLon) * pad);
-    const latPad = Math.max(1.5, (maxLat - minLat) * pad);
+    const pad = 0.2;
+    const lonPad = Math.max(1.5, (maxLon - minLon) * pad);
+    const latPad = Math.max(2, (maxLat - minLat) * pad);
     // Чуть больше запаса на север — туда уходят дуги в перспективе.
-    const northPad = latPad * 1.35;
+    const northPad = Math.max(3, latPad * 1.6);
     try {
         maplibreMap.fitBounds(
-            [[minLon - lonPad, minLat - latPad], [maxLon + lonPad, Math.min(85, maxLat + northPad)]],
-            { padding: { top: 72, bottom: 48, left: 48, right: 48 }, maxZoom: 5.5, duration: 0 }
+            [[minLon - lonPad, minLat - latPad], [maxLon + lonPad, Math.min(82, maxLat + northPad)]],
+            { padding: { top: 110, bottom: 52, left: 52, right: 52 }, maxZoom: 5, duration: 0 }
         );
+        // Сдвигаем карту вниз, чтобы оставить «воздух» над дугами.
+        maplibreMap.panBy([0, 48], { duration: 0 });
         syncViewStateFromMap();
     } catch (e) {
         const lonSpan = maxLon - minLon, latSpan = maxLat - minLat;
