@@ -65,28 +65,28 @@ func DefaultReputationFeeds() []ReputationFeed {
 func CatalogReputationFeeds() []ReputationFeed {
 	return []ReputationFeed{
 		{
-			Name: "spamhaus_drop_official",
-			URL:  "https://www.spamhaus.org/drop/drop_v4.json",
+			Name:     "spamhaus_drop_official",
+			URL:      "https://www.spamhaus.org/drop/drop_v4.json",
 			Category: "drop", Format: "spamhaus_json",
 		},
 		{
-			Name: "feodo_abusech",
-			URL:  "https://feodotracker.abuse.ch/downloads/ipblocklist.txt",
+			Name:     "feodo_abusech",
+			URL:      "https://feodotracker.abuse.ch/downloads/ipblocklist.txt",
 			Category: "c2", Format: "netset",
 		},
 		{
-			Name: "feodo_badips",
-			URL:  fireholRawBase + "feodo_badips.ipset",
+			Name:     "feodo_badips",
+			URL:      fireholRawBase + "feodo_badips.ipset",
 			Category: "c2", Format: "netset",
 		},
 		{
-			Name: "blocklist_de_ssh",
-			URL:  "https://lists.blocklist.de/lists/ssh.txt",
+			Name:     "blocklist_de_ssh",
+			URL:      "https://lists.blocklist.de/lists/ssh.txt",
 			Category: "attacks", Format: "netset",
 		},
 		{
-			Name: "et_block_official",
-			URL:  "https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt",
+			Name:     "et_block_official",
+			URL:      "https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt",
 			Category: "block", Format: "netset",
 		},
 	}
@@ -119,6 +119,8 @@ type Config struct {
 	APITokensFile string
 	// RetentionFile — JSON с TTL таблиц CH (том /app/data рядом с users.json).
 	RetentionFile string
+	// SearchTemplatesFile — персональные шаблоны поиска карты по username.
+	SearchTemplatesFile string
 
 	MaxLogUploadSize     int64
 	MaxGeoUploadSize     int64
@@ -195,6 +197,7 @@ func FromEnv() Config {
 		AuthUsersFile:        envOr("AUTH_USERS_FILE", "/app/data/users.json"),
 		APITokensFile:        envOr("API_TOKENS_FILE", "/app/data/api_tokens.json"),
 		RetentionFile:        envOr("RETENTION_FILE", "/app/data/retention.json"),
+		SearchTemplatesFile:  envOr("SEARCH_TEMPLATES_FILE", "/app/data/search_templates.json"),
 		MaxLogUploadSize:     envInt64("MAX_LOG_UPLOAD_SIZE", 1<<30), // 1 GiB
 		MaxGeoUploadSize:     envInt64("MAX_GEO_UPLOAD_SIZE", 1<<30), // 1 GiB
 		IngestBatchSize:      envInt("INGEST_BATCH_SIZE", 10000),

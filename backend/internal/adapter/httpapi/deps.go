@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"network_monitor/internal/adapter/searchtemplatesfile"
 	"network_monitor/internal/auth"
 	"network_monitor/internal/config"
 	usecaseauth "network_monitor/internal/usecase/auth"
@@ -19,20 +20,21 @@ import (
 
 // Deps — общие зависимости HTTP-слоя (без clickhouse.Conn — только usecase/ports).
 type Deps struct {
-	cfg           config.Config
-	ingest        Ingester
-	parseErrorsUC *parseerrors.Service
-	parseTestUC   *parsetest.Service
-	eventsUC      *usecaseevents.Service
-	geoUC         *usecasegeo.Service
-	reputationUC  *usecasereputation.Service
-	systemUC      *usecasesystem.Service
-	systemPinger  usecasesystem.ClickHousePinger
-	retentionUC   *usecaseretention.Service
-	authUC        *usecaseauth.Service
-	users         *auth.UserStore // middleware / LiveSession
-	sessions      *auth.SessionManager
-	apiTokens     *auth.TokenStore
+	cfg             config.Config
+	ingest          Ingester
+	parseErrorsUC   *parseerrors.Service
+	parseTestUC     *parsetest.Service
+	eventsUC        *usecaseevents.Service
+	geoUC           *usecasegeo.Service
+	reputationUC    *usecasereputation.Service
+	systemUC        *usecasesystem.Service
+	systemPinger    usecasesystem.ClickHousePinger
+	retentionUC     *usecaseretention.Service
+	authUC          *usecaseauth.Service
+	users           *auth.UserStore // middleware / LiveSession
+	sessions        *auth.SessionManager
+	apiTokens       *auth.TokenStore
+	searchTemplates *searchtemplatesfile.Store
 }
 
 func NewDeps(
@@ -72,6 +74,14 @@ func (d *Deps) WithAuth(authUC *usecaseauth.Service, users *auth.UserStore, sess
 	d.users = users
 	d.sessions = sessions
 	d.apiTokens = apiTokens
+	return d
+}
+
+func (d *Deps) WithSearchTemplates(store *searchtemplatesfile.Store) *Deps {
+	if d == nil {
+		return nil
+	}
+	d.searchTemplates = store
 	return d
 }
 

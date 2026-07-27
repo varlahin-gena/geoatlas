@@ -629,6 +629,250 @@ function searchBuilderStatusText() {
     return 'Подсказка: country:Россия AND device:fw1, NOT rule:block, (A OR B)';
 }
 
+let searchBuilderActiveTab = 'builder';
+let searchTemplatesMineCache = [];
+let searchTemplatesAllCache = [];
+let searchTemplateEditingId = '';
+
+function searchTemplatesFetch(url, options) {
+    const opts = Object.assign({ credentials: 'same-origin' }, options || {});
+    if (!opts.headers) opts.headers = {};
+    if (typeof nmAuthHeaders === 'function') {
+        opts.headers = nmAuthHeaders(opts.headers);
+    } else if (window.NMAuth && typeof NMAuth.nmAuthHeaders === 'function') {
+        opts.headers = NMAuth.nmAuthHeaders(opts.headers);
+    }
+    return fetch(url, opts);
+}
+
+async function loadSearchTemplatesMine() {
+    const host = document.getElementById('searchTemplatesMine');
+    if (!host) return;
+    host.innerHTML = '<div class="search-templates-empty">Загрузка…</div>';
+    try {
+        const res = await searchTemplatesFetch('/api/me/search-templates');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        searchTemplatesMineCache = Array.isArray(data.templates) ? data.templates : [];
+        renderSearchTemplatesMine();
+    } catch (e) {
+        host.innerHTML = '<div class="search-templates-empty">Не удалось загрузить шаблоны</div>';
+    }
+}
+
+async function loadSearchTemplatesAll() {
+    const host = document.getElementById('searchTemplatesAll');
+    if (!host) return;
+    host.innerHTML = '<div class="search-templates-empty">Загрузка…</div>';
+    try {
+        const res = await searchTemplatesFetch('/api/search-templates');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        searchTemplatesAllCache = Array.isArray(data.templates) ? data.templates : [];
+        renderSearchTemplatesAll();
+    } catch (e) {
+        host.innerHTML = '<div class="search-templates-empty">Не удалось загрузить шаблоны</div>';
+    }
+}
+
+function applySearchTemplateQuery(query) {
+    searchBuilderForceOpen = true;
+    setSearchQuery(query || '', {
+        syncInput: true,
+        save: true,
+        refresh: true,
+        updateOverlay: true,
+        keepBuilderOpen: true,
+    });
+}
+
+function renderSearchTemplatesMine() {
+    const host = document.getElementById('searchTemplatesMine');
+    if (!host) return;
+    host.innerHTML = '';
+    if (!searchTemplatesMineCache.length) {
+        host.innerHTML = '<div class="search-templates-empty">Пока нет сохранённых запросов. Сохраните текущий поиск кнопкой выше.</div>';
+        return;
+    }
+    searchTemplatesMineCache.forEach(function (tpl) {
+        const card = document.createElement('div');
+        card.className = 'search-template-card';
+        if (searchTemplateEditingId === tpl.id) {
+            const edit = document.createElement('div');
+            edit.className = 'search-template-edit';
+            const nameInput = document.createElement('input');
+            nameInput.type = 'text';
+            nameInput.value = tpl.name || '';
+            nameInput.placeholder = 'Название';
+            const queryInput = document.createElement('textarea');
+            queryInput.value = tpl.query || '';
+            queryInput.placeholder = 'Запрос';
+            const actions = document.createElement('div');
+            actions.className = 'search-template-actions';
+            appendBuilderButton(actions, 'search-builder-remove', 'Сохранить', false, async function () {
+                try {
+                    const res = await searchTemplatesFetch('/api/me/search-templates/' + encodeURIComponent(tpl.id), {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: nameInput.value, query: queryInput.value }),
+                    });
+                    if (!res.ok) {
+                        const err = await res.json().catch(function () { return {}; });
+                        toast(err.error || 'Не удалось сохранить', 'error');
+                        return;
+                    }
+                    searchTemplateEditingId = '';
+                    await loadSearchTemplatesMine();
+                    toast('Шаблон обновлён', 'success', 2000);
+                } catch (e) {
+                    toast('Не удалось сохранить', 'error');
+                }
+            });
+            appendBuilderButton(actions, 'search-builder-remove', 'Отмена', false, function () {
+                searchTemplateEditingId = '';
+                renderSearchTemplatesMine();
+            });
+            edit.appendChild(nameInput);
+            edit.appendChild(queryInput);
+            edit.appendChild(actions);
+            card.appendChild(edit);
+            host.appendChild(card);
+            return;
+        }
+
+        const head = document.createElement('div');
+        head.className = 'search-template-card-head';
+        const name = document.createElement('div');
+        name.className = 'search-template-name';
+        name.textContent = tpl.name || 'Без названия';
+        head.appendChild(name);
+        card.appendChild(head);
+
+        const query = document.createElement('div');
+        query.className = 'search-template-query';
+        query.textContent = tpl.query || '';
+        card.appendChild(query);
+
+        const actions = document.createElement('div');
+        actions.className = 'search-template-actions';
+        appendBuilderButton(actions, 'search-builder-remove', 'Применить', false, function () {
+            applySearchTemplateQuery(tpl.query);
+        });
+        appendBuilderButton(actions, 'search-builder-remove', 'Изменить', false, function () {
+            searchTemplateEditingId = tpl.id;
+            renderSearchTemplatesMine();
+        });
+        appendBuilderButton(actions, 'search-builder-remove', 'Удалить', false, async function () {
+            if (!window.confirm('Удалить шаблон «' + (tpl.name || '') + '»?')) return;
+            try {
+                const res = await searchTemplatesFetch('/api/me/search-templates/' + encodeURIComponent(tpl.id), {
+                    method: 'DELETE',
+                });
+                if (!res.ok) {
+                    toast('Не удалось удалить', 'error');
+                    return;
+                }
+                await loadSearchTemplatesMine();
+                toast('Шаблон удалён', 'success', 2000);
+            } catch (e) {
+                toast('Не удалось удалить', 'error');
+            }
+        });
+        card.appendChild(actions);
+        host.appendChild(card);
+    });
+}
+
+function renderSearchTemplatesAll() {
+    const host = document.getElementById('searchTemplatesAll');
+    if (!host) return;
+    host.innerHTML = '';
+    if (!searchTemplatesAllCache.length) {
+        host.innerHTML = '<div class="search-templates-empty">Шаблонов пока нет.</div>';
+        return;
+    }
+    searchTemplatesAllCache.forEach(function (tpl) {
+        const card = document.createElement('div');
+        card.className = 'search-template-card';
+        const head = document.createElement('div');
+        head.className = 'search-template-card-head';
+        const name = document.createElement('div');
+        name.className = 'search-template-name';
+        name.textContent = tpl.name || 'Без названия';
+        const author = document.createElement('div');
+        author.className = 'search-template-author';
+        author.textContent = tpl.username || '—';
+        head.appendChild(name);
+        head.appendChild(author);
+        card.appendChild(head);
+        const query = document.createElement('div');
+        query.className = 'search-template-query';
+        query.textContent = tpl.query || '';
+        card.appendChild(query);
+        const actions = document.createElement('div');
+        actions.className = 'search-template-actions';
+        appendBuilderButton(actions, 'search-builder-remove', 'Применить', false, function () {
+            applySearchTemplateQuery(tpl.query);
+        });
+        card.appendChild(actions);
+        host.appendChild(card);
+    });
+}
+
+function setSearchBuilderTab(tab) {
+    searchBuilderActiveTab = tab === 'mine' || tab === 'all' ? tab : 'builder';
+    if (searchBuilderActiveTab === 'all' && !nmIsAdmin) searchBuilderActiveTab = 'builder';
+    document.querySelectorAll('.search-builder-tab').forEach(function (btn) {
+        btn.classList.toggle('active', btn.getAttribute('data-search-tab') === searchBuilderActiveTab);
+    });
+    document.querySelectorAll('[data-search-tab-panel]').forEach(function (panel) {
+        const match = panel.getAttribute('data-search-tab-panel') === searchBuilderActiveTab;
+        panel.hidden = !match;
+    });
+    if (searchBuilderActiveTab === 'mine') loadSearchTemplatesMine();
+    if (searchBuilderActiveTab === 'all') loadSearchTemplatesAll();
+}
+
+async function saveCurrentSearchTemplate() {
+    const query = (document.getElementById('searchInput')?.value || currentSearch || '').trim();
+    if (!query) {
+        toast('Сначала введите поисковый запрос', 'warn');
+        return;
+    }
+    const suggested = query.length > 60 ? query.slice(0, 57) + '…' : query;
+    const name = window.prompt('Название шаблона', suggested);
+    if (name == null) return;
+    const trimmed = String(name).trim();
+    if (!trimmed) {
+        toast('Нужно название', 'warn');
+        return;
+    }
+    try {
+        const res = await searchTemplatesFetch('/api/me/search-templates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: trimmed, query: query }),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(function () { return {}; });
+            toast(err.error || 'Не удалось сохранить', 'error');
+            return;
+        }
+        await loadSearchTemplatesMine();
+        toast('Шаблон сохранён', 'success', 2000);
+    } catch (e) {
+        toast('Не удалось сохранить', 'error');
+    }
+}
+
+function syncSearchBuilderTabsVisibility() {
+    const allTab = document.getElementById('searchTabAll');
+    if (allTab) allTab.style.display = nmIsAdmin ? '' : 'none';
+    if (!nmIsAdmin && searchBuilderActiveTab === 'all') {
+        setSearchBuilderTab('builder');
+    }
+}
+
 function searchBuilderPanelOpen() {
     return !!searchBuilderForceOpen;
 }
@@ -763,7 +1007,15 @@ function syncSearchBuilderUI() {
     toggle.classList.toggle('active', open);
     toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     hint.textContent = searchBuilderStatusText();
+    syncSearchBuilderTabsVisibility();
     syncSearchExampleChips();
+    document.querySelectorAll('.search-builder-tab').forEach(function (btn) {
+        btn.classList.toggle('active', btn.getAttribute('data-search-tab') === searchBuilderActiveTab);
+    });
+    document.querySelectorAll('[data-search-tab-panel]').forEach(function (panelEl) {
+        const match = panelEl.getAttribute('data-search-tab-panel') === searchBuilderActiveTab;
+        panelEl.hidden = !match;
+    });
 
     const rows = currentSearchBuilderState();
     if (add) add.disabled = !currentSearchBuilderEditable;
@@ -970,5 +1222,33 @@ function bindSearchBuilderUI() {
         if (searchEventInsideSearchBox(event, searchBox)) return;
         searchBuilderForceOpen = false;
         syncSearchBuilderUI();
+    });
+
+    document.querySelectorAll('.search-builder-tab').forEach(function (btn) {
+        btn.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            searchBuilderForceOpen = true;
+            setSearchBuilderTab(btn.getAttribute('data-search-tab'));
+        });
+    });
+
+    document.getElementById('btnSearchTemplateSave')?.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        searchBuilderForceOpen = true;
+        saveCurrentSearchTemplate();
+    });
+    document.getElementById('btnSearchTemplateReload')?.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        searchBuilderForceOpen = true;
+        loadSearchTemplatesMine();
+    });
+    document.getElementById('btnSearchTemplateReloadAll')?.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        searchBuilderForceOpen = true;
+        loadSearchTemplatesAll();
     });
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/gorilla/mux"
 
+	"network_monitor/internal/adapter/searchtemplatesfile"
 	"network_monitor/internal/auth"
 	"network_monitor/internal/config"
 	usecaseauth "network_monitor/internal/usecase/auth"
@@ -49,7 +50,8 @@ func NewServer(
 	apiTokens *auth.TokenStore,
 ) *Server {
 	deps := NewDeps(cfg, ingestSvc, eventsUC, geoUC, reputationUC, parseErrorsUC, systemUC, systemPinger, parseTestUC, retentionUC).
-		WithAuth(authUC, users, sessions, apiTokens)
+		WithAuth(authUC, users, sessions, apiTokens).
+		WithSearchTemplates(searchtemplatesfile.New(cfg.SearchTemplatesFile))
 	health := &HealthHandler{deps}
 	events := &EventsHandler{deps}
 	ingestH := &IngestHandler{deps}
@@ -60,6 +62,7 @@ func NewServer(
 	authH := &AuthHandler{deps}
 	usersH := &UsersHandler{deps}
 	tokensH := &APITokensHandler{deps}
+	tplH := &SearchTemplatesHandler{deps}
 
 	envTokens := cfg.APIAuthTokens()
 	if cfg.APIAuthDisabled {
@@ -114,6 +117,23 @@ func NewServer(
 	r.Handle("/api/users/{username}",
 		chain(http.HandlerFunc(usersH.Delete), adminMW, csrf),
 	).Methods("DELETE")
+
+	// --- Личные шаблоны поиска (карта) ---
+	r.Handle("/api/me/search-templates",
+		withTimeout(chain(http.HandlerFunc(tplH.ListMine), loginMW), healthTimeout),
+	).Methods("GET")
+	r.Handle("/api/me/search-templates",
+		chain(http.HandlerFunc(tplH.CreateMine), loginMW, csrf, maxBytesMW(64<<10)),
+	).Methods("POST")
+	r.Handle("/api/me/search-templates/{id}",
+		chain(http.HandlerFunc(tplH.UpdateMine), loginMW, csrf, maxBytesMW(64<<10)),
+	).Methods("PUT")
+	r.Handle("/api/me/search-templates/{id}",
+		chain(http.HandlerFunc(tplH.DeleteMine), loginMW, csrf),
+	).Methods("DELETE")
+	r.Handle("/api/search-templates",
+		withTimeout(chain(http.HandlerFunc(tplH.ListAll), adminMW), healthTimeout),
+	).Methods("GET")
 
 	// --- API-токены (administrator) ---
 	r.Handle("/api/tokens",

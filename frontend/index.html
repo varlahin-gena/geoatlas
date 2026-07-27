@@ -205,19 +205,41 @@
                     <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18"/><path d="M6 12h12"/><path d="M10 19h4"/></svg>
                 </button>
                 <div class="search-builder-panel" id="searchBuilderPanel">
-                    <div class="search-builder-head">
-                        <div class="search-builder-title">Конструктор запроса</div>
-                        <div class="search-builder-actions">
-                            <button type="button" id="btnSearchBuilderAdd">Добавить условие</button>
-                            <button type="button" id="btnSearchBuilderAddGroup">Добавить группу</button>
-                            <button type="button" id="btnSearchBuilderApply">Применить</button>
-                            <button type="button" id="btnSearchBuilderClear">Сбросить</button>
-                        </div>
+                    <div class="search-builder-tabs" role="tablist">
+                        <button type="button" class="search-builder-tab active" data-search-tab="builder" id="searchTabBuilder">Конструктор</button>
+                        <button type="button" class="search-builder-tab" data-search-tab="mine" id="searchTabMine">Мои запросы</button>
+                        <button type="button" class="search-builder-tab" data-search-tab="all" id="searchTabAll" style="display:none;">Все шаблоны</button>
                     </div>
-                    <div class="search-builder-chips" id="searchBuilderChips" aria-label="Примеры запросов"></div>
-                    <div class="search-builder-hint" id="searchBuilderHint"></div>
-                    <div class="search-builder-notice" id="searchBuilderNotice" style="display:none;"></div>
-                    <div class="search-builder-rows" id="searchBuilderRows"></div>
+                    <div class="search-builder-tab-panel" id="searchBuilderTabBuilder" data-search-tab-panel="builder">
+                        <div class="search-builder-head">
+                            <div class="search-builder-title">Конструктор запроса</div>
+                            <div class="search-builder-actions">
+                                <button type="button" id="btnSearchBuilderAdd">Добавить условие</button>
+                                <button type="button" id="btnSearchBuilderAddGroup">Добавить группу</button>
+                                <button type="button" id="btnSearchBuilderApply">Применить</button>
+                                <button type="button" id="btnSearchBuilderClear">Сбросить</button>
+                            </div>
+                        </div>
+                        <div class="search-builder-chips" id="searchBuilderChips" aria-label="Примеры запросов"></div>
+                        <div class="search-builder-hint" id="searchBuilderHint"></div>
+                        <div class="search-builder-notice" id="searchBuilderNotice" style="display:none;"></div>
+                        <div class="search-builder-rows" id="searchBuilderRows"></div>
+                    </div>
+                    <div class="search-builder-tab-panel" id="searchBuilderTabMine" data-search-tab-panel="mine" hidden>
+                        <div class="search-templates-toolbar">
+                            <button type="button" id="btnSearchTemplateSave">Сохранить текущий</button>
+                            <button type="button" id="btnSearchTemplateReload">Обновить</button>
+                        </div>
+                        <div class="search-templates-hint">Личные шаблоны хранятся на сервере и доступны только вашей учётной записи.</div>
+                        <div class="search-templates-list" id="searchTemplatesMine"></div>
+                    </div>
+                    <div class="search-builder-tab-panel" id="searchBuilderTabAll" data-search-tab-panel="all" hidden>
+                        <div class="search-templates-toolbar">
+                            <button type="button" id="btnSearchTemplateReloadAll">Обновить</button>
+                        </div>
+                        <div class="search-templates-hint">Обзор шаблонов всех пользователей: название и автор. Чужие шаблоны можно только применить.</div>
+                        <div class="search-templates-list" id="searchTemplatesAll"></div>
+                    </div>
                 </div>
             </div>
             <div class="group-control">
@@ -349,7 +371,7 @@
 <script src="/auth.js?v=20260727s"></script>
 <script src="/common.js?v=20260727s"></script>
 <script src="/js/map-state.js?v=20260727s"></script>
-<script src="/js/map-search.js?v=20260727t"></script>
+<script src="/js/map-search.js?v=20260727u"></script>
 <script src="/js/map-reputation.js?v=20260727s"></script>
 <script src="/js/map-detail.js?v=20260727s"></script>
 <script src="/js/map-render.js?v=20260727s"></script>
