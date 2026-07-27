@@ -353,6 +353,16 @@ function mapArcHeight(d) {
     return Math.max(0.15, Math.min(0.35, 0.1 + dist / 160));
 }
 
+/** Arc height on globe — ниже, чтобы дуги не вылезали над сферой. */
+function globeArcHeight(d) {
+    const [sLon, sLat] = nodeLonLat(d.src, d.src_lon, d.src_lat);
+    const [tLon, tLat] = nodeLonLat(d.dst, d.dst_lon, d.dst_lat);
+    let dLon = Math.abs(tLon - sLon);
+    if (dLon > 180) dLon = 360 - dLon;
+    const dist = Math.max(1, Math.hypot(dLon, Math.abs(tLat - sLat)));
+    return Math.max(0.06, Math.min(0.18, 0.04 + dist / 380));
+}
+
 function densityLayerActive(isGlobe) {
     if (isGlobe) return false;
     if (!showDensity) return false;
@@ -532,18 +542,7 @@ function buildDeckLayers(mode = 'map') {
         getTargetColor: d => [...arcRGB(d.status, d), d._flowAlpha || 210],
         getWidth: d => Math.max(1.2, Math.min(7, 1.2 + Math.log2((d.count || 1) + 1) * 0.9)),
         widthUnits: 'pixels',
-        getHeight: d => {
-            if (isGlobe) {
-                // Стабильная высота как в официальном globe-примере (~0.2–0.35).
-                const [sLon, sLat] = nodeLonLat(d.src, d.src_lon, d.src_lat);
-                const [tLon, tLat] = nodeLonLat(d.dst, d.dst_lon, d.dst_lat);
-                let dLon = Math.abs(tLon - sLon);
-                if (dLon > 180) dLon = 360 - dLon;
-                const dist = Math.max(1, Math.hypot(dLon, Math.abs(tLat - sLat)));
-                return Math.max(0.15, Math.min(0.45, 0.12 + dist / 180));
-            }
-            return mapArcHeight(d);
-        },
+        getHeight: d => isGlobe ? globeArcHeight(d) : mapArcHeight(d),
         getTilt: isGlobe ? 0 : d => arcTilt(d) * 0.5,
         autoHighlight: true,
         highlightColor: [255, 255, 255, 140],
