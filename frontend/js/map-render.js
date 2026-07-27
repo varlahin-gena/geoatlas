@@ -206,8 +206,18 @@ function isOnVisibleGlobeHemisphere(lon, lat, viewLon, viewLat) {
     const λ2 = lon * toRad;
     const cosC = Math.sin(φ1) * Math.sin(φ2)
         + Math.cos(φ1) * Math.cos(φ2) * Math.cos(λ2 - λ1);
-    // Чуть строже порог — у лимба дуги и так почти в ребре.
-    return cosC > 0.08;
+    // Строже порог: у лимба дуги легко «просвечивают» сквозь сферу.
+    return cosC > 0.22;
+}
+
+function globeAngularDistanceRad(lon1, lat1, lon2, lat2) {
+    const toRad = Math.PI / 180;
+    const φ1 = lat1 * toRad;
+    const φ2 = lat2 * toRad;
+    const dλ = (lon2 - lon1) * toRad;
+    const cosC = Math.sin(φ1) * Math.sin(φ2)
+        + Math.cos(φ1) * Math.cos(φ2) * Math.cos(dλ);
+    return Math.acos(Math.max(-1, Math.min(1, cosC)));
 }
 
 /** Скрыть дуги, уходящие на обратную сторону глобуса (нет шейдерной окклюзии в нашем deck.gl). */
@@ -216,21 +226,25 @@ function isArcVisibleOnGlobe(line, viewLon, viewLat) {
     const [tLon, tLat] = nodeLonLat(line.dst, line.dst_lon, line.dst_lat);
     const srcVis = isOnVisibleGlobeHemisphere(sLon, sLat, viewLon, viewLat);
     const dstVis = isOnVisibleGlobeHemisphere(tLon, tLat, viewLon, viewLat);
-    if (!srcVis && !dstVis) return false;
+    // Одна точка за горизонтом — дуга почти всегда уходит «сквозь» планету.
+    if (!srcVis || !dstVis) return false;
+
+    // Слишком длинные хорды на сфере огибают лимб даже при видимых концах.
+    if (globeAngularDistanceRad(sLon, sLat, tLon, tLat) > Math.PI * 0.55) return false;
 
     let dLon = tLon - sLon;
     if (dLon > 180) dLon -= 360;
     if (dLon < -180) dLon += 360;
 
-    // Если середина пути за горизонтом — дуга уходит «сквозь» планету.
-    let behind = 0;
-    for (let i = 1; i <= 3; i++) {
-        const t = i / 4;
+    // Плотнее семплируем путь: любой участок за горизонтом — скрываем дугу.
+    const samples = 10;
+    for (let i = 1; i < samples; i++) {
+        const t = i / samples;
         const lon = sLon + dLon * t;
         const lat = sLat + (tLat - sLat) * t;
-        if (!isOnVisibleGlobeHemisphere(lon, lat, viewLon, viewLat)) behind++;
+        if (!isOnVisibleGlobeHemisphere(lon, lat, viewLon, viewLat)) return false;
     }
-    return behind < 2;
+    return true;
 }
 
 function filterGlobeVisibleLines(lines, viewLon, viewLat) {
@@ -248,8 +262,9 @@ let lastGlobeCullKey = '';
 
 function maybeRefreshGlobeLabels(force) {
     if (viewMode !== 'globe') return;
-    const lon = Math.round((globeViewState.longitude || 0) * 2) / 2;
-    const lat = Math.round((globeViewState.latitude || 0) * 2) / 2;
+    // Чаще обновляем cull при вращении — иначе дуги «догоняют» горизонт с задержкой.
+    const lon = Math.round((globeViewState.longitude || 0) * 4) / 4;
+    const lat = Math.round((globeViewState.latitude || 0) * 4) / 4;
     const key = lon + ':' + lat;
     if (!force && key === lastGlobeCullKey) return;
     lastGlobeCullKey = key;
