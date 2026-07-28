@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"runtime"
 	"strings"
-	"sync"
 	"time"
 
 	"network_monitor/internal/model"
@@ -31,6 +30,7 @@ type Service struct {
 	maintenance        MaintenanceScheduler
 	installProfilePath string
 	startupTime        time.Time
+	rates              *RateSampler
 }
 
 func New(deps Dependencies) *Service {
@@ -46,6 +46,7 @@ func New(deps Dependencies) *Service {
 		maintenance:        deps.Maintenance,
 		installProfilePath: deps.InstallProfilePath,
 		startupTime:        startupTime,
+		rates:              &RateSampler{},
 	}
 }
 
@@ -117,7 +118,7 @@ func (s *Service) CollectStats(ctx context.Context) (SystemStatsResponse, error)
 
 	if s.ingest != nil {
 		if snapshot, ok := s.ingest.Snapshot(); ok {
-			mergeLiveIngestStats(&resp, snapshot)
+			mergeLiveIngestStats(&resp, snapshot, s.rates)
 		}
 	}
 	if s.profiles != nil {
@@ -227,7 +228,7 @@ func (s *Service) Health(ctx context.Context, pinger ClickHousePinger) (HealthRe
 	body := map[string]any{"ok": true, "status": "healthy", "clickhouse": "ok"}
 	if s.ingest != nil {
 		if snap, ok := s.ingest.Snapshot(); ok {
-			status, reasons, dropsPerSec := classifyIngest(snap)
+			status, reasons, dropsPerSec := classifyIngest(snap, s.rates)
 			body["status"] = status
 			ingestInfo := map[string]any{
 				"state": snap.State, "queue_depth": snap.QueueDepth, "queue_capacity": snap.QueueCapacity,
@@ -255,7 +256,7 @@ func memHeapAlloc() uint64 {
 	return stats.HeapAlloc
 }
 
-func mergeLiveIngestStats(resp *SystemStatsResponse, ingestStats IngestSnapshot) {
+func mergeLiveIngestStats(resp *SystemStatsResponse, ingestStats IngestSnapshot, rates *RateSampler) {
 	if resp.Pipeline["ingest"] == nil {
 		resp.Pipeline["ingest"] = map[string]float64{}
 	}
@@ -299,39 +300,12 @@ func mergeLiveIngestStats(resp *SystemStatsResponse, ingestStats IngestSnapshot)
 	if ingestStats.LastDropAt != "" {
 		h["last_drop_at"] = ingestStats.LastDropAt
 	}
-	now := time.Now()
 	if resp.Pipeline["rate"] == nil {
 		resp.Pipeline["rate"] = map[string]float64{}
 	}
 	rate := resp.Pipeline["rate"]
-	for _, key := range []string{"udp_events_per_sec", "tcp_events_per_sec", "drops_per_sec", "buffer_drops_per_sec"} {
-		if _, ok := rate[key]; !ok {
-			rate[key] = 0
-		}
-	}
-	prevIngestMu.Lock()
-	prevTS, prevRecv := prevIngestTS, prevIngestRecv
-	prevUDP, prevTCP, prevDrop := prevIngestUDPRecv, prevIngestTCPRecv, prevIngestDropped
-	prevBufDrop := prevIngestBufferDrops
-	prevIngestRecv, prevIngestUDPRecv, prevIngestTCPRecv = ingestStats.ReceivedTotal, ingestStats.UDPReceived, ingestStats.TCPReceived
-	prevIngestDropped, prevIngestBufferDrops, prevIngestTS = ingestStats.DroppedTotal, ingestStats.BufferDropsTotal, now
-	prevIngestMu.Unlock()
-	if !prevTS.IsZero() {
-		if dt := now.Sub(prevTS).Seconds(); dt > 0 {
-			delta := func(current, previous int64) float64 {
-				value := float64(current - previous)
-				if value < 0 {
-					return 0
-				}
-				return value / dt
-			}
-			rate["events_per_sec"] = delta(ingestStats.ReceivedTotal, prevRecv)
-			rate["input_events_per_sec"] = rate["events_per_sec"]
-			rate["udp_events_per_sec"] = delta(ingestStats.UDPReceived, prevUDP)
-			rate["tcp_events_per_sec"] = delta(ingestStats.TCPReceived, prevTCP)
-			rate["drops_per_sec"] = delta(ingestStats.DroppedTotal, prevDrop)
-			rate["buffer_drops_per_sec"] = delta(ingestStats.BufferDropsTotal, prevBufDrop)
-		}
+	for key, value := range rates.ObserveRates(ingestStats) {
+		rate[key] = value
 	}
 	if eventRate := rate["events_per_sec"]; eventRate > 0 {
 		backlog := float64(ingestStats.BufferedLines + ingestStats.QueueDepth)
@@ -428,9 +402,11 @@ func queueRatio(snap IngestSnapshot) float64 {
 	return depthRatio
 }
 
-func classifyIngest(snap IngestSnapshot) (status string, reasons []string, dropsPerSec float64) {
+func classifyIngest(snap IngestSnapshot, rates *RateSampler) (status string, reasons []string, dropsPerSec float64) {
 	status = "healthy"
-	dropsPerSec = sampleDropsPerSec(snap.DroppedTotal)
+	if rates != nil {
+		dropsPerSec = rates.DropsPerSec(snap.DroppedTotal)
+	}
 	ratio := queueRatio(snap)
 	if snap.State == "error" {
 		return "overloaded", []string{"ingest_error"}, dropsPerSec
@@ -459,35 +435,4 @@ func classifyIngest(snap IngestSnapshot) (status string, reasons []string, drops
 		status, reasons = "degraded", append(reasons, "dropping")
 	}
 	return status, reasons, dropsPerSec
-}
-
-var (
-	prevIngestMu          sync.Mutex
-	prevIngestRecv        int64
-	prevIngestUDPRecv     int64
-	prevIngestTCPRecv     int64
-	prevIngestDropped     int64
-	prevIngestBufferDrops int64
-	prevIngestTS          time.Time
-
-	healthDropMu   sync.Mutex
-	healthPrevDrop int64
-	healthPrevTS   time.Time
-)
-
-func sampleDropsPerSec(droppedTotal int64) float64 {
-	healthDropMu.Lock()
-	defer healthDropMu.Unlock()
-	now := time.Now()
-	var rate float64
-	if !healthPrevTS.IsZero() {
-		if dt := now.Sub(healthPrevTS).Seconds(); dt > 0 {
-			rate = float64(droppedTotal-healthPrevDrop) / dt
-			if rate < 0 {
-				rate = 0
-			}
-		}
-	}
-	healthPrevDrop, healthPrevTS = droppedTotal, now
-	return rate
 }

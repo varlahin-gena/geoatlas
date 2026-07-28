@@ -58,40 +58,21 @@ func (s *Service) GetMap(ctx context.Context, in GetMapInput) (GetMapResult, err
 		Source:  "ip",
 	}
 
-	if groupBy == "city" || groupBy == "country" || groupBy == "ip" || groupBy == "subnet" {
-		geoRows, ok, err := s.traffic.ScanGeoEdgesForTimeRange(
-			ctx, in.TimeRange, groupBy, in.Limit, filter, in.Timeout,
-		)
-		if err != nil {
-			return GetMapResult{}, err
-		}
-		if ok {
-			lines, points, skipped := mapagg.BuildMapFromGeoEdges(geoRows)
-			out.Lines = lines
-			out.Points = points
-			out.SkippedNoGeo = skipped
-			out.RawPairs = len(geoRows)
-			out.Source = "geo_" + groupBy
-			// GeoIP залили после ingest → в traffic_logs нет lat/city.
-			// Pre-agg путь пустой — считаем через live Lookup по IP.
-			if len(lines) == 0 {
-				out.Source = "ip"
-			}
-		}
+	scan, err := s.traffic.ScanMapAggs(ctx, in.TimeRange, groupBy, in.Limit, filter, in.Timeout)
+	if err != nil {
+		return GetMapResult{}, err
 	}
-
-	if out.Source == "ip" {
-		raws, err := s.traffic.ScanRawAggsForTimeRange(
-			ctx, in.TimeRange, in.Limit, filter, in.Timeout,
-		)
-		if err != nil {
-			return GetMapResult{}, err
-		}
-		out.RawPairs = len(raws)
-		out.Lines, out.Points, out.SkippedNoGeo = buildMapFromIPRaws(raws, s.geo, groupBy)
-		if groupBy == "city" || groupBy == "country" || groupBy == "ip" || groupBy == "subnet" {
-			out.Source = "ip_live_" + groupBy
-		}
+	if len(scan.GeoEdges) > 0 {
+		lines, points, skipped := mapagg.BuildMapFromGeoEdges(scan.GeoEdges)
+		out.Lines = lines
+		out.Points = points
+		out.SkippedNoGeo = skipped
+		out.RawPairs = len(scan.GeoEdges)
+		out.Source = scan.Source
+	} else if len(scan.Raws) > 0 {
+		out.RawPairs = len(scan.Raws)
+		out.Lines, out.Points, out.SkippedNoGeo = buildMapFromIPRaws(scan.Raws, s.geo, groupBy)
+		out.Source = scan.Source
 	}
 
 	if out.Points == nil {

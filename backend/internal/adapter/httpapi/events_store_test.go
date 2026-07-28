@@ -20,20 +20,18 @@ type stubTraffic struct {
 	rawCalled bool
 }
 
-func (s *stubTraffic) ScanRawAggsForTimeRange(ctx context.Context, tr model.TimeRange, limit int, filter string, timeout time.Duration) ([]model.RawAgg, error) {
-	s.rawCalled = true
-	return nil, nil
-}
-
-func (s *stubTraffic) ScanGeoEdgesForTimeRange(ctx context.Context, tr model.TimeRange, groupBy string, limit int, filter string, timeout time.Duration) ([]model.GeoEdgeAgg, bool, error) {
+func (s *stubTraffic) ScanMapAggs(ctx context.Context, tr model.TimeRange, groupBy string, limit int, filter string, timeout time.Duration) (usecaseevents.MapAggScanResult, error) {
 	s.geoCalled = true
 	s.geoMode = tr.Mode
-	return []model.GeoEdgeAgg{{
-		SrcKey: "Moscow, Россия", DstKey: "Berlin, Germany",
-		SrcLabel: "Moscow", DstLabel: "Berlin",
-		SrcLat: 55.75, SrcLon: 37.62, DstLat: 52.52, DstLon: 13.40,
-		Count: 3, AllowedCnt: 3,
-	}}, true, nil
+	return usecaseevents.MapAggScanResult{
+		Source: "geo_" + groupBy,
+		GeoEdges: []model.GeoEdgeAgg{{
+			SrcKey: "Moscow, Россия", DstKey: "Berlin, Germany",
+			SrcLabel: "Moscow", DstLabel: "Berlin",
+			SrcLat: 55.75, SrcLon: 37.62, DstLat: 52.52, DstLon: 13.40,
+			Count: 3, AllowedCnt: 3,
+		}},
+	}, nil
 }
 
 func (s *stubTraffic) ScanCountrySeries(ctx context.Context, tr model.TimeRange, country string, timeout time.Duration) ([]usecaseevents.SeriesPoint, int, error) {
@@ -107,22 +105,17 @@ type stubTrafficNoGeo struct {
 	stubTraffic
 }
 
-func (s *stubTrafficNoGeo) ScanGeoEdgesForTimeRange(ctx context.Context, tr model.TimeRange, groupBy string, limit int, filter string, timeout time.Duration) ([]model.GeoEdgeAgg, bool, error) {
+func (s *stubTrafficNoGeo) ScanMapAggs(ctx context.Context, tr model.TimeRange, groupBy string, limit int, filter string, timeout time.Duration) (usecaseevents.MapAggScanResult, error) {
 	s.geoCalled = true
 	s.geoMode = tr.Mode
-	return []model.GeoEdgeAgg{{
-		SrcKey: "city:unknown", DstKey: "city:unknown",
-		SrcLabel: "Неизвестно", DstLabel: "Неизвестно",
-		Count: 10, AllowedCnt: 10,
-	}}, true, nil
-}
-
-func (s *stubTrafficNoGeo) ScanRawAggsForTimeRange(ctx context.Context, tr model.TimeRange, limit int, filter string, timeout time.Duration) ([]model.RawAgg, error) {
 	s.rawCalled = true
-	return []model.RawAgg{{
-		SrcIP: "1.1.1.1", DstIP: "8.8.8.8",
-		Count: 5, AllowedCnt: 5,
-	}}, nil
+	return usecaseevents.MapAggScanResult{
+		Source: "ip_live_" + groupBy,
+		Raws: []model.RawAgg{{
+			SrcIP: "1.1.1.1", DstIP: "8.8.8.8",
+			Count: 5, AllowedCnt: 5,
+		}},
+	}, nil
 }
 
 func TestGetEventsFallsBackToLiveGeoWhenStoredCoordsEmpty(t *testing.T) {
@@ -157,19 +150,18 @@ type stubTrafficIPLogGeo struct {
 	stubTraffic
 }
 
-func (s *stubTrafficIPLogGeo) ScanGeoEdgesForTimeRange(ctx context.Context, tr model.TimeRange, groupBy string, limit int, filter string, timeout time.Duration) ([]model.GeoEdgeAgg, bool, error) {
-	return nil, false, nil
-}
-
-func (s *stubTrafficIPLogGeo) ScanRawAggsForTimeRange(ctx context.Context, tr model.TimeRange, limit int, filter string, timeout time.Duration) ([]model.RawAgg, error) {
+func (s *stubTrafficIPLogGeo) ScanMapAggs(ctx context.Context, tr model.TimeRange, groupBy string, limit int, filter string, timeout time.Duration) (usecaseevents.MapAggScanResult, error) {
 	s.rawCalled = true
-	return []model.RawAgg{{
-		SrcIP: "10.0.0.1", DstIP: "10.0.0.2",
-		Count: 7, AllowedCnt: 7,
-		SrcCountry: "Russia", DstCountry: "Germany",
-		SrcLat: 55.75, SrcLon: 37.62,
-		DstLat: 52.52, DstLon: 13.40,
-	}}, nil
+	return usecaseevents.MapAggScanResult{
+		Source: "ip_live_" + groupBy,
+		Raws: []model.RawAgg{{
+			SrcIP: "10.0.0.1", DstIP: "10.0.0.2",
+			Count: 7, AllowedCnt: 7,
+			SrcCountry: "Russia", DstCountry: "Germany",
+			SrcLat: 55.75, SrcLon: 37.62,
+			DstLat: 52.52, DstLon: 13.40,
+		}},
+	}, nil
 }
 
 func TestGetEventsIPUsesStoredLogGeoWhenLiveMisses(t *testing.T) {
@@ -205,17 +197,16 @@ type stubTrafficIPCountryOnly struct {
 	stubTraffic
 }
 
-func (s *stubTrafficIPCountryOnly) ScanGeoEdgesForTimeRange(ctx context.Context, tr model.TimeRange, groupBy string, limit int, filter string, timeout time.Duration) ([]model.GeoEdgeAgg, bool, error) {
-	return nil, false, nil
-}
-
-func (s *stubTrafficIPCountryOnly) ScanRawAggsForTimeRange(ctx context.Context, tr model.TimeRange, limit int, filter string, timeout time.Duration) ([]model.RawAgg, error) {
+func (s *stubTrafficIPCountryOnly) ScanMapAggs(ctx context.Context, tr model.TimeRange, groupBy string, limit int, filter string, timeout time.Duration) (usecaseevents.MapAggScanResult, error) {
 	s.rawCalled = true
-	return []model.RawAgg{{
-		SrcIP: "10.0.0.1", DstIP: "10.0.0.2",
-		Count: 7, AllowedCnt: 7,
-		SrcCountry: "Russia", DstCountry: "Germany",
-	}}, nil
+	return usecaseevents.MapAggScanResult{
+		Source: "ip_live_" + groupBy,
+		Raws: []model.RawAgg{{
+			SrcIP: "10.0.0.1", DstIP: "10.0.0.2",
+			Count: 7, AllowedCnt: 7,
+			SrcCountry: "Russia", DstCountry: "Germany",
+		}},
+	}, nil
 }
 
 func TestGetEventsSubnetUsesCountryFallback(t *testing.T) {

@@ -14,12 +14,11 @@ type stubRepo struct {
 	raws    []model.RawAgg
 }
 
-func (s *stubRepo) ScanRawAggsForTimeRange(ctx context.Context, tr model.TimeRange, limit int, filter string, timeout time.Duration) ([]model.RawAgg, error) {
-	return s.raws, nil
-}
-
-func (s *stubRepo) ScanGeoEdgesForTimeRange(ctx context.Context, tr model.TimeRange, groupBy string, limit int, filter string, timeout time.Duration) ([]model.GeoEdgeAgg, bool, error) {
-	return s.geoRows, s.geoOK, nil
+func (s *stubRepo) ScanMapAggs(ctx context.Context, tr model.TimeRange, groupBy string, limit int, filter string, timeout time.Duration) (MapAggScanResult, error) {
+	if s.geoOK {
+		return MapAggScanResult{Source: "geo_" + groupBy, GeoEdges: s.geoRows}, nil
+	}
+	return MapAggScanResult{Source: "ip_live_" + groupBy, Raws: s.raws}, nil
 }
 
 func (s *stubRepo) ScanCountrySeries(ctx context.Context, tr model.TimeRange, country string, timeout time.Duration) ([]SeriesPoint, int, error) {
@@ -65,7 +64,7 @@ func TestGetMapUsesGeoEdges(t *testing.T) {
 
 func TestGetMapFallsBackWhenGeoEmpty(t *testing.T) {
 	repo := &stubRepo{
-		geoOK: true,
+		geoOK: false,
 		geoRows: []model.GeoEdgeAgg{{
 			SrcKey: "city:unknown", DstKey: "city:unknown",
 			SrcLabel: "Неизвестно", DstLabel: "Неизвестно",

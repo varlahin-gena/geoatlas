@@ -7,6 +7,7 @@ import (
 	ch "github.com/ClickHouse/clickhouse-go/v2"
 
 	"network_monitor/internal/adapter/clickhouse/query"
+	"network_monitor/internal/mapagg"
 	"network_monitor/internal/model"
 	"network_monitor/internal/usecase/events"
 )
@@ -22,12 +23,29 @@ func NewTrafficRepository(apiCH ch.Conn) *TrafficRepository {
 
 var _ events.TrafficRepository = (*TrafficRepository)(nil)
 
-func (r *TrafficRepository) ScanRawAggsForTimeRange(ctx context.Context, tr model.TimeRange, limit int, filter string, timeout time.Duration) ([]model.RawAgg, error) {
-	return query.ScanRawAggsForTimeRange(ctx, r.apiCH, tr, limit, filter, timeout)
-}
+func (r *TrafficRepository) ScanMapAggs(ctx context.Context, tr model.TimeRange, groupBy string, limit int, filter string, timeout time.Duration) (events.MapAggScanResult, error) {
+	geoRows, ok, err := query.ScanGeoEdgesForTimeRange(ctx, r.apiCH, tr, groupBy, limit, filter, timeout)
+	if err != nil {
+		return events.MapAggScanResult{}, err
+	}
+	if ok {
+		lines, _, _ := mapagg.BuildMapFromGeoEdges(geoRows)
+		if len(lines) > 0 {
+			return events.MapAggScanResult{
+				Source:   "geo_" + groupBy,
+				GeoEdges: geoRows,
+			}, nil
+		}
+	}
 
-func (r *TrafficRepository) ScanGeoEdgesForTimeRange(ctx context.Context, tr model.TimeRange, groupBy string, limit int, filter string, timeout time.Duration) ([]model.GeoEdgeAgg, bool, error) {
-	return query.ScanGeoEdgesForTimeRange(ctx, r.apiCH, tr, groupBy, limit, filter, timeout)
+	raws, err := query.ScanRawAggsForTimeRange(ctx, r.apiCH, tr, limit, filter, timeout)
+	if err != nil {
+		return events.MapAggScanResult{}, err
+	}
+	return events.MapAggScanResult{
+		Source: "ip_live_" + groupBy,
+		Raws:   raws,
+	}, nil
 }
 
 func (r *TrafficRepository) ScanGeoMissingIPsForTimeRange(ctx context.Context, tr model.TimeRange, limit int, timeout time.Duration) ([]model.GeoMissingIPRow, error) {

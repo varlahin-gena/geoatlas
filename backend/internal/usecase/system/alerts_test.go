@@ -52,13 +52,13 @@ func TestComputeAlertsEdgesAggRebuilding(t *testing.T) {
 }
 
 func TestMergeLiveIngestStatsDropsPerSec(t *testing.T) {
-	prevIngestMu.Lock()
-	prevIngestRecv, prevIngestUDPRecv, prevIngestTCPRecv, prevIngestDropped, prevIngestBufferDrops = 0, 0, 0, 100, 0
-	prevIngestTS = time.Now().Add(-2 * time.Second)
-	prevIngestMu.Unlock()
+	rates := &RateSampler{
+		prevDrop: 100,
+		prevTS:   time.Now().Add(-2 * time.Second),
+	}
 
 	resp := &SystemStatsResponse{Pipeline: map[string]map[string]float64{}, Health: map[string]map[string]any{}}
-	mergeLiveIngestStats(resp, IngestSnapshot{State: "running", DroppedTotal: 300, ReceivedTotal: 0})
+	mergeLiveIngestStats(resp, IngestSnapshot{State: "running", DroppedTotal: 300, ReceivedTotal: 0}, rates)
 	rate := resp.Pipeline["rate"]["drops_per_sec"]
 	if rate < 50 {
 		t.Fatalf("drops_per_sec=%v want roughly 100", rate)
@@ -84,7 +84,7 @@ func hasAlertCode(alerts []Alert, code string) bool {
 func TestClassifyIngestQueueCritical(t *testing.T) {
 	st, reasons, _ := classifyIngest(IngestSnapshot{
 		State: "running", QueueDepth: 950, QueueCapacity: 1000,
-	})
+	}, &RateSampler{})
 	if st != "overloaded" {
 		t.Fatalf("status=%s want overloaded", st)
 	}
@@ -97,7 +97,7 @@ func TestClassifyIngestQueueBytesCritical(t *testing.T) {
 	st, reasons, _ := classifyIngest(IngestSnapshot{
 		State: "running", QueueDepth: 10, QueueCapacity: 1000,
 		QueueBytes: 95 << 20, QueueBytesCapacity: 100 << 20,
-	})
+	}, &RateSampler{})
 	if st != "overloaded" {
 		t.Fatalf("status=%s want overloaded", st)
 	}
@@ -131,7 +131,7 @@ func TestComputeAlertsQueueBytes(t *testing.T) {
 func TestClassifyIngestHealthy(t *testing.T) {
 	st, reasons, _ := classifyIngest(IngestSnapshot{
 		State: "running", QueueDepth: 10, QueueCapacity: 1000,
-	})
+	}, &RateSampler{})
 	if st != "healthy" {
 		t.Fatalf("status=%s want healthy, reasons=%v", st, reasons)
 	}
@@ -147,15 +147,7 @@ func containsReason(reasons []string, want string) bool {
 }
 
 func TestMergeLiveIngestStatsConcurrent(t *testing.T) {
-	prevIngestMu.Lock()
-	prevIngestRecv = 0
-	prevIngestUDPRecv = 0
-	prevIngestTCPRecv = 0
-	prevIngestDropped = 0
-	prevIngestBufferDrops = 0
-	prevIngestTS = time.Time{}
-	prevIngestMu.Unlock()
-
+	rates := &RateSampler{}
 	var wg sync.WaitGroup
 	for i := 0; i < 32; i++ {
 		wg.Add(1)
@@ -170,7 +162,7 @@ func TestMergeLiveIngestStatsConcurrent(t *testing.T) {
 				UDPReceived:   n / 2,
 				TCPReceived:   n / 2,
 				State:         "running",
-			})
+			}, rates)
 		}(int64(i * 100))
 	}
 	wg.Wait()
