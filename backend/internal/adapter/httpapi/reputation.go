@@ -45,11 +45,7 @@ func (h *ReputationHandler) UploadReputation(w http.ResponseWriter, r *http.Requ
 
 	result, err := h.reputationUC.UploadCSV(ctx, reader, dryRun)
 	if err != nil {
-		if usecasereputation.IsClientError(err) {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
-			return
-		}
-		writeInternalError(w, "reputation csv upload failed", err)
+		writeDomainError(w, "reputation csv upload failed", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -77,11 +73,7 @@ func (h *ReputationHandler) DeleteList(w http.ResponseWriter, r *http.Request) {
 	}
 	name := mux.Vars(r)["name"]
 	if err := h.reputationUC.DeleteList(r.Context(), name); err != nil {
-		if usecasereputation.IsClientError(err) {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
-			return
-		}
-		writeInternalError(w, "reputation delete failed", err)
+		writeDomainError(w, "reputation delete failed", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "deleted": name})
@@ -114,11 +106,7 @@ func (h *ReputationHandler) Lookup(w http.ResponseWriter, r *http.Request) {
 	ip := r.URL.Query().Get("ip")
 	hits, err := h.reputationUC.Lookup(ip)
 	if err != nil {
-		if usecasereputation.IsClientError(err) {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
-			return
-		}
-		writeInternalError(w, "reputation lookup failed", err)
+		writeDomainError(w, "reputation lookup failed", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "ip": ip, "hits": hits})
@@ -166,11 +154,7 @@ func (h *ReputationHandler) AddFeed(w http.ResponseWriter, r *http.Request) {
 		Name: req.Name, URL: req.URL, Category: req.Category, Format: req.Format,
 	})
 	if err != nil {
-		if usecasereputation.IsClientError(err) {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
-			return
-		}
-		writeInternalError(w, "reputation add feed failed", err)
+		writeDomainError(w, "reputation add feed failed", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "added": req.Name})
@@ -183,11 +167,7 @@ func (h *ReputationHandler) RemoveFeed(w http.ResponseWriter, r *http.Request) {
 	}
 	name := mux.Vars(r)["name"]
 	if err := h.reputationUC.RemoveFeed(r.Context(), name); err != nil {
-		if usecasereputation.IsClientError(err) {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
-			return
-		}
-		writeInternalError(w, "reputation remove feed failed", err)
+		writeDomainError(w, "reputation remove feed failed", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "deleted": name})

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"network_monitor/internal/apperr"
 	"network_monitor/internal/model"
 	"network_monitor/internal/mapagg"
 )
@@ -40,7 +41,7 @@ type UploadResult struct {
 func (s *Service) UploadCSV(ctx context.Context, r io.Reader, dryRun bool) (UploadResult, error) {
 	ranges, err := s.codec.ReadCSV(r)
 	if err != nil {
-		return UploadResult{}, err
+		return UploadResult{}, apperr.InvalidCSV(err)
 	}
 	if dryRun {
 		sample := ranges
@@ -56,16 +57,9 @@ func (s *Service) UploadCSV(ctx context.Context, r io.Reader, dryRun bool) (Uplo
 	return UploadResult{Count: count, Reload: "applied", Backfill: "scheduled"}, nil
 }
 
-// IsClientCSVError — ошибки формата CSV, которые API отдаёт как 400.
+// IsClientCSVError — совместимость: CSV-ошибки помечены ErrInvalidCSV.
 func IsClientCSVError(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := err.Error()
-	return strings.Contains(msg, "missing required columns") ||
-		strings.Contains(msg, "no valid geo rows") ||
-		strings.Contains(msg, "error reading header") ||
-		strings.Contains(msg, "overlapping geo ranges")
+	return errors.Is(err, apperr.ErrInvalidCSV)
 }
 
 // --- Ranges ---
@@ -97,7 +91,7 @@ func (s *Service) ListRanges(ctx context.Context, in ListRangesInput) (ListRange
 
 	if ipQ := strings.TrimSpace(in.IP); ipQ != "" {
 		if parsed := net.ParseIP(ipQ); parsed == nil || parsed.To4() == nil {
-			return ListRangesResult{}, clientErr{fmt.Errorf("invalid IPv4 address")}
+			return ListRangesResult{}, apperr.InvalidInput("invalid IPv4 address")
 		}
 		var (
 			g     model.GeoRange
@@ -156,7 +150,7 @@ type MutateRangeResult struct {
 func (s *Service) AppendRange(ctx context.Context, network, country, region, city string, lat, lon float64) (MutateRangeResult, error) {
 	entry, err := s.codec.ParseEntry(network, country, region, city, lat, lon)
 	if err != nil {
-		return MutateRangeResult{}, clientErr{err}
+		return MutateRangeResult{}, apperr.InvalidInput(err.Error())
 	}
 	existing, err := s.store.Load(ctx)
 	if err != nil {
@@ -164,7 +158,7 @@ func (s *Service) AppendRange(ctx context.Context, network, country, region, cit
 	}
 	merged := append(append([]model.GeoRange(nil), existing...), entry)
 	if err := s.codec.CheckNonOverlapping(merged); err != nil {
-		return MutateRangeResult{}, clientErr{fmt.Errorf("range overlaps existing GeoIP entry: %w", err)}
+		return MutateRangeResult{}, apperr.Conflict(fmt.Sprintf("range overlaps existing GeoIP entry: %v", err))
 	}
 	count, err := s.persistRanges(ctx, merged)
 	if err != nil {
@@ -180,11 +174,11 @@ func (s *Service) AppendRange(ctx context.Context, network, country, region, cit
 func (s *Service) UpdateRange(ctx context.Context, originalNetwork, network, country, region, city string, lat, lon float64) (MutateRangeResult, error) {
 	origStart, origEnd, ok := s.codec.ParseNetwork(originalNetwork)
 	if !ok {
-		return MutateRangeResult{}, clientErr{fmt.Errorf("invalid original_network")}
+		return MutateRangeResult{}, apperr.InvalidInput("invalid original_network")
 	}
 	entry, err := s.codec.ParseEntry(network, country, region, city, lat, lon)
 	if err != nil {
-		return MutateRangeResult{}, clientErr{err}
+		return MutateRangeResult{}, apperr.InvalidInput(err.Error())
 	}
 	existing, err := s.store.Load(ctx)
 	if err != nil {
@@ -200,11 +194,11 @@ func (s *Service) UpdateRange(ctx context.Context, originalNetwork, network, cou
 		kept = append(kept, g)
 	}
 	if !found {
-		return MutateRangeResult{}, notFoundErr{fmt.Errorf("original range not found: %s", strings.TrimSpace(originalNetwork))}
+		return MutateRangeResult{}, apperr.NotFound(fmt.Sprintf("original range not found: %s", strings.TrimSpace(originalNetwork)))
 	}
 	merged := append(kept, entry)
 	if err := s.codec.CheckNonOverlapping(merged); err != nil {
-		return MutateRangeResult{}, clientErr{fmt.Errorf("updated range overlaps another GeoIP entry: %w", err)}
+		return MutateRangeResult{}, apperr.Conflict(fmt.Sprintf("updated range overlaps another GeoIP entry: %v", err))
 	}
 	count, err := s.persistRanges(ctx, merged)
 	if err != nil {
@@ -413,24 +407,16 @@ func summarizeGeoMissingItems(items []MissingItem) map[string]any {
 	}
 }
 
-// --- typed errors for HTTP mapping ---
-
-type clientErr struct{ err error }
-
-func (e clientErr) Error() string { return e.err.Error() }
-func (e clientErr) Unwrap() error { return e.err }
-
-type notFoundErr struct{ err error }
-
-func (e notFoundErr) Error() string { return e.err.Error() }
-func (e notFoundErr) Unwrap() error { return e.err }
+// --- typed errors for HTTP mapping (compat wrappers over apperr) ---
 
 func IsClientError(err error) bool {
-	var ce clientErr
-	return errors.As(err, &ce)
+	return apperr.IsClient(err)
 }
 
 func IsNotFound(err error) bool {
-	var ne notFoundErr
-	return errors.As(err, &ne)
+	return errors.Is(err, apperr.ErrNotFound)
+}
+
+func IsConflict(err error) bool {
+	return errors.Is(err, apperr.ErrConflict)
 }

@@ -104,17 +104,3 @@ func parseCSVRow(row []string, cols csvColumns, now time.Time) (model.Reputation
 		UpdatedAt: now,
 	}, true
 }
-
-// IsClientCSVError — ошибки формата → HTTP 400.
-func IsClientCSVError(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := err.Error()
-	return strings.Contains(msg, "missing required columns") ||
-		strings.Contains(msg, "no valid reputation rows") ||
-		strings.Contains(msg, "error reading header") ||
-		strings.Contains(msg, "no valid IPv4 ranges") ||
-		strings.Contains(msg, "csv_ip") ||
-		strings.Contains(msg, "spamhaus json")
-}

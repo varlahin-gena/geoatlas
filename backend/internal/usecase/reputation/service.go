@@ -2,6 +2,7 @@ package reputation
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -11,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"network_monitor/internal/apperr"
 	"network_monitor/internal/model"
 	reppkg "network_monitor/internal/reputation"
 )
@@ -68,7 +70,7 @@ type UploadResult struct {
 func (s *Service) UploadCSV(ctx context.Context, r io.Reader, dryRun bool) (UploadResult, error) {
 	ranges, err := s.codec.ReadCSV(r)
 	if err != nil {
-		return UploadResult{}, err
+		return UploadResult{}, apperr.InvalidCSV(err)
 	}
 	lists := uniqueLists(ranges)
 	if dryRun {
@@ -101,10 +103,10 @@ func (s *Service) UploadCSV(ctx context.Context, r io.Reader, dryRun bool) (Uplo
 func (s *Service) Lookup(ipStr string) ([]model.ReputationHit, error) {
 	ipStr = strings.TrimSpace(ipStr)
 	if ipStr == "" {
-		return nil, clientErr{fmt.Errorf("ip is required")}
+		return nil, apperr.InvalidInput("ip is required")
 	}
 	if parsed := net.ParseIP(ipStr); parsed == nil || parsed.To4() == nil {
-		return nil, clientErr{fmt.Errorf("invalid IPv4 address")}
+		return nil, apperr.InvalidInput("invalid IPv4 address")
 	}
 	if s.index == nil {
 		return nil, nil
@@ -136,7 +138,7 @@ func (s *Service) ListLists(ctx context.Context) ([]model.ReputationListMeta, er
 func (s *Service) DeleteList(ctx context.Context, name string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return clientErr{fmt.Errorf("list name is required")}
+		return apperr.InvalidInput("list name is required")
 	}
 	// Если список был URL-фидом — снимаем его из расписания, иначе вернётся при refresh.
 	if err := s.removeFeedConfig(name); err != nil {
@@ -149,7 +151,7 @@ func (s *Service) DeleteList(ctx context.Context, name string) error {
 func (s *Service) DeleteListData(ctx context.Context, name string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return clientErr{fmt.Errorf("list name is required")}
+		return apperr.InvalidInput("list name is required")
 	}
 	if err := s.store.DeleteList(ctx, name); err != nil {
 		return err
@@ -197,7 +199,7 @@ func (s *Service) AddFeed(ctx context.Context, feed Feed) error {
 	}
 	for _, f := range feeds {
 		if f.Name == feed.Name {
-			return clientErr{fmt.Errorf("feed %q already exists", feed.Name)}
+			return apperr.Conflict(fmt.Sprintf("feed %q already exists", feed.Name))
 		}
 	}
 	feeds = append(feeds, feed)
@@ -213,7 +215,7 @@ func (s *Service) AddFeed(ctx context.Context, feed Feed) error {
 func (s *Service) RemoveFeed(ctx context.Context, name string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return clientErr{fmt.Errorf("feed name is required")}
+		return apperr.InvalidInput("feed name is required")
 	}
 	if err := s.removeFeedConfig(name); err != nil {
 		return err
@@ -262,27 +264,27 @@ func normalizeFeedInput(feed Feed) (Feed, error) {
 	feed.Category = strings.TrimSpace(feed.Category)
 	feed.Format = strings.ToLower(strings.TrimSpace(feed.Format))
 	if feed.Name == "" || !feedNameRe.MatchString(feed.Name) {
-		return feed, clientErr{fmt.Errorf("invalid feed name (use letters, digits, _-; max 64)")}
+		return feed, apperr.InvalidInput("invalid feed name (use letters, digits, _-; max 64)")
 	}
 	if feed.URL == "" {
-		return feed, clientErr{fmt.Errorf("url is required")}
+		return feed, apperr.InvalidInput("url is required")
 	}
 	u, err := url.Parse(feed.URL)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		return feed, clientErr{fmt.Errorf("url must be http(s)")}
+		return feed, apperr.InvalidInput("url must be http(s)")
 	}
 	if feed.Category == "" {
 		feed.Category = "unknown"
 	}
 	if len(feed.Category) > 64 {
-		return feed, clientErr{fmt.Errorf("category too long")}
+		return feed, apperr.InvalidInput("category too long")
 	}
 	if feed.Format == "" {
 		feed.Format = "netset"
 	}
 	feed.Format = reppkg.NormalizeFeedFormat(feed.Format)
 	if !reppkg.IsSupportedFeedFormat(feed.Format) {
-		return feed, clientErr{fmt.Errorf("unsupported format %q (netset|plain|spamhaus_json|csv_ip)", feed.Format)}
+		return feed, apperr.InvalidInput(fmt.Sprintf("unsupported format %q (netset|plain|spamhaus_json|csv_ip)", feed.Format))
 	}
 	return feed, nil
 }
@@ -318,16 +320,12 @@ func (s *Service) Reload(ctx context.Context) error {
 	return nil
 }
 
-type clientErr struct{ error }
-
 func IsClientError(err error) bool {
-	if err == nil {
-		return false
-	}
-	if _, ok := err.(clientErr); ok {
-		return true
-	}
-	return reppkg.IsClientCSVError(err)
+	return apperr.IsClient(err)
+}
+
+func IsConflict(err error) bool {
+	return errors.Is(err, apperr.ErrConflict)
 }
 
 func uniqueLists(ranges []model.ReputationRange) []string {

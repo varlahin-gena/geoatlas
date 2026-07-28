@@ -58,11 +58,7 @@ func (h *ParseHandler) DeleteParseErrors(w http.ResponseWriter, r *http.Request)
 
 	err := h.parseErrorsUC.Delete(ctx, parseerrors.DeleteInput{IDs: req.IDs, All: req.All})
 	if err != nil {
-		if parseerrors.IsClientError(err) {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
-			return
-		}
-		writeInternalError(w, "delete parse errors failed", err)
+		writeDomainError(w, "delete parse errors failed", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})

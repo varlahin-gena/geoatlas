@@ -136,11 +136,7 @@ func (h *SystemHandler) PutRetention(w http.ResponseWriter, r *http.Request) {
 
 	out, err := h.retentionUC.Update(ctx, req)
 	if err != nil {
-		if usecaseretention.IsClientError(err) {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
-			return
-		}
-		writeInternalError(w, "retention update failed", err)
+		writeDomainError(w, "retention update failed", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "retention": out})

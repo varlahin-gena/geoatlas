@@ -85,11 +85,7 @@ func (h *GeoHandler) ListGeoRanges(w http.ResponseWriter, r *http.Request) {
 		IP:    strings.TrimSpace(r.URL.Query().Get("ip")),
 	})
 	if err != nil {
-		if usecasegeo.IsClientError(err) {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
-			return
-		}
-		writeInternalError(w, "geo list failed", err)
+		writeDomainError(w, "geo list failed", err)
 		return
 	}
 
@@ -128,11 +124,7 @@ func (h *GeoHandler) AppendGeoRange(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.geoUC.AppendRange(ctx, req.Network, req.Country, req.Region, req.City, req.Lat, req.Lon)
 	if err != nil {
-		if usecasegeo.IsClientError(err) {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
-			return
-		}
-		writeInternalError(w, "geo append failed", err)
+		writeDomainError(w, "geo append failed", err)
 		return
 	}
 
@@ -158,15 +150,7 @@ func (h *GeoHandler) UpdateGeoRange(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.geoUC.UpdateRange(ctx, req.OriginalNetwork, req.Network, req.Country, req.Region, req.City, req.Lat, req.Lon)
 	if err != nil {
-		if usecasegeo.IsNotFound(err) {
-			writeJSON(w, http.StatusNotFound, map[string]any{"error": err.Error()})
-			return
-		}
-		if usecasegeo.IsClientError(err) {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
-			return
-		}
-		writeInternalError(w, "geo update failed", err)
+		writeDomainError(w, "geo update failed", err)
 		return
 	}
 

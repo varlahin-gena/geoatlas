@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	usecasegeo "network_monitor/internal/usecase/geo"
 )
 
 func (h *GeoHandler) UploadGeo(w http.ResponseWriter, r *http.Request) {
@@ -41,11 +39,7 @@ func (h *GeoHandler) UploadGeo(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.geoUC.UploadCSV(ctx, reader, dryRun)
 	if err != nil {
-		if usecasegeo.IsClientCSVError(err) {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
-			return
-		}
-		writeInternalError(w, "geo csv upload failed", err)
+		writeDomainError(w, "geo csv upload failed", err)
 		return
 	}
 

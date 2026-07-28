@@ -87,8 +87,8 @@ func TestAddRemoveFeed(t *testing.T) {
 
 	if err := svc.AddFeed(context.Background(), usecasereputation.Feed{
 		Name: "dshield", URL: "https://example.com/other", Category: "attacks",
-	}); err == nil || !usecasereputation.IsClientError(err) {
-		t.Fatalf("expected client duplicate err, got %v", err)
+	}); err == nil || !usecasereputation.IsConflict(err) {
+		t.Fatalf("expected conflict duplicate err, got %v", err)
 	}
 
 	if err := svc.RemoveFeed(context.Background(), "dshield"); err != nil {
