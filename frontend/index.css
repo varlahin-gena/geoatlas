@@ -690,18 +690,22 @@ html, body {
 .viz-overlay-card p { margin: 0; font-size: 13px; color: var(--text-dim); line-height: 1.5; }
 
 .map-loading {
-    position: absolute; inset: 0; z-index: 46;
-    display: none; flex-direction: column;
-    align-items: center; justify-content: center; gap: 12px;
-    background: var(--loading-bg);
-    backdrop-filter: blur(1.5px);
-    color: var(--text); font-size: 13px; font-weight: 500;
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    z-index: 46;
+    display: none; flex-direction: row;
+    align-items: center; justify-content: center; gap: 10px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--panel-bg, #161b22) 88%, transparent);
+    border: 1px solid var(--border, rgba(255,255,255,0.08));
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+    color: var(--text); font-size: 12px; font-weight: 500;
     letter-spacing: 0.2px; pointer-events: none;
 }
 .map-loading.visible { display: flex; animation: mapLoadingIn 0.18s ease; }
 .map-loading-spinner {
-    width: 30px; height: 30px;
-    border: 2.5px solid rgba(88, 166, 255, 0.2);
+    width: 16px; height: 16px;
+    border: 2px solid rgba(88, 166, 255, 0.2);
     border-top-color: var(--accent);
     border-radius: 50%;
     animation: mapSpin 0.65s linear infinite;
@@ -710,8 +714,9 @@ html, body {
     transition: opacity 0.2s ease, filter 0.2s ease;
 }
 .viz-area.is-loading .viz-host:not(.hidden) {
-    opacity: 0.45;
-    filter: saturate(0.7);
+    /* Карта остаётся видимой — спиннер только индикатор данных. */
+    opacity: 1;
+    filter: none;
 }
 @keyframes mapSpin { to { transform: rotate(360deg); } }
 @keyframes mapLoadingIn {

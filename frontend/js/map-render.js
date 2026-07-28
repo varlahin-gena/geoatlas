@@ -409,7 +409,10 @@ function buildDeckLayers(mode = 'map') {
     const viewLat = isGlobe ? (globeViewState.latitude || 0) : 0;
     let lines = getVisibleLines();
     const totalBeforeLimit = lines.length;
-    lines = topByCount(lines, maxArcs);
+    const arcLimit = heavyCountryLayersAllowed
+        ? maxArcs
+        : Math.min(maxArcs, FIRST_PAINT_MAX_ARCS);
+    lines = topByCount(lines, arcLimit);
     lines = decorateFlowLines(lines);
     const drawnForCount = lines.length;
     if (isGlobe) {
@@ -428,8 +431,7 @@ function buildDeckLayers(mode = 'map') {
     const outlineSoft = cssRgb('--map-outline-rgb', 160);
     const useHeat = heatmapEnabled();
     const countriesPickable = useHeat || currentGroupBy() === 'country';
-    // Без тайлов заливка нужна сразу; иначе ждём scheduleHeavyCountryLayers().
-    const heavyOk = heavyCountryLayersAllowed || mapTilesFailed;
+    const heavyOk = heavyCountryLayersAllowed;
 
     // На глобусе GeoJson-заливка стран даёт артефакты (серый «диск» / ломаный wrap).
     // Heatmap оставляем для 2D; на globe — только basemap (+ fallback при отсутствии тайлов).
@@ -809,6 +811,60 @@ function emptyStyleFallback() {
     };
 }
 
+/** Лимит дуг до первого «тяжёлого» кадра — быстрее WebGL upload. */
+const FIRST_PAINT_MAX_ARCS = 800;
+
+let _basemapUpgradeGen = 0;
+
+/**
+ * Стартуем с локального empty-style (мгновенный load), CARTO подтягиваем фоном.
+ * Иначе first paint ждёт style.json + тайлы с cartocdn.
+ */
+function beginRemoteBasemapUpgrade(styleUrl) {
+    if (!maplibreMap || !styleUrl) return;
+    const gen = ++_basemapUpgradeGen;
+    let settled = false;
+    const center = maplibreMap.getCenter();
+    const zoom = maplibreMap.getZoom();
+    const bearing = maplibreMap.getBearing();
+    const pitch = maplibreMap.getPitch();
+
+    const finishOk = () => {
+        if (settled || gen !== _basemapUpgradeGen || !maplibreMap) return;
+        settled = true;
+        mapTilesFailed = false;
+        try {
+            maplibreMap.jumpTo({ center, zoom, bearing, pitch });
+            if (viewMode === 'globe') applyMapProjection('globe');
+            else applyMapProjection('map');
+        } catch (e) {}
+        refreshMapLayers();
+    };
+
+    maplibreMap.once('style.load', finishOk);
+    try {
+        maplibreMap.setStyle(styleUrl);
+    } catch (e) {
+        console.warn('Remote basemap upgrade failed to start:', e);
+        return;
+    }
+
+    // Remote style/tiles недоступны — остаёмся на локальном фоне + GeoJSON fills.
+    setTimeout(() => {
+        if (settled || gen !== _basemapUpgradeGen || !maplibreMap) return;
+        settled = true;
+        mapTilesFailed = true;
+        console.warn('Remote basemap slow/unavailable, keeping local style');
+        try { maplibreMap.setStyle(emptyStyleFallback()); } catch (err) {}
+        try {
+            maplibreMap.jumpTo({ center, zoom, bearing, pitch });
+            if (viewMode === 'globe') applyMapProjection('globe');
+            else applyMapProjection('map');
+        } catch (err) {}
+        refreshMapLayers();
+    }, 6000);
+}
+
 function initMapView() {
     if (maplibreMap) return;
     const host = document.getElementById('map-host');
@@ -825,13 +881,16 @@ function initMapView() {
     }
 
     const theme = (typeof NMAuth !== 'undefined' && NMAuth.getTheme()) || 'dark';
-    const styleUrl = theme === 'light' ? MAP_STYLE_LIGHT : MAP_STYLE_DARK;
+    const remoteStyleUrl = theme === 'light' ? MAP_STYLE_LIGHT : MAP_STYLE_DARK;
     const vs = viewMode === 'globe' ? globeViewState : mapViewState;
+
+    // Локальный стиль → overlay/дуги без ожидания cartocdn.
+    mapTilesFailed = true;
 
     try {
         maplibreMap = new maplibregl.Map({
             container: host,
-            style: styleUrl,
+            style: emptyStyleFallback(),
             center: [vs.longitude ?? DEFAULT_MAP_VIEW.longitude, vs.latitude ?? DEFAULT_MAP_VIEW.latitude],
             zoom: vs.zoom ?? DEFAULT_MAP_VIEW.zoom,
             bearing: vs.bearing ?? DEFAULT_MAP_VIEW.bearing,
@@ -894,22 +953,16 @@ function initMapView() {
         syncViewStateFromMap();
         refreshMapLayers();
         scheduleHeavyCountryLayers();
+        beginRemoteBasemapUpgrade(remoteStyleUrl);
         if (viewMode === 'globe' && autoRotate) startGlobeAutoRotate();
     };
 
     if (maplibreMap.isStyleLoaded()) onReady();
     else maplibreMap.once('load', onReady);
-    // If remote style never loads (offline), still initialize overlay on fallback style.
+    // Local empty style should load immediately; tiny fallback if not.
     setTimeout(() => {
-        if (readyOnce || !maplibreMap) return;
-        if (!mapTilesFailed) {
-            mapTilesFailed = true;
-            try { maplibreMap.setStyle(emptyStyleFallback()); } catch (e) {}
-        }
-        maplibreMap.once('load', onReady);
-        // empty style usually loads sync/quick
-        setTimeout(onReady, 200);
-    }, 8000);
+        if (!readyOnce) onReady();
+    }, 300);
 
     maplibreMap.on('move', () => {
         syncViewStateFromMap();

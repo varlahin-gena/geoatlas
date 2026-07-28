@@ -179,21 +179,25 @@ function mapClearColor() {
 function applyMapTheme() {
     if (!maplibreMap) return;
     const styleUrl = NMAuth.getTheme() === 'light' ? MAP_STYLE_LIGHT : MAP_STYLE_DARK;
-    const center = maplibreMap.getCenter();
-    const zoom = maplibreMap.getZoom();
-    const bearing = maplibreMap.getBearing();
-    const pitch = maplibreMap.getPitch();
     try {
-        maplibreMap.setStyle(styleUrl);
-        maplibreMap.once('style.load', () => {
-            try {
-                maplibreMap.jumpTo({ center, zoom, bearing, pitch });
-                if (viewMode === 'globe' && maplibreMap.setProjection) {
-                    maplibreMap.setProjection({ type: 'globe' });
-                }
-            } catch (e) {}
-            refreshMapLayers();
-        });
+        if (typeof beginRemoteBasemapUpgrade === 'function') {
+            beginRemoteBasemapUpgrade(styleUrl);
+        } else {
+            const center = maplibreMap.getCenter();
+            const zoom = maplibreMap.getZoom();
+            const bearing = maplibreMap.getBearing();
+            const pitch = maplibreMap.getPitch();
+            maplibreMap.setStyle(styleUrl);
+            maplibreMap.once('style.load', () => {
+                try {
+                    maplibreMap.jumpTo({ center, zoom, bearing, pitch });
+                    if (viewMode === 'globe' && maplibreMap.setProjection) {
+                        maplibreMap.setProjection({ type: 'globe' });
+                    }
+                } catch (e) {}
+                refreshMapLayers();
+            });
+        }
     } catch (e) {
         console.warn('applyMapTheme:', e);
         refreshMapLayers();

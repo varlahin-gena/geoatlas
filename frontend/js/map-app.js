@@ -106,6 +106,8 @@ function bindUI() {
 
 async function init() {
     bindUI();
+    // Статика — можно качать до /api/auth/me.
+    const countriesP = loadCountries();
     nmCurrentUser = await NMAuth.requireLogin();
     if (!nmCurrentUser) return;
     nmIsAdmin = NMAuth.applyAdminVisibility(nmCurrentUser);
@@ -133,7 +135,7 @@ async function init() {
 
     // Карта сразу: basemap не ждёт countries.geojson /api/events.
     initMapView();
-    await Promise.all([loadCountries(), fetchData()]);
+    await Promise.all([countriesP, fetchData()]);
     NMUI.startSystemHealthPolling({ isAdmin: nmIsAdmin });
 
     setInterval(() => { if (isAutoRefresh()) fetchData({ silent: true }); }, REFRESH_DATA_MS);
