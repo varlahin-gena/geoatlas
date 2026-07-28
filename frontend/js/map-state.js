@@ -498,7 +498,8 @@ function buildPeriodQuery() {
     const h = preset.match(/^(\d+)h$/);
     if (h) return `&hours=${h[1]}`;
     const d = preset.match(/^(\d+)d$/);
-    if (d) return `&hours=${parseInt(d[1], 10) * 24}`;
+    // days=N → pre-agg traffic_edges_*_daily; hours=N*24 всегда cold-сканит traffic_logs.
+    if (d) return `&days=${parseInt(d[1], 10)}`;
     return '&days=1';
 }
 function applyCustomPeriod() {

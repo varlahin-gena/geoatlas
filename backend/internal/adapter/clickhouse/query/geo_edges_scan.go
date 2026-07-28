@@ -32,6 +32,8 @@ func ScanGeoEdgesForTimeRange(
 		return nil, false, nil
 	}
 
+	tr = promoteHoursToGeoDays(tr, groupBy)
+
 	switch tr.Mode {
 	case "days":
 		// У IP/subnet нет daily geo-агрегата; читаем traffic_logs.
@@ -77,6 +79,21 @@ func ScanGeoEdgesForTimeRange(
 	default:
 		return nil, false, nil
 	}
+}
+
+// promoteHoursToGeoDays: city/country + hours кратные суткам → days, если pre-agg готов.
+// Иначе UI «1 день» как hours=24 всегда cold-сканит traffic_logs.
+func promoteHoursToGeoDays(tr model.TimeRange, groupBy string) model.TimeRange {
+	if groupBy != "city" && groupBy != "country" {
+		return tr
+	}
+	if tr.Mode != "hours" || tr.Amount < 24 || tr.Amount%24 != 0 {
+		return tr
+	}
+	if !aggstate.PreferGeoEdgesAgg() {
+		return tr
+	}
+	return model.TimeRange{Mode: "days", Amount: tr.Amount / 24}
 }
 
 func scanGeoFromLogsSelect(srcKey, dstKey, srcLabel, dstLabel, whereExtra string) string {

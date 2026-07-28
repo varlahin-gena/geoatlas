@@ -193,7 +193,7 @@ function periodQuery() {
   const h = p.match(/^(\d+)h$/);
   if (h) return `hours=${h[1]}`;
   const d = p.match(/^(\d+)d$/);
-  if (d) return `hours=${parseInt(d[1], 10) * 24}`;
+  if (d) return `days=${parseInt(d[1], 10)}`;
   return 'hours=12';
 }
 
