@@ -53,7 +53,7 @@ func TestComputeAlertsEdgesAggRebuilding(t *testing.T) {
 
 func TestMergeLiveIngestStatsDropsPerSec(t *testing.T) {
 	prevIngestMu.Lock()
-	prevIngestRecv, prevIngestUDPRecv, prevIngestTCPRecv, prevIngestDropped = 0, 0, 0, 100
+	prevIngestRecv, prevIngestUDPRecv, prevIngestTCPRecv, prevIngestDropped, prevIngestBufferDrops = 0, 0, 0, 100, 0
 	prevIngestTS = time.Now().Add(-2 * time.Second)
 	prevIngestMu.Unlock()
 
@@ -152,6 +152,7 @@ func TestMergeLiveIngestStatsConcurrent(t *testing.T) {
 	prevIngestUDPRecv = 0
 	prevIngestTCPRecv = 0
 	prevIngestDropped = 0
+	prevIngestBufferDrops = 0
 	prevIngestTS = time.Time{}
 	prevIngestMu.Unlock()
 

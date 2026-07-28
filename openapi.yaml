@@ -554,7 +554,10 @@ paths:
     get:
       tags: [ingest]
       summary: Live-ingest counters
-      description: administrator или Bearer (ops).
+      description: |
+        administrator или Bearer (ops).
+        Ключевые поля: `dropped_total` (queue admission), `buffer_drops_total`
+        (processor buffer при CH outage), `circuit_open` (dequeue paused).
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -572,9 +575,15 @@ paths:
       summary: Загрузить сырые строки логов (text/plain)
       description: |
         administrator или Bearer (ops). Сессия operator — 403.
-        Строки ставятся в ту же очередь, что syslog TCP. При переполнении
+        Строки ставятся в ту же очередь, что syslog TCP.
+
+        **Delivery contract (at-most-once / best-effort):** при переполнении
         очередь **не блокируется**: дропнутые строки → HTTP **503** + `Retry-After`
         и `stats.dropped` (не маскируется под 200). Клиент должен backoff/retry.
+        При outage ClickHouse insert circuit **ставит dequeue на паузу** (очередь
+        растёт → дальнейшие enqueue дают 503); потери processor-буфера видны в
+        `buffer_drops_total` на `GET /api/ingest/stats`. Durable spool в backend
+        нет — для audit-grade доставки полагайтесь на disk-буфер syslog-ng.
       security:
         - bearerAuth: []
         - cookieAuth: []

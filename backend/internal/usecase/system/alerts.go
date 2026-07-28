@@ -60,8 +60,10 @@ func computeAlerts(stats SystemStatsResponse) []Alert {
 			}
 		}
 		dropsPerSec := 0.0
+		bufferDropsPerSec := 0.0
 		if rate, ok := stats.Pipeline["rate"]; ok {
 			dropsPerSec = rate["drops_per_sec"]
+			bufferDropsPerSec = rate["buffer_drops_per_sec"]
 		}
 		switch {
 		case dropsPerSec >= 100:
@@ -70,6 +72,17 @@ func computeAlerts(stats SystemStatsResponse) []Alert {
 			alerts = append(alerts, Alert{Level: "warn", Code: "ingest_dropping", Target: "ingest", Message: "Ingest queue full — lines dropped (capacity SLO: any sustained drops/s is an incident)"})
 		case pipeline["dropped_total"] > 0:
 			alerts = append(alerts, Alert{Level: "warn", Code: "ingest_dropped_total", Target: "ingest", Message: "Ingest dropped lines since start (queue was full); check profile capacity if this grows"})
+		}
+		switch {
+		case bufferDropsPerSec >= 100:
+			alerts = append(alerts, Alert{Level: "error", Code: "ingest_buffer_dropping_critical", Target: "ingest", Message: "Processor buffer dropping >=100 lines/s — ClickHouse insert path unhealthy"})
+		case bufferDropsPerSec > 0:
+			alerts = append(alerts, Alert{Level: "warn", Code: "ingest_buffer_dropping", Target: "ingest", Message: "Processor buffer dropping lines (usually ClickHouse outage / open insert circuit)"})
+		case pipeline["buffer_drops_total"] > 0:
+			alerts = append(alerts, Alert{Level: "warn", Code: "ingest_buffer_dropped_total", Target: "ingest", Message: "Processor buffer dropped lines since start; check ClickHouse health and insert circuit"})
+		}
+		if pipeline["circuit_open"] >= 1 {
+			alerts = append(alerts, Alert{Level: "warn", Code: "ingest_circuit_open", Target: "ingest", Message: "Insert circuit open — dequeue paused; queue will back up until ClickHouse recovers"})
 		}
 		rate := pipeline["events_per_sec_db"]
 		if rate == 0 {

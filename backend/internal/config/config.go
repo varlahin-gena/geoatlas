@@ -93,6 +93,8 @@ func CatalogReputationFeeds() []ReputationFeed {
 }
 
 type Config struct {
+	parseErrors []string
+
 	ListenAddr           string
 	IngestListenAddr     string
 	IngestUDPListenAddr  string
@@ -174,22 +176,23 @@ type ReputationFeed struct {
 }
 
 func FromEnv() Config {
-	return Config{
+	var parser envParser
+	cfg := Config{
 		ListenAddr:           envOr("LISTEN_ADDR", ":8080"),
 		IngestListenAddr:     envOr("INGEST_LISTEN_ADDR", ":1514"),
 		IngestUDPListenAddr:  envOr("INGEST_UDP_LISTEN_ADDR", ""),
 		IngestTCPListenAddr:  envOr("INGEST_TCP_LISTEN_ADDR", ""),
 		ClickHouseHost:       envOr("CLICKHOUSE_HOST", "clickhouse"),
-		ClickHousePort:       envOr("CLICKHOUSE_PORT", "9000"),
+		ClickHousePort:       parser.port("CLICKHOUSE_PORT", "9000"),
 		ClickHouseUser:       envOr("CLICKHOUSE_USER", "default"),
 		ClickHousePassword:   envOr("CLICKHOUSE_PASSWORD", ""),
 		ClickHouseDatabase:   envOr("CLICKHOUSE_DATABASE", "default"),
 		APIAuthToken:         envOr("API_AUTH_TOKEN", ""),
 		APIAuthPreviousToken: envOr("API_AUTH_PREVIOUS_TOKEN", ""),
-		APIAuthDisabled:      envBool("API_AUTH_DISABLED", false),
-		AuthDisabled:         envBool("AUTH_DISABLED", false),
+		APIAuthDisabled:      parser.bool("API_AUTH_DISABLED", false),
+		AuthDisabled:         parser.bool("AUTH_DISABLED", false),
 		SessionSecret:        envOr("SESSION_SECRET", ""),
-		SessionTTLHours:      envInt("SESSION_TTL_HOURS", 12),
+		SessionTTLHours:      parser.int("SESSION_TTL_HOURS", 12),
 		AuthAdminUser:        envOr("AUTH_ADMIN_USER", "admin"),
 		AuthAdminPassword:    envOr("AUTH_ADMIN_PASSWORD", ""),
 		AuthOperatorUser:     envOr("AUTH_OPERATOR_USER", "operator"),
@@ -198,51 +201,77 @@ func FromEnv() Config {
 		APITokensFile:        envOr("API_TOKENS_FILE", "/app/data/api_tokens.json"),
 		RetentionFile:        envOr("RETENTION_FILE", "/app/data/retention.json"),
 		SearchTemplatesFile:  envOr("SEARCH_TEMPLATES_FILE", "/app/data/search_templates.json"),
-		MaxLogUploadSize:     envInt64("MAX_LOG_UPLOAD_SIZE", 1<<30), // 1 GiB
-		MaxGeoUploadSize:     envInt64("MAX_GEO_UPLOAD_SIZE", 1<<30), // 1 GiB
-		IngestBatchSize:      envInt("INGEST_BATCH_SIZE", 10000),
-		IngestQueueSize:      envInt("INGEST_QUEUE_SIZE", 300000),
-		IngestQueueMaxBytes:  envInt("INGEST_QUEUE_MAX_BYTES", 256<<20), // 256 MiB
-		IngestWorkers:        envInt("INGEST_WORKERS", 4),
-		IngestFlushSec:       envInt("INGEST_FLUSH_SEC", 3),
-		IngestMaxConnections: envInt("INGEST_MAX_CONNECTIONS", 256),
-		IngestConnIdleSec:    envInt("INGEST_CONN_IDLE_SEC", 300),
-		QueryTimeout:         envDuration("QUERY_TIMEOUT_SEC", 3*time.Minute),
-		CHMaxMemoryUsage:     envInt64("CH_MAX_MEMORY_USAGE", 2<<30),
-		CHExternalGroupBy:    envInt64("CH_EXTERNAL_GROUP_BY_BYTES", 256<<20),
-		CHExternalSort:       envInt64("CH_EXTERNAL_SORT_BYTES", 256<<20),
+		MaxLogUploadSize:     parser.int64("MAX_LOG_UPLOAD_SIZE", 1<<30), // 1 GiB
+		MaxGeoUploadSize:     parser.int64("MAX_GEO_UPLOAD_SIZE", 1<<30), // 1 GiB
+		IngestBatchSize:      parser.int("INGEST_BATCH_SIZE", 10000),
+		IngestQueueSize:      parser.int("INGEST_QUEUE_SIZE", 300000),
+		IngestQueueMaxBytes:  parser.int("INGEST_QUEUE_MAX_BYTES", 256<<20), // 256 MiB
+		IngestWorkers:        parser.int("INGEST_WORKERS", 4),
+		IngestFlushSec:       parser.int("INGEST_FLUSH_SEC", 3),
+		IngestMaxConnections: parser.int("INGEST_MAX_CONNECTIONS", 256),
+		IngestConnIdleSec:    parser.int("INGEST_CONN_IDLE_SEC", 300),
+		QueryTimeout:         parser.durationSeconds("QUERY_TIMEOUT_SEC", 3*time.Minute),
+		CHMaxMemoryUsage:     parser.int64("CH_MAX_MEMORY_USAGE", 2<<30),
+		CHExternalGroupBy:    parser.int64("CH_EXTERNAL_GROUP_BY_BYTES", 256<<20),
+		CHExternalSort:       parser.int64("CH_EXTERNAL_SORT_BYTES", 256<<20),
 		InstallProfilePath:   envOr("INSTALL_PROFILE_PATH", "/app/install-profile.json"),
 
-		CHIngestMaxOpen:         envInt("CH_INGEST_MAX_OPEN_CONNS", 4),
-		CHAPIMaxOpen:            envInt("CH_API_MAX_OPEN_CONNS", 8),
-		CHBackgroundMaxOpen:     envInt("CH_BACKGROUND_MAX_OPEN_CONNS", 2),
-		CHIngestAsyncInsert:     envBool("CH_INGEST_ASYNC_INSERT", true),
-		GeoEnrichOnIngest:       envBool("GEO_ENRICH_ON_INGEST", true),
-		GeoBackfillLookbackDays: envInt("GEO_BACKFILL_LOOKBACK_DAYS", 7),
-		SkipStartupBackfill:     envBool("SKIP_STARTUP_BACKFILL", false),
-		MaxReputationUploadSize: envInt64("MAX_REPUTATION_UPLOAD_SIZE", 1<<30),
-		ReputationFetchEnabled:  envBool("REPUTATION_FETCH_ENABLED", true),
-		ReputationFetchInterval: envDurationFlexible("REPUTATION_FETCH_INTERVAL", 6*time.Hour),
+		CHIngestMaxOpen:         parser.int("CH_INGEST_MAX_OPEN_CONNS", 4),
+		CHAPIMaxOpen:            parser.int("CH_API_MAX_OPEN_CONNS", 8),
+		CHBackgroundMaxOpen:     parser.int("CH_BACKGROUND_MAX_OPEN_CONNS", 2),
+		CHIngestAsyncInsert:     parser.bool("CH_INGEST_ASYNC_INSERT", true),
+		GeoEnrichOnIngest:       parser.bool("GEO_ENRICH_ON_INGEST", true),
+		GeoBackfillLookbackDays: parser.int("GEO_BACKFILL_LOOKBACK_DAYS", 7),
+		SkipStartupBackfill:     parser.bool("SKIP_STARTUP_BACKFILL", false),
+		MaxReputationUploadSize: parser.int64("MAX_REPUTATION_UPLOAD_SIZE", 1<<30),
+		ReputationFetchEnabled:  parser.bool("REPUTATION_FETCH_ENABLED", true),
+		ReputationFetchInterval: parser.durationFlexible("REPUTATION_FETCH_INTERVAL", 6*time.Hour),
 		ReputationFeeds:         parseReputationFeeds(os.Getenv("REPUTATION_FEEDS")),
 		ReputationFeedsFile:     envOr("REPUTATION_FEEDS_FILE", "/app/data/reputation_feeds.json"),
 		LogLevel:                strings.ToLower(envOr("LOG_LEVEL", "info")),
 		LogFormat:               strings.ToLower(envOr("LOG_FORMAT", "text")),
 	}
+	cfg.parseErrors = parser.errors
+	return cfg
 }
 
-func envBool(key string, def bool) bool {
-	v := strings.TrimSpace(os.Getenv(key))
-	if v == "" {
+// ValidateConfig reports invalid safety-critical environment values collected
+// during FromEnv. Unset values continue to use their production defaults.
+func (c Config) ValidateConfig() error {
+	if len(c.parseErrors) == 0 {
+		return nil
+	}
+	return fmt.Errorf("invalid environment configuration: %s", strings.Join(c.parseErrors, "; "))
+}
+
+type envParser struct {
+	errors []string
+}
+
+func (p *envParser) invalid(key string) {
+	p.errors = append(p.errors, key+" must be a valid value")
+}
+
+func (p *envParser) bool(key string, def bool) bool {
+	raw, ok := os.LookupEnv(key)
+	if !ok {
 		return def
 	}
+	v := strings.TrimSpace(raw)
 	switch strings.ToLower(v) {
 	case "1", "true", "yes", "on":
 		return true
 	case "0", "false", "no", "off":
 		return false
 	default:
+		p.invalid(key)
 		return def
 	}
+}
+
+// envBool retains soft parsing for optional compatibility switches.
+func envBool(key string, def bool) bool {
+	return (&envParser{}).bool(key, def)
 }
 
 func (c Config) ClickHouseAddr() string {
@@ -270,45 +299,69 @@ func envOr(key, def string) string {
 	return def
 }
 
-func envInt(key string, def int) int {
-	if v := os.Getenv(key); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			return n
-		}
+func (p *envParser) int(key string, def int) int {
+	raw, ok := os.LookupEnv(key)
+	if !ok {
+		return def
 	}
+	if n, err := strconv.Atoi(strings.TrimSpace(raw)); err == nil {
+		return n
+	}
+	p.invalid(key)
 	return def
 }
 
-func envInt64(key string, def int64) int64 {
-	if v := os.Getenv(key); v != "" {
-		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
-			return n
-		}
+func (p *envParser) port(key, def string) string {
+	raw, ok := os.LookupEnv(key)
+	if !ok {
+		return def
 	}
+	v := strings.TrimSpace(raw)
+	if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 65535 {
+		return v
+	}
+	p.invalid(key)
 	return def
 }
 
-func envDuration(key string, def time.Duration) time.Duration {
-	if v := os.Getenv(key); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			return time.Duration(n) * time.Second
-		}
+func (p *envParser) int64(key string, def int64) int64 {
+	raw, ok := os.LookupEnv(key)
+	if !ok {
+		return def
 	}
+	if n, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 64); err == nil {
+		return n
+	}
+	p.invalid(key)
+	return def
+}
+
+func (p *envParser) durationSeconds(key string, def time.Duration) time.Duration {
+	raw, ok := os.LookupEnv(key)
+	if !ok {
+		return def
+	}
+	if n, err := strconv.Atoi(strings.TrimSpace(raw)); err == nil && n > 0 {
+		return time.Duration(n) * time.Second
+	}
+	p.invalid(key)
 	return def
 }
 
 // envDurationFlexible принимает секунды (число) или Go duration ("6h", "30m").
-func envDurationFlexible(key string, def time.Duration) time.Duration {
-	v := strings.TrimSpace(os.Getenv(key))
-	if v == "" {
+func (p *envParser) durationFlexible(key string, def time.Duration) time.Duration {
+	raw, ok := os.LookupEnv(key)
+	if !ok {
 		return def
 	}
+	v := strings.TrimSpace(raw)
 	if n, err := strconv.Atoi(v); err == nil && n > 0 {
 		return time.Duration(n) * time.Second
 	}
 	if d, err := time.ParseDuration(v); err == nil && d > 0 {
 		return d
 	}
+	p.invalid(key)
 	return def
 }
 

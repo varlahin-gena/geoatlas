@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"network_monitor/internal/config"
+	usecasereputation "network_monitor/internal/usecase/reputation"
 )
 
 // fileDoc — JSON на диске.
 type fileDoc struct {
-	Feeds []config.ReputationFeed `json:"feeds"`
+	Feeds []usecasereputation.Feed `json:"feeds"`
 }
 
 // Store — JSON-файл с URL-фидами (том /app/data рядом с users.json).
@@ -25,7 +25,7 @@ func New(path string) *Store {
 }
 
 // Load читает фиды. ok=false если файла нет.
-func (s *Store) Load() (feeds []config.ReputationFeed, ok bool, err error) {
+func (s *Store) Load() (feeds []usecasereputation.Feed, ok bool, err error) {
 	if s == nil || s.path == "" {
 		return nil, false, nil
 	}
@@ -44,7 +44,7 @@ func (s *Store) Load() (feeds []config.ReputationFeed, ok bool, err error) {
 }
 
 // Save атомарно пишет фиды.
-func (s *Store) Save(feeds []config.ReputationFeed) error {
+func (s *Store) Save(feeds []usecasereputation.Feed) error {
 	if s == nil || s.path == "" {
 		return errors.New("reputation feeds file path is empty")
 	}
@@ -53,7 +53,7 @@ func (s *Store) Save(feeds []config.ReputationFeed) error {
 	}
 	doc := fileDoc{Feeds: normalizeFeeds(feeds)}
 	if doc.Feeds == nil {
-		doc.Feeds = []config.ReputationFeed{}
+		doc.Feeds = []usecasereputation.Feed{}
 	}
 	data, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
@@ -68,8 +68,8 @@ func (s *Store) Save(feeds []config.ReputationFeed) error {
 }
 
 // LoadOrSeed: файл есть → его содержимое (даже пустой список);
-// файла нет → seed (или DefaultReputationFeeds) и запись.
-func (s *Store) LoadOrSeed(seed []config.ReputationFeed) ([]config.ReputationFeed, error) {
+// файла нет → seed и запись.
+func (s *Store) LoadOrSeed(seed []usecasereputation.Feed) ([]usecasereputation.Feed, error) {
 	feeds, exists, err := s.Load()
 	if err != nil {
 		return nil, err
@@ -78,20 +78,17 @@ func (s *Store) LoadOrSeed(seed []config.ReputationFeed) ([]config.ReputationFee
 		return feeds, nil
 	}
 	seed = normalizeFeeds(seed)
-	if len(seed) == 0 {
-		seed = config.DefaultReputationFeeds()
-	}
 	if err := s.Save(seed); err != nil {
 		return seed, err
 	}
 	return seed, nil
 }
 
-func normalizeFeeds(in []config.ReputationFeed) []config.ReputationFeed {
+func normalizeFeeds(in []usecasereputation.Feed) []usecasereputation.Feed {
 	if len(in) == 0 {
 		return nil
 	}
-	out := make([]config.ReputationFeed, 0, len(in))
+	out := make([]usecasereputation.Feed, 0, len(in))
 	seen := map[string]struct{}{}
 	for _, f := range in {
 		f.Name = strings.TrimSpace(f.Name)

@@ -101,7 +101,7 @@ func cookieSecure(r *http.Request) bool {
 	return strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 }
 
-func SessionFromRequest(r *http.Request, m *auth.SessionManager) (auth.Session, error) {
+func SessionFromRequest(r *http.Request, m SessionParser) (auth.Session, error) {
 	if m == nil || r == nil {
 		return auth.Session{}, auth.ErrInvalidSession
 	}

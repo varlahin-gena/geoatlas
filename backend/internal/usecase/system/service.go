@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"network_monitor/internal/installprofile"
 	"network_monitor/internal/model"
 )
 
@@ -205,7 +204,7 @@ func (s *Service) EdgesAgg(ctx context.Context) EdgesAggView {
 }
 
 // InstallProfile loads the on-disk install profile for /api/system/install-profile.
-func (s *Service) InstallProfile() (*installprofile.Profile, error) {
+func (s *Service) InstallProfile() (*CapacityProfile, error) {
 	if s == nil || s.profiles == nil {
 		return nil, errors.New("install profile loader unavailable")
 	}
@@ -267,6 +266,7 @@ func mergeLiveIngestStats(resp *SystemStatsResponse, ingestStats IngestSnapshot)
 	p["queue_bytes"] = float64(ingestStats.QueueBytes)
 	p["queue_bytes_capacity"] = float64(ingestStats.QueueBytesCapacity)
 	p["dropped_total"] = float64(ingestStats.DroppedTotal)
+	p["buffer_drops_total"] = float64(ingestStats.BufferDropsTotal)
 	p["skipped_total"] = float64(ingestStats.SkippedTotal)
 	p["parse_errors_total"] = float64(ingestStats.ParseErrorsTotal)
 	p["inserted_total"] = float64(ingestStats.InsertedTotal)
@@ -276,6 +276,11 @@ func mergeLiveIngestStats(resp *SystemStatsResponse, ingestStats IngestSnapshot)
 	p["tcp_received_total"] = float64(ingestStats.TCPReceived)
 	p["udp_connections"] = float64(ingestStats.UDPConnections)
 	p["tcp_connections"] = float64(ingestStats.TCPConnections)
+	if ingestStats.CircuitOpen {
+		p["circuit_open"] = 1
+	} else {
+		p["circuit_open"] = 0
+	}
 	if resp.Health["ingest"] == nil {
 		resp.Health["ingest"] = map[string]any{}
 	}
@@ -299,7 +304,7 @@ func mergeLiveIngestStats(resp *SystemStatsResponse, ingestStats IngestSnapshot)
 		resp.Pipeline["rate"] = map[string]float64{}
 	}
 	rate := resp.Pipeline["rate"]
-	for _, key := range []string{"udp_events_per_sec", "tcp_events_per_sec", "drops_per_sec"} {
+	for _, key := range []string{"udp_events_per_sec", "tcp_events_per_sec", "drops_per_sec", "buffer_drops_per_sec"} {
 		if _, ok := rate[key]; !ok {
 			rate[key] = 0
 		}
@@ -307,8 +312,9 @@ func mergeLiveIngestStats(resp *SystemStatsResponse, ingestStats IngestSnapshot)
 	prevIngestMu.Lock()
 	prevTS, prevRecv := prevIngestTS, prevIngestRecv
 	prevUDP, prevTCP, prevDrop := prevIngestUDPRecv, prevIngestTCPRecv, prevIngestDropped
+	prevBufDrop := prevIngestBufferDrops
 	prevIngestRecv, prevIngestUDPRecv, prevIngestTCPRecv = ingestStats.ReceivedTotal, ingestStats.UDPReceived, ingestStats.TCPReceived
-	prevIngestDropped, prevIngestTS = ingestStats.DroppedTotal, now
+	prevIngestDropped, prevIngestBufferDrops, prevIngestTS = ingestStats.DroppedTotal, ingestStats.BufferDropsTotal, now
 	prevIngestMu.Unlock()
 	if !prevTS.IsZero() {
 		if dt := now.Sub(prevTS).Seconds(); dt > 0 {
@@ -324,6 +330,7 @@ func mergeLiveIngestStats(resp *SystemStatsResponse, ingestStats IngestSnapshot)
 			rate["udp_events_per_sec"] = delta(ingestStats.UDPReceived, prevUDP)
 			rate["tcp_events_per_sec"] = delta(ingestStats.TCPReceived, prevTCP)
 			rate["drops_per_sec"] = delta(ingestStats.DroppedTotal, prevDrop)
+			rate["buffer_drops_per_sec"] = delta(ingestStats.BufferDropsTotal, prevBufDrop)
 		}
 	}
 	if eventRate := rate["events_per_sec"]; eventRate > 0 {
@@ -455,12 +462,13 @@ func classifyIngest(snap IngestSnapshot) (status string, reasons []string, drops
 }
 
 var (
-	prevIngestMu      sync.Mutex
-	prevIngestRecv    int64
-	prevIngestUDPRecv int64
-	prevIngestTCPRecv int64
-	prevIngestDropped int64
-	prevIngestTS      time.Time
+	prevIngestMu          sync.Mutex
+	prevIngestRecv        int64
+	prevIngestUDPRecv     int64
+	prevIngestTCPRecv     int64
+	prevIngestDropped     int64
+	prevIngestBufferDrops int64
+	prevIngestTS          time.Time
 
 	healthDropMu   sync.Mutex
 	healthPrevDrop int64

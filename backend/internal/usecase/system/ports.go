@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"network_monitor/internal/installprofile"
 	"network_monitor/internal/model"
 )
 
@@ -35,8 +34,10 @@ type IngestSnapshot struct {
 	State                                                                     string
 	ReceivedTotal, ParsedTotal, InsertedTotal, SkippedTotal, ParseErrorsTotal int64
 	BufferedLines, QueueDepth, QueueCapacity, DroppedTotal, Connections       int64
+	BufferDropsTotal                                                          int64
 	QueueBytes, QueueBytesCapacity                                            int64
 	UDPReceived, UDPConnections, TCPReceived, TCPConnections                  int64
+	CircuitOpen                                                               bool
 	LastError                                                                 string
 	LastDropAt                                                                string // RFC3339; empty if never dropped
 }
@@ -54,7 +55,7 @@ type ClickHousePinger interface {
 
 // ProfileLoader loads the installation capacity profile.
 type ProfileLoader interface {
-	Load(path string) (*installprofile.Profile, error)
+	Load(path string) (*CapacityProfile, error)
 }
 
 // MaintenanceScheduler — сериализованный edges/geo backfill (реализация: *geojob.Scheduler).

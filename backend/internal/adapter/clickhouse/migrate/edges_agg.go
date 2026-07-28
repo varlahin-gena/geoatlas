@@ -28,7 +28,7 @@ func EnsureEdgesAggSchema(ctx context.Context, ch clickhouse.Conn) error {
 	if needDDL {
 		aggstate.SetEdgesAggStatus(aggstate.EdgesAggStatus{
 			State: "running", Phase: aggstate.PhaseSchema,
-			Message:   "rebuilding schema (DROP/CREATE MV) — map uses traffic_logs",
+			Message:   "rebuilding schema (create MV → EXCHANGE) — map uses traffic_logs until ready",
 			StartedAt: time.Now().UTC(),
 		})
 		if err := applyEdgesAggSchema(ctx, ch); err != nil {
@@ -85,9 +85,7 @@ func RefreshEdgesAggReady(ctx context.Context, ch clickhouse.Conn) error {
 }
 
 func applyEdgesAggSchema(ctx context.Context, ch clickhouse.Conn) error {
-	// При апгрейде версии MV DROP+CREATE — CREATE IF NOT EXISTS не меняет текст VIEW.
-	_ = execDDL(ctx, ch, `DROP TABLE IF EXISTS traffic_edges_daily_mv`)
-
+	// Таблицу создаём IF NOT EXISTS; MV — через create→EXCHANGE, без окна DROP.
 	if err := execDDL(ctx, ch, `
 		CREATE TABLE IF NOT EXISTS traffic_edges_daily
 		(
@@ -120,8 +118,9 @@ func applyEdgesAggSchema(ctx context.Context, ch clickhouse.Conn) error {
 		return fmt.Errorf("create traffic_edges_daily: %w", err)
 	}
 
-	if err := execDDL(ctx, ch, fmt.Sprintf(`
-		CREATE MATERIALIZED VIEW traffic_edges_daily_mv
+	createMV := func(viewName string) string {
+		return fmt.Sprintf(`
+		CREATE MATERIALIZED VIEW %s
 		TO traffic_edges_daily AS
 		SELECT
 			toDate(timestamp) AS day,
@@ -146,8 +145,10 @@ func applyEdgesAggSchema(ctx context.Context, ch clickhouse.Conn) error {
 			anyState(dst_country)   AS dst_country
 		FROM traffic_logs
 		GROUP BY day, src_ip, dst_ip
-	`, sqlclause.SumBlockedSQL(), sqlclause.SumAllowedSQL())); err != nil {
-		return fmt.Errorf("create traffic_edges_daily_mv: %w", err)
+	`, viewName, sqlclause.SumBlockedSQL(), sqlclause.SumAllowedSQL())
+	}
+	if err := replaceMaterializedView(ctx, ch, "traffic_edges_daily_mv", createMV); err != nil {
+		return err
 	}
 	return nil
 }

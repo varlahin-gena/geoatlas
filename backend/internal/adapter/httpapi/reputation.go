@@ -10,7 +10,6 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"network_monitor/internal/config"
 	usecasereputation "network_monitor/internal/usecase/reputation"
 )
 
@@ -163,7 +162,7 @@ func (h *ReputationHandler) AddFeed(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
 		return
 	}
-	err := h.reputationUC.AddFeed(r.Context(), config.ReputationFeed{
+	err := h.reputationUC.AddFeed(r.Context(), usecasereputation.Feed{
 		Name: req.Name, URL: req.URL, Category: req.Category, Format: req.Format,
 	})
 	if err != nil {

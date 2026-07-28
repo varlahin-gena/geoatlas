@@ -262,6 +262,7 @@ func (p *Processor) appendTrafficLog(entry model.TrafficLog) {
 		p.buf = append(p.buf[:0], p.buf[drop:]...)
 		if p.stats != nil {
 			p.stats.AddBuffered(-int64(drop))
+			p.stats.AddBufferDropped(int64(drop))
 		}
 		slog.Warn("ingest: traffic buffer at capacity, dropping oldest",
 			"dropped", drop, "cap", max)
@@ -309,6 +310,9 @@ func (p *Processor) appendParseError(pe model.ParseError) {
 		dropped++
 	}
 	if dropped > 0 {
+		if p.stats != nil {
+			p.stats.AddBufferDropped(int64(dropped))
+		}
 		slog.Warn("ingest: parse error buffer at capacity, dropping oldest",
 			"dropped", dropped, "cap_entries", max, "cap_bytes", maxParseErrorBufBytes)
 	}

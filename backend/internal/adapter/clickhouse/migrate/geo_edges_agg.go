@@ -170,9 +170,8 @@ func ensureGeoEdgesTable(ctx context.Context, ch clickhouse.Conn, groupBy string
 	srcKey, dstKey, srcLabel, dstLabel := sqlclause.GeoGroupExprs(groupBy)
 	coordOK := sqlclause.GeoCoordOK
 
-	_ = execDDL(ctx, ch, fmt.Sprintf(`DROP TABLE IF EXISTS %s`, mv))
-
-	if err := execDDL(ctx, ch, fmt.Sprintf(`
+	createMV := func(viewName string) string {
+		return fmt.Sprintf(`
 		CREATE MATERIALIZED VIEW %s
 		TO %s AS
 		SELECT
@@ -207,10 +206,12 @@ func ensureGeoEdgesTable(ctx context.Context, ch clickhouse.Conn, groupBy string
 			anyState(dst_city) AS dst_city
 		FROM traffic_logs
 		GROUP BY day, src_key, dst_key
-	`, mv, table, srcKey, dstKey, sqlclause.SumBlockedSQL(), sqlclause.SumAllowedSQL(),
-		coordOK, coordOK, coordOK, coordOK, sqlclause.CoordWeightSQL(),
-		srcLabel, dstLabel)); err != nil {
-		return fmt.Errorf("create %s: %w", mv, err)
+	`, viewName, table, srcKey, dstKey, sqlclause.SumBlockedSQL(), sqlclause.SumAllowedSQL(),
+			coordOK, coordOK, coordOK, coordOK, sqlclause.CoordWeightSQL(),
+			srcLabel, dstLabel)
+	}
+	if err := replaceMaterializedView(ctx, ch, mv, createMV); err != nil {
+		return err
 	}
 	return nil
 }

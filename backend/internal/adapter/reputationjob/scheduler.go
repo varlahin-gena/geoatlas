@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"network_monitor/internal/config"
 	"network_monitor/internal/model"
 	reppkg "network_monitor/internal/reputation"
 	usecasereputation "network_monitor/internal/usecase/reputation"
@@ -29,7 +28,7 @@ type Applier interface {
 
 // Scheduler периодически качает REPUTATION_FEEDS.
 type Scheduler struct {
-	feeds    []config.ReputationFeed
+	feeds    []usecasereputation.Feed
 	interval time.Duration
 	enabled  bool
 	applier  Applier
@@ -42,7 +41,7 @@ type Scheduler struct {
 	done    chan struct{}
 }
 
-func New(feeds []config.ReputationFeed, interval time.Duration, enabled bool, applier Applier) *Scheduler {
+func New(feeds []usecasereputation.Feed, interval time.Duration, enabled bool, applier Applier) *Scheduler {
 	if interval < time.Minute {
 		interval = time.Minute
 	}
@@ -110,21 +109,21 @@ func (s *Scheduler) RefreshAll(ctx context.Context, force bool) (usecasereputati
 }
 
 // SetFeeds подменяет набор URL-фидов (из UI / JSON-файла).
-func (s *Scheduler) SetFeeds(feeds []config.ReputationFeed) {
+func (s *Scheduler) SetFeeds(feeds []usecasereputation.Feed) {
 	if s == nil {
 		return
 	}
-	cp := make([]config.ReputationFeed, len(feeds))
+	cp := make([]usecasereputation.Feed, len(feeds))
 	copy(cp, feeds)
 	s.mu.Lock()
 	s.feeds = cp
 	s.mu.Unlock()
 }
 
-func (s *Scheduler) snapshotFeeds() []config.ReputationFeed {
+func (s *Scheduler) snapshotFeeds() []usecasereputation.Feed {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	out := make([]config.ReputationFeed, len(s.feeds))
+	out := make([]usecasereputation.Feed, len(s.feeds))
 	copy(out, s.feeds)
 	return out
 }
@@ -160,7 +159,7 @@ func (s *Scheduler) runOnce(ctx context.Context, force bool) usecasereputation.R
 
 // pruneObsoleteURLLists удаляет URL-списки, которых больше нет в конфиге
 // (например устаревший агрегат firehol_level1). CSV upload (source=upload) не трогает.
-func (s *Scheduler) pruneObsoleteURLLists(ctx context.Context, feeds []config.ReputationFeed, res *usecasereputation.RefreshResult) {
+func (s *Scheduler) pruneObsoleteURLLists(ctx context.Context, feeds []usecasereputation.Feed, res *usecasereputation.RefreshResult) {
 	if s == nil || s.applier == nil || res == nil {
 		return
 	}
@@ -189,7 +188,7 @@ func (s *Scheduler) pruneObsoleteURLLists(ctx context.Context, feeds []config.Re
 	}
 }
 
-func (s *Scheduler) fetchOne(ctx context.Context, feed config.ReputationFeed, force bool) (string, error) {
+func (s *Scheduler) fetchOne(ctx context.Context, feed usecasereputation.Feed, force bool) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, feed.URL, nil)
 	if err != nil {
 		return "failed", err

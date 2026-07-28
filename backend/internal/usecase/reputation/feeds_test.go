@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"network_monitor/internal/adapter/reputationfeedsfile"
-	"network_monitor/internal/config"
 	"network_monitor/internal/model"
 	usecasereputation "network_monitor/internal/usecase/reputation"
 )
@@ -55,13 +54,13 @@ func (memIndex) ListMeta() []model.ReputationListMeta            { return nil }
 func (memIndex) Snapshot() []model.ReputationRange               { return nil }
 
 type stubRefresher struct {
-	feeds []config.ReputationFeed
+	feeds []usecasereputation.Feed
 }
 
 func (s *stubRefresher) RefreshAll(ctx context.Context, force bool) (usecasereputation.RefreshResult, error) {
 	return usecasereputation.RefreshResult{}, nil
 }
-func (s *stubRefresher) SetFeeds(feeds []config.ReputationFeed) { s.feeds = feeds }
+func (s *stubRefresher) SetFeeds(feeds []usecasereputation.Feed) { s.feeds = feeds }
 
 func TestAddRemoveFeed(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "feeds.json")
@@ -72,7 +71,7 @@ func TestAddRemoveFeed(t *testing.T) {
 	ref := &stubRefresher{}
 	svc := usecasereputation.New(&memStore{lists: map[string][]model.ReputationRange{}}, memIndex{}, usecasereputation.DefaultCodec{}, ref, store)
 
-	err := svc.AddFeed(context.Background(), config.ReputationFeed{
+	err := svc.AddFeed(context.Background(), usecasereputation.Feed{
 		Name: "dshield", URL: "https://example.com/dshield.netset", Category: "attacks", Format: "netset",
 	})
 	if err != nil {
@@ -86,7 +85,7 @@ func TestAddRemoveFeed(t *testing.T) {
 		t.Fatalf("refresher not updated: %+v", ref.feeds)
 	}
 
-	if err := svc.AddFeed(context.Background(), config.ReputationFeed{
+	if err := svc.AddFeed(context.Background(), usecasereputation.Feed{
 		Name: "dshield", URL: "https://example.com/other", Category: "attacks",
 	}); err == nil || !usecasereputation.IsClientError(err) {
 		t.Fatalf("expected client duplicate err, got %v", err)

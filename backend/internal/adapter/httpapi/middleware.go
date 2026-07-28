@@ -168,10 +168,10 @@ func maxBytesMW(n int64) middleware {
 // bearerAuth — env Bearer (всегда admin) + именованные токены из TokenStore.
 type bearerAuth struct {
 	envTokens []string
-	store     *auth.TokenStore
+	store     APITokenStore
 }
 
-func newBearerAuth(envTokens []string, store *auth.TokenStore) bearerAuth {
+func newBearerAuth(envTokens []string, store APITokenStore) bearerAuth {
 	return bearerAuth{envTokens: envTokens, store: store}
 }
 
@@ -219,7 +219,7 @@ func bearerPlain(r *http.Request) string {
 }
 
 // requireLoginMW требует cookie-сессию, Bearer (scope≥read), либо AUTH_DISABLED.
-func requireLoginMW(ba bearerAuth, sessions *auth.SessionManager, users *auth.UserStore, authDisabled bool) middleware {
+func requireLoginMW(ba bearerAuth, sessions SessionParser, users UserDirectory, authDisabled bool) middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if authDisabled {
@@ -249,7 +249,7 @@ func requireLoginMW(ba bearerAuth, sessions *auth.SessionManager, users *auth.Us
 }
 
 // requireAdminMW — роль administrator, Bearer scope=admin, либо AUTH_DISABLED.
-func requireAdminMW(ba bearerAuth, sessions *auth.SessionManager, users *auth.UserStore, authDisabled bool) middleware {
+func requireAdminMW(ba bearerAuth, sessions SessionParser, users UserDirectory, authDisabled bool) middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if authDisabled {
@@ -284,7 +284,7 @@ func requireAdminMW(ba bearerAuth, sessions *auth.SessionManager, users *auth.Us
 
 // requireOpsMW — mutate / metrics / ingest stats: Bearer scope≥ops или administrator.
 // API_AUTH_DISABLED или AUTH_DISABLED открывают доступ (dev / локальный контур).
-func requireOpsMW(ba bearerAuth, sessions *auth.SessionManager, users *auth.UserStore, apiAuthDisabled, authDisabled bool) middleware {
+func requireOpsMW(ba bearerAuth, sessions SessionParser, users UserDirectory, apiAuthDisabled, authDisabled bool) middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if authDisabled || apiAuthDisabled {
@@ -317,7 +317,7 @@ func requireOpsMW(ba bearerAuth, sessions *auth.SessionManager, users *auth.User
 	}
 }
 
-func denyIfMustReset(w http.ResponseWriter, users *auth.UserStore, username string) bool {
+func denyIfMustReset(w http.ResponseWriter, users UserDirectory, username string) bool {
 	if users != nil && users.MustReset(username) {
 		writeJSON(w, http.StatusForbidden, map[string]any{"error": "password reset required"})
 		return true

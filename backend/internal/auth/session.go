@@ -94,10 +94,15 @@ func (m *SessionManager) Parse(token string) (Session, error) {
 	return sess, nil
 }
 
+// UserLookup supplies the current public user record for a live session.
+type UserLookup interface {
+	Get(username string) (UserPublic, bool)
+}
+
 // LiveSession подставляет актуальную роль из UserStore.
 // Пользователь, удалённый после выдачи cookie, даёт ok=false.
 // users == nil — оставляет cookie как есть (тесты / AUTH_DISABLED path).
-func LiveSession(users *UserStore, sess Session) (Session, bool) {
+func LiveSession(users UserLookup, sess Session) (Session, bool) {
 	if users == nil {
 		return sess, true
 	}

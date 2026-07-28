@@ -8,15 +8,7 @@ import (
 	"github.com/gorilla/mux"
 
 	"network_monitor/internal/adapter/searchtemplatesfile"
-	"network_monitor/internal/auth"
 	"network_monitor/internal/config"
-	usecaseauth "network_monitor/internal/usecase/auth"
-	usecaseevents "network_monitor/internal/usecase/events"
-	usecasegeo "network_monitor/internal/usecase/geo"
-	"network_monitor/internal/usecase/parseerrors"
-	"network_monitor/internal/usecase/parsetest"
-	usecasereputation "network_monitor/internal/usecase/reputation"
-	usecaseretention "network_monitor/internal/usecase/retention"
 	usecasesystem "network_monitor/internal/usecase/system"
 )
 
@@ -36,18 +28,18 @@ type Server struct {
 func NewServer(
 	cfg config.Config,
 	ingestSvc Ingester,
-	eventsUC *usecaseevents.Service,
-	geoUC *usecasegeo.Service,
-	reputationUC *usecasereputation.Service,
-	parseErrorsUC *parseerrors.Service,
-	systemUC *usecasesystem.Service,
+	eventsUC EventsAPI,
+	geoUC GeoAPI,
+	reputationUC ReputationAPI,
+	parseErrorsUC ParseErrorsAPI,
+	systemUC SystemAPI,
 	systemPinger usecasesystem.ClickHousePinger,
-	parseTestUC *parsetest.Service,
-	retentionUC *usecaseretention.Service,
-	authUC *usecaseauth.Service,
-	users *auth.UserStore,
-	sessions *auth.SessionManager,
-	apiTokens *auth.TokenStore,
+	parseTestUC ParseTestAPI,
+	retentionUC RetentionAPI,
+	authUC AuthAPI,
+	users UserDirectory,
+	sessions SessionParser,
+	apiTokens APITokenStore,
 ) *Server {
 	deps := NewDeps(cfg, ingestSvc, eventsUC, geoUC, reputationUC, parseErrorsUC, systemUC, systemPinger, parseTestUC, retentionUC).
 		WithAuth(authUC, users, sessions, apiTokens).

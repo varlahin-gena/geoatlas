@@ -45,6 +45,8 @@ type LineStats interface {
 	AddParseErrors(n int64)
 	AddInserted(n int64)
 	AddBuffered(delta int64)
+	// AddBufferDropped — потери из processor-буфера (не путать с queue DroppedTotal).
+	AddBufferDropped(n int64)
 	SetLastFlushAt(t time.Time)
 }
 

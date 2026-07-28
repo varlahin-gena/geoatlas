@@ -16,6 +16,13 @@ type IngestStats struct {
 	InsertedTotal float64 `json:"inserted_total"`
 	SkippedTotal  float64 `json:"skipped_total"`
 	BufferedLines float64 `json:"buffered_lines"`
+	QueueDepth         float64 `json:"queue_depth"`
+	QueueCapacity      float64 `json:"queue_capacity"`
+	QueueBytes         float64 `json:"queue_bytes"`
+	QueueBytesCapacity float64 `json:"queue_bytes_capacity"`
+	DroppedTotal       float64 `json:"dropped_total"`
+	BufferDropsTotal   float64 `json:"buffer_drops_total"`
+	CircuitOpen        bool    `json:"circuit_open"`
 	Connections   float64 `json:"connections"`
 	UDP           struct {
 		ReceivedTotal float64 `json:"received_total"`
@@ -60,12 +67,23 @@ func (c *Collector) collectIngestMetrics(ctx context.Context, ts time.Time) []Me
 
 	out = append(out,
 		Metric{Timestamp: ts, Type: "pipeline", Target: "ingest", Name: "buffered_lines", Value: status.BufferedLines},
+		Metric{Timestamp: ts, Type: "pipeline", Target: "ingest", Name: "queue_depth", Value: status.QueueDepth},
+		Metric{Timestamp: ts, Type: "pipeline", Target: "ingest", Name: "queue_capacity", Value: status.QueueCapacity},
+		Metric{Timestamp: ts, Type: "pipeline", Target: "ingest", Name: "queue_bytes", Value: status.QueueBytes},
+		Metric{Timestamp: ts, Type: "pipeline", Target: "ingest", Name: "queue_bytes_capacity", Value: status.QueueBytesCapacity},
+		Metric{Timestamp: ts, Type: "pipeline", Target: "ingest", Name: "dropped_total", Value: status.DroppedTotal},
+		Metric{Timestamp: ts, Type: "pipeline", Target: "ingest", Name: "buffer_drops_total", Value: status.BufferDropsTotal},
 		Metric{Timestamp: ts, Type: "pipeline", Target: "ingest", Name: "inserted_total", Value: status.InsertedTotal},
 		Metric{Timestamp: ts, Type: "pipeline", Target: "ingest", Name: "received_total", Value: status.ReceivedTotal},
 		Metric{Timestamp: ts, Type: "pipeline", Target: "ingest", Name: "connections", Value: status.Connections},
 		Metric{Timestamp: ts, Type: "pipeline", Target: "ingest", Name: "udp_received_total", Value: status.UDP.ReceivedTotal},
 		Metric{Timestamp: ts, Type: "pipeline", Target: "ingest", Name: "tcp_received_total", Value: status.TCP.ReceivedTotal},
 	)
+	circuitOpen := 0.0
+	if status.CircuitOpen {
+		circuitOpen = 1
+	}
+	out = append(out, Metric{Timestamp: ts, Type: "pipeline", Target: "ingest", Name: "circuit_open", Value: circuitOpen})
 
 	stateValue := 0.0
 	switch status.State {

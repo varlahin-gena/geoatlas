@@ -32,6 +32,27 @@ func (c *CircuitBreaker) Check() error {
 	return nil
 }
 
+// Open reports whether inserts are currently blocked by the circuit.
+func (c *CircuitBreaker) Open() bool {
+	return c.Check() != nil
+}
+
+// RemainingOpen — сколько ждать до закрытия окна; 0 если circuit закрыт.
+func (c *CircuitBreaker) RemainingOpen() time.Duration {
+	if c == nil {
+		return 0
+	}
+	until := c.openUntil.Load()
+	if until == 0 {
+		return 0
+	}
+	left := until - time.Now().UnixNano()
+	if left <= 0 {
+		return 0
+	}
+	return time.Duration(left)
+}
+
 func (c *CircuitBreaker) NoteSuccess() {
 	if c == nil {
 		return

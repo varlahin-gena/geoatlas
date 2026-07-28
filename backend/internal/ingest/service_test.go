@@ -377,3 +377,60 @@ func (c *countingInserter) InsertTrafficLogs(_ context.Context, logs []model.Tra
 func (c *countingInserter) InsertParseErrors(context.Context, []model.ParseError) error {
 	return nil
 }
+
+func TestWorkerPausesDequeueWhenCircuitOpen(t *testing.T) {
+	ins := &countingInserter{}
+	circuit := usecaseingest.NewCircuitBreaker()
+	circuit.OpenForTest(2 * time.Second)
+
+	svc := NewService(Config{
+		Workers:       1,
+		BatchSize:     10,
+		FlushInterval: 50 * time.Millisecond,
+		QueueSize:     64,
+		QueryTimeout:  time.Second,
+	}, ProcessorDeps{Logs: ins, Errors: ins, Parser: testLineParser()})
+	svc.circuit = circuit
+	for i := range svc.processors {
+		svc.processors[i] = usecaseingest.NewProcessor(usecaseingest.Deps{
+			Logs: ins, Errors: ins, Parser: testLineParser(),
+			BatchSize: 10, QueryTimeout: time.Second, Circuit: circuit,
+		}, svc.stats)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- svc.Run(ctx) }()
+
+	line := `src=10.0.0.1 dst=8.8.8.8 action=allow proto=tcp sport=1 dport=443`
+	const n = 20
+	for i := 0; i < n; i++ {
+		if !svc.TryEnqueue(line, "tcp") {
+			t.Fatalf("enqueue %d failed", i)
+		}
+	}
+
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		snap := svc.Stats()
+		if !snap.CircuitOpen {
+			t.Fatal("circuit should stay open during wait")
+		}
+		if snap.QueueDepth < int64(n) {
+			t.Fatalf("dequeue advanced while circuit open: depth=%d want %d", snap.QueueDepth, n)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if ins.logs.Load() != 0 {
+		t.Fatalf("inserted=%d want 0 while circuit open", ins.logs.Load())
+	}
+
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("Run did not stop")
+	}
+}
+

@@ -27,7 +27,7 @@ func EnsureTTLOnlyDropParts(ctx context.Context, ch clickhouse.Conn) error {
 
 	tables := []string{"traffic_logs", "parse_errors", "system_metrics"}
 	for _, table := range tables {
-		ok, err := tableExists(ctx, ch, table)
+		ok, err := ttlTableExists(ctx, ch, table)
 		if err != nil {
 			return fmt.Errorf("check table %s: %w", table, err)
 		}
@@ -48,7 +48,7 @@ func EnsureTTLOnlyDropParts(ctx context.Context, ch clickhouse.Conn) error {
 	return nil
 }
 
-func tableExists(ctx context.Context, ch clickhouse.Conn, name string) (bool, error) {
+func ttlTableExists(ctx context.Context, ch clickhouse.Conn, name string) (bool, error) {
 	qctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	var n uint64

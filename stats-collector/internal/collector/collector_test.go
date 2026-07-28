@@ -46,6 +46,36 @@ func TestCollectHealthMetricsDown(t *testing.T) {
 	}
 }
 
+func TestCollectIngestMetricsPersistsQueueHealth(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{
+			"state":"running","buffered_lines":3,"queue_depth":4,"queue_capacity":10,
+			"queue_bytes":40,"queue_bytes_capacity":100,"dropped_total":5,
+			"buffer_drops_total":6,"circuit_open":true
+		}`))
+	}))
+	defer srv.Close()
+
+	c := &Collector{cfg: config.Config{IngestStatsURL: srv.URL}, http: srv.Client()}
+	metrics := c.collectIngestMetrics(context.Background(), time.Now().UTC())
+	want := map[string]float64{
+		"buffered_lines": 3, "queue_depth": 4, "queue_capacity": 10,
+		"queue_bytes": 40, "queue_bytes_capacity": 100, "dropped_total": 5,
+		"buffer_drops_total": 6, "circuit_open": 1,
+	}
+	got := map[string]float64{}
+	for _, metric := range metrics {
+		if metric.Type == "pipeline" && metric.Target == "ingest" {
+			got[metric.Name] = metric.Value
+		}
+	}
+	for name, value := range want {
+		if got[name] != value {
+			t.Errorf("metric %s = %v, want %v", name, got[name], value)
+		}
+	}
+}
+
 func TestWriteMetricsSkipsNaN(t *testing.T) {
 	c := &Collector{}
 	ms := []Metric{

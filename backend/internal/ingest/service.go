@@ -127,6 +127,9 @@ func (s *Service) Stats() StatsSnapshot {
 	}
 	snap.QueueBytes = s.queueBytes.Load()
 	snap.QueueBytesCapacity = int64(s.cfg.QueueMaxBytes)
+	if s.circuit != nil {
+		snap.CircuitOpen = s.circuit.Open()
+	}
 	return snap
 }
 
@@ -470,6 +473,35 @@ func (s *Service) worker(ctx context.Context, proc *usecaseingest.Processor) {
 	}
 
 	for {
+		// Пока insert circuit open — не забираем из очереди (иначе processor
+		// буфер дропает oldest без учёта в dropped_total). Очередь растёт →
+		// admission drops видны в DroppedTotal; flush по тикеру пробует half-open.
+		if s.circuit != nil && s.circuit.Open() {
+			wait := s.circuit.RemainingOpen()
+			if wait <= 0 || wait > 200*time.Millisecond {
+				wait = 200 * time.Millisecond
+			}
+			timer := time.NewTimer(wait)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				drainCtx, cancel := s.beginDrain(ctx)
+				s.drainWorker(drainCtx, proc)
+				cancel()
+				return
+			case <-t.C:
+				timer.Stop()
+				if _, err := proc.Flush(ctx); err != nil {
+					noteErr(err)
+					slog.Error("ingest: flush error", "err", err)
+				} else {
+					noteOK()
+				}
+			case <-timer.C:
+			}
+			continue
+		}
+
 		select {
 		case <-ctx.Done():
 			drainCtx, cancel := s.beginDrain(ctx)
@@ -500,6 +532,24 @@ func (s *Service) drainWorker(ctx context.Context, proc *usecaseingest.Processor
 	for {
 		if ctx.Err() != nil {
 			return
+		}
+		if s.circuit != nil && s.circuit.Open() {
+			wait := s.circuit.RemainingOpen()
+			if wait <= 0 || wait > 200*time.Millisecond {
+				wait = 200 * time.Millisecond
+			}
+			timer := time.NewTimer(wait)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return
+			case <-timer.C:
+			}
+			// После cooldown пробуем flush (half-open) прежде чем снова dequeue.
+			if _, err := proc.Flush(ctx); err != nil {
+				slog.Error("ingest: drain flush error", "err", err)
+			}
+			continue
 		}
 		select {
 		case <-ctx.Done():

@@ -98,7 +98,7 @@
 
 1. **Syslog**: МСЭ отправляет события на `<IP_сервера>:514` (TCP или UDP).
 2. **syslog-ng** принимает сообщения и пересылает их по TCP на `backend:1514` с маркерами транспорта (`@@nm/udp/@@` / `@@nm/tcp/@@`).
-3. **backend** снимает маркеры транспорта, парсит строки, обогащает GeoIP, пишет в ClickHouse; при старте `Ensure*` создаёт/обновляет агрегаты (`traffic_edges_*`, geo), применяет TTL из `retention.json` и при необходимости делает backfill. Полная очередь ingest **не блокирует** TCP — лишние строки дропаются (`dropped_total`, алерты на `/system.html`).
+3. **backend** снимает маркеры транспорта, парсит строки, обогащает GeoIP, пишет в ClickHouse; при старте `Ensure*` создаёт/обновляет агрегаты (`traffic_edges_*`, geo), применяет TTL из `retention.json` и при необходимости делает backfill. **Delivery contract — at-most-once / best-effort:** полная очередь ingest **не блокирует** TCP — лишние строки дропаются (`dropped_total`); при outage ClickHouse insert circuit ставит dequeue на паузу (очередь растёт → admission drops), а потери из processor-буфера учитываются отдельно (`buffer_drops_total`). Для более надёжной доставки используйте disk-буфер syslog-ng перед backend. Алерты — на `/system.html`.
 4. **frontend** отдаёт статику и проксирует API-запросы на backend.
 5. **stats-collector** каждые 30 секунд собирает метрики CPU/RAM контейнеров и состояние пайплайна (включая разбивку UDP/TCP).
 
@@ -499,7 +499,7 @@ docker compose exec clickhouse clickhouse-client --query "
 | ClickHouse idle CPU высокий, мало данных | `system.trace_log`/`text_log` — см. `config.d/z_system_logs.xml`; `TRUNCATE`/`DROP` старых system-логов |
 | Нет метрик на странице «Система» | `docker compose logs stats-collector`, cgroup, `/proc` и `/sys/fs/cgroup` на хосте |
 | Превышена расчётная ёмкость      | `/system.html` → алёрты `capacity_high` / `capacity_exceeded`, пересчёт профиля |
-| Drops под нагрузкой / очередь полная | `/api/ingest/stats` → `dropped_total`, `/system.html` → `ingest_dropping*`, `./scripts/watch-ingest.sh` |
+| Drops под нагрузкой / очередь полная | `/api/ingest/stats` → `dropped_total`, `buffer_drops_total`, `circuit_open`; `/system.html` → `ingest_dropping*`, `ingest_buffer_dropping*`, `ingest_circuit_open`; `./scripts/watch-ingest.sh` |
 | UDP/TCP EPS не разделяются       | Перезапустить `syslog-ng` (маркеры `@@nm/udp/@@` / `@@nm/tcp/@@`) |
 | TTL не применился / старые данные остаются | `/api/system/retention`, логи backend `retention:`, том `auth-users` (`retention.json`) |
 

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"network_monitor/internal/config"
+	usecasereputation "network_monitor/internal/usecase/reputation"
 )
 
 func TestLoadOrSeedAndSave(t *testing.T) {
@@ -13,7 +13,7 @@ func TestLoadOrSeedAndSave(t *testing.T) {
 	path := filepath.Join(dir, "feeds.json")
 	st := New(path)
 
-	seed := []config.ReputationFeed{{
+	seed := []usecasereputation.Feed{{
 		Name: "a", URL: "https://example.com/a.netset", Category: "attacks", Format: "netset",
 	}}
 	got, err := st.LoadOrSeed(seed)
@@ -28,7 +28,7 @@ func TestLoadOrSeedAndSave(t *testing.T) {
 	}
 
 	// повторный LoadOrSeed не перетирает
-	got2, err := st.LoadOrSeed([]config.ReputationFeed{{
+	got2, err := st.LoadOrSeed([]usecasereputation.Feed{{
 		Name: "b", URL: "https://example.com/b.netset", Category: "c2", Format: "netset",
 	}})
 	if err != nil {
@@ -38,7 +38,7 @@ func TestLoadOrSeedAndSave(t *testing.T) {
 		t.Fatalf("should keep seeded file: %+v", got2)
 	}
 
-	if err := st.Save([]config.ReputationFeed{
+	if err := st.Save([]usecasereputation.Feed{
 		{Name: "x", URL: "https://example.com/x", Category: "drop", Format: "netset"},
 		{Name: "y", URL: "https://example.com/y", Category: "c2", Format: "netset"},
 	}); err != nil {

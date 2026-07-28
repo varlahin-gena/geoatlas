@@ -5,16 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"network_monitor/internal/adapter/searchtemplatesfile"
-	"network_monitor/internal/auth"
 	"network_monitor/internal/config"
-	usecaseauth "network_monitor/internal/usecase/auth"
-	usecaseevents "network_monitor/internal/usecase/events"
-	usecasegeo "network_monitor/internal/usecase/geo"
-	"network_monitor/internal/usecase/parseerrors"
-	"network_monitor/internal/usecase/parsetest"
-	usecasereputation "network_monitor/internal/usecase/reputation"
-	usecaseretention "network_monitor/internal/usecase/retention"
 	usecasesystem "network_monitor/internal/usecase/system"
 )
 
@@ -22,32 +13,32 @@ import (
 type Deps struct {
 	cfg             config.Config
 	ingest          Ingester
-	parseErrorsUC   *parseerrors.Service
-	parseTestUC     *parsetest.Service
-	eventsUC        *usecaseevents.Service
-	geoUC           *usecasegeo.Service
-	reputationUC    *usecasereputation.Service
-	systemUC        *usecasesystem.Service
+	parseErrorsUC   ParseErrorsAPI
+	parseTestUC     ParseTestAPI
+	eventsUC        EventsAPI
+	geoUC           GeoAPI
+	reputationUC    ReputationAPI
+	systemUC        SystemAPI
 	systemPinger    usecasesystem.ClickHousePinger
-	retentionUC     *usecaseretention.Service
-	authUC          *usecaseauth.Service
-	users           *auth.UserStore // middleware / LiveSession
-	sessions        *auth.SessionManager
-	apiTokens       *auth.TokenStore
-	searchTemplates *searchtemplatesfile.Store
+	retentionUC     RetentionAPI
+	authUC          AuthAPI
+	users           UserDirectory // middleware / LiveSession
+	sessions        SessionParser
+	apiTokens       APITokenStore
+	searchTemplates SearchTemplatesStore
 }
 
 func NewDeps(
 	cfg config.Config,
 	ingestSvc Ingester,
-	eventsUC *usecaseevents.Service,
-	geoUC *usecasegeo.Service,
-	reputationUC *usecasereputation.Service,
-	parseErrorsUC *parseerrors.Service,
-	systemUC *usecasesystem.Service,
+	eventsUC EventsAPI,
+	geoUC GeoAPI,
+	reputationUC ReputationAPI,
+	parseErrorsUC ParseErrorsAPI,
+	systemUC SystemAPI,
 	systemPinger usecasesystem.ClickHousePinger,
-	parseTestUC *parsetest.Service,
-	retentionUC *usecaseretention.Service,
+	parseTestUC ParseTestAPI,
+	retentionUC RetentionAPI,
 ) *Deps {
 	d := &Deps{
 		cfg:           cfg,
@@ -66,7 +57,7 @@ func NewDeps(
 	return d
 }
 
-func (d *Deps) WithAuth(authUC *usecaseauth.Service, users *auth.UserStore, sessions *auth.SessionManager, apiTokens *auth.TokenStore) *Deps {
+func (d *Deps) WithAuth(authUC AuthAPI, users UserDirectory, sessions SessionParser, apiTokens APITokenStore) *Deps {
 	if d == nil {
 		return nil
 	}
@@ -77,7 +68,7 @@ func (d *Deps) WithAuth(authUC *usecaseauth.Service, users *auth.UserStore, sess
 	return d
 }
 
-func (d *Deps) WithSearchTemplates(store *searchtemplatesfile.Store) *Deps {
+func (d *Deps) WithSearchTemplates(store SearchTemplatesStore) *Deps {
 	if d == nil {
 		return nil
 	}

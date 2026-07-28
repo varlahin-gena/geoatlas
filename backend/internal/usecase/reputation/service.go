@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"network_monitor/internal/config"
 	"network_monitor/internal/model"
 	reppkg "network_monitor/internal/reputation"
 )
@@ -162,7 +161,7 @@ func (s *Service) DeleteListData(ctx context.Context, name string) error {
 	return nil
 }
 
-func (s *Service) ListFeeds() ([]config.ReputationFeed, error) {
+func (s *Service) ListFeeds() ([]Feed, error) {
 	if s.feedStore == nil {
 		return nil, nil
 	}
@@ -171,17 +170,17 @@ func (s *Service) ListFeeds() ([]config.ReputationFeed, error) {
 		return nil, err
 	}
 	if !ok || feeds == nil {
-		return []config.ReputationFeed{}, nil
+		return []Feed{}, nil
 	}
 	return feeds, nil
 }
 
 // ListCatalog — кураторские пресеты для UI.
-func (s *Service) ListCatalog() []config.ReputationFeed {
-	return config.CatalogReputationFeeds()
+func (s *Service) ListCatalog() []Feed {
+	return CatalogFeeds()
 }
 
-func (s *Service) AddFeed(ctx context.Context, feed config.ReputationFeed) error {
+func (s *Service) AddFeed(ctx context.Context, feed Feed) error {
 	_ = ctx
 	feed, err := normalizeFeedInput(feed)
 	if err != nil {
@@ -236,7 +235,7 @@ func (s *Service) removeFeedConfig(name string) error {
 	if !ok {
 		return nil
 	}
-	next := make([]config.ReputationFeed, 0, len(feeds))
+	next := make([]Feed, 0, len(feeds))
 	found := false
 	for _, f := range feeds {
 		if f.Name == name {
@@ -257,7 +256,7 @@ func (s *Service) removeFeedConfig(name string) error {
 	return nil
 }
 
-func normalizeFeedInput(feed config.ReputationFeed) (config.ReputationFeed, error) {
+func normalizeFeedInput(feed Feed) (Feed, error) {
 	feed.Name = strings.TrimSpace(feed.Name)
 	feed.URL = strings.TrimSpace(feed.URL)
 	feed.Category = strings.TrimSpace(feed.Category)

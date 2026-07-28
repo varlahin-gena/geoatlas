@@ -3,7 +3,6 @@ package system
 import (
 	"time"
 
-	"network_monitor/internal/installprofile"
 	"network_monitor/internal/model"
 )
 
@@ -16,8 +15,61 @@ type SystemStatsResponse struct {
 	Health         map[string]map[string]any     `json:"health"`
 	Alerts         []Alert                       `json:"alerts"`
 	Backend        BackendInfo                   `json:"backend_info"`
-	InstallProfile *installprofile.Profile       `json:"install_profile,omitempty"`
+	InstallProfile *CapacityProfile              `json:"install_profile,omitempty"`
 	EdgesAgg       EdgesAggView                  `json:"edges_agg"`
+}
+
+// CapacityProfile is the installation sizing data required by system APIs.
+// It mirrors the external install-profile document without coupling the use case
+// to its file-format package.
+type CapacityProfile struct {
+	GeneratedAt  string           `json:"generated_at"`
+	Host         ProfileHost      `json:"host"`
+	Profile      string           `json:"profile"`
+	ProfileLabel string           `json:"profile_label"`
+	Limits       ProfileLimits    `json:"limits"`
+	Capacity     ProfileCapacity  `json:"capacity"`
+}
+
+type ProfileHost struct {
+	CPUCores    int    `json:"cpu_cores"`
+	RAMMB       int    `json:"ram_mb"`
+	DiskGBAvail int    `json:"disk_gb_avail"`
+	Cgroup      string `json:"cgroup"`
+}
+
+type ProfileServiceLimits struct {
+	MemoryGB int `json:"memory_gb"`
+	CPUs     int `json:"cpus"`
+}
+
+type ProfileClickHouseLimits struct {
+	ProfileServiceLimits
+	MaxQueryMemoryBytes int64 `json:"max_query_memory_bytes"`
+	ExternalSpillBytes  int64 `json:"external_spill_bytes"`
+}
+
+type ProfileBackendLimits struct {
+	ProfileServiceLimits
+	IngestWorkers   int `json:"ingest_workers"`
+	IngestQueueSize int `json:"ingest_queue_size"`
+	IngestBatchSize int `json:"ingest_batch_size"`
+}
+
+type ProfileSyslogLimits struct {
+	MemoryMB int `json:"memory_mb"`
+	CPUs     int `json:"cpus"`
+}
+
+type ProfileLimits struct {
+	ClickHouse ProfileClickHouseLimits `json:"clickhouse"`
+	Backend    ProfileBackendLimits    `json:"backend"`
+	SyslogNG   ProfileSyslogLimits     `json:"syslog_ng"`
+}
+
+type ProfileCapacity struct {
+	ExpectedEPSMin int `json:"expected_eps_min"`
+	ExpectedEPSMax int `json:"expected_eps_max"`
 }
 
 // SystemStatusResponse is the compact status for authenticated indicators.

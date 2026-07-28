@@ -54,7 +54,7 @@ func (s *stubInserter) InsertParseErrors(ctx context.Context, items []model.Pars
 }
 
 type memStats struct {
-	received, skipped, parsed, parseErrs, inserted, buffered int64
+	received, skipped, parsed, parseErrs, inserted, buffered, bufferDrops int64
 }
 
 func (m *memStats) AddReceived(string)         { m.received++ }
@@ -63,6 +63,7 @@ func (m *memStats) AddParsed(n int64)          { m.parsed += n }
 func (m *memStats) AddParseErrors(n int64)     { m.parseErrs += n }
 func (m *memStats) AddInserted(n int64)        { m.inserted += n }
 func (m *memStats) AddBuffered(delta int64)    { m.buffered += delta }
+func (m *memStats) AddBufferDropped(n int64)   { m.bufferDrops += n }
 func (m *memStats) SetLastFlushAt(t time.Time) {}
 
 func testDeps(ins *stubInserter) Deps {
@@ -232,5 +233,22 @@ func TestProcessorTrafficBufCapDropsOldest(t *testing.T) {
 	}
 	if st.buffered != int64(max) {
 		t.Fatalf("buffered=%d want %d", st.buffered, max)
+	}
+	if st.bufferDrops < 5 {
+		t.Fatalf("bufferDrops=%d want >=5", st.bufferDrops)
+	}
+}
+
+func TestProcessorErrBufCapCountsBufferDrops(t *testing.T) {
+	d := testDeps(&stubInserter{})
+	d.BatchSize = 2
+	st := &memStats{}
+	proc := NewProcessor(d, st)
+	extra := 5
+	for i := 0; i < proc.MaxParseErrorBuf()+extra; i++ {
+		proc.SeedParseError(model.ParseError{Reason: "x", Raw: "line"})
+	}
+	if st.bufferDrops < int64(extra) {
+		t.Fatalf("bufferDrops=%d want >=%d", st.bufferDrops, extra)
 	}
 }

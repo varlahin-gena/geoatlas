@@ -11,6 +11,10 @@ import (
 
 // TryEnqueue кладёт строку в общую очередь (тот же путь, что TCP ingest).
 // false — очередь полна по depth или bytes, строка дропнута (non-blocking).
+//
+// Delivery contract: at-most-once / best-effort. Backend не даёт per-line ACK
+// и не пишет durable WAL. При open insert circuit workers не dequeue'ят —
+// очередь заполняется и дальнейшие TryEnqueue начинают дропать с DroppedTotal.
 func (s *Service) TryEnqueue(line, transport string) bool {
 	if s == nil || s.lineCh == nil {
 		return false
