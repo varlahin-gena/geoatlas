@@ -131,10 +131,9 @@ async function init() {
     document.getElementById('maxArcsVal').textContent = fmtNumber(maxArcs);
     syncViewToURL();
 
-    await loadCountries();
+    // Карта сразу: basemap не ждёт countries.geojson /api/events.
     initMapView();
-
-    await fetchData();
+    await Promise.all([loadCountries(), fetchData()]);
     NMUI.startSystemHealthPolling({ isAdmin: nmIsAdmin });
 
     setInterval(() => { if (isAutoRefresh()) fetchData({ silent: true }); }, REFRESH_DATA_MS);

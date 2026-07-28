@@ -79,11 +79,27 @@ function featureCountryName(feature) {
 }
 
 function precomputeFeatureHeat(features, stats) {
+    // O(C + F) вместо O(F×C): индекс имён → значение heatmap.
+    const byName = new Map();
+    for (const [country, value] of Object.entries(stats)) {
+        const target = String(country).toLowerCase();
+        byName.set(target, value);
+        for (const [en, ru] of Object.entries(countryNamesRu)) {
+            if (String(ru).toLowerCase() === target) byName.set(String(en).toLowerCase(), value);
+        }
+    }
     const heat = new Map();
     for (const f of features) {
+        const p = f.properties || {};
+        const candidates = [
+            p.name, p.name_long, p.admin, p.sovereignt,
+            p.ADMIN, p.NAME, p.NAME_LONG, p.ISO_A2, p.ISO_A3,
+            p.iso_a2, p.iso_a3,
+        ].filter(Boolean);
         let v = 0;
-        for (const country of Object.keys(stats)) {
-            if (matchCountryFeature(f, country)) { v = stats[country]; break; }
+        for (let i = 0; i < candidates.length; i++) {
+            const hit = byName.get(String(candidates[i]).toLowerCase());
+            if (hit != null) { v = hit; break; }
         }
         heat.set(f, v);
     }
@@ -412,10 +428,12 @@ function buildDeckLayers(mode = 'map') {
     const outlineSoft = cssRgb('--map-outline-rgb', 160);
     const useHeat = heatmapEnabled();
     const countriesPickable = useHeat || currentGroupBy() === 'country';
+    // Без тайлов заливка нужна сразу; иначе ждём scheduleHeavyCountryLayers().
+    const heavyOk = heavyCountryLayersAllowed || mapTilesFailed;
 
     // На глобусе GeoJson-заливка стран даёт артефакты (серый «диск» / ломаный wrap).
     // Heatmap оставляем для 2D; на globe — только basemap (+ fallback при отсутствии тайлов).
-    const showCountryFills = countriesGeoJSON && (mapTilesFailed || (useHeat && !isGlobe));
+    const showCountryFills = heavyOk && countriesGeoJSON && (mapTilesFailed || (useHeat && !isGlobe));
     if (showCountryFills) {
         const { max, heat } = getStatsCache();
         layers.push(new deck.GeoJsonLayer({
@@ -449,7 +467,7 @@ function buildDeckLayers(mode = 'map') {
                 }
             },
         }));
-    } else if (countriesGeoJSON && countriesPickable && !isGlobe) {
+    } else if (heavyOk && countriesGeoJSON && countriesPickable && !isGlobe) {
         // Invisible pick layer for country clicks when basemap is present.
         layers.push(new deck.GeoJsonLayer({
             id: 'countries-pick',
@@ -474,7 +492,7 @@ function buildDeckLayers(mode = 'map') {
     // Heatmap на глобусе отключаем по производительности:
     // ScatterplotLayer по центроидам заметно тормозит анимацию при вращении.
 
-    if (showCountryLabels) {
+    if (heavyOk && showCountryLabels) {
         const centroids = isGlobe ? visibleGlobeCentroids() : buildCountryCentroids();
         const labelAlt = isGlobe ? 8e4 : 0;
         const labelColor = NMAuth.getTheme() === 'light'
@@ -653,6 +671,30 @@ function syncViewStateFromMap() {
 let _refreshMapLayersBusy = false;
 /** Тяжёлый сброс GlobeView — только после смены group_by (иначе мерцание при вращении). */
 let _pendingGlobeViewResync = false;
+/**
+ * Полный GeoJSON стран / TextLayer тяжелы для первого кадра.
+ * Сначала рисуем basemap (+ дуги, если данные уже есть), потом включаем.
+ */
+let heavyCountryLayersAllowed = false;
+
+function scheduleHeavyCountryLayers() {
+    if (heavyCountryLayersAllowed) return;
+    const enable = () => {
+        if (heavyCountryLayersAllowed) return;
+        heavyCountryLayersAllowed = true;
+        if (deckOverlay) refreshMapLayers();
+    };
+    // Два rAF: после первого paint basemap; idle — если браузер даёт передышку.
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            if (typeof requestIdleCallback === 'function') {
+                requestIdleCallback(enable, { timeout: 120 });
+            } else {
+                enable();
+            }
+        });
+    });
+}
 
 function requestGlobeViewResync() {
     _pendingGlobeViewResync = true;
@@ -842,7 +884,7 @@ function initMapView() {
 
         deckOverlay = new deck.MapboxOverlay({
             interleaved: false,
-            layers: buildDeckLayers(viewMode),
+            layers: [],
             getTooltip: getDeckTooltip,
             parameters: { preserveDrawingBuffer: true },
         });
@@ -851,6 +893,7 @@ function initMapView() {
 
         syncViewStateFromMap();
         refreshMapLayers();
+        scheduleHeavyCountryLayers();
         if (viewMode === 'globe' && autoRotate) startGlobeAutoRotate();
     };
 
@@ -910,6 +953,7 @@ function destroyMapView() {
     }
     deckOverlay = null;
     deckInstance = null;
+    heavyCountryLayersAllowed = false;
     if (maplibreMap) {
         try { maplibreMap.remove(); } catch (e) {}
         maplibreMap = null;
@@ -1115,6 +1159,8 @@ async function loadCountries() {
         countryCentroidsCache = null;
         countryHeatCentroidsCache = null;
     }
+    // Карта могла уже стартовать параллельно — подтянуть heatmap / labels / pick.
+    if (deckOverlay) refreshMapLayers();
 }
 
 function clearFocusedCountry() {
