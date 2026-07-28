@@ -100,7 +100,9 @@ func buildApp(ctx context.Context, cfg config.Config) (*app, error) {
 	}
 
 	aCtx, cancel := context.WithCancel(ctx)
-	bgCtx, bgCancel := context.WithCancel(context.Background())
+	// WithoutCancel: bootstrap/jobs живут до явного bgCancel на shutdown,
+	// а не обрываются вместе с signal ctx (пока идёт HTTP/ingest drain).
+	bgCtx, bgCancel := context.WithCancel(context.WithoutCancel(ctx))
 	a := &app{pools: pools, bgCancel: bgCancel, ctx: aCtx, cancel: cancel, listenAddr: cfg.ListenAddr}
 	geo := chadapter.NewReloadableGeoIndex(pools.Background)
 	a.geoJobs = geojob.New(geo, chadapter.NewMaintenanceStore(pools.Background), cfg.GeoBackfillLookbackDays)
@@ -206,23 +208,25 @@ func (a *app) run(ctx context.Context) error {
 	case <-a.ctx.Done():
 	}
 	slog.Info("shutdown signal received")
-	httpCtx, httpCancel := context.WithTimeout(context.Background(), 15*time.Second)
+	// Parent ctx уже Done — бюджеты shutdown наследуют values, но не cancel.
+	base := context.WithoutCancel(ctx)
+	httpCtx, httpCancel := context.WithTimeout(base, 15*time.Second)
 	if err := a.srv.Shutdown(httpCtx); err != nil {
 		slog.Warn("http shutdown failed", "err", err)
 	} else {
 		slog.Info("http shutdown complete")
 	}
 	httpCancel()
-	geoCtx, geoCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	geoCtx, geoCancel := context.WithTimeout(base, 5*time.Second)
 	a.geoJobs.Shutdown(geoCtx)
 	geoCancel()
-	repCtx, repCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	repCtx, repCancel := context.WithTimeout(base, 5*time.Second)
 	a.repJobs.Shutdown(repCtx)
 	repCancel()
 	ingestWait := a.ingestSvc.ShutdownWaitTimeout()
 	snap := a.ingestSvc.Stats()
 	slog.Info("waiting for ingest drain", "budget", ingestWait.String(), "queue_depth", snap.QueueDepth, "dropped_total", snap.DroppedTotal)
-	waitCtx, waitCancel := context.WithTimeout(context.Background(), ingestWait)
+	waitCtx, waitCancel := context.WithTimeout(base, ingestWait)
 	select {
 	case err := <-a.ingestDone:
 		if err != nil {
@@ -241,14 +245,14 @@ func (a *app) run(ctx context.Context) error {
 	}
 	waitCancel()
 	a.bgCancel()
-	bgCtx, bgCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer bgCancel()
+	bgWaitCtx, bgWaitCancel := context.WithTimeout(base, 5*time.Second)
+	defer bgWaitCancel()
 	done := make(chan struct{})
 	go func() { a.bgWg.Wait(); close(done) }()
 	select {
 	case <-done:
 		slog.Info("background workers stopped")
-	case <-bgCtx.Done():
+	case <-bgWaitCtx.Done():
 		slog.Warn("background workers drain timeout")
 	}
 	slog.Info("shutdown complete")
