@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: ГеоАтлас API
-  version: "1.2.0"
+  version: "1.3.0"
   description: |
     Backend API для приёма syslog/логов МСЭ, GeoIP и карты трафика.
 

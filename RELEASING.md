@@ -4,8 +4,8 @@
 
 | Что | Где | Пример |
 |-----|-----|--------|
-| Продукт | `VERSION`, git tag `vX.Y.Z` | `1.0.0` |
-| HTTP API (OpenAPI) | `openapi.yaml` → `info.version` | `1.2.0` |
+| Продукт | `VERSION`, git tag `vX.Y.Z` | `1.1.0` |
+| HTTP API (OpenAPI) | `openapi.yaml` → `info.version` | `1.3.0` |
 | Схема CH | `nm_schema_version` (Go Ensure*) | независимо |
 
 ## Чеклист перед тегом
@@ -22,10 +22,10 @@
 
 ```bash
 # убедиться что working tree clean и main запушен
-git tag -a v1.0.0 -m "ГеоАтлас v1.0.0"
-git push origin v1.0.0
+git tag -a v1.1.0 -m "ГеоАтлас v1.1.0"
+git push origin v1.1.0
 
-gh release create v1.0.0 --title "v1.0.0" --notes-file CHANGELOG.md
+gh release create v1.1.0 --title "v1.1.0" --notes-file CHANGELOG.md
 # или вручную на GitHub → Releases, вставить секцию из CHANGELOG
 ```
 
