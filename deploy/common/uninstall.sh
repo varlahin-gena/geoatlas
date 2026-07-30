@@ -33,18 +33,30 @@ REMOVE_FIREWALL_RULES="${REMOVE_FIREWALL_RULES:-1}"
 _nm_log() { echo "[$(date +'%F %T')] $*"; }
 
 _nm_ensure_ui() {
-    if declare -F nm_ui_yesno >/dev/null 2>&1; then
-        return 0
+    if ! declare -F nm_ui_yesno >/dev/null 2>&1; then
+        local dir helper
+        dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+        helper="${dir}/ui.sh"
+        if [[ -f "$helper" ]]; then
+            # shellcheck source=deploy/common/ui.sh
+            source "$helper"
+        else
+            return 1
+        fi
     fi
-    local dir helper
-    dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-    helper="${dir}/ui.sh"
-    if [[ -f "$helper" ]]; then
-        # shellcheck source=deploy/common/ui.sh
-        source "$helper"
-        return 0
+    if [[ -z "${NM_UI_BACKEND:-}" ]] && declare -F nm_ui_init >/dev/null 2>&1; then
+        nm_ui_init
     fi
-    return 1
+    return 0
+}
+
+_nm_run_gauge_fn() {
+    local title="$1" text="$2" fn="$3"
+    if declare -F nm_ui_run_with_gauge >/dev/null 2>&1; then
+        nm_ui_run_with_gauge "$title" "$text" "$fn"
+    else
+        "$fn"
+    fi
 }
 
 _nm_trap_err() {
@@ -655,6 +667,16 @@ _nm_print_summary() {
         _nm_log "Note: Docker volumes preserved — данные ClickHouse можно восстановить при повторной установке,"
         _nm_log "      если тома не были удалены вручную."
     fi
+    _nm_ensure_ui || true
+    if declare -F nm_ui_msgbox >/dev/null 2>&1; then
+        local note=""
+        if [[ "$REMOVE_DOCKER_VOLUMES" != "1" && "$REMOVE_PROJECT_FILES" == "1" ]]; then
+            note=$'\n\nДанные ClickHouse в Docker volumes сохранены.'
+        fi
+        nm_ui_msgbox "Удаление завершено" \
+"ГеоАтлас удалён согласно выбранному режиму.
+Docker Engine на хосте не трогали.${note}" || true
+    fi
 }
 
 nm_run_uninstall() {
@@ -692,14 +714,16 @@ nm_run_uninstall() {
 
     _nm_confirm
 
+    _nm_ensure_ui || true
+
     _nm_step 1 "Остановка Docker Compose стека"
-    _nm_stop_stack
+    _nm_run_gauge_fn "Остановка стека" "docker compose down…" _nm_stop_stack
 
     _nm_step 2 "Удаление правил firewall"
-    _nm_remove_firewall
+    _nm_run_gauge_fn "Firewall" "Удаление правил firewall…" _nm_remove_firewall
 
     _nm_step 3 "Удаление файлов проекта"
-    _nm_remove_project_files
+    _nm_run_gauge_fn "Файлы проекта" "Удаление ${NM_PROJECT_DIR}…" _nm_remove_project_files
 
     _nm_print_summary
 }

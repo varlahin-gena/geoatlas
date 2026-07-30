@@ -5,7 +5,7 @@
 #   confirm_modules
 #   apply_module_selection /opt/network-monitor
 #
-# UI: deploy/common/ui.sh (YAD → whiptail/dialog → текст).
+# UI: deploy/common/ui.sh (whiptail → dialog → текст).
 #
 # Переменные окружения (CI / без TTY):
 #   NM_AUTO_MODULES=1              — принять все модули по умолчанию (вкл.)
@@ -15,7 +15,7 @@
 #   NM_ENABLE_SYSLOG=0|1           — контейнер syslog-ng
 #   NM_ENABLE_STATS=0|1            — контейнер stats-collector
 #   NM_ENABLE_REPUTATION=0|1       — модуль репутации IP (API, UI, фиды)
-#   NM_UI=yad|whiptail|dialog|text — бэкенд диалогов
+#   NM_UI=whiptail|dialog|text     — бэкенд диалогов
 #
 # После confirm_modules доступны:
 #   NM_MODULE_AUTH, NM_MODULE_API_AUTH, NM_MODULE_SYSLOG, NM_MODULE_STATS,
@@ -27,18 +27,21 @@ set -Eeuo pipefail
 _nm_mod_log() { echo "[$(date +'%F %T')] [modules] $*"; }
 
 _nm_mod_ensure_ui() {
-    if declare -F nm_ui_yesno >/dev/null 2>&1; then
-        return 0
+    if ! declare -F nm_ui_yesno >/dev/null 2>&1; then
+        local dir helper
+        dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+        helper="${dir}/ui.sh"
+        if [[ -f "$helper" ]]; then
+            # shellcheck source=deploy/common/ui.sh
+            source "$helper"
+        else
+            return 1
+        fi
     fi
-    local dir helper
-    dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-    helper="${dir}/ui.sh"
-    if [[ -f "$helper" ]]; then
-        # shellcheck source=deploy/common/ui.sh
-        source "$helper"
-        return 0
+    if [[ -z "${NM_UI_BACKEND:-}" ]] && declare -F nm_ui_init >/dev/null 2>&1; then
+        nm_ui_init
     fi
-    return 1
+    return 0
 }
 
 _nm_mod_truthy() {
@@ -169,6 +172,8 @@ print_modules_summary() {
     [[ "${NM_MODULE_SYSLOG:-0}" == "1" ]] && s="вкл." || s="выкл."
     [[ "${NM_MODULE_STATS:-0}" == "1" ]] && p="вкл." || p="выкл."
     [[ "${NM_MODULE_REPUTATION:-0}" == "1" ]] && r="вкл." || r="выкл. (модуль отключён)"
+    local profiles="${NM_COMPOSE_PROFILES:-}"
+    [[ -n "$profiles" ]] || profiles="(нет — только ядро)"
     echo ""
     echo "══════════════════════════════════════════════════════════"
     echo "  Выбранные модули"
@@ -179,13 +184,20 @@ print_modules_summary() {
     echo "  syslog-ng         : ${s}"
     echo "  stats-collector   : ${p}"
     echo "  Репутация IP      : ${r}"
-    if [[ -n "${NM_COMPOSE_PROFILES:-}" ]]; then
-        echo "  Compose profiles  : ${NM_COMPOSE_PROFILES}"
-    else
-        echo "  Compose profiles  : (нет — только ядро)"
-    fi
+    echo "  Compose profiles  : ${profiles}"
     echo "══════════════════════════════════════════════════════════"
     echo ""
+    _nm_mod_ensure_ui || true
+    if declare -F nm_ui_msgbox >/dev/null 2>&1 && [[ "${NM_UI_BACKEND:-text}" != "text" ]]; then
+        nm_ui_msgbox "Выбранные модули" \
+"Ядро: ClickHouse + Backend + Frontend
+UI-авторизация: ${a}
+API Bearer-токен: ${t}
+syslog-ng: ${s}
+stats-collector: ${p}
+Репутация IP: ${r}
+Compose profiles: ${profiles}" || true
+    fi
 }
 
 confirm_modules() {

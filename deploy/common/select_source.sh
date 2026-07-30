@@ -9,25 +9,28 @@
 #   BRANCH=v1.1.0|main|...           — явный ref (без вопросов), если задан до скрипта
 #   NM_AUTO_MODULES=1                — как release (стабильный), если source не задан
 #   REPO_URL                         — URL git-репозитория
-#   NM_UI=yad|whiptail|dialog|text
+#   NM_UI=whiptail|dialog|text
 
 set -Eeuo pipefail
 
 _nm_src_log() { echo "[$(date +'%F %T')] [source] $*"; }
 
 _nm_src_ensure_ui() {
-    if declare -F nm_ui_radiolist >/dev/null 2>&1; then
-        return 0
+    if ! declare -F nm_ui_radiolist >/dev/null 2>&1; then
+        local dir helper
+        dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+        helper="${dir}/ui.sh"
+        if [[ -f "$helper" ]]; then
+            # shellcheck source=deploy/common/ui.sh
+            source "$helper"
+        else
+            return 1
+        fi
     fi
-    local dir helper
-    dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-    helper="${dir}/ui.sh"
-    if [[ -f "$helper" ]]; then
-        # shellcheck source=deploy/common/ui.sh
-        source "$helper"
-        return 0
+    if [[ -z "${NM_UI_BACKEND:-}" ]] && declare -F nm_ui_init >/dev/null 2>&1; then
+        nm_ui_init
     fi
-    return 1
+    return 0
 }
 
 # owner/repo из REPO_URL (github).
@@ -71,42 +74,6 @@ nm_latest_release_tag() {
     echo "$tag"
 }
 
-_nm_src_text_radiolist() {
-    # stdout: release|main
-    local def="${1:-release}"
-    echo "" >&2
-    echo "══════════════════════════════════════════════════════════" >&2
-    echo "  Источник установки" >&2
-    echo "══════════════════════════════════════════════════════════" >&2
-    echo "  [release] Последний релиз (стабильный тег)" >&2
-    echo "  [main]    Весь проект с последними изменениями (ветка main)" >&2
-    echo "" >&2
-    local answer hint
-    if [[ "$def" == "main" ]]; then
-        hint="main/release"
-    else
-        hint="release/main"
-    fi
-    if [[ -r /dev/tty && -w /dev/tty ]]; then
-        printf 'Ваш выбор [%s]: ' "$def" >/dev/tty
-        read -r answer </dev/tty || answer=""
-    else
-        printf 'Ваш выбор [%s]: ' "$def" >&2
-        read -r answer || answer=""
-    fi
-    answer="${answer,,}"
-    answer="${answer//[[:space:]]/}"
-    [[ -z "$answer" ]] && answer="$def"
-    case "$answer" in
-        release|rel|r|stable|стаб*) echo "release" ;;
-        main|latest|dev|m|ветк*) echo "main" ;;
-        *)
-            echo "  Введите release или main." >&2
-            _nm_src_text_radiolist "$def"
-            ;;
-    esac
-}
-
 # Выставляет:
 #   BRANCH, NM_INSTALL_SOURCE (release|main), NM_INSTALL_IS_TAG (0|1)
 confirm_install_source() {
@@ -147,16 +114,9 @@ confirm_install_source() {
                 "Что установить с GitHub?" \
                 release "$release_label" ON \
                 main "Ветка main — все последние изменения" OFF)" || source_choice="release"
-        elif command -v whiptail >/dev/null 2>&1; then
-            source_choice="$(whiptail --backtitle "ГеоАтлас" --title "Источник установки" \
-                --radiolist "Что установить с GitHub?" 14 72 2 \
-                release "$release_label" ON \
-                main "Ветка main — все последние изменения" OFF \
-                3>&1 1>&2 2>&3)" || source_choice="release"
-            source_choice="${source_choice//\"/}"
-            source_choice="${source_choice%%[[:space:]]*}"
         else
-            source_choice="$(_nm_src_text_radiolist release)"
+            source_choice="release"
+            _nm_src_log "UI недоступен — источник release."
         fi
     fi
 

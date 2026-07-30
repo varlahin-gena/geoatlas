@@ -26,30 +26,60 @@ log() { echo "[$(date +'%F %T')] $*"; }
 
 trap 'log "ERROR at line ${LINENO} (exit code $?). Check logs above / docker compose logs."' ERR
 
-print_banner() {
-    echo ""
-    echo "══════════════════════════════════════════════════════════"
-    echo "  ГеоАтлас — интерактивная установка (Ubuntu)"
-    echo "══════════════════════════════════════════════════════════"
-    echo "  Каталог : ${PROJECT_DIR}"
+_nm_banner_text() {
+    local src_line
     if [[ -n "${NM_INSTALL_SOURCE:-}" ]]; then
-        echo "  Источник: ${NM_INSTALL_SOURCE} → ${BRANCH}"
+        src_line="Источник: ${NM_INSTALL_SOURCE} → ${BRANCH}"
     else
-        echo "  Ref     : ${BRANCH} (выбор источника — после Docker)"
+        src_line="Ref: ${BRANCH} (выбор источника — после Docker)"
     fi
-    echo "  Репо    : ${REPO_URL}"
+    cat <<EOF
+Каталог: ${PROJECT_DIR}
+${src_line}
+Репозиторий: ${REPO_URL}
+
+Шаги:
+  1. Пакеты и Docker
+  2. Источник (релиз / main)
+  3. Клонирование репозитория
+  4. Выбор модулей
+  5. Порт веб-интерфейса
+  6. Профиль производительности
+  7. Firewall
+  8. Запуск стека
+EOF
+}
+
+print_banner() {
+    local text
+    text="$(_nm_banner_text)"
     echo ""
-    echo "  Шаги:"
-    echo "    1. Пакеты и Docker"
-    echo "    2. Источник (релиз / main)"
-    echo "    3. Клонирование репозитория"
-    echo "    4. Выбор модулей"
-    echo "    5. Порт веб-интерфейса"
-    echo "    6. Профиль производительности"
-    echo "    7. Firewall"
-    echo "    8. Запуск стека"
+    echo "══════════════════════════════════════════════════════════"
+    echo "  ГеоАтлас — установка (Ubuntu)"
+    echo "══════════════════════════════════════════════════════════"
+    echo "$text" | sed 's/^/  /'
     echo "══════════════════════════════════════════════════════════"
     echo ""
+}
+
+_nm_run_gauge() {
+    local title="$1" text="$2"
+    shift 2
+    if declare -F nm_ui_run_with_gauge >/dev/null 2>&1; then
+        nm_ui_run_with_gauge "$title" "$text" "$@"
+    else
+        "$@"
+    fi
+}
+
+_nm_run_gauge_fn() {
+    local title="$1" text="$2" fn="$3"
+    if declare -F nm_ui_run_with_gauge >/dev/null 2>&1; then
+        # Функция в том же интерпретаторе (не bash -c) — доступны log/PROJECT_DIR.
+        nm_ui_run_with_gauge "$title" "$text" "$fn"
+    else
+        "$fn"
+    fi
 }
 
 _source_ui() {
@@ -66,6 +96,23 @@ _source_ui() {
             return 0
         fi
     done
+    # curl-установка одним файлом: подтянуть ui.sh с main
+    if command -v curl >/dev/null 2>&1; then
+        local tmp owner
+        owner="$(echo "$REPO_URL" | sed -E 's#.*github.com[:/]([^/]+/[^/.]+)(\.git)?$#\1#')"
+        [[ -n "$owner" ]] || owner="varlahin-gena/network_monitor"
+        tmp="$(mktemp)"
+        if curl -fsSL --connect-timeout 10 --max-time 30 \
+            "https://raw.githubusercontent.com/${owner}/main/deploy/common/ui.sh" \
+            -o "$tmp"; then
+            # shellcheck source=/dev/null
+            source "$tmp"
+            rm -f "$tmp"
+            nm_ui_init
+            return 0
+        fi
+        rm -f "$tmp"
+    fi
     return 1
 }
 
@@ -107,24 +154,15 @@ _welcome_dialog() {
         return 0
     fi
     _ensure_dark_newt
-    if _source_ui && declare -F nm_ui_msgbox >/dev/null 2>&1; then
+    _source_ui || true
+    if declare -F nm_ui_msgbox >/dev/null 2>&1; then
         nm_ui_msgbox "Установка ГеоАтлас" \
 "Добро пожаловать в мастер установки.
 
 Каталог: ${PROJECT_DIR}
 Репозиторий: ${REPO_URL}
 
-Далее: выбор релиза или ветки main, зависимости, Docker и модули." || true
-        return 0
-    fi
-    # Ранний этап (до clone): простой whiptail, если уже есть
-    if command -v whiptail >/dev/null 2>&1; then
-        whiptail --backtitle "ГеоАтлас" --title "Установка ГеоАтлас" \
-            --msgbox "Добро пожаловать в мастер установки.
-
-Каталог: ${PROJECT_DIR}
-
-Далее: выбор релиза или ветки main, зависимости и Docker." 14 60 || true
+Далее: пакеты, Docker, выбор релиза или main, модули и запуск." || true
     fi
 }
 
@@ -159,12 +197,8 @@ install_packages() {
         ufw \
         whiptail
 
-    # YAD только при наличии дисплея; сбой не блокирует установку.
-    if [[ -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]]; then
-        log "Graphical display detected — installing yad (optional)..."
-        DEBIAN_FRONTEND=noninteractive apt-get install -y yad || \
-            log "yad not available — continuing with whiptail/text UI."
-    fi
+    # dialog — запасной TUI, если есть в репозитории
+    DEBIAN_FRONTEND=noninteractive apt-get install -y dialog 2>/dev/null || true
 }
 
 install_docker() {
@@ -434,18 +468,17 @@ ask_firewall() {
     if [[ "${NM_FIREWALL_FROM_ENV}" == "1" ]] || [[ "${NM_AUTO_MODULES:-0}" == "1" ]] || [[ ! -t 0 ]]; then
         return
     fi
-    local answer
-    if [[ -r /dev/tty && -w /dev/tty ]]; then
-        printf 'Настроить правила UFW (порты %s, 514)? [Y/n]: ' "${HTTP_PORT:-80}" >/dev/tty
-        read -r answer </dev/tty || answer=""
-    else
-        printf 'Настроить правила UFW (порты %s, 514)? [Y/n]: ' "${HTTP_PORT:-80}" >&2
-        read -r answer || answer=""
+    _source_ui || true
+    if declare -F nm_ui_yesno >/dev/null 2>&1; then
+        if nm_ui_yesno "Firewall" \
+            "Настроить правила UFW (порты ${HTTP_PORT:-80}, 514)?" 1; then
+            ENABLE_UFW=1
+        else
+            ENABLE_UFW=0
+        fi
+        return
     fi
-    answer="${answer,,}"
-    if [[ "$answer" =~ ^(n|no|н|нет)$ ]]; then
-        ENABLE_UFW=0
-    fi
+    ENABLE_UFW=1
 }
 
 start_stack() {
@@ -462,19 +495,26 @@ start_stack() {
 
 main() {
     require_root
-    print_banner
     detect_ubuntu
-    install_packages
+    _ensure_dark_newt
+    _source_ui || true
+    print_banner
+    _nm_run_gauge_fn "Пакеты" "Обновление apt и установка зависимостей…" install_packages
+    _source_ui || true
     _welcome_dialog
-    install_docker
+    _nm_run_gauge_fn "Docker" "Установка Docker Engine и Compose…" install_docker
     choose_install_source
     print_banner
-    clone_or_update_repo
+    _nm_run_gauge_fn "Репозиторий" "Клонирование / обновление ${BRANCH}…" clone_or_update_repo
     # После clone — полноценный UI-слой из репозитория
     _source_ui || true
     prepare_project
     ask_firewall
-    configure_firewall
+    if [[ "${ENABLE_UFW}" == "1" ]]; then
+        _nm_run_gauge_fn "Firewall" "Настройка правил UFW…" configure_firewall
+    else
+        configure_firewall
+    fi
     start_stack
 }
 

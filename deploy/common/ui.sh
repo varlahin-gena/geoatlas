@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Единый UI-слой для install/uninstall (YAD → whiptail/dialog → текст).
+# Единый TUI-слой для install/uninstall (whiptail → dialog → текст).
 #
 # Использование:
 #   source deploy/common/ui.sh
@@ -8,22 +8,23 @@
 #   nm_ui_yesno "Заголовок" "Вопрос?" 1   # default 0|1 → return 0 если Yes
 #   nm_ui_checklist "Заголовок" "Подсказка" TAG "Desc" ON TAG2 "Desc2" OFF ...
 #   nm_ui_radiolist "Заголовок" "Подсказка" TAG "Desc" ON TAG2 "Desc2" OFF ...
+#   nm_ui_inputbox "Заголовок" "Подсказка" ["default"]  # stdout = ввод
+#   nm_ui_gauge "Заголовок" "Текст" PERCENT
+#   nm_ui_run_with_gauge "Заголовок" "Текст" CMD [ARGS...]
 #
 # Переменные:
-#   NM_UI=yad|whiptail|dialog|text   — принудительный бэкенд
-#   NM_UI_BACKTITLE                  — строка вверху TUI (по умолчанию ГеоАтлас)
-#   NM_UI_TITLE                      — короткое имя для YAD window title
-#   NEWT_COLORS                      — палитра whiptail (если задана снаружи — не трогаем)
-#   NM_UI_DARK=0                     — отключить тёмную тему (вернуть системную)
+#   NM_UI=whiptail|dialog|text   — принудительный бэкенд
+#   NM_UI_BACKTITLE              — строка вверху TUI (по умолчанию ГеоАтлас)
+#   NEWT_COLORS                  — палитра whiptail (если задана снаружи — не трогаем)
+#   NM_UI_DARK=0                 — отключить тёмную тему (вернуть системную)
 #
 # После nm_ui_init:
 #   NM_UI_BACKEND  — выбранный бэкенд
-#   NM_UI_AVAILABLE — 1 если интерактивный UI доступен (не text-only без TTY)
+#   NM_UI_AVAILABLE — 1 если интерактивный UI доступен
 #
 # Коды возврата диалогов:
 #   0 — OK / Yes
-#   1 — No / Cancel (для yesno: No; для остальных — отмена)
-#   2 — ESC / abort (трактуем как cancel)
+#   1 — No / Cancel
 
 set -Eeuo pipefail
 
@@ -34,12 +35,9 @@ NM_UI_AVAILABLE="${NM_UI_AVAILABLE:-0}"
 NM_UI_HEIGHT="${NM_UI_HEIGHT:-18}"
 NM_UI_WIDTH="${NM_UI_WIDTH:-72}"
 NM_UI_LIST_HEIGHT="${NM_UI_LIST_HEIGHT:-10}"
+NM_UI_GAUGE_HEIGHT="${NM_UI_GAUGE_HEIGHT:-8}"
 
 _nm_ui_log() { echo "[$(date +'%F %T')] [ui] $*" >&2; }
-
-_nm_ui_has_display() {
-    [[ -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]]
-}
 
 _nm_ui_interactive() {
     [[ -t 0 ]] || [[ -r /dev/tty && -w /dev/tty ]]
@@ -50,29 +48,26 @@ _nm_ui_pick_backend() {
     forced="${forced,,}"
 
     case "$forced" in
-        yad|whiptail|dialog|text)
-            if [[ "$forced" == "yad" ]]; then
-                if command -v yad >/dev/null 2>&1 && _nm_ui_has_display; then
-                    echo "yad"
-                    return
-                fi
-                _nm_ui_log "NM_UI=yad недоступен — fallback."
-            elif [[ "$forced" == "whiptail" ]]; then
-                if command -v whiptail >/dev/null 2>&1; then
-                    echo "whiptail"
-                    return
-                fi
-                _nm_ui_log "NM_UI=whiptail недоступен — fallback."
-            elif [[ "$forced" == "dialog" ]]; then
-                if command -v dialog >/dev/null 2>&1; then
-                    echo "dialog"
-                    return
-                fi
-                _nm_ui_log "NM_UI=dialog недоступен — fallback."
-            else
-                echo "text"
+        whiptail)
+            if command -v whiptail >/dev/null 2>&1; then
+                echo "whiptail"
                 return
             fi
+            _nm_ui_log "NM_UI=whiptail недоступен — fallback."
+            ;;
+        dialog)
+            if command -v dialog >/dev/null 2>&1; then
+                echo "dialog"
+                return
+            fi
+            _nm_ui_log "NM_UI=dialog недоступен — fallback."
+            ;;
+        text)
+            echo "text"
+            return
+            ;;
+        yad)
+            _nm_ui_log "NM_UI=yad больше не поддерживается — используем whiptail/dialog/text."
             ;;
         "")
             ;;
@@ -81,10 +76,6 @@ _nm_ui_pick_backend() {
             ;;
     esac
 
-    if _nm_ui_has_display && command -v yad >/dev/null 2>&1; then
-        echo "yad"
-        return
-    fi
     if command -v whiptail >/dev/null 2>&1; then
         echo "whiptail"
         return
@@ -97,7 +88,6 @@ _nm_ui_pick_backend() {
 }
 
 # Тёмная палитра вместо розового/magenta default newt.
-# Формат: element=fg,bg  (цвета newt: black, red, green, brown, blue, magenta, cyan, lightgray, …)
 _nm_ui_default_newt_colors() {
     cat <<'EOF'
 root=white,black
@@ -127,18 +117,15 @@ EOF
 }
 
 _nm_ui_apply_theme() {
-    # Не перетираем пользовательскую NEWT_COLORS; NM_UI_DARK=0 — оставить системную.
     if [[ "${NM_UI_DARK:-1}" == "0" ]]; then
         return 0
     fi
-    # Whiptail/newt: ставим всегда (и для ранних вызовов, и когда backend=whiptail).
     if [[ -z "${NEWT_COLORS:-}" ]]; then
         NEWT_COLORS="$(_nm_ui_default_newt_colors)"
         export NEWT_COLORS
     fi
     case "${NM_UI_BACKEND:-}" in
         dialog)
-            # dialog читает DIALOGRC; задаём временный тёмный rc, если свой не указан.
             if [[ -z "${DIALOGRC:-}" ]]; then
                 local rc="${TMPDIR:-/tmp}/nm-dialogrc.$$"
                 cat >"$rc" <<'EOF'
@@ -175,14 +162,9 @@ darrow_color = (CYAN,BLACK,ON)
 itemhelp_color = (BLACK,LIGHTGRAY,OFF)
 form_active_text_color = (WHITE,BLACK,ON)
 form_text_color = (WHITE,BLACK,OFF)
+gauge_color = (WHITE,BLACK,ON)
 EOF
                 export DIALOGRC="$rc"
-            fi
-            ;;
-        yad)
-            # Предпочитаем тёмную GTK-тему, если пользователь не задал свою.
-            if [[ -z "${GTK_THEME:-}" ]]; then
-                export GTK_THEME="${NM_UI_GTK_THEME:-Adwaita:dark}"
             fi
             ;;
     esac
@@ -205,7 +187,6 @@ nm_ui_init() {
 # --- text helpers -----------------------------------------------------------
 
 _nm_ui_text_yesno() {
-    # $1 prompt, $2 default 0|1 → 0 if yes
     local prompt="$1"
     local def="${2:-1}"
     local hint answer
@@ -247,29 +228,20 @@ _nm_ui_text_msgbox() {
     # shellcheck disable=SC2001
     echo "$text" | sed 's/^/  /' >&2
     echo "══════════════════════════════════════════════════════════" >&2
-    echo "" >&2
-    if [[ -r /dev/tty && -w /dev/tty ]]; then
-        printf 'Нажмите Enter для продолжения… ' >/dev/tty
+    if _nm_ui_interactive && [[ -r /dev/tty && -w /dev/tty ]]; then
+        printf '  [Enter] ' >/dev/tty
         read -r _ </dev/tty || true
     fi
 }
 
-# Парсинг пар tag/desc/status для checklist/radiolist.
-# Аргументы после title+text: TAG "Desc" ON|OFF ...
-# Результат в массивах _NM_UI_TAGS _NM_UI_DESCS _NM_UI_ON
 _nm_ui_parse_list_items() {
     _NM_UI_TAGS=()
     _NM_UI_DESCS=()
     _NM_UI_ON=()
-    while [[ $# -ge 3 ]]; do
+    while (($# >= 3)); do
         _NM_UI_TAGS+=("$1")
         _NM_UI_DESCS+=("$2")
-        local st="${3^^}"
-        if [[ "$st" == "ON" || "$st" == "1" || "$st" == "TRUE" ]]; then
-            _NM_UI_ON+=("ON")
-        else
-            _NM_UI_ON+=("OFF")
-        fi
+        _NM_UI_ON+=("$3")
         shift 3
     done
 }
@@ -280,22 +252,15 @@ _nm_ui_text_checklist() {
     shift 2
     _nm_ui_parse_list_items "$@"
     echo "" >&2
-    echo "══════════════════════════════════════════════════════════" >&2
     echo "  ${title}" >&2
-    echo "══════════════════════════════════════════════════════════" >&2
-    # shellcheck disable=SC2001
-    echo "$text" | sed 's/^/  /' >&2
-    echo "" >&2
-
-    local i tag desc def ans
-    local -a selected=()
+    echo "  ${text}" >&2
+    local i selected=()
     for i in "${!_NM_UI_TAGS[@]}"; do
-        tag="${_NM_UI_TAGS[$i]}"
-        desc="${_NM_UI_DESCS[$i]}"
-        def=0
+        local def=0
         [[ "${_NM_UI_ON[$i]}" == "ON" ]] && def=1
+        local desc="${_NM_UI_TAGS[$i]} — ${_NM_UI_DESCS[$i]}"
         if _nm_ui_text_yesno "  ${desc}" "$def"; then
-            selected+=("$tag")
+            selected+=("${_NM_UI_TAGS[$i]}")
         fi
     done
     (IFS=','; echo "${selected[*]-}")
@@ -306,153 +271,48 @@ _nm_ui_text_radiolist() {
     local text="$2"
     shift 2
     _nm_ui_parse_list_items "$@"
-    local default_tag=""
-    local i
-    for i in "${!_NM_UI_TAGS[@]}"; do
-        if [[ "${_NM_UI_ON[$i]}" == "ON" ]]; then
-            default_tag="${_NM_UI_TAGS[$i]}"
-            break
-        fi
-    done
-    [[ -z "$default_tag" && ${#_NM_UI_TAGS[@]} -gt 0 ]] && default_tag="${_NM_UI_TAGS[0]}"
-
     echo "" >&2
-    echo "══════════════════════════════════════════════════════════" >&2
     echo "  ${title}" >&2
-    echo "══════════════════════════════════════════════════════════" >&2
-    # shellcheck disable=SC2001
-    echo "$text" | sed 's/^/  /' >&2
-    echo "" >&2
+    echo "  ${text}" >&2
+    local i default_idx=0
     for i in "${!_NM_UI_TAGS[@]}"; do
-        local mark=""
-        [[ "${_NM_UI_TAGS[$i]}" == "$default_tag" ]] && mark="  ← по умолчанию"
-        printf "  [%s] %s%s\n" "${_NM_UI_TAGS[$i]}" "${_NM_UI_DESCS[$i]}" "$mark" >&2
+        echo "  [$((i + 1))] ${_NM_UI_TAGS[$i]} — ${_NM_UI_DESCS[$i]}" >&2
+        [[ "${_NM_UI_ON[$i]}" == "ON" ]] && default_idx=$((i + 1))
     done
-    echo "" >&2
-
     local answer
-    while true; do
-        if [[ -r /dev/tty && -w /dev/tty ]]; then
-            printf 'Ваш выбор [%s]: ' "$default_tag" >/dev/tty
-            read -r answer </dev/tty || answer=""
-        else
-            printf 'Ваш выбор [%s]: ' "$default_tag" >&2
-            read -r answer || answer=""
-        fi
-        answer="${answer,,}"
-        answer="${answer//[[:space:]]/}"
-        [[ -z "$answer" ]] && answer="$default_tag"
-
-        for i in "${!_NM_UI_TAGS[@]}"; do
-            if [[ "${_NM_UI_TAGS[$i],,}" == "$answer" ]]; then
-                echo "${_NM_UI_TAGS[$i]}"
-                return 0
-            fi
-        done
-        # также принять индекс 1..N
-        if [[ "$answer" =~ ^[0-9]+$ ]] && (( answer >= 1 && answer <= ${#_NM_UI_TAGS[@]} )); then
-            echo "${_NM_UI_TAGS[$((answer - 1))]}"
-            return 0
-        fi
-        if [[ "$answer" == "q" || "$answer" == "quit" || "$answer" == "отмена" ]]; then
-            return 1
-        fi
-        echo "  Не понял «${answer}». Введите тег из списка или q для отмены." >&2
-    done
-}
-
-# --- YAD --------------------------------------------------------------------
-
-_nm_ui_yad_msgbox() {
-    local title="$1"
-    local text="$2"
-    yad --title="${NM_UI_TITLE}" \
-        --window-icon=dialog-information \
-        --center --width=520 \
-        --button="OK:0" \
-        --text="<b>${title}</b>\n\n${text}" \
-        --text-align=left 2>/dev/null
-}
-
-_nm_ui_yad_yesno() {
-    local title="$1"
-    local text="$2"
-    local def="${3:-1}"
-    local btn_yes="Да:0"
-    local btn_no="Нет:1"
-    if [[ "$def" == "1" ]]; then
-        yad --title="${NM_UI_TITLE}" --center --width=480 \
-            --button="$btn_yes" --button="$btn_no" \
-            --text="<b>${title}</b>\n\n${text}" 2>/dev/null
+    if [[ -r /dev/tty && -w /dev/tty ]]; then
+        printf '  Выбор [%s]: ' "$default_idx" >/dev/tty
+        read -r answer </dev/tty || answer=""
     else
-        yad --title="${NM_UI_TITLE}" --center --width=480 \
-            --button="$btn_no" --button="$btn_yes" \
-            --text="<b>${title}</b>\n\n${text}" 2>/dev/null
-        local rc=$?
-        # при default=No кнопки переставлены: первая = Нет(1), вторая = Да(0)
-        # yad возвращает код кнопки; при Esc — 252
-        return "$rc"
+        printf '  Выбор [%s]: ' "$default_idx" >&2
+        read -r answer || answer=""
     fi
+    answer="${answer//[[:space:]]/}"
+    [[ -z "$answer" ]] && answer="$default_idx"
+    if [[ "$answer" =~ ^[0-9]+$ ]] && (( answer >= 1 && answer <= ${#_NM_UI_TAGS[@]} )); then
+        echo "${_NM_UI_TAGS[$((answer - 1))]}"
+        return 0
+    fi
+    return 1
 }
 
-_nm_ui_yad_checklist() {
+_nm_ui_text_inputbox() {
     local title="$1"
     local text="$2"
-    shift 2
-    _nm_ui_parse_list_items "$@"
-    local -a args=()
-    local i
-    for i in "${!_NM_UI_TAGS[@]}"; do
-        if [[ "${_NM_UI_ON[$i]}" == "ON" ]]; then
-            args+=(TRUE)
-        else
-            args+=(FALSE)
-        fi
-        args+=("${_NM_UI_TAGS[$i]}" "${_NM_UI_DESCS[$i]}")
-    done
-    local out
-    out="$(yad --title="${NM_UI_TITLE}" --center --width=560 --height=360 \
-        --list --checklist --multiple \
-        --text="<b>${title}</b>\n${text}" \
-        --column="Вкл" --column="Код" --column="Описание" \
-        --button="OK:0" --button="Отмена:1" \
-        "${args[@]}" 2>/dev/null)" || return 1
-    # YAD checklist: строки "TRUE|tag|desc" через \n, поля через |
-    local line tag
-    local -a selected=()
-    while IFS= read -r line; do
-        [[ -z "$line" ]] && continue
-        # формат: TRUE|tag|desc  или TRUE|tag
-        tag="$(echo "$line" | awk -F'|' '{print $2}')"
-        [[ -n "$tag" ]] && selected+=("$tag")
-    done <<<"$out"
-    (IFS=','; echo "${selected[*]-}")
-}
-
-_nm_ui_yad_radiolist() {
-    local title="$1"
-    local text="$2"
-    shift 2
-    _nm_ui_parse_list_items "$@"
-    local -a args=()
-    local i
-    for i in "${!_NM_UI_TAGS[@]}"; do
-        if [[ "${_NM_UI_ON[$i]}" == "ON" ]]; then
-            args+=(TRUE)
-        else
-            args+=(FALSE)
-        fi
-        args+=("${_NM_UI_TAGS[$i]}" "${_NM_UI_DESCS[$i]}")
-    done
-    local out
-    out="$(yad --title="${NM_UI_TITLE}" --center --width=560 --height=360 \
-        --list --radiolist \
-        --text="<b>${title}</b>\n${text}" \
-        --column="Выбор" --column="Код" --column="Описание" \
-        --button="OK:0" --button="Отмена:1" \
-        "${args[@]}" 2>/dev/null)" || return 1
-    # TRUE|tag|desc
-    echo "$out" | awk -F'|' '{print $2}' | head -n1
+    local def="${3:-}"
+    local answer
+    echo "" >&2
+    echo "  ${title}" >&2
+    echo "  ${text}" >&2
+    if [[ -r /dev/tty && -w /dev/tty ]]; then
+        printf '  [%s]: ' "$def" >/dev/tty
+        read -r answer </dev/tty || answer=""
+    else
+        printf '  [%s]: ' "$def" >&2
+        read -r answer || answer=""
+    fi
+    [[ -z "$answer" ]] && answer="$def"
+    echo "$answer"
 }
 
 # --- whiptail / dialog ------------------------------------------------------
@@ -487,11 +347,7 @@ _nm_ui_tui_yesno() {
     cmd="$(_nm_ui_tui_cmd)"
     local -a extra=()
     if [[ "$def" != "1" ]]; then
-        if [[ "$cmd" == "whiptail" ]]; then
-            extra+=(--defaultno)
-        else
-            extra+=(--defaultno)
-        fi
+        extra+=(--defaultno)
     fi
     if [[ "$cmd" == "dialog" ]]; then
         "$cmd" --backtitle "$NM_UI_BACKTITLE" --title "$title" \
@@ -516,7 +372,6 @@ _nm_ui_tui_checklist() {
     done
     local out rc=0
     if [[ "$cmd" == "dialog" ]]; then
-        # dialog пишет выбор в stderr
         out="$("$cmd" --backtitle "$NM_UI_BACKTITLE" --title "$title" \
             --checklist "$text" "$NM_UI_HEIGHT" "$NM_UI_WIDTH" "$NM_UI_LIST_HEIGHT" \
             "${items[@]}" 2>&1 >/dev/tty)" || rc=$?
@@ -526,7 +381,6 @@ _nm_ui_tui_checklist() {
             "${items[@]}" 3>&1 1>&2 2>&3)" || rc=$?
     fi
     (( rc == 0 )) || return 1
-    # whiptail: "tag1" "tag2"  или tag1 tag2
     out="${out//\"/}"
     # shellcheck disable=SC2086
     local -a selected=($out)
@@ -561,15 +415,139 @@ _nm_ui_tui_radiolist() {
     echo "$out"
 }
 
+_nm_ui_tui_inputbox() {
+    local title="$1"
+    local text="$2"
+    local def="${3:-}"
+    local cmd out rc=0
+    cmd="$(_nm_ui_tui_cmd)"
+    if [[ "$cmd" == "dialog" ]]; then
+        out="$("$cmd" --backtitle "$NM_UI_BACKTITLE" --title "$title" \
+            --inputbox "$text" "$NM_UI_HEIGHT" "$NM_UI_WIDTH" "$def" 2>&1 >/dev/tty)" || rc=$?
+    else
+        out="$("$cmd" --backtitle "$NM_UI_BACKTITLE" --title "$title" \
+            --inputbox "$text" "$NM_UI_HEIGHT" "$NM_UI_WIDTH" "$def" 3>&1 1>&2 2>&3)" || rc=$?
+    fi
+    (( rc == 0 )) || return 1
+    echo "$out"
+}
+
+# Однократный кадр gauge (для ступенчатого прогресса).
+# nm_ui_gauge TITLE TEXT PERCENT
+nm_ui_gauge() {
+    local title="$1"
+    local text="$2"
+    local pct="${3:-0}"
+    [[ "$pct" =~ ^[0-9]+$ ]] || pct=0
+    (( pct > 100 )) && pct=100
+    (( pct < 0 )) && pct=0
+
+    case "${NM_UI_BACKEND:-text}" in
+        whiptail|dialog)
+            if [[ "${NM_UI_AVAILABLE:-0}" != "1" ]]; then
+                echo "[gauge ${pct}%] ${title}: ${text}" >&2
+                return 0
+            fi
+            local cmd
+            cmd="$(_nm_ui_tui_cmd)"
+            if [[ "$cmd" == "dialog" ]]; then
+                echo "$pct" | "$cmd" --backtitle "$NM_UI_BACKTITLE" --title "$title" \
+                    --gauge "$text" "$NM_UI_GAUGE_HEIGHT" "$NM_UI_WIDTH" "$pct" 2>&1 >/dev/tty || true
+            else
+                echo "$pct" | "$cmd" --backtitle "$NM_UI_BACKTITLE" --title "$title" \
+                    --gauge "$text" "$NM_UI_GAUGE_HEIGHT" "$NM_UI_WIDTH" "$pct" || true
+            fi
+            ;;
+        *)
+            echo "[gauge ${pct}%] ${title}: ${text}" >&2
+            ;;
+    esac
+}
+
+# Запуск долгой команды с пульсирующим gauge.
+# Лог → tempfile; при ошибке — msgbox с хвостом лога.
+# nm_ui_run_with_gauge TITLE TEXT CMD [ARGS...]
+nm_ui_run_with_gauge() {
+    local title="$1"
+    local text="$2"
+    shift 2
+    local logf pid rc=0 pct=5
+    logf="$(mktemp "${TMPDIR:-/tmp}/nm-gauge.XXXXXX")"
+
+    if [[ "${NM_UI_BACKEND:-text}" == "text" ]] || [[ "${NM_UI_AVAILABLE:-0}" != "1" ]]; then
+        echo "[gauge] ${title}: ${text}" >&2
+        set +e
+        "$@" >"$logf" 2>&1
+        rc=$?
+        set -e
+        if (( rc != 0 )); then
+            _nm_ui_log "ERROR: ${title} (exit ${rc})"
+            tail -n 40 "$logf" >&2 || true
+            if declare -F nm_ui_msgbox >/dev/null 2>&1; then
+                nm_ui_msgbox "Ошибка: ${title}" \
+                    "Команда завершилась с кодом ${rc}.
+
+$(tail -n 25 "$logf" 2>/dev/null || true)" || true
+            fi
+        else
+            echo "[gauge 100%] ${title}: готово" >&2
+        fi
+        rm -f "$logf"
+        return "$rc"
+    fi
+
+    set +e
+    "$@" >"$logf" 2>&1 &
+    pid=$!
+    set -e
+
+    local cmd
+    cmd="$(_nm_ui_tui_cmd)"
+    (
+        while kill -0 "$pid" 2>/dev/null; do
+            echo "$pct"
+            pct=$((pct + 4))
+            (( pct >= 95 )) && pct=10
+            sleep 0.4
+        done
+        echo 100
+        sleep 0.15
+    ) | {
+        if [[ "$cmd" == "dialog" ]]; then
+            "$cmd" --backtitle "$NM_UI_BACKTITLE" --title "$title" \
+                --gauge "$text" "$NM_UI_GAUGE_HEIGHT" "$NM_UI_WIDTH" 0 2>&1 >/dev/tty || true
+        else
+            "$cmd" --backtitle "$NM_UI_BACKTITLE" --title "$title" \
+                --gauge "$text" "$NM_UI_GAUGE_HEIGHT" "$NM_UI_WIDTH" 0 || true
+        fi
+    }
+
+    set +e
+    wait "$pid"
+    rc=$?
+    set -e
+
+    if (( rc != 0 )); then
+        local tail_txt
+        tail_txt="$(tail -n 25 "$logf" 2>/dev/null || true)"
+        nm_ui_msgbox "Ошибка: ${title}" \
+            "Команда завершилась с кодом ${rc}.
+
+${tail_txt}" || true
+        _nm_ui_log "ERROR: ${title} (exit ${rc}) — см. лог ${logf}"
+        # оставляем лог для отладки при ошибке
+        return "$rc"
+    fi
+    rm -f "$logf"
+    return 0
+}
+
 # --- public API -------------------------------------------------------------
 
 nm_ui_msgbox() {
     local title="$1"
     local text="$2"
     case "${NM_UI_BACKEND:-text}" in
-        yad)
-            _nm_ui_yad_msgbox "$title" "$text" || _nm_ui_text_msgbox "$title" "$text"
-            ;;
         whiptail|dialog)
             _nm_ui_tui_msgbox "$title" "$text" || _nm_ui_text_msgbox "$title" "$text"
             ;;
@@ -586,17 +564,6 @@ nm_ui_yesno() {
     local text="$2"
     local def="${3:-1}"
     case "${NM_UI_BACKEND:-text}" in
-        yad)
-            if _nm_ui_yad_yesno "$title" "$text" "$def"; then
-                return 0
-            fi
-            local rc=$?
-            # Esc / close → treat as No
-            if (( rc == 252 || rc > 1 )); then
-                return 1
-            fi
-            return 1
-            ;;
         whiptail|dialog)
             if _nm_ui_tui_yesno "$title" "$text" "$def"; then
                 return 0
@@ -617,18 +584,6 @@ nm_ui_checklist() {
     shift 2
     local out
     case "${NM_UI_BACKEND:-text}" in
-        yad)
-            if out="$(_nm_ui_yad_checklist "$title" "$text" "$@")"; then
-                echo "$out"
-                return 0
-            fi
-            # fallback на text при сбое yad
-            if out="$(_nm_ui_text_checklist "$title" "$text" "$@")"; then
-                echo "$out"
-                return 0
-            fi
-            return 1
-            ;;
         whiptail|dialog)
             if out="$(_nm_ui_tui_checklist "$title" "$text" "$@")"; then
                 echo "$out"
@@ -652,17 +607,6 @@ nm_ui_radiolist() {
     shift 2
     local out
     case "${NM_UI_BACKEND:-text}" in
-        yad)
-            if out="$(_nm_ui_yad_radiolist "$title" "$text" "$@")"; then
-                echo "$out"
-                return 0
-            fi
-            if out="$(_nm_ui_text_radiolist "$title" "$text" "$@")"; then
-                echo "$out"
-                return 0
-            fi
-            return 1
-            ;;
         whiptail|dialog)
             if out="$(_nm_ui_tui_radiolist "$title" "$text" "$@")"; then
                 echo "$out"
@@ -680,7 +624,25 @@ nm_ui_radiolist() {
     esac
 }
 
-# Инициализация по умолчанию при source (можно переопределить вызовом nm_ui_init).
-if [[ -z "${NM_UI_BACKEND:-}" ]]; then
-    nm_ui_init
-fi
+# nm_ui_inputbox TITLE TEXT [default]
+# печатает ввод в stdout; return 1 при отмене
+nm_ui_inputbox() {
+    local title="$1"
+    local text="$2"
+    local def="${3:-}"
+    local out
+    case "${NM_UI_BACKEND:-text}" in
+        whiptail|dialog)
+            if out="$(_nm_ui_tui_inputbox "$title" "$text" "$def")"; then
+                echo "$out"
+                return 0
+            fi
+            return 1
+            ;;
+        *)
+            out="$(_nm_ui_text_inputbox "$title" "$text" "$def")"
+            echo "$out"
+            return 0
+            ;;
+    esac
+}

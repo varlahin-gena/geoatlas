@@ -15,18 +15,21 @@ set -Eeuo pipefail
 _nm_log() { echo "[$(date +'%F %T')] [resources] $*"; }
 
 _nm_res_ensure_ui() {
-    if declare -F nm_ui_radiolist >/dev/null 2>&1; then
-        return 0
+    if ! declare -F nm_ui_radiolist >/dev/null 2>&1; then
+        local dir helper
+        dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+        helper="${dir}/ui.sh"
+        if [[ -f "$helper" ]]; then
+            # shellcheck source=deploy/common/ui.sh
+            source "$helper"
+        else
+            return 1
+        fi
     fi
-    local dir helper
-    dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-    helper="${dir}/ui.sh"
-    if [[ -f "$helper" ]]; then
-        # shellcheck source=deploy/common/ui.sh
-        source "$helper"
-        return 0
+    if [[ -z "${NM_UI_BACKEND:-}" ]] && declare -F nm_ui_init >/dev/null 2>&1; then
+        nm_ui_init
     fi
-    return 1
+    return 0
 }
 
 detect_cpu_cores() {
@@ -170,7 +173,15 @@ print_host_summary() {
     local cpu="$1" ram_mb="$2" disk_gb="$3" recommended="$4"
     local ram_gib
     ram_gib="$(awk -v mb="$ram_mb" 'BEGIN { printf "%.1f", mb / 1024 }')"
+    profile_capacity "$recommended"
+    local summary
+    summary="CPU ядер: ${cpu}
+RAM: ${ram_gib} GiB (${ram_mb} MiB)
+Свободно диска: ${disk_gb} GiB (/)
+Рекомендация: $(profile_label_ru "$recommended") [${recommended}]
+Расчётная EPS: до ${EPS_MAX} событий/с"
 
+    # Детальный dump — в лог (stderr/stdout для install log).
     echo ""
     echo "══════════════════════════════════════════════════════════"
     echo "  Анализ сервера"
@@ -179,10 +190,14 @@ print_host_summary() {
     echo "  RAM            : ${ram_gib} GiB (${ram_mb} MiB)"
     echo "  Свободно диска : ${disk_gb} GiB (/)"
     echo "  Рекомендация   : $(profile_label_ru "$recommended") [$recommended]"
-    profile_capacity "$recommended"
     echo "  Расчётная EPS  : до ${EPS_MAX} событий/с"
     echo "══════════════════════════════════════════════════════════"
     echo ""
+
+    _nm_res_ensure_ui || true
+    if declare -F nm_ui_msgbox >/dev/null 2>&1 && [[ "${NM_UI_BACKEND:-text}" != "text" ]]; then
+        nm_ui_msgbox "Анализ сервера" "$summary" || true
+    fi
 }
 
 is_valid_profile() {
@@ -283,43 +298,9 @@ confirm_profile() {
         fi
     fi
 
-    echo "" >&2
-    echo "══════════════════════════════════════════════════════════" >&2
-    echo "  Выбор профиля производительности" >&2
-    echo "══════════════════════════════════════════════════════════" >&2
-    print_profile_options "$recommended"
-    echo "  Enter / y     — принять рекомендацию [$recommended]" >&2
-    echo "  tiny … xlarge — выбрать другой профиль" >&2
-    echo "  skip          — оставить значения по умолчанию (без override)" >&2
-    echo "" >&2
-
-    while true; do
-        local answer
-        read -r -p "Ваш выбор [${recommended}]: " answer </dev/tty || answer=""
-        answer="${answer,,}"
-        answer="${answer//[[:space:]]/}"
-
-        case "$answer" in
-            ""|y|yes|д|да)
-                NM_SELECTED_PROFILE="$recommended"
-                _nm_log "Выбран профиль: ${NM_SELECTED_PROFILE} (рекомендация)"
-                return 0
-                ;;
-            skip|s|пропуск|default)
-                NM_SELECTED_PROFILE=""
-                _nm_log "Профиль не применён — используются значения docker-compose.yml"
-                return 0
-                ;;
-            tiny|small|medium|large|xlarge)
-                NM_SELECTED_PROFILE="$answer"
-                _nm_log "Выбран профиль: ${NM_SELECTED_PROFILE}"
-                return 0
-                ;;
-            *)
-                echo "  Не понял «${answer}». Enter = [$recommended], или введите tiny/small/medium/large/xlarge/skip." >&2
-                ;;
-        esac
-    done
+    _nm_log "UI недоступен — применяем рекомендованный профиль: ${recommended}"
+    NM_SELECTED_PROFILE="$recommended"
+    return 0
 }
 
 _nm_env_get() {

@@ -17,18 +17,21 @@ set -Eeuo pipefail
 _nm_port_log() { echo "[$(date +'%F %T')] [http-port] $*"; }
 
 _nm_port_ensure_ui() {
-    if declare -F nm_ui_radiolist >/dev/null 2>&1; then
-        return 0
+    if ! declare -F nm_ui_radiolist >/dev/null 2>&1; then
+        local dir helper
+        dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+        helper="${dir}/ui.sh"
+        if [[ -f "$helper" ]]; then
+            # shellcheck source=deploy/common/ui.sh
+            source "$helper"
+        else
+            return 1
+        fi
     fi
-    local dir helper
-    dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-    helper="${dir}/ui.sh"
-    if [[ -f "$helper" ]]; then
-        # shellcheck source=deploy/common/ui.sh
-        source "$helper"
-        return 0
+    if [[ -z "${NM_UI_BACKEND:-}" ]] && declare -F nm_ui_init >/dev/null 2>&1; then
+        nm_ui_init
     fi
-    return 1
+    return 0
 }
 
 _nm_port_valid() {
@@ -41,19 +44,8 @@ _nm_port_ask_custom() {
     local def="${1:-8080}"
     local answer=""
     while true; do
-        if command -v whiptail >/dev/null 2>&1; then
-            answer="$(whiptail --backtitle "ГеоАтлас" --title "Порт веб-интерфейса" \
-                --inputbox "Введите TCP-порт (1–65535):" 10 50 "$def" \
-                3>&1 1>&2 2>&3)" || answer=""
-        elif declare -F nm_ui_yesno >/dev/null 2>&1; then
-            # text fallback via tty
-            if [[ -r /dev/tty && -w /dev/tty ]]; then
-                printf 'Порт веб-интерфейса [%s]: ' "$def" >/dev/tty
-                read -r answer </dev/tty || answer=""
-            else
-                printf 'Порт веб-интерфейса [%s]: ' "$def" >&2
-                read -r answer || answer=""
-            fi
+        if declare -F nm_ui_inputbox >/dev/null 2>&1; then
+            answer="$(nm_ui_inputbox "Порт веб-интерфейса" "Введите TCP-порт (1–65535):" "$def")" || answer=""
         else
             if [[ -r /dev/tty && -w /dev/tty ]]; then
                 printf 'Порт веб-интерфейса [%s]: ' "$def" >/dev/tty
@@ -69,13 +61,17 @@ _nm_port_ask_custom() {
             echo "$answer"
             return 0
         fi
-        echo "  Некорректный порт «${answer}». Нужно число от 1 до 65535." >&2
+        if declare -F nm_ui_msgbox >/dev/null 2>&1; then
+            nm_ui_msgbox "Порт веб-интерфейса" \
+                "Некорректный порт «${answer}». Нужно число от 1 до 65535." || true
+        else
+            echo "  Некорректный порт «${answer}». Нужно число от 1 до 65535." >&2
+        fi
         def="$answer"
     done
 }
 
 confirm_http_port() {
-    # Уже задан снаружи
     if [[ -n "${HTTP_PORT:-}" ]]; then
         if ! _nm_port_valid "$HTTP_PORT"; then
             _nm_port_log "WARNING: HTTP_PORT=${HTTP_PORT} некорректен — используем 80."
@@ -105,51 +101,19 @@ confirm_http_port() {
 
     _nm_port_ensure_ui || true
     local choice=""
-    local eighty_on=ON p8080_on=OFF p443_on=OFF p8443_on=OFF custom_on=OFF
 
     if declare -F nm_ui_radiolist >/dev/null 2>&1; then
         choice="$(nm_ui_radiolist \
             "Порт веб-интерфейса" \
             "На каком порту открыть UI (nginx)?" \
-            80 "Стандартный HTTP (:80)" "$eighty_on" \
-            8080 "Альтернатива (:8080)" "$p8080_on" \
-            443 "HTTPS-порт без TLS на nginx (:443)" "$p443_on" \
-            8443 "Альтернатива (:8443)" "$p8443_on" \
-            custom "Указать вручную…" "$custom_on")" || choice="80"
-    elif command -v whiptail >/dev/null 2>&1; then
-        choice="$(whiptail --backtitle "ГеоАтлас" --title "Порт веб-интерфейса" \
-            --radiolist "На каком порту открыть UI (nginx)?" 16 70 5 \
             80 "Стандартный HTTP (:80)" ON \
             8080 "Альтернатива (:8080)" OFF \
             443 "HTTPS-порт без TLS на nginx (:443)" OFF \
             8443 "Альтернатива (:8443)" OFF \
-            custom "Указать вручную…" OFF \
-            3>&1 1>&2 2>&3)" || choice="80"
-        choice="${choice//\"/}"
-        choice="${choice%%[[:space:]]*}"
+            custom "Указать вручную…" OFF)" || choice="80"
     else
-        echo "" >&2
-        echo "══════════════════════════════════════════════════════════" >&2
-        echo "  Порт веб-интерфейса" >&2
-        echo "══════════════════════════════════════════════════════════" >&2
-        echo "  [80]     стандартный HTTP" >&2
-        echo "  [8080]   альтернатива" >&2
-        echo "  [443]    порт 443 (TLS на nginx не настраивается)" >&2
-        echo "  [8443]   альтернатива" >&2
-        echo "  [custom] указать вручную" >&2
-        echo "" >&2
-        local answer
-        if [[ -r /dev/tty && -w /dev/tty ]]; then
-            printf 'Ваш выбор [80]: ' >/dev/tty
-            read -r answer </dev/tty || answer=""
-        else
-            printf 'Ваш выбор [80]: ' >&2
-            read -r answer || answer=""
-        fi
-        answer="${answer,,}"
-        answer="${answer//[[:space:]]/}"
-        [[ -z "$answer" ]] && answer="80"
-        choice="$answer"
+        choice="80"
+        _nm_port_log "UI недоступен — HTTP_PORT=80."
     fi
 
     case "${choice}" in
@@ -167,6 +131,10 @@ confirm_http_port() {
     esac
     export HTTP_PORT
     _nm_port_log "Выбран порт веб-интерфейса: ${HTTP_PORT}"
+    if declare -F nm_ui_msgbox >/dev/null 2>&1 && [[ "${NM_UI_BACKEND:-text}" != "text" ]]; then
+        nm_ui_msgbox "Порт веб-интерфейса" \
+            "Веб-интерфейс будет слушать порт ${HTTP_PORT}." || true
+    fi
 }
 
 # Записать HTTP_PORT в .env (не затирая остальные ключи).
