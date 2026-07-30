@@ -131,16 +131,18 @@ func (s *Scheduler) snapshotFeeds() []usecasereputation.Feed {
 func (s *Scheduler) runOnce(ctx context.Context, force bool) usecasereputation.RefreshResult {
 	res := usecasereputation.RefreshResult{
 		Errors: map[string]string{},
+		Counts: map[string]int{},
 	}
 	feeds := s.snapshotFeeds()
 	for _, feed := range feeds {
 		if ctx.Err() != nil {
 			break
 		}
-		status, err := s.fetchOne(ctx, feed, force)
+		status, n, err := s.fetchOne(ctx, feed, force)
 		switch status {
 		case "updated":
 			res.Updated = append(res.Updated, feed.Name)
+			res.Counts[feed.Name] = n
 		case "skipped":
 			res.Skipped = append(res.Skipped, feed.Name)
 		default:
@@ -188,10 +190,10 @@ func (s *Scheduler) pruneObsoleteURLLists(ctx context.Context, feeds []usecasere
 	}
 }
 
-func (s *Scheduler) fetchOne(ctx context.Context, feed usecasereputation.Feed, force bool) (string, error) {
+func (s *Scheduler) fetchOne(ctx context.Context, feed usecasereputation.Feed, force bool) (string, int, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, feed.URL, nil)
 	if err != nil {
-		return "failed", err
+		return "failed", 0, err
 	}
 	req.Header.Set("User-Agent", "network-monitor-reputation/1.0")
 	s.mu.Lock()
@@ -207,25 +209,25 @@ func (s *Scheduler) fetchOne(ctx context.Context, feed usecasereputation.Feed, f
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return "failed", err
+		return "failed", 0, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotModified {
 		slog.Info("reputation feed not modified", "list", feed.Name)
-		return "skipped", nil
+		return "skipped", 0, nil
 	}
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return "failed", fmt.Errorf("HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return "failed", 0, fmt.Errorf("HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 64<<20)) // 64 MiB cap
 	if err != nil {
-		return "failed", err
+		return "failed", 0, err
 	}
 	if looksDeprecatedEmpty(body) {
-		return "failed", fmt.Errorf("feed empty or deprecated (no IPv4 entries)")
+		return "failed", 0, fmt.Errorf("feed empty or deprecated (no IPv4 entries)")
 	}
 
 	format := strings.ToLower(feed.Format)
@@ -234,11 +236,12 @@ func (s *Scheduler) fetchOne(ctx context.Context, feed usecasereputation.Feed, f
 	}
 	ranges, err := reppkg.ParseFeedBody(format, bytes.NewReader(body), feed.Name, feed.Category, "url", time.Now().UTC())
 	if err != nil {
-		return "failed", err
+		return "failed", 0, err
 	}
 
-	if _, err := s.applier.ApplyListRanges(ctx, feed.Name, ranges); err != nil {
-		return "failed", err
+	n, err := s.applier.ApplyListRanges(ctx, feed.Name, ranges)
+	if err != nil {
+		return "failed", 0, err
 	}
 
 	s.mu.Lock()
@@ -250,8 +253,8 @@ func (s *Scheduler) fetchOne(ctx context.Context, feed usecasereputation.Feed, f
 	}
 	s.mu.Unlock()
 
-	slog.Info("reputation feed updated", "list", feed.Name, "ranges", len(ranges))
-	return "updated", nil
+	slog.Info("reputation feed updated", "list", feed.Name, "ranges", n)
+	return "updated", n, nil
 }
 
 func looksDeprecatedEmpty(body []byte) bool {

@@ -336,20 +336,44 @@
       });
       const data = await res.json().catch(function () { return {}; });
       if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
-      const upd = (data.updated || []).length;
+
+      const updated = Array.isArray(data.updated) ? data.updated : [];
+      const skipped = Array.isArray(data.skipped) ? data.skipped : [];
       const failNames = Array.isArray(data.failed) ? data.failed : [];
       const errMap = data.errors && typeof data.errors === 'object' ? data.errors : {};
-      let msg = 'Обновлено: ' + upd;
+      const counts = data.counts && typeof data.counts === 'object' ? data.counts : {};
+
+      const parts = [];
+      if (updated.length) {
+        let totalRanges = 0;
+        const perFeed = updated.map(function (name) {
+          // removed:foo — prune obsolete lists, без counts
+          if (String(name).indexOf('removed:') === 0) {
+            return String(name).slice('removed:'.length) + ' (удалён устаревший)';
+          }
+          const n = Number(counts[name]) || 0;
+          totalRanges += n;
+          return name + ' — ' + NMUI.fmtNumber(n);
+        });
+        parts.push('Обновлено ' + updated.length + ' (диапазонов: ' + NMUI.fmtNumber(totalRanges) + '): ' + perFeed.join('; '));
+      } else {
+        parts.push('Обновлено: 0');
+      }
+      if (skipped.length) {
+        parts.push('без изменений: ' + skipped.length + ' (' + skipped.join(', ') + ')');
+      }
       if (failNames.length) {
         const details = failNames.map(function (name) {
           const why = errMap[name] ? String(errMap[name]) : 'неизвестная ошибка';
           return name + ' — ' + why;
         });
-        msg += ', ошибок: ' + failNames.length + ': ' + details.join('; ');
-        NMUI.toast(msg, 'error', Math.min(20000, 6000 + details.length * 2500));
-      } else {
-        NMUI.toast(msg, 'success');
+        parts.push('ошибок: ' + failNames.length + ': ' + details.join('; '));
       }
+
+      const msg = parts.join('. ');
+      const kind = failNames.length ? 'error' : 'success';
+      const ttl = Math.min(25000, 5000 + (updated.length + failNames.length) * 1200);
+      NMUI.toast(msg, kind, ttl);
       reloadAll();
     } catch (e) {
       NMUI.toast(e.message || String(e), 'error');

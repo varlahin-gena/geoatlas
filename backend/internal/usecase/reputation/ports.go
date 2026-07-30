@@ -51,4 +51,5 @@ type RefreshResult struct {
 	Skipped []string          `json:"skipped"`
 	Failed  []string          `json:"failed"`
 	Errors  map[string]string `json:"errors,omitempty"`
+	Counts  map[string]int    `json:"counts,omitempty"` // число диапазонов по успешно обновлённым фидам
 }
