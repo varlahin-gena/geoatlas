@@ -3,7 +3,12 @@ set -Eeuo pipefail
 
 PROJECT_DIR="/opt/network-monitor"
 REPO_URL="${REPO_URL:-https://github.com/varlahin-gena/network_monitor.git}"
-BRANCH="${BRANCH:-main}"
+if [[ -n "${BRANCH+x}" ]]; then
+    NM_BRANCH_FROM_ENV=1
+else
+    NM_BRANCH_FROM_ENV=0
+    BRANCH="main"
+fi
 
 if [[ -n "${ENABLE_FIREWALL+x}" ]]; then
     NM_FIREWALL_FROM_ENV=1
@@ -25,17 +30,22 @@ print_banner() {
     echo "  ГеоАтлас — интерактивная установка (Oracle Linux)"
     echo "══════════════════════════════════════════════════════════"
     echo "  Каталог : ${PROJECT_DIR}"
-    echo "  Ветка   : ${BRANCH}"
+    if [[ -n "${NM_INSTALL_SOURCE:-}" ]]; then
+        echo "  Источник: ${NM_INSTALL_SOURCE} → ${BRANCH}"
+    else
+        echo "  Ref     : ${BRANCH} (выбор источника — после Docker)"
+    fi
     echo "  Репо    : ${REPO_URL}"
     echo ""
     echo "  Шаги:"
     echo "    1. Пакеты и Docker"
     echo "    2. SELinux"
-    echo "    3. Клонирование репозитория"
-    echo "    4. Выбор модулей"
-    echo "    5. Профиль производительности"
-    echo "    6. Firewall"
-    echo "    7. Запуск стека"
+    echo "    3. Источник (релиз / main)"
+    echo "    4. Клонирование репозитория"
+    echo "    5. Выбор модулей"
+    echo "    6. Профиль производительности"
+    echo "    7. Firewall"
+    echo "    8. Запуск стека"
     echo "══════════════════════════════════════════════════════════"
     echo ""
 }
@@ -100,9 +110,9 @@ _welcome_dialog() {
 "Добро пожаловать в мастер установки.
 
 Каталог: ${PROJECT_DIR}
-Ветка: ${BRANCH}
+Репозиторий: ${REPO_URL}
 
-Сейчас будут установлены зависимости, Docker и выбранные модули." || true
+Далее: выбор релиза или ветки main, зависимости, Docker и модули." || true
         return 0
     fi
     if command -v whiptail >/dev/null 2>&1; then
@@ -110,9 +120,8 @@ _welcome_dialog() {
             --msgbox "Добро пожаловать в мастер установки.
 
 Каталог: ${PROJECT_DIR}
-Ветка: ${BRANCH}
 
-Сейчас будут установлены зависимости и Docker." 14 60 || true
+Далее: выбор релиза или ветки main, зависимости и Docker." 14 60 || true
     fi
 }
 
@@ -228,6 +237,10 @@ configure_firewall() {
 }
 
 clone_or_update_repo() {
+    if declare -F nm_clone_or_update_repo >/dev/null 2>&1; then
+        nm_clone_or_update_repo "$PROJECT_DIR" "$REPO_URL" "$BRANCH" "${NM_INSTALL_IS_TAG:-0}"
+        return
+    fi
     mkdir -p /opt
 
     if [[ -d "$PROJECT_DIR/.git" ]]; then
@@ -239,14 +252,63 @@ clone_or_update_repo() {
             git stash push -u -m "install-$(date +%s)" || true
         fi
 
-        git fetch origin
-        git checkout "$BRANCH"
-        git pull --ff-only origin "$BRANCH"
+        if [[ "${NM_INSTALL_IS_TAG:-0}" == "1" ]]; then
+            git fetch origin --tags --force
+            git checkout --force "$BRANCH"
+        else
+            git fetch origin
+            git checkout "$BRANCH"
+            git pull --ff-only origin "$BRANCH"
+        fi
     else
         log "Cloning repository..."
         git clone -b "$BRANCH" "$REPO_URL" "$PROJECT_DIR"
         cd "$PROJECT_DIR"
     fi
+}
+
+_source_select_source() {
+    local candidates=(
+        "${SCRIPT_DIR}/../common/select_source.sh"
+        "${PROJECT_DIR}/deploy/common/select_source.sh"
+    )
+    local c
+    for c in "${candidates[@]}"; do
+        if [[ -f "$c" ]]; then
+            # shellcheck source=deploy/common/select_source.sh
+            source "$c"
+            return 0
+        fi
+    done
+    local tmp owner
+    if ! command -v curl >/dev/null 2>&1; then
+        return 1
+    fi
+    owner="$(echo "$REPO_URL" | sed -E 's#.*github.com[:/]([^/]+/[^/.]+)(\.git)?$#\1#')"
+    [[ -n "$owner" ]] || owner="varlahin-gena/network_monitor"
+    tmp="$(mktemp)"
+    if curl -fsSL --connect-timeout 10 --max-time 30 \
+        "https://raw.githubusercontent.com/${owner}/main/deploy/common/select_source.sh" \
+        -o "$tmp"; then
+        # shellcheck source=/dev/null
+        source "$tmp"
+        rm -f "$tmp"
+        return 0
+    fi
+    rm -f "$tmp"
+    return 1
+}
+
+choose_install_source() {
+    _ensure_dark_newt
+    _source_ui || true
+    if _source_select_source && declare -F confirm_install_source >/dev/null 2>&1; then
+        confirm_install_source
+        return 0
+    fi
+    log "select_source.sh недоступен — устанавливаем BRANCH=${BRANCH}."
+    NM_INSTALL_SOURCE="${NM_INSTALL_SOURCE:-main}"
+    NM_INSTALL_IS_TAG=0
 }
 
 find_module_helper() {
@@ -310,6 +372,7 @@ prepare_project() {
              deploy/uninstall.sh \
              deploy/common/detect_resources.sh \
              deploy/common/select_modules.sh \
+             deploy/common/select_source.sh \
              deploy/common/ui.sh \
              deploy/common/uninstall.sh \
              deploy/oracle_linux/install_oraclelinux.sh \
@@ -374,6 +437,8 @@ main() {
     _welcome_dialog
     install_docker
     configure_selinux
+    choose_install_source
+    print_banner
     clone_or_update_repo
     _source_ui || true
     prepare_project
