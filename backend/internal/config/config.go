@@ -55,10 +55,11 @@ func DefaultReputationFeeds() []ReputationFeed {
 	}
 }
 
-// RetiredReputationFeedNames — upstream удалён (404) или deprecated; не сидим и вычищаем из JSON.
+// RetiredReputationFeedNames — upstream удалён (404), deprecated или нестабилен; не сидим и вычищаем из JSON.
 var RetiredReputationFeedNames = map[string]struct{}{
 	"cruzit_web_attacks": {}, // firehol cruzit_web_attacks.ipset снят (404)
 	"sslbl":              {}, // FireHOL sslbl.ipset снят; abuse.ch SSLBL IP list deprecated
+	"et_block_official":  {}, // rules.emergingthreats.net часто timeout при fetch
 }
 
 // WithoutRetiredReputationFeeds убирает retired имена; changed=true если что-то отфильтровали.
@@ -104,11 +105,6 @@ func CatalogReputationFeeds() []ReputationFeed {
 			Name:     "blocklist_de_ssh",
 			URL:      "https://lists.blocklist.de/lists/ssh.txt",
 			Category: "attacks", Format: "netset",
-		},
-		{
-			Name:     "et_block_official",
-			URL:      "https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt",
-			Category: "block", Format: "netset",
 		},
 	}
 }

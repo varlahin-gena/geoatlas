@@ -15,6 +15,5 @@ func CatalogFeeds() []Feed {
 		{Name: "feodo_abusech", URL: "https://feodotracker.abuse.ch/downloads/ipblocklist.txt", Category: "c2", Format: "netset"},
 		{Name: "feodo_badips", URL: "https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/feodo_badips.ipset", Category: "c2", Format: "netset"},
 		{Name: "blocklist_de_ssh", URL: "https://lists.blocklist.de/lists/ssh.txt", Category: "attacks", Format: "netset"},
-		{Name: "et_block_official", URL: "https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt", Category: "block", Format: "netset"},
 	}
 }

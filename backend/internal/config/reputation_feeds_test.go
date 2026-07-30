@@ -59,6 +59,9 @@ func TestCatalogReputationFeeds(t *testing.T) {
 		if f.Name == "sslbl_abusech" || strings.Contains(f.URL, "sslipblacklist") {
 			t.Fatalf("deprecated SSLBL IP list in catalog: %+v", f)
 		}
+		if f.Name == "et_block_official" || strings.Contains(f.URL, "emergingthreats.net") {
+			t.Fatalf("unstable et_block_official should not be in catalog: %+v", f)
+		}
 		seen[f.Name] = f.Format
 	}
 	if seen["spamhaus_drop_official"] != "spamhaus_json" {
@@ -74,6 +77,7 @@ func TestWithoutRetiredReputationFeeds(t *testing.T) {
 		{Name: "spamhaus_drop", URL: "https://example.com/a", Category: "drop", Format: "netset"},
 		{Name: "cruzit_web_attacks", URL: "https://example.com/b", Category: "attacks", Format: "netset"},
 		{Name: "sslbl", URL: "https://example.com/c", Category: "c2", Format: "netset"},
+		{Name: "et_block_official", URL: "https://example.com/d", Category: "block", Format: "netset"},
 	}
 	out, changed := WithoutRetiredReputationFeeds(in)
 	if !changed {
