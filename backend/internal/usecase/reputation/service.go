@@ -297,16 +297,16 @@ func (s *Service) Refresh(ctx context.Context, force bool) (RefreshResult, error
 }
 
 // ApplyListRanges пишет один список в CH+индекс (для fetch job).
+// Возвращает число диапазонов этого списка после normalize — не размер всей таблицы.
 func (s *Service) ApplyListRanges(ctx context.Context, listName string, ranges []model.ReputationRange) (int, error) {
-	n, err := s.store.ReplaceList(ctx, listName, ranges)
-	if err != nil {
+	if _, err := s.store.ReplaceList(ctx, listName, ranges); err != nil {
 		return 0, err
 	}
 	if s.index != nil {
 		s.index.ReplaceList(listName, ranges)
 	}
 	s.SetFeedError(listName, "")
-	return n, nil
+	return len(reppkg.NormalizeRanges(ranges)), nil
 }
 
 func (s *Service) Reload(ctx context.Context) error {
