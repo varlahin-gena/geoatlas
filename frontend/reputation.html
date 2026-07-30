@@ -57,8 +57,7 @@
     <h1>Репутация IP</h1>
     <p class="hint">
       URL-фиды хранятся в <code>reputation_feeds.json</code> и обновляются по расписанию.
-      Сиды по умолчанию — зеркала FireHOL (DROP, DShield, Feodo, ET и др.).
-      Официальные источники (Spamhaus JSON, Abuse.ch Feodo, blocklist.de ssh) — в каталоге ниже.
+      Сиды по умолчанию и дополнительные источники — в каталоге ниже (удалённый список можно добавить снова).
       Форматы: <code>netset</code>/<code>plain</code>, <code>spamhaus_json</code>, <code>csv_ip</code>.
       Spamhaus eDROP слит в DROP (2024). SSLBL IP-blacklist на abuse.ch deprecated (2025) —
       удалите <code>sslbl</code>/<code>sslbl_abusech</code>, если остались.
@@ -73,8 +72,8 @@
       <input type="file" id="fileInput" accept=".csv,text/csv,text/plain" hidden />
     </div>
 
-    <h2 class="section-title">Каталог (рекомендуемые)</h2>
-    <p class="hint" style="margin-top:0">Пресеты не активны, пока не нажмёте «Добавить». Затем — «Обновить фиды».</p>
+    <h2 class="section-title">Каталог</h2>
+    <p class="hint" style="margin-top:0">Доступные пресеты (уже активные скрыты). «Добавить», затем — «Обновить фиды».</p>
     <div class="table-wrap">
       <table>
         <thead>

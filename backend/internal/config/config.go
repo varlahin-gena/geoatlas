@@ -81,11 +81,11 @@ func WithoutRetiredReputationFeeds(feeds []ReputationFeed) (out []ReputationFeed
 	return out, changed
 }
 
-// CatalogReputationFeeds — кураторские пресеты (официальные URL, не дублируют FireHOL-сиды).
-// Не входят в DefaultReputationFeeds; добавляются из UI «каталог».
-// sslbl IP blacklist на abuse.ch deprecated 2025-01-03 (пустой файл) — не включаем.
+// CatalogReputationFeeds — пресеты для UI «каталог»: все сиды по умолчанию
+// плюс дополнительные официальные URL. Retired не включаем.
+// Уже активные фиды UI скрывает сам — так удалённый список можно добавить снова.
 func CatalogReputationFeeds() []ReputationFeed {
-	return []ReputationFeed{
+	extras := []ReputationFeed{
 		{
 			Name:     "spamhaus_drop_official",
 			URL:      "https://www.spamhaus.org/drop/drop_v4.json",
@@ -107,6 +107,19 @@ func CatalogReputationFeeds() []ReputationFeed {
 			Category: "attacks", Format: "netset",
 		},
 	}
+	seen := map[string]struct{}{}
+	out := make([]ReputationFeed, 0, len(DefaultReputationFeeds())+len(extras))
+	for _, f := range append(append([]ReputationFeed{}, DefaultReputationFeeds()...), extras...) {
+		if _, retired := RetiredReputationFeedNames[f.Name]; retired {
+			continue
+		}
+		if _, ok := seen[f.Name]; ok {
+			continue
+		}
+		seen[f.Name] = struct{}{}
+		out = append(out, f)
+	}
+	return out
 }
 
 type Config struct {

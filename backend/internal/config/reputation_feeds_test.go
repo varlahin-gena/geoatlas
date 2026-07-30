@@ -70,6 +70,15 @@ func TestCatalogReputationFeeds(t *testing.T) {
 	if _, ok := seen["feodo_abusech"]; !ok {
 		t.Fatal("missing feodo_abusech")
 	}
+	// Default seeds must be re-installable from catalog after delete.
+	for _, need := range []string{
+		"blocklist_de", "spamhaus_drop", "dshield", "feodo",
+		"et_block", "ciarmy", "greensnow", "et_compromised", "bruteforceblocker",
+	} {
+		if _, ok := seen[need]; !ok {
+			t.Fatalf("missing default seed in catalog: %s", need)
+		}
+	}
 }
 
 func TestWithoutRetiredReputationFeeds(t *testing.T) {

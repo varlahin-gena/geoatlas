@@ -1,5 +1,7 @@
 package reputation
 
+import "network_monitor/internal/config"
+
 // Feed is the application DTO for a URL-backed reputation list.
 type Feed struct {
 	Name     string `json:"name"`
@@ -8,12 +10,15 @@ type Feed struct {
 	Format   string `json:"format"`
 }
 
-// CatalogFeeds returns curated feed presets shown by the API.
+// CatalogFeeds returns installable presets for the UI catalog
+// (default seeds + curated extras; retired excluded).
 func CatalogFeeds() []Feed {
-	return []Feed{
-		{Name: "spamhaus_drop_official", URL: "https://www.spamhaus.org/drop/drop_v4.json", Category: "drop", Format: "spamhaus_json"},
-		{Name: "feodo_abusech", URL: "https://feodotracker.abuse.ch/downloads/ipblocklist.txt", Category: "c2", Format: "netset"},
-		{Name: "feodo_badips", URL: "https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/feodo_badips.ipset", Category: "c2", Format: "netset"},
-		{Name: "blocklist_de_ssh", URL: "https://lists.blocklist.de/lists/ssh.txt", Category: "attacks", Format: "netset"},
+	src := config.CatalogReputationFeeds()
+	out := make([]Feed, 0, len(src))
+	for _, f := range src {
+		out = append(out, Feed{
+			Name: f.Name, URL: f.URL, Category: f.Category, Format: f.Format,
+		})
 	}
+	return out
 }
