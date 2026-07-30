@@ -51,7 +51,18 @@ func (r *ReputationRepository) ReplaceList(ctx context.Context, listName string,
 	}
 	kept = append(kept, ranges...)
 	kept = reputation.NormalizeRanges(kept)
-	return ReplaceReputationRanges(ctx, r.writeCH, kept)
+	if _, err := ReplaceReputationRanges(ctx, r.writeCH, kept); err != nil {
+		return 0, err
+	}
+	// Возвращаем число диапазонов именно этого списка (после normalize),
+	// а не размер всей таблицы — иначе toast refresh показывает одно число на все фиды.
+	n := 0
+	for _, x := range kept {
+		if x.ListName == listName {
+			n++
+		}
+	}
+	return n, nil
 }
 
 func (r *ReputationRepository) DeleteList(ctx context.Context, listName string) error {

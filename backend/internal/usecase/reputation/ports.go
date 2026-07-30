@@ -11,6 +11,7 @@ import (
 type RangeStore interface {
 	Load(ctx context.Context) ([]model.ReputationRange, error)
 	ReplaceAll(ctx context.Context, ranges []model.ReputationRange) (int, error)
+	// ReplaceList заменяет один список; int — число диапазонов этого списка после записи.
 	ReplaceList(ctx context.Context, listName string, ranges []model.ReputationRange) (int, error)
 	DeleteList(ctx context.Context, listName string) error
 	ListMeta(ctx context.Context) ([]model.ReputationListMeta, error)
