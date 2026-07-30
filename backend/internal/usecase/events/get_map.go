@@ -85,6 +85,8 @@ func (s *Service) GetMap(ctx context.Context, in GetMapInput) (GetMapResult, err
 }
 
 func enrichMapReputation(lines []model.Line, points map[string]model.Node, rep ReputationLookuper) {
+	// true nil only — typed-nil (*T)(nil) в interface не ловится; composition root
+	// обязан передавать настоящий nil (см. wire_http) либо nil-safe Lookup.
 	if rep == nil {
 		return
 	}

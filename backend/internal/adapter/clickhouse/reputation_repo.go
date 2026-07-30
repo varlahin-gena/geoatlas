@@ -83,6 +83,15 @@ func NewReloadableReputationIndex(ch clickhouse.Conn) *ReloadableReputationIndex
 	return &ReloadableReputationIndex{Index: reputation.New(), ch: ch}
 }
 
+// Lookup перекрывает promoted *reputation.Index.Lookup, чтобы typed-nil
+// *ReloadableReputationIndex в ReputationLookuper не паниковал.
+func (i *ReloadableReputationIndex) Lookup(ipStr string) []model.ReputationHit {
+	if i == nil || i.Index == nil {
+		return nil
+	}
+	return i.Index.Lookup(ipStr)
+}
+
 func (i *ReloadableReputationIndex) Reload(ctx context.Context) error {
 	if i == nil || i.Index == nil {
 		return nil

@@ -19,7 +19,13 @@ import (
 func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, parsers *parser.Registry) *httpapi.Server {
 	trafficRepo := chadapter.NewTrafficRepository(a.pools.API)
 	geoRepo := chadapter.NewGeoRepository(a.pools.API, a.pools.Ingest)
-	eventsUC := usecaseevents.New(trafficRepo, bg.geo, bg.repIdx)
+	// Не передавать typed-nil *ReloadableReputationIndex в ReputationLookuper:
+	// interface!=nil при dyn=nil → enrichMapReputation падает на Lookup.
+	var repLookuper usecaseevents.ReputationLookuper
+	if bg.repIdx != nil {
+		repLookuper = bg.repIdx
+	}
+	eventsUC := usecaseevents.New(trafficRepo, bg.geo, repLookuper)
 	geoUC := usecasegeo.New(geoRepo, trafficRepo, bg.geo, a.geoJobs, geoipcodec.New())
 	parseErrorsUC := parseerrors.New(chadapter.NewParseErrorRepository(a.pools.API, a.pools.Ingest))
 	parseTestAdapter := parseradapter.NewParseTest(parsers)

@@ -92,3 +92,43 @@ func TestGetMapFallsBackWhenGeoEmpty(t *testing.T) {
 		t.Fatalf("source=%q want ip_live_city", out.Source)
 	}
 }
+
+// typedNilRep mimics wire passing (*T)(nil) into ReputationLookuper.
+type typedNilRep struct{}
+
+func (t *typedNilRep) Lookup(ipStr string) []model.ReputationHit {
+	if t == nil {
+		return nil
+	}
+	return []model.ReputationHit{{List: "x", Category: "y"}}
+}
+
+func TestGetMapIPModeWithTypedNilReputation(t *testing.T) {
+	repo := &stubRepo{
+		raws: []model.RawAgg{{
+			SrcIP: "1.1.1.1", DstIP: "8.8.8.8", Count: 5, AllowedCnt: 5,
+		}},
+	}
+	geo := stubGeo{
+		"1.1.1.1": {Found: true, Lat: 1, Lon: 1, City: "S", Country: "AU"},
+		"8.8.8.8": {Found: true, Lat: 2, Lon: 2, City: "M", Country: "US"},
+	}
+	var nilRep *typedNilRep
+	var lookuper ReputationLookuper = nilRep
+	if lookuper == nil {
+		t.Fatal("typed nil must not compare equal to nil interface")
+	}
+	uc := New(repo, geo, lookuper)
+	out, err := uc.GetMap(context.Background(), GetMapInput{
+		TimeRange: model.TimeRange{Mode: "hours", Amount: 6},
+		GroupBy:   "ip",
+		Filter:    "all",
+		Timeout:   time.Minute,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Lines) == 0 {
+		t.Fatal("expected lines")
+	}
+}
