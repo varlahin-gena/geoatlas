@@ -90,6 +90,7 @@
       return null;
     }
     global.__nmReputationEnabled = user.reputationEnabled !== false;
+    global.__nmUIAuthEnabled = !user.authDisabled;
     applyAdminVisibility(user);
     return user;
   }
@@ -111,14 +112,14 @@
       if (isAdmin) el.style.removeProperty('display');
       else el.style.display = 'none';
     });
-    applyReputationVisibility(user);
-    return isAdmin;
-  }
-
-  function applyReputationVisibility(user) {
-    const enabled = !user || user.reputationEnabled !== false;
+    const reputationEnabled = !user || user.reputationEnabled !== false;
+    const uiAuthEnabled = !user || !user.authDisabled;
     document.querySelectorAll('[data-reputation-only]').forEach((el) => {
-      if (enabled) el.style.removeProperty('display');
+      if (reputationEnabled) el.style.removeProperty('display');
+      else el.style.display = 'none';
+    });
+    document.querySelectorAll('[data-auth-only]').forEach((el) => {
+      if (uiAuthEnabled) el.style.removeProperty('display');
       else el.style.display = 'none';
     });
     const sidebar = document.getElementById('adminSidebar');
@@ -128,13 +129,18 @@
       global.NMUI &&
       typeof global.NMUI.mountAdminSidebar === 'function'
     ) {
-      const isAdmin = !user || user.authDisabled || user.role === ROLE_ADMIN;
       global.NMUI.mountAdminSidebar(undefined, {
         isAdmin: isAdmin,
-        reputationEnabled: enabled,
+        reputationEnabled: reputationEnabled,
+        uiAuthEnabled: uiAuthEnabled,
       });
     }
-    return enabled;
+    return isAdmin;
+  }
+
+  function applyReputationVisibility(user) {
+    applyAdminVisibility(user);
+    return !user || user.reputationEnabled !== false;
   }
 
   function csrfToken() {

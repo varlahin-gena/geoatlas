@@ -13,6 +13,23 @@ import (
 	"network_monitor/internal/config"
 )
 
+func TestUsersListDisabledWhenAuthModuleOff(t *testing.T) {
+	h := &UsersHandler{Deps: &Deps{cfg: config.Config{AuthDisabled: true}}}
+	req := httptest.NewRequest(http.MethodGet, "/api/users", nil)
+	rec := httptest.NewRecorder()
+	h.List(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503", rec.Code)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("json: %v", err)
+	}
+	if body["error"] != "auth module disabled" {
+		t.Fatalf("error = %v", body["error"])
+	}
+}
+
 func TestHealthWithoutClickHouse(t *testing.T) {
 	h := &HealthHandler{Deps: &Deps{
 		cfg: config.Config{QueryTimeout: time.Minute},

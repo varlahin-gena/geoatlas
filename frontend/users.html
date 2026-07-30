@@ -301,6 +301,10 @@ $('createForm').addEventListener('submit', async (e) => {
   });
   me = await NMAuth.requireLogin({ admin: true });
   if (!me) return;
+  if (me.authDisabled) {
+    location.replace('/index.html');
+    return;
+  }
   NMAuth.renderUserBar(me, bar.userBarHost);
   NMUI.startSystemHealthPolling({ isAdmin: true });
   load();

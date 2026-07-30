@@ -313,7 +313,18 @@ func (h *AuthHandler) bearerScopeOK(r *http.Request, need string) bool {
 
 // --- Users CRUD (admin) ---
 
+func (h *UsersHandler) authModuleDisabled(w http.ResponseWriter) bool {
+	if h != nil && h.Deps != nil && h.cfg.AuthDisabled {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "auth module disabled"})
+		return true
+	}
+	return false
+}
+
 func (h *UsersHandler) List(w http.ResponseWriter, r *http.Request) {
+	if h.authModuleDisabled(w) {
+		return
+	}
 	if h.authUC == nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "auth not configured"})
 		return
@@ -327,6 +338,9 @@ func (h *UsersHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UsersHandler) Create(w http.ResponseWriter, r *http.Request) {
+	if h.authModuleDisabled(w) {
+		return
+	}
 	if h.authUC == nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "auth not configured"})
 		return
@@ -357,6 +371,9 @@ func (h *UsersHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UsersHandler) SetRole(w http.ResponseWriter, r *http.Request) {
+	if h.authModuleDisabled(w) {
+		return
+	}
 	if h.authUC == nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "auth not configured"})
 		return
@@ -378,6 +395,9 @@ func (h *UsersHandler) SetRole(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UsersHandler) SetFullName(w http.ResponseWriter, r *http.Request) {
+	if h.authModuleDisabled(w) {
+		return
+	}
 	if h.authUC == nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "auth not configured"})
 		return
@@ -399,6 +419,9 @@ func (h *UsersHandler) SetFullName(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UsersHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	if h.authModuleDisabled(w) {
+		return
+	}
 	if h.authUC == nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "auth not configured"})
 		return
@@ -428,6 +451,9 @@ func (h *UsersHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UsersHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	if h.authModuleDisabled(w) {
+		return
+	}
 	if h.authUC == nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "auth not configured"})
 		return

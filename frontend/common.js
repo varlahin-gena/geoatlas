@@ -138,6 +138,7 @@
       href: '/users.html',
       label: 'Пользователи',
       adminOnly: true,
+      requiresUIAuth: true,
       icon:
         ICON +
         '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>' +
@@ -254,6 +255,14 @@
     } else {
       reputationEnabled = true;
     }
+    var uiAuthEnabled;
+    if (opts && typeof opts.uiAuthEnabled === 'boolean') {
+      uiAuthEnabled = opts.uiAuthEnabled;
+    } else if (typeof global.__nmUIAuthEnabled === 'boolean') {
+      uiAuthEnabled = global.__nmUIAuthEnabled;
+    } else {
+      uiAuthEnabled = true;
+    }
     var html =
       '<div class="sidebar-header">' +
       '<img class="logo" src="/logo.png" alt="" width="28" height="28" aria-hidden="true" />' +
@@ -266,6 +275,7 @@
       var item = PAGE_NAV[i];
       if (item.adminOnly && !isAdmin) continue;
       if (item.requiresReputation && !reputationEnabled) continue;
+      if (item.requiresUIAuth && !uiAuthEnabled) continue;
       var active = isNavActive(item, path);
       html +=
         '<a href="' +
