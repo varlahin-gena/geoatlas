@@ -2,6 +2,7 @@ package events
 
 import (
 	"context"
+	"reflect"
 	"time"
 
 	"network_monitor/internal/mapagg"
@@ -84,10 +85,23 @@ func (s *Service) GetMap(ctx context.Context, in GetMapInput) (GetMapResult, err
 	return out, nil
 }
 
-func enrichMapReputation(lines []model.Line, points map[string]model.Node, rep ReputationLookuper) {
-	// true nil only — typed-nil (*T)(nil) в interface не ловится; composition root
-	// обязан передавать настоящий nil (см. wire_http) либо nil-safe Lookup.
+// reputationLookuperNil — true для nil interface и typed-nil (*T)(nil) в interface.
+// Обычный `rep == nil` typed-nil не ловит → Lookup паникует на promoted-методах.
+func reputationLookuperNil(rep ReputationLookuper) bool {
 	if rep == nil {
+		return true
+	}
+	v := reflect.ValueOf(rep)
+	switch v.Kind() {
+	case reflect.Ptr, reflect.Interface, reflect.Map, reflect.Slice, reflect.Func, reflect.Chan:
+		return v.IsNil()
+	default:
+		return false
+	}
+}
+
+func enrichMapReputation(lines []model.Line, points map[string]model.Node, rep ReputationLookuper) {
+	if reputationLookuperNil(rep) {
 		return
 	}
 	cache := map[string][]model.ReputationHit{}

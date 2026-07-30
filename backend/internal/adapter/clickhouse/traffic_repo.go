@@ -2,6 +2,7 @@ package clickhouse
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	ch "github.com/ClickHouse/clickhouse-go/v2"
@@ -26,7 +27,10 @@ var _ events.TrafficRepository = (*TrafficRepository)(nil)
 func (r *TrafficRepository) ScanMapAggs(ctx context.Context, tr model.TimeRange, groupBy string, limit int, filter string, timeout time.Duration) (events.MapAggScanResult, error) {
 	geoRows, ok, err := query.ScanGeoEdgesForTimeRange(ctx, r.apiCH, tr, groupBy, limit, filter, timeout)
 	if err != nil {
-		return events.MapAggScanResult{}, err
+		// Не роняем /api/events: pre-agg/лог-geo могут быть ещё не готовы при старте.
+		slog.Warn("ScanMapAggs: geo edges scan failed, falling back to raw IP pairs",
+			"group_by", groupBy, "err", err)
+		ok = false
 	}
 	if ok {
 		lines, _, _ := mapagg.BuildMapFromGeoEdges(geoRows)

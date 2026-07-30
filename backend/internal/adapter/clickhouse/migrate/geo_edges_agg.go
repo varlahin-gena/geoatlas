@@ -89,6 +89,13 @@ func RefreshGeoEdgesAggReady(ctx context.Context, ch clickhouse.Conn) error {
 
 func geoEdgesAggReady(ctx context.Context, ch clickhouse.Conn, groupBy string) (bool, error) {
 	table := sqlclause.GeoEdgesTable(groupBy)
+	exists, err := tableExists(ctx, ch, table)
+	if err != nil {
+		return false, err
+	}
+	if !exists {
+		return false, nil
+	}
 	rawRows, err := countTableRows(ctx, ch, "traffic_logs")
 	if err != nil {
 		return false, err

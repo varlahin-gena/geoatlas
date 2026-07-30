@@ -33,6 +33,11 @@ func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backg
 		slog.Warn("geo index not loaded", "err", err)
 	}
 
+	// Schema для /api/events до HTTP: иначе city/days бьётся о missing columns/tables.
+	if err := migrate.EnsureGeoEdgesAggSchema(ctx, a.pools.Background); err != nil {
+		slog.Warn("geo edges agg schema ensure (early) failed", "err", err)
+	}
+
 	var repIdx *chadapter.ReloadableReputationIndex
 	var repUC *usecasereputation.Service
 	if cfg.ReputationFetchEnabled {

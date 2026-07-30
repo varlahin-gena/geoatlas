@@ -129,6 +129,9 @@ func findContainingRangeLocked(ranges []model.GeoRange, ip uint32) (model.GeoRan
 }
 
 func (i *Index) Lookup(ipStr string) model.GeoLookup {
+	if i == nil {
+		return model.GeoLookup{Country: "Неизвестно"}
+	}
 	parsed := net.ParseIP(strings.TrimSpace(ipStr))
 	v4 := parsed.To4()
 	if v4 == nil {

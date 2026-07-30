@@ -83,7 +83,11 @@ func (i *Index) Snapshot() []model.ReputationRange {
 
 // Lookup возвращает все хиты (разные list/category) для публичного IPv4.
 // Частные/спец. адреса (RFC1918, loopback, CGNAT и т.п.) всегда без хитов.
+// Nil-receiver безопасен (typed-nil в interface / выключенный модуль).
 func (i *Index) Lookup(ipStr string) []model.ReputationHit {
+	if i == nil {
+		return nil
+	}
 	parsed := net.ParseIP(strings.TrimSpace(ipStr))
 	v4 := parsed.To4()
 	if v4 == nil {

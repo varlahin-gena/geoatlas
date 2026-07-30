@@ -14,9 +14,9 @@ import (
 )
 
 // ScanGeoEdgesForTimeRange читает рёбра, свёрнутые по city|country|ip|subnet.
-// city/country + days → pre-agg таблицы; ip/subnet и minutes/hours/absolute →
-// GROUP BY geo-колонок traffic_logs (без O(n) GeoIP в Go).
-// (nil, false, nil) — нужен fallback на live IP-путь.
+// city/country + days → pre-agg таблицы при готовности, иначе GROUP BY geo из traffic_logs;
+// ip/subnet и minutes/hours/absolute → GROUP BY geo-колонок traffic_logs (без O(n) GeoIP в Go).
+// (nil, false, nil) — нужен fallback на live IP-путь (редкий default).
 func ScanGeoEdgesForTimeRange(
 	ctx context.Context,
 	ch clickhouse.Conn,
@@ -45,20 +45,23 @@ func ScanGeoEdgesForTimeRange(
 			}
 			return rows, true, nil
 		}
-		if !aggstate.PreferGeoEdgesAgg() {
-			return nil, false, nil
+		// city|country: pre-agg если готов; иначе / при ошибке / пусто — GROUP BY geo из traffic_logs
+		// (не (nil,false) → тяжёлый GROUP BY src_ip,dst_ip, который OOM'ит на больших объёмах).
+		if aggstate.PreferGeoEdgesAgg() {
+			table := sqlclause.GeoEdgesTable(groupBy)
+			if table != "" {
+				rows, err := scanGeoEdgesDays(ctx, ch, table, tr.Amount, limit, filter, timeout)
+				if err != nil {
+					slog.Warn("geo edges daily scan failed, falling back to traffic_logs",
+						"group_by", groupBy, "err", err)
+				} else if len(rows) > 0 {
+					return rows, true, nil
+				}
+			}
 		}
-		table := sqlclause.GeoEdgesTable(groupBy)
-		if table == "" {
-			return nil, false, nil
-		}
-		rows, err := scanGeoEdgesDays(ctx, ch, table, tr.Amount, limit, filter, timeout)
+		rows, err := scanGeoFromLogsRelative(ctx, ch, groupBy, "days", tr.Amount, limit, filter, timeout)
 		if err != nil {
 			return nil, false, err
-		}
-		// Пустая pre-agg таблица → (nil, false): handler уйдёт в live IP fallback.
-		if len(rows) == 0 {
-			return nil, false, nil
 		}
 		return rows, true, nil
 	case "minutes", "hours":

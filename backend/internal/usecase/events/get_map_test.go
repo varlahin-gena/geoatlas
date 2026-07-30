@@ -94,12 +94,11 @@ func TestGetMapFallsBackWhenGeoEmpty(t *testing.T) {
 }
 
 // typedNilRep mimics wire passing (*T)(nil) into ReputationLookuper.
-type typedNilRep struct{}
+// Lookup намеренно НЕ nil-safe: enrichment должен отсечь typed-nil до вызова.
+type typedNilRep struct{ marker int }
 
 func (t *typedNilRep) Lookup(ipStr string) []model.ReputationHit {
-	if t == nil {
-		return nil
-	}
+	_ = t.marker // panic if called on typed-nil
 	return []model.ReputationHit{{List: "x", Category: "y"}}
 }
 
@@ -127,5 +126,10 @@ func TestGetMapIPModeWithTypedNilReputation(t *testing.T) {
 	}
 	if len(out.Lines) == 0 {
 		t.Fatal("expected lines")
+	}
+	for _, ln := range out.Lines {
+		if len(ln.SrcReputation) != 0 || len(ln.DstReputation) != 0 {
+			t.Fatalf("typed-nil lookuper must skip enrich, got %#v", ln)
+		}
 	}
 }
