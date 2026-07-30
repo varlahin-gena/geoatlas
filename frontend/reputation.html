@@ -337,8 +337,19 @@
       const data = await res.json().catch(function () { return {}; });
       if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
       const upd = (data.updated || []).length;
-      const fail = (data.failed || []).length;
-      NMUI.toast('Обновлено: ' + upd + (fail ? ', ошибок: ' + fail : ''), fail ? 'error' : 'success');
+      const failNames = Array.isArray(data.failed) ? data.failed : [];
+      const errMap = data.errors && typeof data.errors === 'object' ? data.errors : {};
+      let msg = 'Обновлено: ' + upd;
+      if (failNames.length) {
+        const details = failNames.map(function (name) {
+          const why = errMap[name] ? String(errMap[name]) : 'неизвестная ошибка';
+          return name + ' — ' + why;
+        });
+        msg += ', ошибок: ' + failNames.length + ': ' + details.join('; ');
+        NMUI.toast(msg, 'error', Math.min(20000, 6000 + details.length * 2500));
+      } else {
+        NMUI.toast(msg, 'success');
+      }
       reloadAll();
     } catch (e) {
       NMUI.toast(e.message || String(e), 'error');
