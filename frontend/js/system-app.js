@@ -1081,6 +1081,7 @@ document.addEventListener('nm-theme-change', function () {
 window.addEventListener('load', async function () {
     const user = await NMAuth.requireLogin({ admin: true });
     if (!user) return;
+    NMAuth.applyAdminVisibility(user);
     NMAuth.renderUserBar(user, document.getElementById('userBarHost'));
     initTabs();
     initCharts();

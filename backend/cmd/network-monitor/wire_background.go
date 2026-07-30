@@ -20,10 +20,10 @@ import (
 
 // backgroundParts — индексы/UC, нужные ingest и HTTP после wireBackground.
 type backgroundParts struct {
-	geo          *chadapter.ReloadableGeoIndex
-	repIdx       *chadapter.ReloadableReputationIndex
-	repUC        *usecasereputation.Service
-	retentionUC  *usecaseretention.Service
+	geo         *chadapter.ReloadableGeoIndex
+	repIdx      *chadapter.ReloadableReputationIndex
+	repUC       *usecasereputation.Service
+	retentionUC *usecaseretention.Service
 }
 
 func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backgroundParts {
@@ -33,27 +33,34 @@ func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backg
 		slog.Warn("geo index not loaded", "err", err)
 	}
 
-	repIdx := chadapter.NewReloadableReputationIndex(a.pools.Background)
-	repRepo := chadapter.NewReputationRepository(a.pools.API, a.pools.Ingest)
-	repFeedStore := reputationfeedsfile.New(cfg.ReputationFeedsFile)
-	repFeeds, err := repFeedStore.LoadOrSeed(reputationFeedsFromConfig(cfg.ReputationFeeds))
-	if err != nil {
-		slog.Warn("reputation feeds file load/seed failed", "err", err, "path", cfg.ReputationFeedsFile)
-		repFeeds = reputationFeedsFromConfig(cfg.ReputationFeeds)
-		if len(repFeeds) == 0 {
-			repFeeds = reputationFeedsFromConfig(config.DefaultReputationFeeds())
+	var repIdx *chadapter.ReloadableReputationIndex
+	var repUC *usecasereputation.Service
+	if cfg.ReputationFetchEnabled {
+		repIdx = chadapter.NewReloadableReputationIndex(a.pools.Background)
+		repRepo := chadapter.NewReputationRepository(a.pools.API, a.pools.Ingest)
+		repFeedStore := reputationfeedsfile.New(cfg.ReputationFeedsFile)
+		repFeeds, err := repFeedStore.LoadOrSeed(reputationFeedsFromConfig(cfg.ReputationFeeds))
+		if err != nil {
+			slog.Warn("reputation feeds file load/seed failed", "err", err, "path", cfg.ReputationFeedsFile)
+			repFeeds = reputationFeedsFromConfig(cfg.ReputationFeeds)
+			if len(repFeeds) == 0 {
+				repFeeds = reputationFeedsFromConfig(config.DefaultReputationFeeds())
+			}
+		} else {
+			slog.Info("reputation feeds loaded", "count", len(repFeeds), "path", cfg.ReputationFeedsFile)
+		}
+		repUC = usecasereputation.New(repRepo, repIdx, usecasereputation.DefaultCodec{}, nil, repFeedStore)
+		a.repJobs = reputationjob.New(repFeeds, cfg.ReputationFetchInterval, true, repUC)
+		repUC.SetRefresher(a.repJobs)
+		if err := migrate.EnsureReputationRanges(ctx, a.pools.Background); err != nil {
+			slog.Warn("reputation_ranges ensure (early) failed", "err", err)
+		}
+		if err := repIdx.Reload(ctx); err != nil {
+			slog.Warn("reputation index not loaded", "err", err)
 		}
 	} else {
-		slog.Info("reputation feeds loaded", "count", len(repFeeds), "path", cfg.ReputationFeedsFile)
-	}
-	repUC := usecasereputation.New(repRepo, repIdx, usecasereputation.DefaultCodec{}, nil, repFeedStore)
-	a.repJobs = reputationjob.New(repFeeds, cfg.ReputationFetchInterval, cfg.ReputationFetchEnabled, repUC)
-	repUC.SetRefresher(a.repJobs)
-	if err := migrate.EnsureReputationRanges(ctx, a.pools.Background); err != nil {
-		slog.Warn("reputation_ranges ensure (early) failed", "err", err)
-	}
-	if err := repIdx.Reload(ctx); err != nil {
-		slog.Warn("reputation index not loaded", "err", err)
+		slog.Info("reputation module disabled (REPUTATION_FETCH_ENABLED=false)")
+		a.repJobs = nil
 	}
 
 	retentionUC := usecaseretention.New(
@@ -70,6 +77,7 @@ func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backg
 		}, bootstrap.Options{
 			SkipStartupBackfill:     cfg.SkipStartupBackfill,
 			GeoBackfillLookbackDays: cfg.GeoBackfillLookbackDays,
+			ReputationEnabled:       cfg.ReputationFetchEnabled,
 			Timeout:                 6 * time.Hour,
 		}, func(msg string, err error) {
 			slog.Warn(msg, "err", err)

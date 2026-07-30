@@ -129,6 +129,7 @@
       href: '/reputation.html',
       label: 'Репутация IP',
       adminOnly: true,
+      requiresReputation: true,
       icon:
         ICON +
         '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
@@ -239,12 +240,20 @@
   /**
    * HTML бокового меню навигации.
    * @param {string} [pathname]
-   * @param {{ isAdmin?: boolean }} [opts]
+   * @param {{ isAdmin?: boolean, reputationEnabled?: boolean }} [opts]
    * @returns {string}
    */
   function buildAdminSidebarHtml(pathname, opts) {
     var path = pathname || (typeof location !== 'undefined' ? location.pathname : '/');
     var isAdmin = !opts || opts.isAdmin !== false;
+    var reputationEnabled;
+    if (opts && typeof opts.reputationEnabled === 'boolean') {
+      reputationEnabled = opts.reputationEnabled;
+    } else if (typeof global.__nmReputationEnabled === 'boolean') {
+      reputationEnabled = global.__nmReputationEnabled;
+    } else {
+      reputationEnabled = true;
+    }
     var html =
       '<div class="sidebar-header">' +
       '<img class="logo" src="/logo.png" alt="" width="28" height="28" aria-hidden="true" />' +
@@ -256,6 +265,7 @@
     for (var i = 0; i < PAGE_NAV.length; i++) {
       var item = PAGE_NAV[i];
       if (item.adminOnly && !isAdmin) continue;
+      if (item.requiresReputation && !reputationEnabled) continue;
       var active = isNavActive(item, path);
       html +=
         '<a href="' +
@@ -293,6 +303,8 @@
   function mountAdminSidebar(pathname, opts) {
     var layout = ensureAdminLayout();
     if (!layout.sidebar) return layout;
+
+    layout.sidebar.setAttribute('data-nm-dynamic-nav', '1');
 
     if (readSidebarCollapsed()) {
       layout.app.classList.add('sidebar-collapsed');

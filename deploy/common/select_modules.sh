@@ -9,15 +9,17 @@
 #
 # Переменные окружения (CI / без TTY):
 #   NM_AUTO_MODULES=1              — принять все модули по умолчанию (вкл.)
-#   NM_MODULES=auth,syslog,stats   — явный список (через запятую); пусто = только ядро
+#   NM_MODULES=auth,syslog,stats,reputation — явный список (через запятую); пусто = только ядро
 #   NM_ENABLE_AUTH=0|1             — UI-авторизация (логин / роли)
 #   NM_ENABLE_API_AUTH=0|1         — Bearer-токен для мутирующих API
 #   NM_ENABLE_SYSLOG=0|1           — контейнер syslog-ng
 #   NM_ENABLE_STATS=0|1            — контейнер stats-collector
+#   NM_ENABLE_REPUTATION=0|1       — модуль репутации IP (API, UI, фиды)
 #   NM_UI=yad|whiptail|dialog|text — бэкенд диалогов
 #
 # После confirm_modules доступны:
-#   NM_MODULE_AUTH, NM_MODULE_API_AUTH, NM_MODULE_SYSLOG, NM_MODULE_STATS  (0|1)
+#   NM_MODULE_AUTH, NM_MODULE_API_AUTH, NM_MODULE_SYSLOG, NM_MODULE_STATS,
+#   NM_MODULE_REPUTATION  (0|1)
 #   NM_COMPOSE_PROFILES  — строка для COMPOSE_PROFILES в .env
 
 set -Eeuo pipefail
@@ -98,6 +100,7 @@ _nm_mod_parse_list() {
     NM_MODULE_API_AUTH=0
     NM_MODULE_SYSLOG=0
     NM_MODULE_STATS=0
+    NM_MODULE_REPUTATION=0
     IFS=',' read -ra parts <<<"$raw"
     for part in "${parts[@]}"; do
         part="${part,,}"
@@ -108,11 +111,13 @@ _nm_mod_parse_list() {
             api-auth|api_auth|api) NM_MODULE_API_AUTH=1 ;;
             syslog|syslog-ng|ingest) NM_MODULE_SYSLOG=1 ;;
             stats|stats-collector|monitoring|system) NM_MODULE_STATS=1 ;;
+            reputation|rep|reputation-ip|reputation_ip) NM_MODULE_REPUTATION=1 ;;
             all)
                 NM_MODULE_AUTH=1
                 NM_MODULE_API_AUTH=1
                 NM_MODULE_SYSLOG=1
                 NM_MODULE_STATS=1
+                NM_MODULE_REPUTATION=1
                 ;;
             core|none) ;;
             *)
@@ -127,6 +132,7 @@ _nm_mod_set_defaults() {
     NM_MODULE_API_AUTH="${NM_MODULE_API_AUTH:-1}"
     NM_MODULE_SYSLOG="${NM_MODULE_SYSLOG:-1}"
     NM_MODULE_STATS="${NM_MODULE_STATS:-1}"
+    NM_MODULE_REPUTATION="${NM_MODULE_REPUTATION:-1}"
 }
 
 _nm_mod_from_env_flags() {
@@ -143,6 +149,9 @@ _nm_mod_from_env_flags() {
     if [[ -n "${NM_ENABLE_STATS:-}" ]]; then
         _nm_mod_truthy "$NM_ENABLE_STATS" && NM_MODULE_STATS=1 || NM_MODULE_STATS=0
     fi
+    if [[ -n "${NM_ENABLE_REPUTATION:-}" ]]; then
+        _nm_mod_truthy "$NM_ENABLE_REPUTATION" && NM_MODULE_REPUTATION=1 || NM_MODULE_REPUTATION=0
+    fi
 }
 
 _nm_mod_build_compose_profiles() {
@@ -154,11 +163,12 @@ _nm_mod_build_compose_profiles() {
 }
 
 print_modules_summary() {
-    local a s t p
+    local a s t p r
     [[ "${NM_MODULE_AUTH:-0}" == "1" ]] && a="вкл." || a="выкл. (AUTH_DISABLED)"
     [[ "${NM_MODULE_API_AUTH:-0}" == "1" ]] && t="вкл." || t="выкл. (API_AUTH_DISABLED)"
     [[ "${NM_MODULE_SYSLOG:-0}" == "1" ]] && s="вкл." || s="выкл."
     [[ "${NM_MODULE_STATS:-0}" == "1" ]] && p="вкл." || p="выкл."
+    [[ "${NM_MODULE_REPUTATION:-0}" == "1" ]] && r="вкл." || r="выкл. (модуль отключён)"
     echo ""
     echo "══════════════════════════════════════════════════════════"
     echo "  Выбранные модули"
@@ -168,6 +178,7 @@ print_modules_summary() {
     echo "  API Bearer-токен  : ${t}"
     echo "  syslog-ng         : ${s}"
     echo "  stats-collector   : ${p}"
+    echo "  Репутация IP      : ${r}"
     if [[ -n "${NM_COMPOSE_PROFILES:-}" ]]; then
         echo "  Compose profiles  : ${NM_COMPOSE_PROFILES}"
     else
@@ -188,14 +199,15 @@ confirm_modules() {
 
     if [[ "${NM_AUTO_MODULES:-0}" == "1" ]]; then
         _nm_mod_build_compose_profiles
-        _nm_mod_log "NM_AUTO_MODULES=1 — модули: auth=${NM_MODULE_AUTH} api_auth=${NM_MODULE_API_AUTH} syslog=${NM_MODULE_SYSLOG} stats=${NM_MODULE_STATS}"
+        _nm_mod_log "NM_AUTO_MODULES=1 — модули: auth=${NM_MODULE_AUTH} api_auth=${NM_MODULE_API_AUTH} syslog=${NM_MODULE_SYSLOG} stats=${NM_MODULE_STATS} reputation=${NM_MODULE_REPUTATION}"
         return 0
     fi
 
     # Если задан NM_MODULES или любой NM_ENABLE_* — без вопросов (режим автоматизации).
     if [[ -n "${NM_MODULES+x}" ]] || \
        [[ -n "${NM_ENABLE_AUTH:-}" ]] || [[ -n "${NM_ENABLE_API_AUTH:-}" ]] || \
-       [[ -n "${NM_ENABLE_SYSLOG:-}" ]] || [[ -n "${NM_ENABLE_STATS:-}" ]]; then
+       [[ -n "${NM_ENABLE_SYSLOG:-}" ]] || [[ -n "${NM_ENABLE_STATS:-}" ]] || \
+       [[ -n "${NM_ENABLE_REPUTATION:-}" ]]; then
         _nm_mod_build_compose_profiles
         _nm_mod_log "Модули заданы через окружение (без интерактива)."
         print_modules_summary
@@ -211,11 +223,12 @@ confirm_modules() {
     _nm_mod_ensure_ui || true
 
     local selected=""
-    local auth_on=OFF api_on=OFF syslog_on=OFF stats_on=OFF
+    local auth_on=OFF api_on=OFF syslog_on=OFF stats_on=OFF reputation_on=OFF
     [[ "${NM_MODULE_AUTH:-1}" == "1" ]] && auth_on=ON
     [[ "${NM_MODULE_API_AUTH:-1}" == "1" ]] && api_on=ON
     [[ "${NM_MODULE_SYSLOG:-1}" == "1" ]] && syslog_on=ON
     [[ "${NM_MODULE_STATS:-1}" == "1" ]] && stats_on=ON
+    [[ "${NM_MODULE_REPUTATION:-1}" == "1" ]] && reputation_on=ON
 
     if declare -F nm_ui_checklist >/dev/null 2>&1; then
         if selected="$(nm_ui_checklist \
@@ -225,15 +238,18 @@ confirm_modules() {
             auth "UI-авторизация (логин, роли admin/operator)" "$auth_on" \
             api_auth "Bearer-токен для мутирующих API" "$api_on" \
             syslog "syslog-ng (приём syslog на :514)" "$syslog_on" \
-            stats "stats-collector (метрики / страница system)" "$stats_on")"; then
+            stats "stats-collector (метрики / страница system)" "$stats_on" \
+            reputation "Репутация IP (фиды, /reputation.html, фильтр на карте)" "$reputation_on")"; then
             NM_MODULE_AUTH=0
             NM_MODULE_API_AUTH=0
             NM_MODULE_SYSLOG=0
             NM_MODULE_STATS=0
+            NM_MODULE_REPUTATION=0
             _nm_mod_tag_selected "$selected" auth && NM_MODULE_AUTH=1
             _nm_mod_tag_selected "$selected" api_auth && NM_MODULE_API_AUTH=1
             _nm_mod_tag_selected "$selected" syslog && NM_MODULE_SYSLOG=1
             _nm_mod_tag_selected "$selected" stats && NM_MODULE_STATS=1
+            _nm_mod_tag_selected "$selected" reputation && NM_MODULE_REPUTATION=1
         else
             _nm_mod_log "Выбор модулей отменён — оставляем значения по умолчанию."
             _nm_mod_set_defaults
@@ -273,6 +289,13 @@ confirm_modules() {
         else
             NM_MODULE_STATS=0
         fi
+
+        if _nm_mod_yesno "  Включить модуль репутации IP (/reputation.html, фиды, фильтр на карте)?" 1; then
+            NM_MODULE_REPUTATION=1
+        else
+            NM_MODULE_REPUTATION=0
+            echo "    → REPUTATION_FETCH_ENABLED=false: модуль репутации полностью отключён." >&2
+        fi
     fi
 
     if [[ "${NM_MODULE_AUTH:-1}" != "1" ]]; then
@@ -281,10 +304,13 @@ confirm_modules() {
     if [[ "${NM_MODULE_API_AUTH:-1}" != "1" ]]; then
         _nm_mod_log "API Bearer-защита отключена (API_AUTH_DISABLED=true)."
     fi
+    if [[ "${NM_MODULE_REPUTATION:-1}" != "1" ]]; then
+        _nm_mod_log "Модуль репутации IP отключён (REPUTATION_FETCH_ENABLED=false)."
+    fi
 
     _nm_mod_build_compose_profiles
     print_modules_summary
-    _nm_mod_log "Модули: auth=${NM_MODULE_AUTH} api_auth=${NM_MODULE_API_AUTH} syslog=${NM_MODULE_SYSLOG} stats=${NM_MODULE_STATS}"
+    _nm_mod_log "Модули: auth=${NM_MODULE_AUTH} api_auth=${NM_MODULE_API_AUTH} syslog=${NM_MODULE_SYSLOG} stats=${NM_MODULE_STATS} reputation=${NM_MODULE_REPUTATION}"
 }
 
 # Обновляет/добавляет ключи модулей в .env (не затирает остальные строки).
@@ -294,6 +320,7 @@ apply_module_selection() {
     local modules_json="${project_dir}/install-modules.json"
     local auth_disabled="false"
     local api_auth_disabled="false"
+    local reputation_fetch_enabled="true"
     local allow_insecure="0"
     local tmp
 
@@ -302,6 +329,7 @@ apply_module_selection() {
 
     [[ "${NM_MODULE_AUTH:-1}" == "1" ]] || auth_disabled="true"
     [[ "${NM_MODULE_API_AUTH:-1}" == "1" ]] || api_auth_disabled="true"
+    [[ "${NM_MODULE_REPUTATION:-1}" == "1" ]] || reputation_fetch_enabled="false"
     if [[ "$auth_disabled" == "true" || "$api_auth_disabled" == "true" ]]; then
         # Backend ValidateSecurity требует NM_ALLOW_INSECURE при *_DISABLED.
         allow_insecure="1"
@@ -311,7 +339,7 @@ apply_module_selection() {
     touch "$env_file"
 
     tmp="$(mktemp)"
-    grep -vE '^[[:space:]]*(# --- Модули \(select_modules\.sh\) ---|NM_MODULE_|AUTH_DISABLED=|API_AUTH_DISABLED=|NM_ALLOW_INSECURE=|COMPOSE_PROFILES=)' \
+    grep -vE '^[[:space:]]*(# --- Модули \(select_modules\.sh\) ---|NM_MODULE_|AUTH_DISABLED=|API_AUTH_DISABLED=|REPUTATION_FETCH_ENABLED=|NM_ALLOW_INSECURE=|COMPOSE_PROFILES=)' \
         "$env_file" >"$tmp" || true
     # Убрать завершающие пустые строки.
     while [[ -s "$tmp" ]] && [[ -z "$(tail -n1 "$tmp")" ]]; do
@@ -324,8 +352,10 @@ NM_MODULE_AUTH=${NM_MODULE_AUTH:-1}
 NM_MODULE_API_AUTH=${NM_MODULE_API_AUTH:-1}
 NM_MODULE_SYSLOG=${NM_MODULE_SYSLOG:-1}
 NM_MODULE_STATS=${NM_MODULE_STATS:-1}
+NM_MODULE_REPUTATION=${NM_MODULE_REPUTATION:-1}
 AUTH_DISABLED=${auth_disabled}
 API_AUTH_DISABLED=${api_auth_disabled}
+REPUTATION_FETCH_ENABLED=${reputation_fetch_enabled}
 NM_ALLOW_INSECURE=${allow_insecure}
 COMPOSE_PROFILES=${NM_COMPOSE_PROFILES:-}
 EOF
@@ -339,11 +369,13 @@ EOF
     "auth": $([ "${NM_MODULE_AUTH:-1}" == "1" ] && echo true || echo false),
     "api_auth": $([ "${NM_MODULE_API_AUTH:-1}" == "1" ] && echo true || echo false),
     "syslog": $([ "${NM_MODULE_SYSLOG:-1}" == "1" ] && echo true || echo false),
-    "stats": $([ "${NM_MODULE_STATS:-1}" == "1" ] && echo true || echo false)
+    "stats": $([ "${NM_MODULE_STATS:-1}" == "1" ] && echo true || echo false),
+    "reputation": $([ "${NM_MODULE_REPUTATION:-1}" == "1" ] && echo true || echo false)
   },
   "compose_profiles": "${NM_COMPOSE_PROFILES:-}",
   "auth_disabled": $([ "$auth_disabled" = "true" ] && echo true || echo false),
-  "api_auth_disabled": $([ "$api_auth_disabled" = "true" ] && echo true || echo false)
+  "api_auth_disabled": $([ "$api_auth_disabled" = "true" ] && echo true || echo false),
+  "reputation_fetch_enabled": $([ "$reputation_fetch_enabled" = "true" ] && echo true || echo false)
 }
 EOF
 
@@ -353,6 +385,9 @@ EOF
     fi
     if [[ "$api_auth_disabled" == "true" ]]; then
         _nm_mod_log "API Bearer-защита отключена (API_AUTH_DISABLED=true)."
+    fi
+    if [[ "$reputation_fetch_enabled" == "false" ]]; then
+        _nm_mod_log "Модуль репутации IP отключён (REPUTATION_FETCH_ENABLED=false)."
     fi
 }
 

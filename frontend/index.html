@@ -125,7 +125,7 @@
                 </svg>
                 <span class="label">База GeoIP</span>
             </a>
-            <a href="/reputation.html" class="side-btn" style="text-decoration: none; color: inherit;" title="Репутация IP">
+            <a href="/reputation.html" class="side-btn" style="text-decoration: none; color: inherit;" title="Репутация IP" data-reputation-only>
                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                 </svg>
@@ -258,7 +258,7 @@
                 <button id="filter-allowed" class="allowed">Разрешённые</button>
                 <button id="filter-blocked" class="blocked">Заблокированные</button>
             </div>
-            <div class="reputation-filter" id="reputationFilterWrap">
+            <div class="reputation-filter" id="reputationFilterWrap" data-reputation-only>
                 <button type="button" id="btnReputationFilter" class="rep-filter-btn" title="Фильтр по репутационным спискам">
                     Репутация
                     <span id="repFilterBadge" class="rep-badge" style="display:none;">0</span>

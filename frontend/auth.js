@@ -89,6 +89,8 @@
       location.replace('/index.html');
       return null;
     }
+    global.__nmReputationEnabled = user.reputationEnabled !== false;
+    applyAdminVisibility(user);
     return user;
   }
 
@@ -109,7 +111,30 @@
       if (isAdmin) el.style.removeProperty('display');
       else el.style.display = 'none';
     });
+    applyReputationVisibility(user);
     return isAdmin;
+  }
+
+  function applyReputationVisibility(user) {
+    const enabled = !user || user.reputationEnabled !== false;
+    document.querySelectorAll('[data-reputation-only]').forEach((el) => {
+      if (enabled) el.style.removeProperty('display');
+      else el.style.display = 'none';
+    });
+    const sidebar = document.getElementById('adminSidebar');
+    if (
+      sidebar &&
+      sidebar.getAttribute('data-nm-dynamic-nav') === '1' &&
+      global.NMUI &&
+      typeof global.NMUI.mountAdminSidebar === 'function'
+    ) {
+      const isAdmin = !user || user.authDisabled || user.role === ROLE_ADMIN;
+      global.NMUI.mountAdminSidebar(undefined, {
+        isAdmin: isAdmin,
+        reputationEnabled: enabled,
+      });
+    }
+    return enabled;
   }
 
   function csrfToken() {
@@ -249,6 +274,7 @@
     requireLogin,
     logout,
     applyAdminVisibility,
+    applyReputationVisibility,
     nmAuthHeaders,
     renderUserBar,
     loginUrl,

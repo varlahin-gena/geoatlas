@@ -158,6 +158,8 @@ type Config struct {
 
 	// Reputation: офлайн-списки (FireHOL и др.).
 	MaxReputationUploadSize int64
+	// ReputationFetchEnabled — полный выключатель модуля репутации IP
+	// (API, UI, обогащение карты, фоновые фиды). REPUTATION_FETCH_ENABLED.
 	ReputationFetchEnabled  bool
 	ReputationFetchInterval time.Duration
 	ReputationFeeds         []ReputationFeed // seed, если файла ещё нет

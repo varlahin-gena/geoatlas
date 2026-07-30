@@ -38,8 +38,10 @@ func RunStartup(ctx context.Context, deps Dependencies, opts Options, warn WarnF
 		if err := deps.Schema.EnsureGeoEdgesAggSchema(bctx); err != nil {
 			warn("geo edges agg schema ensure failed", err)
 		}
-		if err := deps.Schema.EnsureReputationRanges(bctx); err != nil {
-			warn("reputation_ranges ensure failed", err)
+		if opts.ReputationEnabled {
+			if err := deps.Schema.EnsureReputationRanges(bctx); err != nil {
+				warn("reputation_ranges ensure failed", err)
+			}
 		}
 	}
 

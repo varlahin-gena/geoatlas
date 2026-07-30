@@ -272,6 +272,7 @@ source_module_helper() {
         NM_MODULE_API_AUTH=1
         NM_MODULE_SYSLOG=1
         NM_MODULE_STATS=1
+        NM_MODULE_REPUTATION=1
         NM_COMPOSE_PROFILES="syslog,stats"
         return 1
     fi

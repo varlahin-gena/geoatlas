@@ -53,6 +53,8 @@ func buildApp(ctx context.Context, cfg config.Config) (*app, error) {
 	parsers := newParserRegistry()
 	startIngest(a, cfg, bg.geo, parsers)
 	a.srv = buildHTTP(cfg, a, authParts, bg, parsers)
-	a.repJobs.Start(bgCtx)
+	if a.repJobs != nil {
+		a.repJobs.Start(bgCtx)
+	}
 	return a, nil
 }

@@ -412,6 +412,11 @@
     });
     const user = await NMAuth.requireLogin({ admin: true });
     if (!user) return;
+    if (user.reputationEnabled === false) {
+      location.replace('/index.html');
+      return;
+    }
+    NMAuth.applyAdminVisibility(user);
     NMAuth.renderUserBar(user, bar.userBarHost);
     NMUI.startSystemHealthPolling({ isAdmin: true });
     await reloadAll();

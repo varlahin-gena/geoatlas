@@ -367,6 +367,8 @@ write_env_file() {
     local mod_api_auth="${NM_MODULE_API_AUTH:-1}"
     local mod_syslog="${NM_MODULE_SYSLOG:-1}"
     local mod_stats="${NM_MODULE_STATS:-1}"
+    local mod_reputation="${NM_MODULE_REPUTATION:-1}"
+    local reputation_fetch_enabled="${REPUTATION_FETCH_ENABLED:-true}"
     local compose_profiles="${NM_COMPOSE_PROFILES:-${COMPOSE_PROFILES:-syslog,stats}}"
 
     if [[ -f "$env_file" ]]; then
@@ -381,8 +383,10 @@ write_env_file() {
             v="$(_nm_env_get "$env_file" NM_MODULE_API_AUTH)"; [[ -n "$v" ]] && mod_api_auth="$v"
             v="$(_nm_env_get "$env_file" NM_MODULE_SYSLOG)"; [[ -n "$v" ]] && mod_syslog="$v"
             v="$(_nm_env_get "$env_file" NM_MODULE_STATS)"; [[ -n "$v" ]] && mod_stats="$v"
+            v="$(_nm_env_get "$env_file" NM_MODULE_REPUTATION)"; [[ -n "$v" ]] && mod_reputation="$v"
             v="$(_nm_env_get "$env_file" AUTH_DISABLED)"; [[ -n "$v" ]] && auth_disabled="$v"
             v="$(_nm_env_get "$env_file" API_AUTH_DISABLED)"; [[ -n "$v" ]] && api_auth_disabled="$v"
+            v="$(_nm_env_get "$env_file" REPUTATION_FETCH_ENABLED)"; [[ -n "$v" ]] && reputation_fetch_enabled="$v"
             v="$(_nm_env_get "$env_file" NM_ALLOW_INSECURE)"; [[ -n "$v" ]] && allow_insecure="$v"
             if grep -qE '^[[:space:]]*COMPOSE_PROFILES=' "$env_file" 2>/dev/null; then
                 compose_profiles="$(_nm_env_get "$env_file" COMPOSE_PROFILES)"
@@ -390,11 +394,13 @@ write_env_file() {
         else
             [[ "${mod_auth}" == "1" ]] && auth_disabled="false" || auth_disabled="true"
             [[ "${mod_api_auth}" == "1" ]] && api_auth_disabled="false" || api_auth_disabled="true"
+            [[ "${mod_reputation}" == "1" ]] && reputation_fetch_enabled="true" || reputation_fetch_enabled="false"
             compose_profiles="${NM_COMPOSE_PROFILES:-}"
         fi
     elif [[ -n "${NM_MODULE_AUTH:-}" ]]; then
         [[ "${mod_auth}" == "1" ]] && auth_disabled="false" || auth_disabled="true"
         [[ "${mod_api_auth}" == "1" ]] && api_auth_disabled="false" || api_auth_disabled="true"
+        [[ "${mod_reputation}" == "1" ]] && reputation_fetch_enabled="true" || reputation_fetch_enabled="false"
         compose_profiles="${NM_COMPOSE_PROFILES:-}"
     fi
 
@@ -427,8 +433,10 @@ NM_MODULE_AUTH=${mod_auth}
 NM_MODULE_API_AUTH=${mod_api_auth}
 NM_MODULE_SYSLOG=${mod_syslog}
 NM_MODULE_STATS=${mod_stats}
+NM_MODULE_REPUTATION=${mod_reputation}
 AUTH_DISABLED=${auth_disabled}
 API_AUTH_DISABLED=${api_auth_disabled}
+REPUTATION_FETCH_ENABLED=${reputation_fetch_enabled}
 NM_ALLOW_INSECURE=${allow_insecure}
 COMPOSE_PROFILES=${compose_profiles}
 EOF

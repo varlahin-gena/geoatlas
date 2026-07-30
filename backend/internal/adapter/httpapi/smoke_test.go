@@ -143,6 +143,9 @@ func TestPostCASmoke(t *testing.T) {
 		if user["username"] != "admin" {
 			t.Fatalf("me: %#v", user)
 		}
+		if user["reputationEnabled"] != false {
+			t.Fatalf("me reputationEnabled: want false (module off), got %#v", user["reputationEnabled"])
+		}
 
 		csrf := csrfFromJar(t, jar, base)
 		req, err := http.NewRequest(http.MethodPost, base+"/api/auth/logout", nil)
@@ -170,6 +173,22 @@ func TestPostCASmoke(t *testing.T) {
 		}
 	}
 	csrf := csrfFromJar(t, jar, base)
+
+	t.Run("reputation_module_off", func(t *testing.T) {
+		resp, err := client.Get(base + "/api/reputation/lists")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		mustStatus(t, "reputation lists", resp, http.StatusServiceUnavailable)
+		var body map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body["error"] != "reputation service unavailable" {
+			t.Fatalf("body: %#v", body)
+		}
+	})
 
 	t.Run("events_map", func(t *testing.T) {
 		resp, err := client.Get(base + "/api/events?period=1h&group_by=country")

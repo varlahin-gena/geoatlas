@@ -22,11 +22,12 @@ type loginRequest struct {
 }
 
 type authUserResponse struct {
-	Username          string `json:"username"`
-	FullName          string `json:"full_name,omitempty"`
-	Role              string `json:"role"`
-	MustResetPassword bool   `json:"must_reset_password,omitempty"`
-	AuthDisabled      bool   `json:"authDisabled,omitempty"`
+	Username            string `json:"username"`
+	FullName            string `json:"full_name,omitempty"`
+	Role                string `json:"role"`
+	MustResetPassword   bool   `json:"must_reset_password,omitempty"`
+	AuthDisabled        bool   `json:"authDisabled,omitempty"`
+	ReputationEnabled   bool   `json:"reputationEnabled"`
 }
 
 type changePasswordRequest struct {
@@ -71,6 +72,13 @@ func userPublicResponse(u auth.UserPublic) authUserResponse {
 		Role:              u.Role,
 		MustResetPassword: u.MustResetPassword,
 	}
+}
+
+func (h *AuthHandler) withModuleFlags(resp authUserResponse) authUserResponse {
+	if h != nil && h.Deps != nil {
+		resp.ReputationEnabled = h.cfg.ReputationFetchEnabled
+	}
+	return resp
 }
 
 // Login — POST /api/auth/login
@@ -140,11 +148,11 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 // Me — GET /api/auth/me
 func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	if h.authDisabled() {
-		writeJSON(w, http.StatusOK, authUserResponse{
+		writeJSON(w, http.StatusOK, h.withModuleFlags(authUserResponse{
 			Username:     "anonymous",
 			Role:         auth.RoleAdministrator,
 			AuthDisabled: true,
-		})
+		}))
 		return
 	}
 	sess, ok := SessionFromContext(r.Context())
@@ -171,7 +179,7 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	EnsureCSRFCookie(w, r, h.authUC.SessionTTL())
-	writeJSON(w, http.StatusOK, userPublicResponse(pub))
+	writeJSON(w, http.StatusOK, h.withModuleFlags(userPublicResponse(pub)))
 }
 
 // ChangePassword — POST /api/auth/change-password (любой залогиненный)

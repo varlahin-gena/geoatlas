@@ -53,9 +53,12 @@ type Dependencies struct {
 
 // Options — флаги старта.
 type Options struct {
-	SkipStartupBackfill bool
+	SkipStartupBackfill     bool
 	GeoBackfillLookbackDays int
-	Timeout time.Duration
+	// ReputationEnabled — создавать/проверять schema reputation_ranges.
+	// false = модуль выключен (REPUTATION_FETCH_ENABLED=false).
+	ReputationEnabled bool
+	Timeout           time.Duration
 }
 
 // WarnFunc логирует нефатальные ошибки Ensure*/backfill.

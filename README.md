@@ -199,7 +199,7 @@ sudo ./install_ubuntu.sh
 2. Устанавливает `curl`, `git`, `ufw`, `whiptail` (`yad`, если есть графический дисплей)
 3. Устанавливает Docker Engine и compose plugin (если ещё нет)
 4. Клонирует или обновляет репозиторий в `/opt/network-monitor`
-5. Спрашивает, какие модули ставить (checklist: авторизация, API-токен, syslog-ng, stats-collector)
+5. Спрашивает, какие модули ставить (checklist: авторизация, API-токен, syslog-ng, stats-collector, репутация IP)
 6. Запускает детектор ресурсов и предлагает профиль
 7. Настраивает UFW (порты 80 и при необходимости 514)
 8. Вызывает `./start.sh` (можно отказаться на последнем шаге)
@@ -212,6 +212,7 @@ sudo ./install_ubuntu.sh
 | API Bearer-токен | вкл.         | защита мутирующих API (`API_AUTH_DISABLED` при отказе)  |
 | syslog-ng        | вкл.         | приём syslog на `:514` (Compose profile `syslog`)       |
 | stats-collector  | вкл.         | метрики / `system.html` (Compose profile `stats`)       |
+| Репутация IP     | вкл.         | модуль целиком; при отказе `REPUTATION_FETCH_ENABLED=false` (API/UI/фиды выкл.) |
 
 Ядро (ClickHouse + Backend + Frontend) ставится всегда.
 
