@@ -170,6 +170,35 @@
 (function () {
   'use strict';
 
+  window.__repCatalogAll = [];
+  window.__repActiveFeedNames = new Set();
+
+  function renderCatalog() {
+    const tbody = document.getElementById('catalogBody');
+    const all = window.__repCatalogAll || [];
+    const active = window.__repActiveFeedNames || new Set();
+    const available = all.filter(function (f) {
+      return f && f.name && !active.has(f.name);
+    });
+    if (!all.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">Каталог пуст</td></tr>';
+      return;
+    }
+    if (!available.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">Все пресеты уже в активных фидах</td></tr>';
+      return;
+    }
+    tbody.innerHTML = available.map(function (f) {
+      return '<tr>' +
+        '<td>' + NMUI.escapeHTML(f.name) + '</td>' +
+        '<td>' + NMUI.escapeHTML(f.category || '') + '</td>' +
+        '<td>' + NMUI.escapeHTML(f.format || 'netset') + '</td>' +
+        '<td class="url-cell" title="' + NMUI.escapeHTML(f.url || '') + '">' + NMUI.escapeHTML(f.url || '') + '</td>' +
+        '<td><button type="button" class="btn primary" data-add-catalog="' + NMUI.escapeHTML(f.name) + '">Добавить</button></td>' +
+        '</tr>';
+    }).join('');
+  }
+
   async function loadCatalog() {
     const tbody = document.getElementById('catalogBody');
     try {
@@ -180,21 +209,8 @@
       }
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
-      const feeds = data.feeds || [];
-      if (!feeds.length) {
-        tbody.innerHTML = '<tr><td colspan="5" class="empty">Каталог пуст</td></tr>';
-        return;
-      }
-      tbody.innerHTML = feeds.map(function (f) {
-        return '<tr>' +
-          '<td>' + NMUI.escapeHTML(f.name) + '</td>' +
-          '<td>' + NMUI.escapeHTML(f.category || '') + '</td>' +
-          '<td>' + NMUI.escapeHTML(f.format || 'netset') + '</td>' +
-          '<td class="url-cell" title="' + NMUI.escapeHTML(f.url || '') + '">' + NMUI.escapeHTML(f.url || '') + '</td>' +
-          '<td><button type="button" class="btn primary" data-add-catalog="' + NMUI.escapeHTML(f.name) + '">Добавить</button></td>' +
-          '</tr>';
-      }).join('');
-      window.__repCatalog = feeds;
+      window.__repCatalogAll = data.feeds || [];
+      renderCatalog();
     } catch (e) {
       tbody.innerHTML = '<tr><td colspan="5" class="empty">Ошибка: ' + NMUI.escapeHTML(e.message) + '</td></tr>';
       NMUI.toast('Не удалось загрузить каталог', 'error');
@@ -212,19 +228,22 @@
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
       const feeds = data.feeds || [];
+      window.__repActiveFeedNames = new Set(feeds.map(function (f) { return f.name; }).filter(Boolean));
       if (!feeds.length) {
         tbody.innerHTML = '<tr><td colspan="5" class="empty">Нет URL-фидов — добавьте ниже или нажмите «Обновить»</td></tr>';
-        return;
+      } else {
+        tbody.innerHTML = feeds.map(function (f) {
+          return '<tr>' +
+            '<td>' + NMUI.escapeHTML(f.name) + '</td>' +
+            '<td>' + NMUI.escapeHTML(f.category || '') + '</td>' +
+            '<td>' + NMUI.escapeHTML(f.format || 'netset') + '</td>' +
+            '<td class="url-cell" title="' + NMUI.escapeHTML(f.url || '') + '">' + NMUI.escapeHTML(f.url || '') + '</td>' +
+            '<td><button type="button" class="btn" data-del-feed="' + NMUI.escapeHTML(f.name) + '">Удалить</button></td>' +
+            '</tr>';
+        }).join('');
       }
-      tbody.innerHTML = feeds.map(function (f) {
-        return '<tr>' +
-          '<td>' + NMUI.escapeHTML(f.name) + '</td>' +
-          '<td>' + NMUI.escapeHTML(f.category || '') + '</td>' +
-          '<td>' + NMUI.escapeHTML(f.format || 'netset') + '</td>' +
-          '<td class="url-cell" title="' + NMUI.escapeHTML(f.url || '') + '">' + NMUI.escapeHTML(f.url || '') + '</td>' +
-          '<td><button type="button" class="btn" data-del-feed="' + NMUI.escapeHTML(f.name) + '">Удалить</button></td>' +
-          '</tr>';
-      }).join('');
+      // Обновить каталог: скрыть уже добавленные / вернуть удалённые.
+      renderCatalog();
     } catch (e) {
       tbody.innerHTML = '<tr><td colspan="5" class="empty">Ошибка: ' + NMUI.escapeHTML(e.message) + '</td></tr>';
       NMUI.toast('Не удалось загрузить фиды', 'error');
@@ -347,7 +366,7 @@
     const btn = e.target.closest('[data-add-catalog]');
     if (!btn) return;
     const name = btn.getAttribute('data-add-catalog');
-    const feeds = window.__repCatalog || [];
+    const feeds = window.__repCatalogAll || [];
     const preset = feeds.find(function (f) { return f.name === name; });
     if (!preset) {
       NMUI.toast('Пресет не найден', 'error');
