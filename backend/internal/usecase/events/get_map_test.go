@@ -114,10 +114,7 @@ func TestGetMapIPModeWithTypedNilReputation(t *testing.T) {
 		"8.8.8.8": {Found: true, Lat: 2, Lon: 2, City: "M", Country: "US"},
 	}
 	var nilRep *typedNilRep
-	var lookuper ReputationLookuper = nilRep
-	if lookuper == nil {
-		t.Fatal("typed nil must not compare equal to nil interface")
-	}
+	var lookuper ReputationLookuper = nilRep // typed nil in interface (SA4023: never == nil)
 	uc := New(repo, geo, lookuper)
 	out, err := uc.GetMap(context.Background(), GetMapInput{
 		TimeRange: model.TimeRange{Mode: "hours", Amount: 6},

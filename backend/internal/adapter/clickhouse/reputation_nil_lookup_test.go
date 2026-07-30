@@ -9,12 +9,10 @@ import (
 
 func TestReloadableReputationIndexLookupNilReceiver(t *testing.T) {
 	var idx *chadapter.ReloadableReputationIndex
+	// typed nil in interface — Lookup must not panic (nil-safe method).
 	var lookuper interface {
 		Lookup(string) []model.ReputationHit
 	} = idx
-	if lookuper == nil {
-		t.Fatal("typed nil should not equal nil interface")
-	}
 	defer func() {
 		if r := recover(); r != nil {
 			t.Fatalf("Lookup on typed-nil index panicked: %v", r)
