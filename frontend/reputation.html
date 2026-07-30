@@ -92,7 +92,7 @@
       </table>
     </div>
 
-    <h2 class="section-title">URL-фиды</h2>
+    <h2 class="section-title">Активные списки</h2>
     <form class="feed-form" id="feedForm">
       <label>Имя
         <input name="name" required pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,63}" placeholder="spamhaus_drop" autocomplete="off" />
@@ -130,22 +130,6 @@
             <th scope="col">Категория</th>
             <th scope="col">Формат</th>
             <th scope="col">URL</th>
-            <th scope="col"><span class="visually-hidden">Действия</span></th>
-          </tr>
-        </thead>
-        <tbody id="feedsBody">
-          <tr><td colspan="5" class="empty">Загрузка…</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <h2 class="section-title">Загруженные списки</h2>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th scope="col">Список</th>
-            <th scope="col">Категория</th>
             <th scope="col">Диапазонов</th>
             <th scope="col">Источник</th>
             <th scope="col">Обновлён</th>
@@ -153,8 +137,8 @@
             <th scope="col"><span class="visually-hidden">Действия</span></th>
           </tr>
         </thead>
-        <tbody id="tbody">
-          <tr><td colspan="7" class="empty">Загрузка…</td></tr>
+        <tbody id="activeBody">
+          <tr><td colspan="9" class="empty">Загрузка…</td></tr>
         </tbody>
       </table>
     </div>
@@ -172,6 +156,8 @@
 
   window.__repCatalogAll = [];
   window.__repActiveFeedNames = new Set();
+  window.__repFeeds = [];
+  window.__repLists = [];
 
   function renderCatalog() {
     const tbody = document.getElementById('catalogBody');
@@ -199,6 +185,54 @@
     }).join('');
   }
 
+  function renderActive() {
+    const tbody = document.getElementById('activeBody');
+    const summary = document.getElementById('summary');
+    const feeds = window.__repFeeds || [];
+    const lists = window.__repLists || [];
+    const byFeed = {};
+    const byList = {};
+    feeds.forEach(function (f) {
+      if (f && f.name) byFeed[f.name] = f;
+    });
+    lists.forEach(function (l) {
+      if (l && l.name) byList[l.name] = l;
+    });
+    const names = Object.keys(Object.assign({}, byFeed, byList)).sort();
+    const totalRanges = lists.reduce(function (s, x) { return s + (x.count || 0); }, 0);
+    summary.textContent = names.length
+      ? ('Списков: ' + names.length + ', диапазонов: ' + NMUI.fmtNumber(totalRanges))
+      : 'Списки ещё не загружены — добавьте фид, нажмите «Обновить фиды» или загрузите CSV.';
+
+    if (!names.length) {
+      tbody.innerHTML = '<tr><td colspan="9" class="empty">Нет активных списков</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = names.map(function (name) {
+      const f = byFeed[name];
+      const l = byList[name];
+      const category = (f && f.category) || (l && l.category) || '';
+      const format = f ? (f.format || 'netset') : '';
+      const url = f ? (f.url || '') : '';
+      const count = l ? (l.count || 0) : 0;
+      const source = l ? (l.source || '') : (f ? 'url' : '');
+      const updated = l ? NMUI.fmtDate(l.updated_at) : '—';
+      const err = (l && l.last_error) || '';
+      return '<tr>' +
+        '<td>' + NMUI.escapeHTML(name) + '</td>' +
+        '<td>' + NMUI.escapeHTML(category) + '</td>' +
+        '<td>' + NMUI.escapeHTML(format) + '</td>' +
+        '<td class="url-cell" title="' + NMUI.escapeHTML(url) + '">' + NMUI.escapeHTML(url) + '</td>' +
+        '<td>' + NMUI.fmtNumber(count) + '</td>' +
+        '<td>' + (source ? '<span class="source-pill">' + NMUI.escapeHTML(source) + '</span>' : '') + '</td>' +
+        '<td>' + NMUI.escapeHTML(updated) + '</td>' +
+        '<td class="err">' + NMUI.escapeHTML(err) + '</td>' +
+        '<td><button type="button" class="btn" data-del="' + NMUI.escapeHTML(name) + '">Удалить</button></td>' +
+        '</tr>';
+    }).join('');
+  }
+
   async function loadCatalog() {
     const tbody = document.getElementById('catalogBody');
     try {
@@ -218,7 +252,6 @@
   }
 
   async function loadFeeds() {
-    const tbody = document.getElementById('feedsBody');
     try {
       const res = await fetch('/api/reputation/feeds', { credentials: 'same-origin', cache: 'no-store' });
       if (res.status === 401) {
@@ -228,31 +261,16 @@
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
       const feeds = data.feeds || [];
+      window.__repFeeds = feeds;
       window.__repActiveFeedNames = new Set(feeds.map(function (f) { return f.name; }).filter(Boolean));
-      if (!feeds.length) {
-        tbody.innerHTML = '<tr><td colspan="5" class="empty">Нет URL-фидов — добавьте ниже или нажмите «Обновить»</td></tr>';
-      } else {
-        tbody.innerHTML = feeds.map(function (f) {
-          return '<tr>' +
-            '<td>' + NMUI.escapeHTML(f.name) + '</td>' +
-            '<td>' + NMUI.escapeHTML(f.category || '') + '</td>' +
-            '<td>' + NMUI.escapeHTML(f.format || 'netset') + '</td>' +
-            '<td class="url-cell" title="' + NMUI.escapeHTML(f.url || '') + '">' + NMUI.escapeHTML(f.url || '') + '</td>' +
-            '<td><button type="button" class="btn" data-del-feed="' + NMUI.escapeHTML(f.name) + '">Удалить</button></td>' +
-            '</tr>';
-        }).join('');
-      }
-      // Обновить каталог: скрыть уже добавленные / вернуть удалённые.
+      renderActive();
       renderCatalog();
     } catch (e) {
-      tbody.innerHTML = '<tr><td colspan="5" class="empty">Ошибка: ' + NMUI.escapeHTML(e.message) + '</td></tr>';
       NMUI.toast('Не удалось загрузить фиды', 'error');
     }
   }
 
   async function loadLists() {
-    const tbody = document.getElementById('tbody');
-    const summary = document.getElementById('summary');
     try {
       const res = await fetch('/api/reputation/lists', { credentials: 'same-origin', cache: 'no-store' });
       if (res.status === 401) {
@@ -261,28 +279,11 @@
       }
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
-      const lists = data.lists || [];
-      const totalRanges = lists.reduce(function (s, x) { return s + (x.count || 0); }, 0);
-      summary.textContent = lists.length
-        ? ('Списков: ' + lists.length + ', диапазонов: ' + NMUI.fmtNumber(totalRanges))
-        : 'Списки ещё не загружены — нажмите «Обновить фиды» или загрузите CSV.';
-      if (!lists.length) {
-        tbody.innerHTML = '<tr><td colspan="7" class="empty">Нет данных</td></tr>';
-        return;
-      }
-      tbody.innerHTML = lists.map(function (l) {
-        return '<tr>' +
-          '<td>' + NMUI.escapeHTML(l.name) + '</td>' +
-          '<td>' + NMUI.escapeHTML(l.category || '') + '</td>' +
-          '<td>' + NMUI.fmtNumber(l.count) + '</td>' +
-          '<td><span class="source-pill">' + NMUI.escapeHTML(l.source || '') + '</span></td>' +
-          '<td>' + NMUI.fmtDate(l.updated_at) + '</td>' +
-          '<td class="err">' + NMUI.escapeHTML(l.last_error || '') + '</td>' +
-          '<td><button type="button" class="btn" data-del="' + NMUI.escapeHTML(l.name) + '">Удалить</button></td>' +
-          '</tr>';
-      }).join('');
+      window.__repLists = data.lists || [];
+      renderActive();
     } catch (e) {
-      tbody.innerHTML = '<tr><td colspan="7" class="empty">Ошибка: ' + NMUI.escapeHTML(e.message) + '</td></tr>';
+      const tbody = document.getElementById('activeBody');
+      tbody.innerHTML = '<tr><td colspan="9" class="empty">Ошибка: ' + NMUI.escapeHTML(e.message) + '</td></tr>';
       NMUI.toast('Не удалось загрузить списки', 'error');
     }
   }
@@ -431,26 +432,7 @@
       NMUI.toast(err.message || String(err), 'error');
     }
   });
-  document.getElementById('feedsBody').addEventListener('click', async function (e) {
-    const btn = e.target.closest('[data-del-feed]');
-    if (!btn) return;
-    const name = btn.getAttribute('data-del-feed');
-    if (!confirm('Удалить фид «' + name + '» и его диапазоны?')) return;
-    try {
-      const res = await fetch('/api/reputation/feeds/' + encodeURIComponent(name), {
-        method: 'DELETE',
-        credentials: 'same-origin',
-        headers: NMAuth.nmAuthHeaders(),
-      });
-      const data = await res.json().catch(function () { return {}; });
-      if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
-      NMUI.toast('Фид удалён: ' + name, 'success');
-      reloadAll();
-    } catch (err) {
-      NMUI.toast(err.message || String(err), 'error');
-    }
-  });
-  document.getElementById('tbody').addEventListener('click', async function (e) {
+  document.getElementById('activeBody').addEventListener('click', async function (e) {
     const btn = e.target.closest('[data-del]');
     if (!btn) return;
     const name = btn.getAttribute('data-del');
