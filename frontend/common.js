@@ -36,12 +36,18 @@
 
   function ensureToastHost() {
     let host = document.getElementById('toastHost');
-    if (host) return host;
-    host = document.createElement('div');
-    host.id = 'toastHost';
-    host.className = 'toast-host';
-    host.setAttribute('aria-live', 'polite');
-    document.body.appendChild(host);
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'toastHost';
+      host.className = 'toast-host';
+      host.setAttribute('aria-live', 'polite');
+    }
+    // Держим у body (не внутри .app с overflow:hidden), поверх layout.
+    if (host.parentNode !== document.body) {
+      document.body.appendChild(host);
+    } else if (document.body.lastElementChild !== host) {
+      document.body.appendChild(host);
+    }
     return host;
   }
 
@@ -51,21 +57,57 @@
    * @param {number} [timeout]
    */
   function toast(msg, kind, timeout) {
-    const ms = typeof timeout === 'number' ? timeout : 4000;
+    const ms = Number.isFinite(timeout) && timeout > 0 ? Number(timeout) : 4000;
     const host = ensureToastHost();
     const el = document.createElement('div');
     el.className = 'toast' + (kind ? ' ' + kind : '');
     el.setAttribute('role', kind === 'error' ? 'alert' : 'status');
     el.textContent = msg;
     host.appendChild(el);
-    if (ms > 200) {
-      setTimeout(function () {
+
+    // Не снимать toast, пока вкладка в фоне (иначе после долгого refresh его уже нет).
+    var hiddenFor = 0;
+    var started = Date.now();
+    var fadeTimer = null;
+    var removeTimer = null;
+
+    function armTimers() {
+      if (fadeTimer) clearTimeout(fadeTimer);
+      if (removeTimer) clearTimeout(removeTimer);
+      var spent = Date.now() - started - hiddenFor;
+      var left = Math.max(0, ms - spent);
+      if (left > 200) {
+        fadeTimer = setTimeout(function () {
+          el.style.opacity = '0';
+        }, left - 200);
+      } else {
         el.style.opacity = '0';
-      }, ms - 200);
+      }
+      removeTimer = setTimeout(function () {
+        document.removeEventListener('visibilitychange', onVis);
+        el.remove();
+      }, left);
     }
-    setTimeout(function () {
-      el.remove();
-    }, ms);
+
+    function onVis() {
+      if (document.hidden) {
+        if (fadeTimer) clearTimeout(fadeTimer);
+        if (removeTimer) clearTimeout(removeTimer);
+        fadeTimer = null;
+        removeTimer = null;
+        onVis._hiddenAt = Date.now();
+        return;
+      }
+      if (onVis._hiddenAt) {
+        hiddenFor += Date.now() - onVis._hiddenAt;
+        onVis._hiddenAt = 0;
+      }
+      armTimers();
+    }
+
+    document.addEventListener('visibilitychange', onVis);
+    if (!document.hidden) armTimers();
+    else onVis._hiddenAt = Date.now();
   }
 
   var SIDEBAR_COLLAPSE_KEY = 'nm.adminSidebarCollapsed';

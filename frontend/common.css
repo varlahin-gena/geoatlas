@@ -487,7 +487,9 @@ tbody tr:hover { background: var(--panel-2); }
   padding: 10px 14px;
   border-radius: 6px;
   box-shadow: var(--shadow);
-  max-width: 360px;
+  max-width: min(420px, calc(100vw - 32px));
+  max-height: min(40vh, 320px);
+  overflow-y: auto;
   font-size: 12px;
   pointer-events: auto;
   white-space: pre-wrap;
@@ -495,6 +497,7 @@ tbody tr:hover { background: var(--panel-2); }
 }
 .toast.success { border-left-color: var(--green); }
 .toast.error { border-left-color: var(--red); color: var(--red); }
+.toast.info { border-left-color: var(--accent); }
 
 .modal-backdrop {
   display: none;

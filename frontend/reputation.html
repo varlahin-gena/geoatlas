@@ -327,6 +327,12 @@
     }
   });
   document.getElementById('btnRefreshFeeds').addEventListener('click', async function () {
+    const btn = document.getElementById('btnRefreshFeeds');
+    if (btn.disabled) return;
+    const prevLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Обновление…';
+    NMUI.toast('Обновление фидов… это может занять несколько минут', 'info', 8000);
     try {
       const res = await fetch('/api/reputation/refresh?force=1', {
         method: 'POST',
@@ -343,7 +349,7 @@
       const errMap = data.errors && typeof data.errors === 'object' ? data.errors : {};
       const counts = data.counts && typeof data.counts === 'object' ? data.counts : {};
 
-      const parts = [];
+      const lines = [];
       if (updated.length) {
         let totalRanges = 0;
         const perFeed = updated.map(function (name) {
@@ -355,28 +361,33 @@
           totalRanges += n;
           return name + ' — ' + NMUI.fmtNumber(n);
         });
-        parts.push('Обновлено ' + updated.length + ' (диапазонов: ' + NMUI.fmtNumber(totalRanges) + '): ' + perFeed.join('; '));
+        lines.push('Обновлено ' + updated.length + ' (диапазонов: ' + NMUI.fmtNumber(totalRanges) + ')');
+        lines.push(perFeed.join('\n'));
       } else {
-        parts.push('Обновлено: 0');
+        lines.push('Обновлено: 0');
       }
       if (skipped.length) {
-        parts.push('без изменений: ' + skipped.length + ' (' + skipped.join(', ') + ')');
+        lines.push('Без изменений: ' + skipped.length + ' (' + skipped.join(', ') + ')');
       }
       if (failNames.length) {
         const details = failNames.map(function (name) {
           const why = errMap[name] ? String(errMap[name]) : 'неизвестная ошибка';
           return name + ' — ' + why;
         });
-        parts.push('ошибок: ' + failNames.length + ': ' + details.join('; '));
+        lines.push('Ошибок: ' + failNames.length);
+        lines.push(details.join('\n'));
       }
 
-      const msg = parts.join('. ');
+      await reloadAll();
+      const msg = lines.join('\n');
       const kind = failNames.length ? 'error' : 'success';
-      const ttl = Math.min(25000, 5000 + (updated.length + failNames.length) * 1200);
+      const ttl = Math.min(30000, 8000 + (updated.length + failNames.length) * 1500);
       NMUI.toast(msg, kind, ttl);
-      reloadAll();
     } catch (e) {
-      NMUI.toast(e.message || String(e), 'error');
+      NMUI.toast(e.message || String(e), 'error', 12000);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = prevLabel;
     }
   });
   document.getElementById('feedForm').addEventListener('submit', async function (e) {
