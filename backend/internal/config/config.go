@@ -52,11 +52,32 @@ func DefaultReputationFeeds() []ReputationFeed {
 			Name: "bruteforceblocker", URL: fireholRawBase + "bruteforceblocker.ipset",
 			Category: "attacks", Format: "netset",
 		},
-		{
-			Name: "cruzit_web_attacks", URL: fireholRawBase + "cruzit_web_attacks.ipset",
-			Category: "attacks", Format: "netset",
-		},
 	}
+}
+
+// RetiredReputationFeedNames — upstream удалён (404) или deprecated; не сидим и вычищаем из JSON.
+var RetiredReputationFeedNames = map[string]struct{}{
+	"cruzit_web_attacks": {}, // firehol cruzit_web_attacks.ipset снят (404)
+	"sslbl":              {}, // FireHOL sslbl.ipset снят; abuse.ch SSLBL IP list deprecated
+}
+
+// WithoutRetiredReputationFeeds убирает retired имена; changed=true если что-то отфильтровали.
+func WithoutRetiredReputationFeeds(feeds []ReputationFeed) (out []ReputationFeed, changed bool) {
+	if len(feeds) == 0 {
+		return nil, false
+	}
+	out = make([]ReputationFeed, 0, len(feeds))
+	for _, f := range feeds {
+		if _, retired := RetiredReputationFeedNames[f.Name]; retired {
+			changed = true
+			continue
+		}
+		out = append(out, f)
+	}
+	if len(out) == 0 {
+		return nil, changed
+	}
+	return out, changed
 }
 
 // CatalogReputationFeeds — кураторские пресеты (официальные URL, не дублируют FireHOL-сиды).

@@ -54,6 +54,14 @@ func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backg
 		} else {
 			slog.Info("reputation feeds loaded", "count", len(repFeeds), "path", cfg.ReputationFeedsFile)
 		}
+		if cleaned, dropped := dropRetiredReputationFeeds(repFeeds); dropped > 0 {
+			repFeeds = cleaned
+			if err := repFeedStore.Save(repFeeds); err != nil {
+				slog.Warn("reputation feeds: failed to persist after dropping retired", "err", err, "dropped", dropped)
+			} else {
+				slog.Info("reputation feeds: dropped retired upstream lists", "dropped", dropped, "remaining", len(repFeeds))
+			}
+		}
 		repUC = usecasereputation.New(repRepo, repIdx, usecasereputation.DefaultCodec{}, nil, repFeedStore)
 		a.repJobs = reputationjob.New(repFeeds, cfg.ReputationFetchInterval, true, repUC)
 		repUC.SetRefresher(a.repJobs)
@@ -100,11 +108,30 @@ func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backg
 }
 
 func reputationFeedsFromConfig(feeds []config.ReputationFeed) []usecasereputation.Feed {
-	out := make([]usecasereputation.Feed, len(feeds))
-	for i, feed := range feeds {
-		out[i] = usecasereputation.Feed{
+	feeds, _ = config.WithoutRetiredReputationFeeds(feeds)
+	out := make([]usecasereputation.Feed, 0, len(feeds))
+	for _, feed := range feeds {
+		out = append(out, usecasereputation.Feed{
 			Name: feed.Name, URL: feed.URL, Category: feed.Category, Format: feed.Format,
-		}
+		})
 	}
 	return out
+}
+
+func dropRetiredReputationFeeds(feeds []usecasereputation.Feed) (cleaned []usecasereputation.Feed, dropped int) {
+	if len(feeds) == 0 {
+		return nil, 0
+	}
+	cleaned = make([]usecasereputation.Feed, 0, len(feeds))
+	for _, f := range feeds {
+		if _, retired := config.RetiredReputationFeedNames[f.Name]; retired {
+			dropped++
+			continue
+		}
+		cleaned = append(cleaned, f)
+	}
+	if len(cleaned) == 0 {
+		return nil, dropped
+	}
+	return cleaned, dropped
 }
