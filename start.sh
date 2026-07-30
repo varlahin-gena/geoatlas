@@ -6,7 +6,22 @@ cd "$SCRIPT_DIR"
 
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-120}"
 DO_BUILD="${DO_BUILD:-1}"          # 1 = пересобирать образы, 0 = только поднять
-HEALTH_URL="${HEALTH_URL:-http://127.0.0.1/api/health}"
+# Порт UI из .env (HTTP_PORT); HEALTH_URL можно переопределить явно.
+_nm_http_port_from_env() {
+    local p="80"
+    if [[ -f .env ]]; then
+        local v
+        v="$(grep -E '^[[:space:]]*HTTP_PORT=' .env 2>/dev/null | tail -n1 | cut -d= -f2- || true)"
+        [[ -n "$v" ]] && p="$v"
+    fi
+    echo "${HTTP_PORT:-$p}"
+}
+HTTP_PORT="$(_nm_http_port_from_env)"
+if [[ "${HTTP_PORT}" == "80" ]]; then
+    HEALTH_URL="${HEALTH_URL:-http://127.0.0.1/api/health}"
+else
+    HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:${HTTP_PORT}/api/health}"
+fi
 
 log() { echo "[$(date +'%F %T')] $*"; }
 
@@ -186,8 +201,13 @@ main() {
     fi
 
     log "Stack is up."
-    log "Web interface: http://${IP_ADDR}"
-    log "Health check : http://${IP_ADDR}/api/health"
+    if [[ "${HTTP_PORT}" == "80" ]]; then
+        log "Web interface: http://${IP_ADDR}"
+        log "Health check : http://${IP_ADDR}/api/health"
+    else
+        log "Web interface: http://${IP_ADDR}:${HTTP_PORT}"
+        log "Health check : http://${IP_ADDR}:${HTTP_PORT}/api/health"
+    fi
 }
 
 main "$@"

@@ -188,7 +188,7 @@ services:
     image: nginx:1.27-alpine
     container_name: frontend
     ports:
-      - "80:80"
+      - "${HTTP_PORT:-80}:80"
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |

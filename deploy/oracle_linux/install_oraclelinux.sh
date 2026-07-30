@@ -43,9 +43,10 @@ print_banner() {
     echo "    3. Источник (релиз / main)"
     echo "    4. Клонирование репозитория"
     echo "    5. Выбор модулей"
-    echo "    6. Профиль производительности"
-    echo "    7. Firewall"
-    echo "    8. Запуск стека"
+    echo "    6. Порт веб-интерфейса"
+    echo "    7. Профиль производительности"
+    echo "    8. Firewall"
+    echo "    9. Запуск стека"
     echo "══════════════════════════════════════════════════════════"
     echo ""
 }
@@ -222,10 +223,17 @@ configure_firewall() {
         return
     fi
 
-    log "Configuring firewalld..."
+    local http_port="${HTTP_PORT:-80}"
+    if [[ -f "${PROJECT_DIR}/.env" ]]; then
+        local v
+        v="$(grep -E '^[[:space:]]*HTTP_PORT=' "${PROJECT_DIR}/.env" 2>/dev/null | tail -n1 | cut -d= -f2- || true)"
+        [[ -n "$v" ]] && http_port="$v"
+    fi
+
+    log "Configuring firewalld (HTTP ${http_port}/tcp)..."
     systemctl enable --now firewalld || true
 
-    firewall-cmd --permanent --add-port=80/tcp   || true
+    firewall-cmd --permanent --add-port="${http_port}/tcp" || true
     if [[ "${NM_MODULE_SYSLOG:-1}" == "1" ]]; then
         firewall-cmd --permanent --add-port=514/tcp  || true
         firewall-cmd --permanent --add-port=514/udp  || true
@@ -349,6 +357,23 @@ configure_modules() {
     fi
 }
 
+configure_http_port() {
+    local helper="${PROJECT_DIR}/deploy/common/select_http_port.sh"
+    if [[ ! -f "$helper" ]]; then
+        helper="${SCRIPT_DIR}/../common/select_http_port.sh"
+    fi
+    if [[ -f "$helper" ]]; then
+        # shellcheck source=deploy/common/select_http_port.sh
+        source "$helper"
+        confirm_http_port
+        apply_http_port "$PROJECT_DIR"
+        return 0
+    fi
+    HTTP_PORT="${HTTP_PORT:-80}"
+    export HTTP_PORT
+    log "select_http_port.sh not found — HTTP_PORT=${HTTP_PORT}."
+}
+
 configure_resources() {
     local detector="${PROJECT_DIR}/deploy/common/detect_resources.sh"
     if [[ ! -f "$detector" ]]; then
@@ -373,6 +398,7 @@ prepare_project() {
              deploy/common/detect_resources.sh \
              deploy/common/select_modules.sh \
              deploy/common/select_source.sh \
+             deploy/common/select_http_port.sh \
              deploy/common/ui.sh \
              deploy/common/uninstall.sh \
              deploy/oracle_linux/install_oraclelinux.sh \
@@ -385,12 +411,18 @@ prepare_project() {
     log "Selecting modules..."
     configure_modules
 
+    log "Selecting HTTP port for web UI..."
+    configure_http_port
+
     log "Detecting server resources and generating performance profile..."
     configure_resources
 
     if source_module_helper; then
         apply_module_selection "$PROJECT_DIR"
         print_modules_summary
+    fi
+    if declare -F apply_http_port >/dev/null 2>&1; then
+        apply_http_port "$PROJECT_DIR"
     fi
 }
 
@@ -404,10 +436,10 @@ ask_firewall() {
     fi
     local answer
     if [[ -r /dev/tty && -w /dev/tty ]]; then
-        printf 'Настроить правила firewalld (порты 80, 514)? [Y/n]: ' >/dev/tty
+        printf 'Настроить правила firewalld (порты %s, 514)? [Y/n]: ' "${HTTP_PORT:-80}" >/dev/tty
         read -r answer </dev/tty || answer=""
     else
-        printf 'Настроить правила firewalld (порты 80, 514)? [Y/n]: ' >&2
+        printf 'Настроить правила firewalld (порты %s, 514)? [Y/n]: ' "${HTTP_PORT:-80}" >&2
         read -r answer || answer=""
     fi
     answer="${answer,,}"

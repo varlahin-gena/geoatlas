@@ -19,8 +19,17 @@ nm_remove_firewall_rules() {
         return
     fi
 
+    local http_port="80"
+    local project_dir="${PROJECT_DIR:-/opt/network-monitor}"
+    if [[ -f "${project_dir}/.env" ]]; then
+        local v
+        v="$(grep -E '^[[:space:]]*HTTP_PORT=' "${project_dir}/.env" 2>/dev/null | tail -n1 | cut -d= -f2- || true)"
+        [[ -n "$v" ]] && http_port="$v"
+    fi
+
     if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld; then
         echo "[$(date +'%F %T')] Removing firewalld rules..."
+        firewall-cmd --permanent --remove-port="${http_port}/tcp" || true
         firewall-cmd --permanent --remove-port=80/tcp   || true
         firewall-cmd --permanent --remove-port=514/tcp  || true
         firewall-cmd --permanent --remove-port=514/udp  || true

@@ -434,7 +434,7 @@ confirm_firewall() {
 
     _nm_mod_ensure_ui || true
     echo "" >&2
-    if _nm_mod_yesno "Настроить правила firewall (порты 80, 514/tcp+udp)?" "${current}"; then
+    if _nm_mod_yesno "Настроить правила firewall (порты ${HTTP_PORT:-80}, 514/tcp+udp)?" "${current}"; then
         printf -v "$var_name" '%s' "1"
     else
         printf -v "$var_name" '%s' "0"
