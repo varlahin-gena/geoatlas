@@ -32,6 +32,7 @@
   - [Пересборка образов](#пересборка-образов)
 - [GeoIP](#geoip)
 - [Веб-интерфейс](#веб-интерфейс)
+  - [HTTP API](#http-api)
 - [Структура репозитория](#структура-репозитория)
 
 ---
@@ -40,20 +41,23 @@
 
 - Приём логов по **syslog** (TCP/UDP, порт 514)
 - Ручная загрузка логов через веб-интерфейс
-- Парсинг **UserGate, FortiGate, Cisco ASA, Cisco FTD (FirePower), Cowrie (honeypot)** и универсальный фолбэк (Generic KV).
+- Парсинг **UserGate, FortiGate, Cisco ASA, Cisco FTD (FirePower), Cowrie (honeypot)** и универсальный фолбэк (Generic KV)
 - **Осознанный пропуск** событий: распознанные, но несетевые строки (например, часть `cowrie.*`) не попадают в `parse_errors`
 - **Авторизация по умолчанию**: роли `administrator` / `operator`, cookie-сессии, CSRF, Bearer `API_AUTH_TOKEN` (+ `API_AUTH_PREVIOUS_TOKEN`); именованные API-токены со scopes `read`/`ops`/`admin` (UI `/api-tokens.html`); управление УЗ в UI
 - Загрузка и правка **GeoIP-базы** (CSV SIEM KUMA, страница `/geo-ranges.html`, IP без координат на `/geo-missing.html`)
-- Хранение и аналитика в **ClickHouse**
+- **Репутация IP** (модуль опционален при установке): offline-списки и URL-фиды (`/reputation.html`), каталог публичных источников, фильтр и подсветка дуг на карте; приватные IP не помечаются
+- Хранение и аналитика в **ClickHouse**; дневные geo-агрегаты для пресетов `1d+` (city/country)
 - **Настраиваемый TTL (retention)** таблиц из UI `/system.html`
 - Построение связей на карте (2D MapLibre) и глобусе (3D MapLibre Globe); на карту попадают только узлы/рёбра с координатами
-- Полный mesh дуг + viewport-fit zoom; heatmap стран (на глобусе отключён) + sparkline по клику на страну
-- Фильтрация: все / разрешённые / заблокированные (на клиенте, без повторного запроса к API)
+- Полный mesh дуг + viewport-fit zoom; heatmap стран (на глобусе отключён) + sparkline по клику на страну; экспорт PNG; светлая/тёмная тема
+- Фильтрация: все / разрешённые / заблокированные (на клиенте); опционально «один цвет линий»
+- **Конструктор поиска** на карте (гибридный query builder) и **личные шаблоны** запросов; у администратора — просмотр всех шаблонов
 - Группировка узлов: по IP / по подсети `/24` / **по городу (по умолчанию)** / по стране; при отсутствии города — фолбэк на центр страны
 - **Тест парсеров** в браузере: статусы parsed / skipped / error, гео-обогащение, пресеты по вендорам
 - **Журнал ошибок парсинга**: поиск, выборочное и полное удаление, передача строк в «Тест парсеров»
-- Страница системного мониторинга (вкладки Обзор / Pipeline / Безопасность / Графики): метрики контейнеров, пайплайна (в т.ч. **UDP/TCP EPS**, drops), **форма TTL**, неуспешные логины, хранилище, профиль установки, **индикатор ёмкости**, алёрты
+- Страница системного мониторинга (вкладки Обзор / Pipeline / Безопасность / Графики): метрики контейнеров, пайплайна (в т.ч. **UDP/TCP EPS**, drops, circuit breaker), **форма TTL**, неуспешные логины, хранилище, профиль установки, **индикатор ёмкости**, алёрты; ручной maintenance backfill агрегатов
 - Индикатор здоровья системы на главной странице (ссылка на `/system.html`)
+- Контракт HTTP API: [`openapi.yaml`](openapi.yaml) (OpenAPI **1.3.0**)
 
 ---
 
@@ -592,20 +596,25 @@ Network,Country,Region,City,Latitude,Longitude
 
 ## Веб-интерфейс
 
-| URL                    | Страница              | Основные возможности                                                                                                                               |
-|------------------------|-----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------|
-| `/login.html`          | Вход                  | Логин (роли admin / operator); смена пароля при `must_reset_password`                                                                              |
-| `/`                    | Карта / глобус        | 2D/3D, группировка (город по умолчанию), фильтры, поиск, порог событий, загрузка логов/GeoIP, индикатор здоровья                                   |
-| `/parse-errors.html`   | Журнал ошибок парсинга| Поиск, удаление выбранных / всех, отправка в тест парсеров                                                                                         |
-| `/geo-missing.html`    | IP без GeoIP          | Адреса без координат; добавление в GeoIP; мгновенная перефильтрация списка                                                                         |
-| `/geo-ranges.html`     | База GeoIP            | Просмотр/правка диапазонов, выгрузка CSV                                                                                                           |
-| `/parser-test.html`    | Тест парсеров         | До 200 строк за запрос, пресеты по вендорам, статусы parsed/skipped/error                                                                          |
-| `/system.html`         | Системный мониторинг  | Вкладки: Обзор (профиль, health, контейнеры), Pipeline (EPS/drops, **TTL retention**), Безопасность (неуспешные логины), Графики; алёрты и ёмкость |
-| `/users.html`          | Учётные записи        | Список/создание УЗ                                                                                                                                 |
-| `/api-tokens.html`     | API-токены            | Именованные Bearer со scope read/ops/admin; секрет показывается один раз                                                                            |
-| `/change-password.html`| Смена пароля          | Смена своего пароля                                                                                                                                |
+| URL                    | Страница              | Основные возможности                                                                                                                                 |
+|------------------------|-----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `/login.html`          | Вход                  | Логин (роли admin / operator); смена пароля при `must_reset_password`                                                                                |
+| `/`                    | Карта / глобус        | 2D/3D, группировка, фильтры status/репутации, конструктор поиска и шаблоны, порог событий, mono-дуги, экспорт PNG, загрузка логов/GeoIP, health pill |
+| `/reputation.html`     | Репутация IP          | Списки и URL-фиды, каталог источников, refresh по расписанию, ручная загрузка; модуль можно отключить при установке                                  |
+| `/parse-errors.html`   | Журнал ошибок парсинга| Поиск, удаление выбранных / всех, отправка в тест парсеров                                                                                           |
+| `/geo-missing.html`    | IP без GeoIP          | Адреса без координат; добавление в GeoIP; выгрузка CSV; мгновенная перефильтрация списка                                                             |
+| `/geo-ranges.html`     | База GeoIP            | Просмотр/правка диапазонов, выгрузка CSV                                                                                                             |
+| `/parser-test.html`    | Тест парсеров         | До 200 строк за запрос, пресеты по вендорам, статусы parsed/skipped/error                                                                            |
+| `/system.html`         | Системный мониторинг  | Обзор / Pipeline (EPS/drops/TTL) / Безопасность / Графики; алёрты, ёмкость, профиль установки                                                        |
+| `/users.html`          | Учётные записи        | Список/создание УЗ (скрыто, если UI-auth выключен)                                                                                                   |
+| `/api-tokens.html`     | API-токены            | Именованные Bearer со scope read/ops/admin; секрет показывается один раз                                                                             |
+| `/change-password.html`| Смена пароля          | Смена своего пароля                                                                                                                                  |
 
-Nginx: карта и смена пароля — любой залогиненный; system / parsers / geo / users — только **administrator**.
+Nginx: карта и смена пароля — любой залогиненный; system / parsers / geo / reputation / users / api-tokens — только **administrator**.
+
+### HTTP API
+
+Контракт REST API (в т.ч. auth, events, geo, reputation, retention, tokens, search-templates): [`openapi.yaml`](openapi.yaml), версия документа **1.3.0**. Проверка живости: `GET /api/health` (публичный). Остальные эндпоинты — cookie-сессия и/или Bearer (`API_AUTH_TOKEN` / именованный токен со scope).
 
 ## Структура репозитория
 
@@ -658,11 +667,12 @@ network_monitor/
 │   ├── index.html / index.css        # карта / глобус
 │   ├── system.html / system.css      # мониторинг
 │   ├── login.html / change-password.html / auth-form.css
-│   ├── users.html / parse-errors.html / geo-missing.html / geo-ranges.html / parser-test.html
+│   ├── users.html / api-tokens.html / reputation.html
+│   ├── parse-errors.html / geo-missing.html / geo-ranges.html / parser-test.html / system.html
 │   ├── auth.js / common.js           # auth + общие UI-хелперы
 │   ├── theme.css / common.css        # токены тем + общий каркас
 │   ├── js/                           # map-*.js, system-app.js
-│   ├── vendor/                       # deck.gl + uPlot (офлайн)
+│   ├── vendor/                       # MapLibre + deck.gl + uPlot (офлайн)
 │   ├── favicon.svg
 │   ├── data/countries.geojson        # контуры стран для карты
 │   └── nginx.conf
@@ -676,7 +686,8 @@ network_monitor/
 │   └── internal/
 │       ├── config/
 │       └── collector/
-├── openapi.yaml                      # контракт HTTP API (в т.ч. retention)
+├── openapi.yaml                      # контракт HTTP API (OpenAPI 1.3.0)
+├── VERSION / CHANGELOG.md / RELEASING.md
 ├── .github/workflows/ci.yml
 ├── start.sh / stop.sh
 └── syslog-ng.conf
