@@ -47,7 +47,7 @@
 - Хранение и аналитика в **ClickHouse**
 - **Настраиваемый TTL (retention)** таблиц из UI `/system.html`
 - Построение связей на карте (2D MapLibre) и глобусе (3D MapLibre Globe); на карту попадают только узлы/рёбра с координатами
-- Режим дуг **hub–spoke** (top-K хабов по числу связей) или полный mesh; hex-плотность на отдалении; heatmap стран + sparkline по клику
+- Полный mesh дуг + viewport-fit zoom; heatmap стран (на глобусе отключён) + sparkline по клику на страну
 - Фильтрация: все / разрешённые / заблокированные (на клиенте, без повторного запроса к API)
 - Группировка узлов: по IP / по подсети `/24` / **по городу (по умолчанию)** / по стране; при отсутствии города — фолбэк на центр страны
 - **Тест парсеров** в браузере: статусы parsed / skipped / error, гео-обогащение, пресеты по вендорам
@@ -222,7 +222,7 @@ sudo ./install_ubuntu.sh
 |-------|-----|--------------|
 | Последний релиз (по умолчанию в UI) | `NM_INSTALL_SOURCE=release` | тег с наибольшей semver-версией (`git ls-remote --tags`) |
 | Ветка main | `NM_INSTALL_SOURCE=main` | `main` — последние изменения |
-| Явный ref | `BRANCH=v1.1.0` | указанная ветка/тег без вопроса |
+| Явный ref | `BRANCH=v1.1.1` | указанная ветка/тег без вопроса |
 
 **Порт UI:** `HTTP_PORT=8080` (или `NM_HTTP_PORT`) — без вопроса; в compose: `${HTTP_PORT:-80}:80`.
 
@@ -390,12 +390,12 @@ docker compose restart clickhouse
 
 При установке скрипт `deploy/common/detect_resources.sh` анализирует CPU, RAM и диск, затем генерирует:
 
-| Файл                                       | Назначение                                    |
-|--------------------------------------------|-----------------------------------------------|
-| `docker-compose.override.yml`              | Лимиты CPU/RAM контейнеров, параметры ingest  |
-| `.env`                                     | Переменные для compose                        |
-| `clickhouse/users.d/zz_install_limits.xml` | Лимиты памяти запросов ClickHouse             |
-| `install-profile.json`                     | Сводка профиля (отображается в UI «Система»)  |
+| Файл                                       | Назначение                                              |
+|--------------------------------------------|---------------------------------------------------------|
+| `docker-compose.override.yml`              | Лимиты CPU/RAM контейнеров, параметры ingest, `CH_MAX_THREADS` |
+| `.env`                                     | Переменные для compose                                  |
+| `clickhouse/users.d/zz_install_limits.xml` | Лимиты памяти и `max_threads` запросов ClickHouse       |
+| `install-profile.json`                     | Сводка профиля (отображается в UI «Система»)            |
 
 **Доступные профили:**
 
@@ -406,6 +406,8 @@ docker compose restart clickhouse
 | `medium` | ≤8 CPU / ≤16 GiB RAM    | 6 GiB         | 4 GiB         | 4       | 10 000 – 25 000 |
 | `large`  | ≤16 CPU / ≤32 GiB RAM   | 12 GiB        | 8 GiB         | 8       | 25 000 – 80 000 |
 | `xlarge` | >16 CPU / >32 GiB RAM   | 24 GiB        | 16 GiB        | 12      | 80 000 – 200 000|
+
+Профиль также задаёт **`CH_MAX_THREADS`** (~половина ядер ClickHouse, потолок 4; по умолчанию 2): лимит потоков на тяжёлые `GROUP BY` карты, чтобы refresh не утилизировал все ядра. Варианты в установщике — только `tiny`…`xlarge`.
 
 **Пересчёт профиля после изменения ресурсов сервера:**
 
@@ -518,7 +520,8 @@ docker compose exec clickhouse clickhouse-client --query "
 | Нет событий на карте           | `docker compose logs syslog-ng`, `/api/ingest/stats` |
 | Ошибки парсинга                | UI → «Ошибки парсинга», таблица `parse_errors`     |
 | Backend не стартует            | `docker compose logs backend`, healthcheck         |
-| ClickHouse OOM / медленные запросы | `install-profile.json`, увеличить профиль       |
+| ClickHouse OOM / медленные запросы | `install-profile.json`, увеличить профиль; для карты предпочтительнее период `1d+` + groupBy city/country (daily geo-agg) |
+| ClickHouse CPU скачет при обновлении карты | abort предыдущих `/api/events`; `CH_MAX_THREADS` / `max_threads` в профиле; логи backend `geo edges agg: ready`; периоды `1h`/`6h` всегда читают `traffic_logs` |
 | ClickHouse idle CPU высокий, мало данных | `system.trace_log`/`text_log` — см. `config.d/z_system_logs.xml`; `TRUNCATE`/`DROP` старых system-логов |
 | Нет метрик на странице «Система» | `docker compose logs stats-collector`, cgroup, `/proc` и `/sys/fs/cgroup` на хосте |
 | Превышена расчётная ёмкость      | `/system.html` → алёрты `capacity_high` / `capacity_exceeded`, пересчёт профиля |

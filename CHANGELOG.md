@@ -3,6 +3,31 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/).
 Версии — [SemVer](https://semver.org/lang/ru/).
 
+## [1.1.1] — 2026-07-31
+
+Патч: снижение CPU ClickHouse при обновлении карты, единое админ-меню, доработки установщика и репутации.
+
+### Fixed
+- Geo edges MV/backfill: alias-shadowing `trimBoth` + `anyState(src_city) AS src_city` (CH code 43) — pre-agg снова создаётся, карта не уходит в cold-скан `traffic_logs`
+- Пики CPU при смене периода/группировки: `AbortController` + debounce для `/api/events` (и series); без лишнего raw fallback после успешного geo-скана
+- `/api/events` 500 и panic карты при неготовых geo-агрегатах / отключённой репутации
+- Пункт «API-токены» пропадал из статичных сайдбаров карты/мониторинга — навигация из единого `PAGE_NAV`
+- Репутация: тосты refresh, подсчёт ranges, скрытие уже активных пресетов каталога; убраны битые/устаревшие фиды (`et_block_official`, `cruzit_web_attacks`)
+
+### Changed
+- `CH_MAX_THREADS` / `max_threads` в профиле установки (по умолчанию 2; ~½ ядер CH, потолок 4) — тяжёлые GROUP BY не утилизируют все ядра
+- Установщик: профили только `tiny`…`xlarge` (без «оставить docker-compose.yml»); выбор HTTP-порта; источник install (релиз / `main`); опциональный модуль reputation; whiptail/dialog TUI
+- Управление пользователями скрыто при отключённом UI-auth
+
+### Added
+- Дефолтные reputation seeds в установочном каталоге; объединение URL-фидов и загруженных списков в одной таблице UI
+
+### Notes
+- OpenAPI API doc version: **1.3.0** (без изменений)
+- Продуктовая версия: **1.1.1**
+- После обновления: `git pull`, перезапуск backend (пересоздаст geo MV, schema v2); для `max_threads` в users.d — `./scripts/tune-resources.sh` или `CH_MAX_THREADS` в override
+- 22 коммита с `v1.1.0`
+
 ## [1.1.0] — 2026-07-29
 
 Минорный релиз: репутация IP, поиск по карте, MapLibre/глобус, ускорение загрузки карты и усиление ingest.
@@ -63,5 +88,6 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[1.1.1]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.1.1
 [1.1.0]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.1.0
 [1.0.0]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.0.0
