@@ -174,14 +174,30 @@ func ensureGeoEdgesTable(ctx context.Context, ch clickhouse.Conn, groupBy string
 		return fmt.Errorf("create %s: %w", table, err)
 	}
 
-	srcKey, dstKey, srcLabel, dstLabel := sqlclause.GeoGroupExprs(groupBy)
+	srcKey, dstKey, srcLabel, dstLabel := sqlclause.GeoGroupExprsPrefixed("traffic_logs", groupBy)
 	coordOK := sqlclause.GeoCoordOK
+	selectBody := geoEdgesAggSelectBody(srcKey, dstKey, srcLabel, dstLabel, coordOK)
 
 	createMV := func(viewName string) string {
 		return fmt.Sprintf(`
 		CREATE MATERIALIZED VIEW %s
 		TO %s AS
-		SELECT
+		%s
+		FROM traffic_logs
+		GROUP BY day, src_key, dst_key
+	`, viewName, table, selectBody)
+	}
+	if err := replaceMaterializedView(ctx, ch, mv, createMV); err != nil {
+		return err
+	}
+	return nil
+}
+
+// geoEdgesAggSelectBody — SELECT-список для MV и backfill INSERT.
+// Колонки src_city/country квалифицируются как traffic_logs.*: иначе CH
+// подставляет anyState(...) AS src_city в trimBoth(src_city) (code 43).
+func geoEdgesAggSelectBody(srcKey, dstKey, srcLabel, dstLabel, coordOK string) string {
+	return fmt.Sprintf(`SELECT
 			toDate(timestamp) AS day,
 			%s AS src_key,
 			%s AS dst_key,
@@ -207,20 +223,13 @@ func ensureGeoEdgesTable(ctx context.Context, ch clickhouse.Conn, groupBy string
 			anyState(device) AS device,
 			anyState(src_zone) AS src_zone,
 			anyState(dst_zone) AS dst_zone,
-			anyState(src_country) AS src_country,
-			anyState(dst_country) AS dst_country,
-			anyState(src_city) AS src_city,
-			anyState(dst_city) AS dst_city
-		FROM traffic_logs
-		GROUP BY day, src_key, dst_key
-	`, viewName, table, srcKey, dstKey, sqlclause.SumBlockedSQL(), sqlclause.SumAllowedSQL(),
-			coordOK, coordOK, coordOK, coordOK, sqlclause.CoordWeightSQL(),
-			srcLabel, dstLabel)
-	}
-	if err := replaceMaterializedView(ctx, ch, mv, createMV); err != nil {
-		return err
-	}
-	return nil
+			anyState(traffic_logs.src_country) AS src_country,
+			anyState(traffic_logs.dst_country) AS dst_country,
+			anyState(traffic_logs.src_city) AS src_city,
+			anyState(traffic_logs.dst_city) AS dst_city`,
+		srcKey, dstKey, sqlclause.SumBlockedSQL(), sqlclause.SumAllowedSQL(),
+		coordOK, coordOK, coordOK, coordOK, sqlclause.CoordWeightSQL(),
+		srcLabel, dstLabel)
 }
 
 func backfillGeoEdgesAgg(ctx context.Context, ch clickhouse.Conn, groupBy string) error {
@@ -305,48 +314,17 @@ func missingGeoDays(ctx context.Context, ch clickhouse.Conn, table string) ([]ti
 
 func insertGeoEdgesDays(ctx context.Context, ch clickhouse.Conn, groupBy string, days []time.Time) error {
 	table := sqlclause.GeoEdgesTable(groupBy)
-	srcKey, dstKey, srcLabel, dstLabel := sqlclause.GeoGroupExprs(groupBy)
-	coordOK := sqlclause.GeoCoordOK
+	srcKey, dstKey, srcLabel, dstLabel := sqlclause.GeoGroupExprsPrefixed("traffic_logs", groupBy)
+	selectBody := geoEdgesAggSelectBody(srcKey, dstKey, srcLabel, dstLabel, sqlclause.GeoCoordOK)
 
 	insertTpl := fmt.Sprintf(`
 		INSERT INTO %s
-		SELECT
-			toDate(timestamp) AS day,
-			%s AS src_key,
-			%s AS dst_key,
-			count() AS cnt,
-			%s AS blocked_cnt,
-			%s AS allowed_cnt,
-			sum(bytes_sent) AS bytes_sent,
-			sum(bytes_recv) AS bytes_recv,
-			sum(packets_sent) AS packets_sent,
-			sum(packets_recv) AS packets_recv,
-			sumIf(src_lat, %s) AS src_lat_sum,
-			sumIf(src_lon, %s) AS src_lon_sum,
-			sumIf(dst_lat, %s) AS dst_lat_sum,
-			sumIf(dst_lon, %s) AS dst_lon_sum,
-			%s AS coord_weight,
-			anyState(%s) AS src_label,
-			anyState(%s) AS dst_label,
-			argMaxState(action, timestamp) AS last_action,
-			anyState(rule) AS rule,
-			anyState(proto) AS proto,
-			anyState(src_port) AS src_port,
-			anyState(dst_port) AS dst_port,
-			anyState(device) AS device,
-			anyState(src_zone) AS src_zone,
-			anyState(dst_zone) AS dst_zone,
-			anyState(src_country) AS src_country,
-			anyState(dst_country) AS dst_country,
-			anyState(src_city) AS src_city,
-			anyState(dst_city) AS dst_city
+		%s
 		FROM traffic_logs
 		WHERE toDate(timestamp) = ?
 		GROUP BY day, src_key, dst_key
 		%s
-	`, table, srcKey, dstKey, sqlclause.SumBlockedSQL(), sqlclause.SumAllowedSQL(),
-		coordOK, coordOK, coordOK, coordOK, sqlclause.CoordWeightSQL(),
-		srcLabel, dstLabel, query.AggSettings())
+	`, table, selectBody, query.AggSettings())
 
 	for i, day := range days {
 		if err := ctx.Err(); err != nil {

@@ -19,7 +19,7 @@ const (
 	schemaComponentGeoEdges = "geo_edges_agg"
 
 	schemaVersionEdgesAgg uint32 = 1
-	schemaVersionGeoEdges uint32 = 1
+	schemaVersionGeoEdges uint32 = 2
 )
 
 func ensureSchemaVersionTable(ctx context.Context, ch clickhouse.Conn) error {
