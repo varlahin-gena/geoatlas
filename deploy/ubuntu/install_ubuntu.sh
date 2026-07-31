@@ -450,7 +450,7 @@ prepare_project() {
     log "Detecting server resources and generating performance profile..."
     configure_resources
 
-    # Синхронизируем модули в .env (и на случай NM_SKIP_PROFILE / skip профиля).
+    # Синхронизируем модули в .env (и на случай NM_SKIP_PROFILE).
     if source_module_helper; then
         apply_module_selection "$PROJECT_DIR"
         print_modules_summary

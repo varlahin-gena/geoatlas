@@ -122,18 +122,28 @@
       if (uiAuthEnabled) el.style.removeProperty('display');
       else el.style.display = 'none';
     });
+    const navOpts = {
+      isAdmin: isAdmin,
+      reputationEnabled: reputationEnabled,
+      uiAuthEnabled: uiAuthEnabled,
+    };
     const sidebar = document.getElementById('adminSidebar');
     if (
       sidebar &&
-      sidebar.getAttribute('data-nm-dynamic-nav') === '1' &&
       global.NMUI &&
-      typeof global.NMUI.mountAdminSidebar === 'function'
+      typeof global.NMUI.mountAdminSidebar === 'function' &&
+      (sidebar.getAttribute('data-nm-dynamic-nav') === '1' ||
+        sidebar.children.length === 0)
     ) {
-      global.NMUI.mountAdminSidebar(undefined, {
-        isAdmin: isAdmin,
-        reputationEnabled: reputationEnabled,
-        uiAuthEnabled: uiAuthEnabled,
-      });
+      global.NMUI.mountAdminSidebar(undefined, navOpts);
+    }
+    const adminNav = document.getElementById('adminNavSection');
+    if (
+      adminNav &&
+      global.NMUI &&
+      typeof global.NMUI.mountPageNav === 'function'
+    ) {
+      global.NMUI.mountPageNav(adminNav, Object.assign({ adminLinksOnly: true }, navOpts));
     }
     return isAdmin;
   }

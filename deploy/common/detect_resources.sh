@@ -262,7 +262,6 @@ confirm_profile() {
             desc="$(profile_label_ru "$p")${mark} · CH ${CH_MEM_GB}G · BE ${BE_MEM_GB}G · EPS до ${EPS_MAX}/с"
             items+=("$p" "$desc" "$on_flag")
         done
-        items+=(skip "Оставить значения docker-compose.yml (без override)" OFF)
 
         local answer
         if answer="$(nm_ui_radiolist \
@@ -271,11 +270,6 @@ confirm_profile() {
 Выберите профиль:" \
             "${items[@]}")"; then
             case "$answer" in
-                skip)
-                    NM_SELECTED_PROFILE=""
-                    _nm_log "Профиль не применён — используются значения docker-compose.yml"
-                    return 0
-                    ;;
                 tiny|small|medium|large|xlarge)
                     NM_SELECTED_PROFILE="$answer"
                     if [[ "$answer" == "$recommended" ]]; then

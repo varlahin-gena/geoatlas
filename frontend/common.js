@@ -281,44 +281,53 @@
   }
 
   /**
-   * HTML бокового меню навигации.
-   * @param {string} [pathname]
-   * @param {{ isAdmin?: boolean, reputationEnabled?: boolean }} [opts]
-   * @returns {string}
+   * Нормализует флаги доступа для PAGE_NAV.
+   * @param {{ isAdmin?: boolean, reputationEnabled?: boolean, uiAuthEnabled?: boolean, adminLinksOnly?: boolean }} [opts]
+   * @returns {{ isAdmin: boolean, reputationEnabled: boolean, uiAuthEnabled: boolean, adminLinksOnly: boolean, path: string }}
    */
-  function buildAdminSidebarHtml(pathname, opts) {
-    var path = pathname || (typeof location !== 'undefined' ? location.pathname : '/');
-    var isAdmin = !opts || opts.isAdmin !== false;
+  function resolveNavOpts(pathname, opts) {
+    var o = opts || {};
     var reputationEnabled;
-    if (opts && typeof opts.reputationEnabled === 'boolean') {
-      reputationEnabled = opts.reputationEnabled;
+    if (typeof o.reputationEnabled === 'boolean') {
+      reputationEnabled = o.reputationEnabled;
     } else if (typeof global.__nmReputationEnabled === 'boolean') {
       reputationEnabled = global.__nmReputationEnabled;
     } else {
       reputationEnabled = true;
     }
     var uiAuthEnabled;
-    if (opts && typeof opts.uiAuthEnabled === 'boolean') {
-      uiAuthEnabled = opts.uiAuthEnabled;
+    if (typeof o.uiAuthEnabled === 'boolean') {
+      uiAuthEnabled = o.uiAuthEnabled;
     } else if (typeof global.__nmUIAuthEnabled === 'boolean') {
       uiAuthEnabled = global.__nmUIAuthEnabled;
     } else {
       uiAuthEnabled = true;
     }
-    var html =
-      '<div class="sidebar-header">' +
-      '<img class="logo" src="/logo.png" alt="" width="28" height="28" aria-hidden="true" />' +
-      '<div class="title">ГеоАтлас</div>' +
-      '</div>' +
-      '<div class="sidebar-section">' +
-      '<div class="sidebar-section-title">Разделы</div>';
+    return {
+      isAdmin: o.isAdmin !== false,
+      reputationEnabled: reputationEnabled,
+      uiAuthEnabled: uiAuthEnabled,
+      adminLinksOnly: !!o.adminLinksOnly,
+      path: pathname || (typeof location !== 'undefined' ? location.pathname : '/'),
+    };
+  }
 
+  /**
+   * HTML ссылок из PAGE_NAV с фильтрами ролей.
+   * @param {string} [pathname]
+   * @param {{ isAdmin?: boolean, reputationEnabled?: boolean, uiAuthEnabled?: boolean, adminLinksOnly?: boolean }} [opts]
+   * @returns {string}
+   */
+  function buildPageNavLinksHtml(pathname, opts) {
+    var nav = resolveNavOpts(pathname, opts);
+    var html = '';
     for (var i = 0; i < PAGE_NAV.length; i++) {
       var item = PAGE_NAV[i];
-      if (item.adminOnly && !isAdmin) continue;
-      if (item.requiresReputation && !reputationEnabled) continue;
-      if (item.requiresUIAuth && !uiAuthEnabled) continue;
-      var active = isNavActive(item, path);
+      if (nav.adminLinksOnly && !item.adminOnly) continue;
+      if (item.adminOnly && !nav.isAdmin) continue;
+      if (item.requiresReputation && !nav.reputationEnabled) continue;
+      if (item.requiresUIAuth && !nav.uiAuthEnabled) continue;
+      var active = isNavActive(item, nav.path);
       html +=
         '<a href="' +
         escapeHTML(item.href) +
@@ -334,22 +343,38 @@
         escapeHTML(item.label) +
         '</span></a>';
     }
+    return html;
+  }
 
-    html +=
+  /**
+   * HTML бокового меню навигации.
+   * @param {string} [pathname]
+   * @param {{ isAdmin?: boolean, reputationEnabled?: boolean, uiAuthEnabled?: boolean }} [opts]
+   * @returns {string}
+   */
+  function buildAdminSidebarHtml(pathname, opts) {
+    return (
+      '<div class="sidebar-header">' +
+      '<img class="logo" src="/logo.png" alt="" width="28" height="28" aria-hidden="true" />' +
+      '<div class="title">ГеоАтлас</div>' +
+      '</div>' +
+      '<div class="sidebar-section">' +
+      '<div class="sidebar-section-title">Разделы</div>' +
+      buildPageNavLinksHtml(pathname, opts) +
       '</div>' +
       '<div class="sidebar-collapse-btn">' +
       '<button type="button" class="side-btn" id="btnToggleAdminSidebar" title="Развернуть / свернуть меню">' +
       ICON +
       '<path d="M15 18l-6-6 6-6"/></svg>' +
       '<span class="label">Свернуть меню</span>' +
-      '</button></div>';
-
-    return html;
+      '</button></div>'
+    );
   }
 
   /**
    * Монтирует боковое меню и layout админ-страницы.
    * @param {string} [pathname]
+   * @param {{ isAdmin?: boolean, reputationEnabled?: boolean, uiAuthEnabled?: boolean }} [opts]
    * @returns {{ app: HTMLElement, sidebar: HTMLElement }}
    */
   function mountAdminSidebar(pathname, opts) {
@@ -375,6 +400,32 @@
     }
 
     return layout;
+  }
+
+  /**
+   * Встраивает ссылки PAGE_NAV в контейнер (секция «Администрирование» на карте).
+   * @param {string|HTMLElement} host
+   * @param {{ isAdmin?: boolean, reputationEnabled?: boolean, uiAuthEnabled?: boolean, adminLinksOnly?: boolean, pathname?: string, title?: string }} [opts]
+   * @returns {HTMLElement|null}
+   */
+  function mountPageNav(host, opts) {
+    var el = typeof host === 'string' ? document.querySelector(host) : host;
+    if (!el) return null;
+    var o = opts || {};
+    var title = o.title || 'Администрирование';
+    var navOpts = {
+      isAdmin: o.isAdmin,
+      reputationEnabled: o.reputationEnabled,
+      uiAuthEnabled: o.uiAuthEnabled,
+      adminLinksOnly: o.adminLinksOnly !== false,
+    };
+    el.setAttribute('data-nm-dynamic-nav', '1');
+    el.innerHTML =
+      '<div class="sidebar-section-title">' +
+      escapeHTML(title) +
+      '</div>' +
+      buildPageNavLinksHtml(o.pathname, navOpts);
+    return el;
   }
 
   var STATUS_REFRESH_MS = 5000;
@@ -536,6 +587,7 @@
     toast,
     ensureToastHost,
     mountAdminSidebar,
+    mountPageNav,
     mountAdminTopbar,
     applySystemHealthPillAccess,
     fetchSystemHealth,

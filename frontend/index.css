@@ -75,6 +75,7 @@ html, body {
     width: 100%; background: transparent; border: none; color: var(--text);
     padding: 8px 10px; border-radius: 6px; cursor: pointer;
     font-size: 13px; text-align: left; transition: background 0.12s;
+    text-decoration: none;
 }
 .side-btn:hover { background: var(--panel-3); }
 .side-btn .icon { width: 18px; height: 18px; flex-shrink: 0; color: var(--text-dim); }

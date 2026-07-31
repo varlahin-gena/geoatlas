@@ -28,53 +28,7 @@
 <a class="skip-link" href="#system-main">К содержимому</a>
 
 <div class="app" id="adminApp">
-    <aside id="adminSidebar" class="sidebar" aria-label="Навигация">
-        <div class="sidebar-header">
-            <img class="logo" src="/logo.png" alt="" width="28" height="28" aria-hidden="true" />
-            <div class="title">ГеоАтлас</div>
-        </div>
-        <div class="sidebar-section">
-            <div class="sidebar-section-title">Разделы</div>
-            <a href="/" class="side-btn" title="Карта">
-                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6v15l7-3 8 3 7-3V3l-7 3-8-3-7 3z"/><path d="M8 3v15M16 6v15"/></svg>
-                <span class="label">Карта</span>
-            </a>
-            <a href="/system.html" class="side-btn active" aria-current="page" title="Мониторинг">
-                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 3 5-5"/></svg>
-                <span class="label">Мониторинг</span>
-            </a>
-            <a href="/parser-test.html" class="side-btn" title="Тест парсеров">
-                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-                <span class="label">Тест парсеров</span>
-            </a>
-            <a href="/parse-errors.html" class="side-btn" title="Ошибки парсинга">
-                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                <span class="label">Ошибки парсинга</span>
-            </a>
-            <a href="/geo-missing.html" class="side-btn" title="IP без GeoIP">
-                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-                <span class="label">IP без GeoIP</span>
-            </a>
-            <a href="/geo-ranges.html" class="side-btn" title="База GeoIP">
-                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>
-                <span class="label">База GeoIP</span>
-            </a>
-            <a href="/reputation.html" class="side-btn" title="Репутация IP" data-reputation-only>
-                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                <span class="label">Репутация IP</span>
-            </a>
-            <a href="/users.html" class="side-btn" title="Пользователи" data-auth-only>
-                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                <span class="label">Пользователи</span>
-            </a>
-        </div>
-        <div class="sidebar-collapse-btn">
-            <button type="button" class="side-btn" id="btnToggleAdminSidebar" title="Развернуть / свернуть меню">
-                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
-                <span class="label">Свернуть меню</span>
-            </button>
-        </div>
-    </aside>
+    <aside id="adminSidebar" class="sidebar" aria-label="Навигация"></aside>
 
     <div class="admin-main">
     <header class="header">
@@ -326,23 +280,6 @@
 <script src="/config.js"></script>
 <script src="/auth.js"></script>
 <script src="/common.js"></script>
-<script>
-(function () {
-  var KEY = 'nm.adminSidebarCollapsed';
-  var app = document.getElementById('adminApp');
-  var btn = document.getElementById('btnToggleAdminSidebar');
-  if (!app || !btn) return;
-  try {
-    if (localStorage.getItem(KEY) === '1') app.classList.add('sidebar-collapsed');
-  } catch (e) {}
-  btn.addEventListener('click', function () {
-    app.classList.toggle('sidebar-collapsed');
-    try {
-      localStorage.setItem(KEY, app.classList.contains('sidebar-collapsed') ? '1' : '0');
-    } catch (e) {}
-  });
-})();
-</script>
 <script src="/js/system-app.js"></script>
 
 </body>
