@@ -33,7 +33,7 @@ function bindUI() {
         saveUIState();
         // На глобусе после смены группировки нужен однократный resync GlobeView.
         if (typeof requestGlobeViewResync === 'function') requestGlobeViewResync();
-        refreshMap();
+        refreshMapDebounced();
     });
     $('periodPreset')?.addEventListener('change', () => onPeriodPresetChange());
     $('periodPreset')?.addEventListener('mousedown', function () {

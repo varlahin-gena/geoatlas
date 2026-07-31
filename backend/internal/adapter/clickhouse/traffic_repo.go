@@ -8,7 +8,6 @@ import (
 	ch "github.com/ClickHouse/clickhouse-go/v2"
 
 	"network_monitor/internal/adapter/clickhouse/query"
-	"network_monitor/internal/mapagg"
 	"network_monitor/internal/model"
 	"network_monitor/internal/usecase/events"
 )
@@ -33,13 +32,12 @@ func (r *TrafficRepository) ScanMapAggs(ctx context.Context, tr model.TimeRange,
 		ok = false
 	}
 	if ok {
-		lines, _, _ := mapagg.BuildMapFromGeoEdges(geoRows)
-		if len(lines) > 0 {
-			return events.MapAggScanResult{
-				Source:   "geo_" + groupBy,
-				GeoEdges: geoRows,
-			}, nil
-		}
+		// Geo-путь уже отработал (pre-agg или GROUP BY geo из traffic_logs).
+		// Пустой/неdrawable результат не должен запускать второй тяжёлый raw scan.
+		return events.MapAggScanResult{
+			Source:   "geo_" + groupBy,
+			GeoEdges: geoRows,
+		}, nil
 	}
 
 	raws, err := query.ScanRawAggsForTimeRange(ctx, r.apiCH, tr, limit, filter, timeout)

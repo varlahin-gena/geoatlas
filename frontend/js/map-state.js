@@ -11,6 +11,7 @@ const LS_KEY = 'nm.ui';
 const REFRESH_DATA_MS   = 30000;
 const COUNTRY_LABEL_MAX_RANK = 5;
 const SEARCH_DEBOUNCE_MS = 250;
+const MAP_REFRESH_DEBOUNCE_MS = 400;
 
 // Лимиты отрисовки (данные с API приходят без top-N; порог — ползунок minCount)
 const MAX_ARCS_DEFAULT = 5000;
@@ -86,6 +87,10 @@ let lastPeriodInfo = {};
 let lastFetchError = null;
 let backendHealthy = false;
 let dataFetchGen = 0;
+let dataFetchController = null;
+let dataFetchWasSilent = false;
+let mapRefreshDebounceTimer = null;
+let seriesFetchController = null;
 
 // Кэш статистики по странам — пересчитывается только при обновлении данных
 let _statsCache = null;
@@ -507,7 +512,7 @@ function applyCustomPeriod() {
     updateCustomPeriodLabel();
     syncPeriodCustomPanel();
     saveUIState();
-    refreshMap();
+    refreshMapDebounced();
 }
 function openCustomPeriodPanel() {
     initCustomPeriodDefaults();
@@ -525,7 +530,7 @@ function onPeriodPresetChange() {
     updateCustomPeriodLabel();
     syncPeriodCustomPanel();
     saveUIState();
-    refreshMap();
+    refreshMapDebounced();
 }
 
 function toggleSidebar() {

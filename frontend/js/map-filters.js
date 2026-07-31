@@ -8,11 +8,31 @@ function setMapLoading(on) {
     if (area) area.classList.toggle('is-loading', !!on);
 }
 
+function isAbortError(err) {
+    return !!(err && (err.name === 'AbortError' || err.code === 20));
+}
+
+function abortSeriesFetch() {
+    if (!seriesFetchController) return;
+    try { seriesFetchController.abort(); } catch (e) {}
+    seriesFetchController = null;
+}
+
 async function fetchData(opts) {
     const silent = !!(opts && opts.silent);
     // Фоновый poll не мешает явной перестройке карты
     if (silent && document.querySelector('.viz-area.is-loading')) return;
+    // Фоновый poll не отменяет явный /api/events
+    if (silent && dataFetchController && !dataFetchWasSilent) return;
 
+    if (dataFetchController) {
+        try { dataFetchController.abort(); } catch (e) {}
+    }
+    abortSeriesFetch();
+
+    const controller = new AbortController();
+    dataFetchController = controller;
+    dataFetchWasSilent = silent;
     const gen = ++dataFetchGen;
     if (!silent) setMapLoading(true);
     try {
@@ -27,7 +47,11 @@ async function fetchData(opts) {
             + `&limit=${apiLimit}`
             + periodQuery;
 
-        const res = await fetch(url, { cache: 'no-store', credentials: 'same-origin' });
+        const res = await fetch(url, {
+            cache: 'no-store',
+            credentials: 'same-origin',
+            signal: controller.signal,
+        });
         if (res.status === 401) {
             location.replace(NMAuth.loginUrl(location.pathname));
             return;
@@ -37,7 +61,7 @@ async function fetchData(opts) {
             throw new Error(text || `HTTP ${res.status}`);
         }
         const data = await res.json();
-        if (gen !== dataFetchGen) return;
+        if (gen !== dataFetchGen || controller.signal.aborted) return;
         allPoints  = data.points || {};
         allLines   = data.lines  || [];
         lastStats  = data.stats  || {};
@@ -68,6 +92,7 @@ async function fetchData(opts) {
         );
         if (autoFitPending) { fitDeckToData(); autoFitPending = false; }
     } catch (err) {
+        if (controller.signal.aborted || isAbortError(err)) return;
         if (gen !== dataFetchGen) return;
         console.error(err);
         backendHealthy = false;
@@ -76,6 +101,7 @@ async function fetchData(opts) {
         NMUI.fetchSystemHealth();
         toast('Ошибка загрузки данных: ' + err.message, 'error');
     } finally {
+        if (dataFetchController === controller) dataFetchController = null;
         if (!silent && gen === dataFetchGen) {
             setMapLoading(false);
             updateMapOverlay();
@@ -136,7 +162,19 @@ function onMaxArcsChange() {
     updateMapOverlay();
 }
 
-function refreshMap() { fetchData(); }
+function refreshMap() {
+    clearTimeout(mapRefreshDebounceTimer);
+    mapRefreshDebounceTimer = null;
+    fetchData();
+}
+
+function refreshMapDebounced() {
+    clearTimeout(mapRefreshDebounceTimer);
+    mapRefreshDebounceTimer = setTimeout(function () {
+        mapRefreshDebounceTimer = null;
+        fetchData();
+    }, MAP_REFRESH_DEBOUNCE_MS);
+}
 
 function resetView() {
     currentFilter = 'all';

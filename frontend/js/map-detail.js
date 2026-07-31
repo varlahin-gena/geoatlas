@@ -354,15 +354,28 @@ function renderSparklineSVG(points) {
 }
 
 async function fetchCountrySeries(country) {
-    const periodQuery = buildPeriodQuery();
-    const url = `${API_BASE}/api/events/series?country=${encodeURIComponent(country)}${periodQuery}`;
-    const res = await fetch(url, { cache: 'no-store', credentials: 'same-origin' });
-    if (res.status === 401) {
-        location.replace(NMAuth.loginUrl(location.pathname));
-        return null;
+    if (seriesFetchController) {
+        try { seriesFetchController.abort(); } catch (e) {}
     }
-    if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
-    return res.json();
+    const controller = new AbortController();
+    seriesFetchController = controller;
+    try {
+        const periodQuery = buildPeriodQuery();
+        const url = `${API_BASE}/api/events/series?country=${encodeURIComponent(country)}${periodQuery}`;
+        const res = await fetch(url, {
+            cache: 'no-store',
+            credentials: 'same-origin',
+            signal: controller.signal,
+        });
+        if (res.status === 401) {
+            location.replace(NMAuth.loginUrl(location.pathname));
+            return null;
+        }
+        if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+        return await res.json();
+    } finally {
+        if (seriesFetchController === controller) seriesFetchController = null;
+    }
 }
 
 function linesForCountry(country) {
@@ -442,6 +455,8 @@ async function showCountryDetail(countryKey, feature) {
         title.textContent = 'Динамика (bucket ' + (data.bucket_sec || '?') + 's)';
         sparkHost.insertBefore(title, sparkHost.firstChild);
     } catch (e) {
+        if (typeof isAbortError === 'function' && isAbortError(e)) return;
+        if (focusedCountry !== countryKey) return;
         sparkHost.innerHTML = '<div class="detail-sparkline"><div style="color:var(--red);font-size:11px">Ряд недоступен: '
             + escapeHTML(e.message || e) + '</div></div>';
     }
