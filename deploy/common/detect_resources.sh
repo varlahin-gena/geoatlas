@@ -169,6 +169,15 @@ calc_external_spill_bytes() {
     }'
 }
 
+# Потоки на один тяжёлый GROUP BY: ~половина ядер CH, потолок 4 (не утилизировать все ядра картой).
+calc_ch_max_threads() {
+    local ch_cpus="$1"
+    local t=$(( (ch_cpus + 1) / 2 ))
+    (( t < 1 )) && t=1
+    (( t > 4 )) && t=4
+    echo "$t"
+}
+
 print_host_summary() {
     local cpu="$1" ram_mb="$2" disk_gb="$3" recommended="$4"
     local ram_gib
@@ -427,10 +436,11 @@ EOF
 write_compose_override() {
     local project_dir="$1" profile="$2"
     local override="${project_dir}/docker-compose.override.yml"
-    local ch_max_mem spill
+    local ch_max_mem spill ch_threads
 
     ch_max_mem="$(calc_ch_max_query_bytes "$CH_MEM_GB")"
     spill="$(calc_external_spill_bytes "$CH_MEM_GB")"
+    ch_threads="$(calc_ch_max_threads "$CH_CPUS")"
 
     cat >"$override" <<EOF
 # Сгенерировано detect_resources.sh — профиль: ${profile}
@@ -458,6 +468,7 @@ services:
       CH_MAX_MEMORY_USAGE: "${ch_max_mem}"
       CH_EXTERNAL_GROUP_BY_BYTES: "${spill}"
       CH_EXTERNAL_SORT_BYTES: "${spill}"
+      CH_MAX_THREADS: "${ch_threads}"
     deploy:
       resources:
         limits:
@@ -476,22 +487,24 @@ EOF
 write_clickhouse_limits() {
     local project_dir="$1" profile="$2"
     local limits_file="${project_dir}/clickhouse/users.d/zz_install_limits.xml"
-    local max_mem spill
+    local max_mem spill ch_threads
 
     max_mem="$(calc_ch_max_query_bytes "$CH_MEM_GB")"
     spill="$(calc_external_spill_bytes "$CH_MEM_GB")"
+    ch_threads="$(calc_ch_max_threads "$CH_CPUS")"
 
     mkdir -p "${project_dir}/clickhouse/users.d"
     cat >"$limits_file" <<EOF
 <?xml version="1.0"?>
 <clickhouse>
     <!-- Сгенерировано detect_resources.sh, профиль: ${profile} -->
-    <!-- ClickHouse container: ${CH_MEM_GB} GiB, per-query limit: ~40% RAM -->
+    <!-- ClickHouse container: ${CH_MEM_GB} GiB / ${CH_CPUS} CPU; per-query ~40% RAM, max_threads=${ch_threads} -->
     <profiles>
         <default>
             <max_memory_usage>${max_mem}</max_memory_usage>
             <max_bytes_before_external_group_by>${spill}</max_bytes_before_external_group_by>
             <max_bytes_before_external_sort>${spill}</max_bytes_before_external_sort>
+            <max_threads>${ch_threads}</max_threads>
         </default>
     </profiles>
 </clickhouse>
@@ -523,7 +536,8 @@ write_install_profile_json() {
       "memory_gb": ${CH_MEM_GB},
       "cpus": ${CH_CPUS},
       "max_query_memory_bytes": ${ch_max_mem},
-      "external_spill_bytes": ${spill}
+      "external_spill_bytes": ${spill},
+      "max_threads": $(calc_ch_max_threads "$CH_CPUS")
     },
     "backend": {
       "memory_gb": ${BE_MEM_GB},

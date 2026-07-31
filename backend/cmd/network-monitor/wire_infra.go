@@ -13,7 +13,7 @@ import (
 )
 
 func connectPools(ctx context.Context, cfg config.Config) (*chadapter.Pools, error) {
-	query.ConfigureQuerySettings(cfg.CHMaxMemoryUsage, cfg.CHExternalGroupBy, cfg.CHExternalSort)
+	query.ConfigureQuerySettings(cfg.CHMaxMemoryUsage, cfg.CHExternalGroupBy, cfg.CHExternalSort, cfg.CHMaxThreads)
 
 	ingestOpts := chadapter.PoolOptions{MaxOpenConns: cfg.CHIngestMaxOpen, MaxIdleConns: cfg.CHIngestMaxOpen}
 	if cfg.CHIngestAsyncInsert {

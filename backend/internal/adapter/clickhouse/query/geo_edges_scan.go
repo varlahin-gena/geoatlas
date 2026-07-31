@@ -45,8 +45,8 @@ func ScanGeoEdgesForTimeRange(
 			}
 			return rows, true, nil
 		}
-		// city|country: pre-agg если готов; иначе / при ошибке / пусто — GROUP BY geo из traffic_logs
-		// (не (nil,false) → тяжёлый GROUP BY src_ip,dst_ip, который OOM'ит на больших объёмах).
+		// city|country: pre-agg если готов — даже пустой ответ (нет данных за период).
+		// Не падаем обратно на traffic_logs: иначе каждый «пустой» день = cold GROUP BY на миллионы строк.
 		if aggstate.PreferGeoEdgesAgg() {
 			table := sqlclause.GeoEdgesTable(groupBy)
 			if table != "" {
@@ -54,7 +54,7 @@ func ScanGeoEdgesForTimeRange(
 				if err != nil {
 					slog.Warn("geo edges daily scan failed, falling back to traffic_logs",
 						"group_by", groupBy, "err", err)
-				} else if len(rows) > 0 {
+				} else {
 					return rows, true, nil
 				}
 			}

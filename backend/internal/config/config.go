@@ -167,6 +167,7 @@ type Config struct {
 	CHMaxMemoryUsage     int64
 	CHExternalGroupBy    int64
 	CHExternalSort       int64
+	CHMaxThreads         int
 	InstallProfilePath   string
 
 	// Размеры пулов ClickHouse (отдельные Conn на write/read/background).
@@ -246,6 +247,7 @@ func FromEnv() Config {
 		CHMaxMemoryUsage:     parser.int64("CH_MAX_MEMORY_USAGE", 2<<30),
 		CHExternalGroupBy:    parser.int64("CH_EXTERNAL_GROUP_BY_BYTES", 256<<20),
 		CHExternalSort:       parser.int64("CH_EXTERNAL_SORT_BYTES", 256<<20),
+		CHMaxThreads:         parser.int("CH_MAX_THREADS", 2),
 		InstallProfilePath:   envOr("INSTALL_PROFILE_PATH", "/app/install-profile.json"),
 
 		CHIngestMaxOpen:         parser.int("CH_INGEST_MAX_OPEN_CONNS", 4),
