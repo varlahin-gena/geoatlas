@@ -102,18 +102,21 @@ confirm_install_source() {
     else
         release_tag="$(nm_latest_release_tag "${REPO_URL:-}" || true)"
         if [[ -n "$release_tag" ]]; then
-            release_label="Последний релиз ${release_tag} (стабильный)"
+            release_label="Релиз ${release_tag}"
         else
-            release_label="Последний релиз (тег не найден — будет main)"
+            release_label="Релиз (или main)"
         fi
 
         _nm_src_ensure_ui || true
         if declare -F nm_ui_radiolist >/dev/null 2>&1; then
-            source_choice="$(nm_ui_radiolist \
+            if ! source_choice="$(nm_ui_radiolist \
                 "Источник установки" \
                 "Что установить с GitHub?" \
                 release "$release_label" ON \
-                main "Ветка main — все последние изменения" OFF)" || source_choice="release"
+                main "Ветка main" OFF)"; then
+                _nm_src_log "Установка отменена пользователем."
+                exit 0
+            fi
         else
             source_choice="release"
             _nm_src_log "UI недоступен — источник release."

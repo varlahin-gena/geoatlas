@@ -186,21 +186,33 @@ _welcome_dialog() {
         return 0
     fi
 
+    # Короткий tag+item: длинные UTF-8 строки в radiolist ломают рамку newt/whiptail.
     local mode
-    mode="$(nm_ui_radiolist "Установка ГеоАтлас" \
-"Выберите режим установки.
+    local _ui_w="${NM_UI_WIDTH:-72}" _ui_h="${NM_UI_HEIGHT:-18}" _ui_lh="${NM_UI_LIST_HEIGHT:-8}"
+    NM_UI_WIDTH=64
+    NM_UI_HEIGHT=14
+    NM_UI_LIST_HEIGHT=3
+    if ! mode="$(nm_ui_radiolist "Установка ГеоАтлас" \
+"Режим установки
 
-Сделай мне хорошо: релиз, все модули, порт 8080,
-автопрофиль, firewall выкл., запуск стека.
+auto — релиз, модули, :8080, firewall off
+step — спросить каждый шаг
 
-Пошаговая: спросить источник, модули, порт, профиль.
+${PROJECT_DIR}" \
+        auto "Сделай мне хорошо" ON \
+        step "Пошаговая" OFF \
+    )"; then
+        NM_UI_WIDTH="$_ui_w"
+        NM_UI_HEIGHT="$_ui_h"
+        NM_UI_LIST_HEIGHT="$_ui_lh"
+        log "Установка отменена пользователем."
+        exit 0
+    fi
+    NM_UI_WIDTH="$_ui_w"
+    NM_UI_HEIGHT="$_ui_h"
+    NM_UI_LIST_HEIGHT="$_ui_lh"
 
-Каталог: ${PROJECT_DIR}" \
-        full_auto "Сделай мне хорошо" ON \
-        guided "Пошаговая установка" OFF \
-    )" || mode="guided"
-
-    if [[ "$mode" == "full_auto" ]]; then
+    if [[ "$mode" == "auto" || "$mode" == "full_auto" ]]; then
         export NM_FULL_AUTO=1
         if declare -F nm_apply_full_auto_preset >/dev/null 2>&1; then
             nm_apply_full_auto_preset

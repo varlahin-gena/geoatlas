@@ -104,14 +104,17 @@ confirm_http_port() {
     local choice=""
 
     if declare -F nm_ui_radiolist >/dev/null 2>&1; then
-        choice="$(nm_ui_radiolist \
+        if ! choice="$(nm_ui_radiolist \
             "Порт веб-интерфейса" \
             "На каком порту открыть UI (nginx)?" \
-            80 "Стандартный HTTP (:80)" ON \
-            8080 "Альтернатива (:8080)" OFF \
-            443 "HTTPS-порт без TLS на nginx (:443)" OFF \
-            8443 "Альтернатива (:8443)" OFF \
-            custom "Указать вручную…" OFF)" || choice="80"
+            80 "HTTP :80" ON \
+            8080 "HTTP :8080" OFF \
+            443 "Порт :443" OFF \
+            8443 "Порт :8443" OFF \
+            custom "Указать вручную" OFF)"; then
+            _nm_port_log "Установка отменена пользователем."
+            exit 0
+        fi
     else
         choice="80"
         _nm_port_log "UI недоступен — HTTP_PORT=80."

@@ -263,8 +263,8 @@ confirm_modules() {
             _nm_mod_tag_selected "$selected" stats && NM_MODULE_STATS=1
             _nm_mod_tag_selected "$selected" reputation && NM_MODULE_REPUTATION=1
         else
-            _nm_mod_log "Выбор модулей отменён — оставляем значения по умолчанию."
-            _nm_mod_set_defaults
+            _nm_mod_log "Выбор модулей отменён — установка прервана."
+            exit 0
         fi
     else
         echo "" >&2

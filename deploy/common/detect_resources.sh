@@ -268,7 +268,7 @@ confirm_profile() {
             on_flag=OFF
             mark=""
             [[ "$p" == "$recommended" ]] && on_flag=ON && mark=" ← рекомендуется"
-            desc="$(profile_label_ru "$p")${mark} · CH ${CH_MEM_GB}G · BE ${BE_MEM_GB}G · EPS до ${EPS_MAX}/с"
+            desc="$(profile_label_ru "$p")${mark} · ${CH_MEM_GB}/${BE_MEM_GB}G"
             items+=("$p" "$desc" "$on_flag")
         done
 
@@ -295,9 +295,8 @@ confirm_profile() {
                     ;;
             esac
         else
-            _nm_log "Выбор профиля отменён — применяем рекомендацию: ${recommended}"
-            NM_SELECTED_PROFILE="$recommended"
-            return 0
+            _nm_log "Выбор профиля отменён — установка прервана."
+            exit 0
         fi
     fi
 
