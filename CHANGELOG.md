@@ -3,6 +3,29 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/).
 Версии — [SemVer](https://semver.org/lang/ru/).
 
+## [1.1.3] — 2026-08-05
+
+Патч: установщик «Сделай мне хорошо», устойчивее GeoIP/старт backend, UX уведомлений и загрузки CSV.
+
+### Added
+- Установщик: режим **«Сделай мне хорошо»** (`NM_FULL_AUTO=1` / `--full-auto` / пункт TUI) — релиз, все модули, порт **8080**, автопрофиль, firewall OFF, старт стека
+- UI: toast’ы без автоскрытия, крестик закрытия; незакрытые уведомления переживают смену страниц (`sessionStorage`)
+
+### Fixed
+- Cancel в TUI установщика больше не продолжает установку (источник / порт / модули / профиль / режим)
+- Короткий radiolist (UTF-8) — рамка whiptail не ломается на длинных подписях
+- Старт backend: загрузка GeoIP/reputation-индекса **асинхронно** — после OOM/рестарта страницы не получают nginx **500** на auth, пока индекс ещё поднимается
+- Upload GeoIP/логов: понятное предупреждение при уходе со страницы (`Failed to fetch`); `beforeunload` только на время POST, не на ожидание индекса
+
+### Changed
+- Документация: загрузка большого GeoIP с сервера (`curl`), OOM/502 при повторной заливке поверх индекса в RAM, не уходить со страницы во время browser-upload
+
+### Notes
+- OpenAPI API doc version: **1.3.0** (без изменений)
+- Продуктовая версия: **1.1.3**
+- После обновления: `git pull`, `docker compose up -d --build backend` (frontend с тома — Ctrl+F5)
+- 9 коммитов с `v1.1.2`
+
 ## [1.1.2] — 2026-08-05
 
 Патч: карта снова читает daily geo-агрегаты; stats-collector корректно снимает MemoryTracking.
@@ -102,6 +125,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[1.1.3]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.1.3
 [1.1.2]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.1.2
 [1.1.1]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.1.1
 [1.1.0]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.1.0

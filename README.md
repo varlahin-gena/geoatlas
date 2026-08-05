@@ -44,7 +44,9 @@
 - Парсинг **UserGate, FortiGate, Cisco ASA, Cisco FTD (FirePower), Cowrie (honeypot)** и универсальный фолбэк (Generic KV)
 - **Осознанный пропуск** событий: распознанные, но несетевые строки (например, часть `cowrie.*`) не попадают в `parse_errors`
 - **Авторизация по умолчанию**: роли `administrator` / `operator`, cookie-сессии, CSRF, Bearer `API_AUTH_TOKEN` (+ `API_AUTH_PREVIOUS_TOKEN`); именованные API-токены со scopes `read`/`ops`/`admin` (UI `/api-tokens.html`); управление УЗ в UI
-- Загрузка и правка **GeoIP-базы** (CSV SIEM KUMA, страница `/geo-ranges.html`, IP без координат на `/geo-missing.html`)
+- Загрузка и правка **GeoIP-базы** (CSV SIEM KUMA, страница `/geo-ranges.html`, IP без координат на `/geo-missing.html`); большие CSV — с сервера через `curl` (см. [GeoIP](#geoip))
+- Установка **«Сделай мне хорошо»** (`NM_FULL_AUTO` / `--full-auto`): релиз, все модули, порт 8080, автопрофиль, firewall off
+- Toast-уведомления без автоскрытия (крестик), сохраняются при смене страниц до ручного закрытия
 - **Репутация IP** (модуль опционален при установке): offline-списки и URL-фиды (`/reputation.html`), каталог публичных источников, фильтр и подсветка дуг на карте; приватные IP не помечаются
 - Хранение и аналитика в **ClickHouse**; дневные geo-агрегаты для пресетов `1d+` (city/country)
 - **Настраиваемый TTL (retention)** таблиц из UI `/system.html`
@@ -237,7 +239,7 @@ sudo ./install_ubuntu.sh --full-auto
 |-------|-----|--------------|
 | Последний релиз (по умолчанию в UI) | `NM_INSTALL_SOURCE=release` | тег с наибольшей semver-версией (`git ls-remote --tags`) |
 | Ветка main | `NM_INSTALL_SOURCE=main` | `main` — последние изменения |
-| Явный ref | `BRANCH=v1.1.1` | указанная ветка/тег без вопроса |
+| Явный ref | `BRANCH=v1.1.3` | указанная ветка/тег без вопроса |
 
 **Порт UI:** `HTTP_PORT=8080` (или `NM_HTTP_PORT`) — без вопроса; в compose: `${HTTP_PORT:-80}:80`.
 
@@ -544,6 +546,9 @@ docker compose exec clickhouse clickhouse-client --query "
 | Превышена расчётная ёмкость      | `/system.html` → алёрты `capacity_high` / `capacity_exceeded`, пересчёт профиля |
 | Drops под нагрузкой / очередь полная | `/api/ingest/stats` → `dropped_total`, `buffer_drops_total`, `circuit_open`; `/system.html` → `ingest_dropping*`, `ingest_buffer_dropping*`, `ingest_circuit_open`; `./scripts/watch-ingest.sh` |
 | UDP/TCP EPS не разделяются       | Перезапустить `syslog-ng` (маркеры `@@nm/udp/@@` / `@@nm/tcp/@@`) |
+| GeoIP upload → 502 / OOM, backend перезапускается | Не заливать большой CSV поверх уже загруженного индекса через браузер; `dmesg`/`oom-kill`; см. [GeoIP](#geoip) |
+| GeoIP: `Failed to fetch` при смене страницы | Уход со страницы во время POST обрывает `fetch`; дождитесь окончания или `curl` с сервера |
+| После рестарта backend страницы 500 (auth) | Обновить до ≥1.1.3 (индекс GeoIP грузится асинхронно); дождаться `geo index loaded` |
 | TTL не применился / старые данные остаются | `/api/system/retention`, логи backend `retention:`, том `auth-users` (`retention.json`) |
 
 ---
