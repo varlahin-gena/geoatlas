@@ -478,13 +478,15 @@ tbody tr:hover { background: var(--panel-2); }
   flex-direction: column;
   gap: 8px;
   pointer-events: none;
+  align-items: flex-end;
 }
 .toast {
+  position: relative;
   background: var(--panel);
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
   color: var(--text);
-  padding: 10px 14px;
+  padding: 10px 36px 10px 14px;
   border-radius: 6px;
   box-shadow: var(--shadow);
   max-width: min(420px, calc(100vw - 32px));
@@ -495,9 +497,36 @@ tbody tr:hover { background: var(--panel-2); }
   white-space: pre-wrap;
   transition: opacity 0.2s;
 }
+.toast-body {
+  min-width: 0;
+}
+.toast-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted, #8b95a8);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.toast-close:hover {
+  color: var(--text);
+  background: rgba(128, 128, 128, 0.18);
+}
 .toast.success { border-left-color: var(--green); }
 .toast.error { border-left-color: var(--red); color: var(--red); }
 .toast.info { border-left-color: var(--accent); }
+.toast.warn { border-left-color: var(--orange); }
 
 .modal-backdrop {
   display: none;

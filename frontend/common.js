@@ -52,62 +52,37 @@
   }
 
   /**
+   * Показывает уведомление без автоскрытия — закрытие только крестиком.
    * @param {string} msg
-   * @param {'info'|'success'|'error'|string} [kind]
-   * @param {number} [timeout]
+   * @param {'info'|'success'|'error'|'warn'|string} [kind]
+   * @param {number} [_timeout] устарел, игнорируется (совместимость вызовов)
    */
-  function toast(msg, kind, timeout) {
-    const ms = Number.isFinite(timeout) && timeout > 0 ? Number(timeout) : 4000;
+  function toast(msg, kind, _timeout) {
     const host = ensureToastHost();
     const el = document.createElement('div');
     el.className = 'toast' + (kind ? ' ' + kind : '');
     el.setAttribute('role', kind === 'error' ? 'alert' : 'status');
-    el.textContent = msg;
-    host.appendChild(el);
 
-    // Не снимать toast, пока вкладка в фоне (иначе после долгого refresh его уже нет).
-    var hiddenFor = 0;
-    var started = Date.now();
-    var fadeTimer = null;
-    var removeTimer = null;
+    const body = document.createElement('div');
+    body.className = 'toast-body';
+    body.textContent = msg == null ? '' : String(msg);
 
-    function armTimers() {
-      if (fadeTimer) clearTimeout(fadeTimer);
-      if (removeTimer) clearTimeout(removeTimer);
-      var spent = Date.now() - started - hiddenFor;
-      var left = Math.max(0, ms - spent);
-      if (left > 200) {
-        fadeTimer = setTimeout(function () {
-          el.style.opacity = '0';
-        }, left - 200);
-      } else {
-        el.style.opacity = '0';
-      }
-      removeTimer = setTimeout(function () {
-        document.removeEventListener('visibilitychange', onVis);
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'toast-close';
+    closeBtn.setAttribute('aria-label', 'Закрыть');
+    closeBtn.title = 'Закрыть';
+    closeBtn.textContent = '×';
+    closeBtn.addEventListener('click', function () {
+      el.style.opacity = '0';
+      setTimeout(function () {
         el.remove();
-      }, left);
-    }
+      }, 200);
+    });
 
-    function onVis() {
-      if (document.hidden) {
-        if (fadeTimer) clearTimeout(fadeTimer);
-        if (removeTimer) clearTimeout(removeTimer);
-        fadeTimer = null;
-        removeTimer = null;
-        onVis._hiddenAt = Date.now();
-        return;
-      }
-      if (onVis._hiddenAt) {
-        hiddenFor += Date.now() - onVis._hiddenAt;
-        onVis._hiddenAt = 0;
-      }
-      armTimers();
-    }
-
-    document.addEventListener('visibilitychange', onVis);
-    if (!document.hidden) armTimers();
-    else onVis._hiddenAt = Date.now();
+    el.appendChild(closeBtn);
+    el.appendChild(body);
+    host.appendChild(el);
   }
 
   var SIDEBAR_COLLAPSE_KEY = 'nm.adminSidebarCollapsed';
