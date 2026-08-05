@@ -1,7 +1,44 @@
+let uploadInFlight = 0;
+
+function onUploadBeforeUnload(e) {
+    e.preventDefault();
+    e.returnValue = '';
+}
+
+function markUploadStart() {
+    uploadInFlight++;
+    if (uploadInFlight === 1) {
+        window.addEventListener('beforeunload', onUploadBeforeUnload);
+    }
+}
+
+function markUploadEnd() {
+    uploadInFlight = Math.max(0, uploadInFlight - 1);
+    if (uploadInFlight === 0) {
+        window.removeEventListener('beforeunload', onUploadBeforeUnload);
+    }
+}
+
+/** Браузерный обрыв fetch при уходе со страницы / сети — не путать с ошибкой API. */
+function uploadInterruptedMessage(err) {
+    const name = err && err.name ? String(err.name) : '';
+    const msg = err && err.message ? String(err.message) : String(err || '');
+    if (name === 'AbortError') {
+        return 'Загрузка прервана. Дождитесь окончания или не переключайте страницу.';
+    }
+    if (/failed to fetch|networkerror|load failed|network request failed/i.test(msg)) {
+        return 'Загрузка прервана (уход со страницы или обрыв связи). '
+            + 'Не переключайте вкладки во время upload. '
+            + 'Большой GeoIP лучше заливать с сервера через curl (см. README).';
+    }
+    return null;
+}
+
 async function uploadLogs() {
     const fi = document.getElementById('logFile');
     const f = fi.files[0]; if (!f) return;
     toast(`Загрузка логов: ${f.name}`, 'info', 2500);
+    markUploadStart();
     try {
         const res = await fetch(`${API_BASE}/upload-logs`, {
             method: 'POST',
@@ -14,13 +51,20 @@ async function uploadLogs() {
         const s = data && data.stats || {};
         toast(`Логи загружены\nПолучено: ${s.received ?? 0}\nРаспарсено: ${s.parsed ?? 0}\nЗаписано: ${s.inserted ?? 0}`, 'success', 6000);
         refreshMap();
-    } catch (e) { toast('Ошибка загрузки логов: ' + e.message, 'error'); }
+    } catch (e) {
+        const interrupted = uploadInterruptedMessage(e);
+        if (interrupted) toast(interrupted, 'warn');
+        else toast('Ошибка загрузки логов: ' + e.message, 'error');
+    } finally {
+        markUploadEnd();
+    }
 }
 
 async function uploadGeo() {
     const fi = document.getElementById('geoFile');
     const f = fi.files[0]; if (!f) return;
     toast(`Загрузка GeoIP: ${f.name}`, 'info', 2500);
+    markUploadStart();
     try {
         const res = await fetch(`${API_BASE}/upload-geo`, {
             method: 'POST',
@@ -47,7 +91,13 @@ async function uploadGeo() {
             } catch (_) { /* backend может кратковременно перезапускаться */ }
         }
         refreshMap();
-    } catch (e) { toast('Ошибка обновления GeoIP: ' + e.message, 'error'); }
+    } catch (e) {
+        const interrupted = uploadInterruptedMessage(e);
+        if (interrupted) toast(interrupted, 'warn');
+        else toast('Ошибка обновления GeoIP: ' + e.message, 'error');
+    } finally {
+        markUploadEnd();
+    }
 }
 
 async function exportPNG() {
