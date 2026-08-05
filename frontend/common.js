@@ -53,13 +53,31 @@
 
   var TOAST_STORE_KEY = 'nm.toasts.v1';
   var TOAST_STORE_MAX = 30;
+  var TOAST_MSG_MAX = 2000;
+
+  function sanitizeToastEntry(entry) {
+    if (!entry || typeof entry !== 'object') return null;
+    var id = entry.id != null ? String(entry.id) : '';
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) return null;
+    var kind = entry.kind != null ? String(entry.kind) : '';
+    if (kind && !/^[A-Za-z0-9_-]{1,32}$/.test(kind)) kind = '';
+    var msg = entry.msg == null ? '' : String(entry.msg);
+    if (msg.length > TOAST_MSG_MAX) msg = msg.slice(0, TOAST_MSG_MAX) + '…';
+    return { id: id, msg: msg, kind: kind, at: Number(entry.at) || 0 };
+  }
 
   function readToastStore() {
     try {
       var raw = sessionStorage.getItem(TOAST_STORE_KEY);
       if (!raw) return [];
       var arr = JSON.parse(raw);
-      return Array.isArray(arr) ? arr : [];
+      if (!Array.isArray(arr)) return [];
+      var out = [];
+      for (var i = 0; i < arr.length; i++) {
+        var e = sanitizeToastEntry(arr[i]);
+        if (e) out.push(e);
+      }
+      return out;
     } catch (_) {
       return [];
     }
@@ -71,9 +89,14 @@
         sessionStorage.removeItem(TOAST_STORE_KEY);
         return;
       }
+      var clean = [];
+      for (var i = 0; i < items.length; i++) {
+        var e = sanitizeToastEntry(items[i]);
+        if (e) clean.push(e);
+      }
       sessionStorage.setItem(
         TOAST_STORE_KEY,
-        JSON.stringify(items.slice(-TOAST_STORE_MAX))
+        JSON.stringify(clean.slice(-TOAST_STORE_MAX))
       );
     } catch (_) {
       /* quota / private mode */
@@ -93,46 +116,58 @@
     if (!el || !el.parentNode) return;
     el.style.opacity = '0';
     setTimeout(function () {
-      el.remove();
+      try {
+        el.remove();
+      } catch (_) { /* ignore */ }
     }, 200);
   }
 
   function renderToastEntry(entry) {
-    if (!entry || !entry.id) return;
-    if (document.querySelector('[data-toast-id="' + entry.id + '"]')) return;
+    try {
+      entry = sanitizeToastEntry(entry);
+      if (!entry) return;
+      if (document.querySelector('[data-toast-id="' + entry.id + '"]')) return;
+      if (!document.body) return;
 
-    var host = ensureToastHost();
-    var kind = entry.kind || '';
-    var el = document.createElement('div');
-    el.className = 'toast' + (kind ? ' ' + kind : '');
-    el.setAttribute('data-toast-id', entry.id);
-    el.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+      var host = ensureToastHost();
+      var kind = entry.kind || '';
+      var el = document.createElement('div');
+      el.className = 'toast' + (kind ? ' ' + kind : '');
+      el.setAttribute('data-toast-id', entry.id);
+      el.setAttribute('role', kind === 'error' ? 'alert' : 'status');
 
-    var body = document.createElement('div');
-    body.className = 'toast-body';
-    body.textContent = entry.msg == null ? '' : String(entry.msg);
+      var body = document.createElement('div');
+      body.className = 'toast-body';
+      body.textContent = entry.msg;
 
-    var closeBtn = document.createElement('button');
-    closeBtn.type = 'button';
-    closeBtn.className = 'toast-close';
-    closeBtn.setAttribute('aria-label', 'Закрыть');
-    closeBtn.title = 'Закрыть';
-    closeBtn.textContent = '×';
-    closeBtn.addEventListener('click', function () {
-      dismissToastEl(el, entry.id);
-    });
+      var closeBtn = document.createElement('button');
+      closeBtn.type = 'button';
+      closeBtn.className = 'toast-close';
+      closeBtn.setAttribute('aria-label', 'Закрыть');
+      closeBtn.title = 'Закрыть';
+      closeBtn.textContent = '×';
+      closeBtn.addEventListener('click', function () {
+        dismissToastEl(el, entry.id);
+      });
 
-    el.appendChild(closeBtn);
-    el.appendChild(body);
-    host.appendChild(el);
+      el.appendChild(closeBtn);
+      el.appendChild(body);
+      host.appendChild(el);
+    } catch (_) {
+      /* toast must never break page navigation */
+    }
   }
 
   /** Восстановить незакрытые toast’ы после перехода на другую страницу. */
   function restoreToasts() {
-    if (!document.body) return;
-    var items = readToastStore();
-    for (var i = 0; i < items.length; i++) {
-      renderToastEntry(items[i]);
+    try {
+      if (!document.body) return;
+      var items = readToastStore();
+      for (var i = 0; i < items.length; i++) {
+        renderToastEntry(items[i]);
+      }
+    } catch (_) {
+      /* ignore */
     }
   }
 
@@ -145,23 +180,38 @@
    * @param {number} [_timeout] устарел, игнорируется (совместимость вызовов)
    */
   function toast(msg, kind, _timeout) {
-    var entry = {
-      id: 't' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8),
-      msg: msg == null ? '' : String(msg),
-      kind: kind ? String(kind) : '',
-      at: Date.now(),
-    };
-    var items = readToastStore();
-    items.push(entry);
-    writeToastStore(items);
-    renderToastEntry(entry);
+    try {
+      var entry = sanitizeToastEntry({
+        id: 't' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8),
+        msg: msg == null ? '' : String(msg),
+        kind: kind ? String(kind) : '',
+        at: Date.now(),
+      });
+      if (!entry) return;
+      var items = readToastStore();
+      items.push(entry);
+      writeToastStore(items);
+      renderToastEntry(entry);
+    } catch (_) {
+      /* ignore */
+    }
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', restoreToasts);
-  } else {
-    restoreToasts();
+  function scheduleToastRestore() {
+    var run = function () {
+      restoreToasts();
+    };
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', run);
+    } else {
+      run();
+    }
+    // bfcache / back-forward: страница может показаться из кэша без полного reload.
+    window.addEventListener('pageshow', function () {
+      restoreToasts();
+    });
   }
+  scheduleToastRestore();
 
   var SIDEBAR_COLLAPSE_KEY = 'nm.adminSidebarCollapsed';
   var ICON =

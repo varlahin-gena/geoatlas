@@ -29,9 +29,15 @@ type backgroundParts struct {
 func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backgroundParts {
 	geo := chadapter.NewReloadableGeoIndex(a.pools.Background)
 	a.geoJobs = geojob.New(geo, chadapter.NewMaintenanceStore(a.pools.Background), cfg.GeoBackfillLookbackDays)
-	if err := geo.Reload(ctx); err != nil {
-		slog.Warn("geo index not loaded", "err", err)
-	}
+	// Не блокируем старт HTTP на полной загрузке GeoIP (миллионы диапазонов → минуты).
+	// Иначе после OOM/рестарта nginx auth_request падает → клиенту 500 на всех страницах.
+	a.bgWg.Add(1)
+	go func() {
+		defer a.bgWg.Done()
+		if err := geo.Reload(bgCtx); err != nil {
+			slog.Warn("geo index not loaded", "err", err)
+		}
+	}()
 
 	// Schema для /api/events до HTTP: иначе city/days бьётся о missing columns/tables.
 	if err := migrate.EnsureGeoEdgesAggSchema(ctx, a.pools.Background); err != nil {
@@ -68,9 +74,13 @@ func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backg
 		if err := migrate.EnsureReputationRanges(ctx, a.pools.Background); err != nil {
 			slog.Warn("reputation_ranges ensure (early) failed", "err", err)
 		}
-		if err := repIdx.Reload(ctx); err != nil {
-			slog.Warn("reputation index not loaded", "err", err)
-		}
+		a.bgWg.Add(1)
+		go func() {
+			defer a.bgWg.Done()
+			if err := repIdx.Reload(bgCtx); err != nil {
+				slog.Warn("reputation index not loaded", "err", err)
+			}
+		}()
 	} else {
 		slog.Info("reputation module disabled (REPUTATION_FETCH_ENABLED=false)")
 		a.repJobs = nil
