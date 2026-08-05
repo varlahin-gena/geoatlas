@@ -51,38 +51,116 @@
     return host;
   }
 
-  /**
-   * Показывает уведомление без автоскрытия — закрытие только крестиком.
-   * @param {string} msg
-   * @param {'info'|'success'|'error'|'warn'|string} [kind]
-   * @param {number} [_timeout] устарел, игнорируется (совместимость вызовов)
-   */
-  function toast(msg, kind, _timeout) {
-    const host = ensureToastHost();
-    const el = document.createElement('div');
+  var TOAST_STORE_KEY = 'nm.toasts.v1';
+  var TOAST_STORE_MAX = 30;
+
+  function readToastStore() {
+    try {
+      var raw = sessionStorage.getItem(TOAST_STORE_KEY);
+      if (!raw) return [];
+      var arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function writeToastStore(items) {
+    try {
+      if (!items || !items.length) {
+        sessionStorage.removeItem(TOAST_STORE_KEY);
+        return;
+      }
+      sessionStorage.setItem(
+        TOAST_STORE_KEY,
+        JSON.stringify(items.slice(-TOAST_STORE_MAX))
+      );
+    } catch (_) {
+      /* quota / private mode */
+    }
+  }
+
+  function removeToastFromStore(id) {
+    writeToastStore(
+      readToastStore().filter(function (t) {
+        return t && t.id !== id;
+      })
+    );
+  }
+
+  function dismissToastEl(el, id) {
+    if (id) removeToastFromStore(id);
+    if (!el || !el.parentNode) return;
+    el.style.opacity = '0';
+    setTimeout(function () {
+      el.remove();
+    }, 200);
+  }
+
+  function renderToastEntry(entry) {
+    if (!entry || !entry.id) return;
+    if (document.querySelector('[data-toast-id="' + entry.id + '"]')) return;
+
+    var host = ensureToastHost();
+    var kind = entry.kind || '';
+    var el = document.createElement('div');
     el.className = 'toast' + (kind ? ' ' + kind : '');
+    el.setAttribute('data-toast-id', entry.id);
     el.setAttribute('role', kind === 'error' ? 'alert' : 'status');
 
-    const body = document.createElement('div');
+    var body = document.createElement('div');
     body.className = 'toast-body';
-    body.textContent = msg == null ? '' : String(msg);
+    body.textContent = entry.msg == null ? '' : String(entry.msg);
 
-    const closeBtn = document.createElement('button');
+    var closeBtn = document.createElement('button');
     closeBtn.type = 'button';
     closeBtn.className = 'toast-close';
     closeBtn.setAttribute('aria-label', 'Закрыть');
     closeBtn.title = 'Закрыть';
     closeBtn.textContent = '×';
     closeBtn.addEventListener('click', function () {
-      el.style.opacity = '0';
-      setTimeout(function () {
-        el.remove();
-      }, 200);
+      dismissToastEl(el, entry.id);
     });
 
     el.appendChild(closeBtn);
     el.appendChild(body);
     host.appendChild(el);
+  }
+
+  /** Восстановить незакрытые toast’ы после перехода на другую страницу. */
+  function restoreToasts() {
+    if (!document.body) return;
+    var items = readToastStore();
+    for (var i = 0; i < items.length; i++) {
+      renderToastEntry(items[i]);
+    }
+  }
+
+  /**
+   * Показывает уведомление без автоскрытия — закрытие только крестиком.
+   * Сохраняется в sessionStorage и снова показывается при смене страниц,
+   * пока пользователь не закроет уведомление.
+   * @param {string} msg
+   * @param {'info'|'success'|'error'|'warn'|string} [kind]
+   * @param {number} [_timeout] устарел, игнорируется (совместимость вызовов)
+   */
+  function toast(msg, kind, _timeout) {
+    var entry = {
+      id: 't' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8),
+      msg: msg == null ? '' : String(msg),
+      kind: kind ? String(kind) : '',
+      at: Date.now(),
+    };
+    var items = readToastStore();
+    items.push(entry);
+    writeToastStore(items);
+    renderToastEntry(entry);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', restoreToasts);
+  } else {
+    restoreToasts();
   }
 
   var SIDEBAR_COLLAPSE_KEY = 'nm.adminSidebarCollapsed';
@@ -561,6 +639,7 @@
     fmtDate,
     toast,
     ensureToastHost,
+    restoreToasts,
     mountAdminSidebar,
     mountPageNav,
     mountAdminTopbar,
