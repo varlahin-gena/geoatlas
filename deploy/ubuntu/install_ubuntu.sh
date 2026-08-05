@@ -82,38 +82,55 @@ _nm_run_gauge_fn() {
     fi
 }
 
-_source_ui() {
+_nm_github_owner() {
+    local owner
+    owner="$(echo "$REPO_URL" | sed -E 's#.*github.com[:/]([^/]+/[^/.]+)(\.git)?$#\1#')"
+    [[ -n "$owner" ]] || owner="varlahin-gena/network_monitor"
+    echo "$owner"
+}
+
+_nm_source_common() {
+    # $1 — имя файла в deploy/common (например ui.sh)
+    local name="$1"
     local candidates=(
-        "${PROJECT_DIR}/deploy/common/ui.sh"
-        "${SCRIPT_DIR}/../common/ui.sh"
+        "${PROJECT_DIR}/deploy/common/${name}"
+        "${SCRIPT_DIR}/../common/${name}"
     )
     local c
     for c in "${candidates[@]}"; do
         if [[ -f "$c" ]]; then
-            # shellcheck source=deploy/common/ui.sh
+            # shellcheck source=/dev/null
             source "$c"
-            nm_ui_init
             return 0
         fi
     done
-    # curl-установка одним файлом: подтянуть ui.sh с main
     if command -v curl >/dev/null 2>&1; then
         local tmp owner
-        owner="$(echo "$REPO_URL" | sed -E 's#.*github.com[:/]([^/]+/[^/.]+)(\.git)?$#\1#')"
-        [[ -n "$owner" ]] || owner="varlahin-gena/network_monitor"
+        owner="$(_nm_github_owner)"
         tmp="$(mktemp)"
         if curl -fsSL --connect-timeout 10 --max-time 30 \
-            "https://raw.githubusercontent.com/${owner}/main/deploy/common/ui.sh" \
+            "https://raw.githubusercontent.com/${owner}/main/deploy/common/${name}" \
             -o "$tmp"; then
             # shellcheck source=/dev/null
             source "$tmp"
             rm -f "$tmp"
-            nm_ui_init
             return 0
         fi
         rm -f "$tmp"
     fi
     return 1
+}
+
+_source_ui() {
+    if ! _nm_source_common ui.sh; then
+        return 1
+    fi
+    nm_ui_init
+    return 0
+}
+
+_source_full_auto_preset() {
+    _nm_source_common full_auto_preset.sh
 }
 
 # Тёмная тема whiptail до появления ui.sh (curl-установка / welcome).
@@ -150,19 +167,39 @@ scale=white,black'
 }
 
 _welcome_dialog() {
-    if [[ "${NM_AUTO_MODULES:-0}" == "1" ]] || [[ ! -t 0 ]]; then
+    # Уже выбран авто-режим (env / --full-auto / нет TTY) — без диалога.
+    if [[ "${NM_FULL_AUTO:-0}" == "1" ]] || [[ "${NM_AUTO_MODULES:-0}" == "1" ]] || [[ ! -t 0 ]]; then
         return 0
     fi
     _ensure_dark_newt
     _source_ui || true
-    if declare -F nm_ui_msgbox >/dev/null 2>&1; then
-        nm_ui_msgbox "Установка ГеоАтлас" \
+    if ! declare -F nm_ui_radiolist >/dev/null 2>&1; then
+        if declare -F nm_ui_msgbox >/dev/null 2>&1; then
+            nm_ui_msgbox "Установка ГеоАтлас" \
 "Добро пожаловать в мастер установки.
 
 Каталог: ${PROJECT_DIR}
 Репозиторий: ${REPO_URL}
 
-Далее: пакеты, Docker, выбор релиза или main, модули и запуск." || true
+Далее: Docker, выбор релиза или main, модули и запуск." || true
+        fi
+        return 0
+    fi
+
+    local mode
+    mode="$(nm_ui_radiolist "Установка ГеоАтлас" \
+"Выберите режим установки.
+
+Каталог: ${PROJECT_DIR}" \
+        full_auto "Сделай мне хорошо — релиз, все модули, порт 8080, автопрофиль, firewall OFF" ON \
+        guided "Пошаговая установка — спросить источник, модули, порт, профиль" OFF \
+    )" || mode="guided"
+
+    if [[ "$mode" == "full_auto" ]]; then
+        export NM_FULL_AUTO=1
+        if declare -F nm_apply_full_auto_preset >/dev/null 2>&1; then
+            nm_apply_full_auto_preset
+        fi
     fi
 }
 
@@ -432,6 +469,7 @@ prepare_project() {
              deploy/common/select_modules.sh \
              deploy/common/select_source.sh \
              deploy/common/select_http_port.sh \
+             deploy/common/full_auto_preset.sh \
              deploy/common/ui.sh \
              deploy/common/uninstall.sh \
              deploy/ubuntu/install_ubuntu.sh \
@@ -497,10 +535,18 @@ main() {
     require_root
     detect_ubuntu
     _ensure_dark_newt
+    _source_full_auto_preset || true
+    if declare -F nm_parse_full_auto_argv >/dev/null 2>&1; then
+        nm_parse_full_auto_argv "$@"
+    fi
+    if declare -F nm_apply_full_auto_preset >/dev/null 2>&1; then
+        nm_apply_full_auto_preset
+    fi
     _source_ui || true
     print_banner
     _nm_run_gauge_fn "Пакеты" "Обновление apt и установка зависимостей…" install_packages
     _source_ui || true
+    _source_full_auto_preset || true
     _welcome_dialog
     _nm_run_gauge_fn "Docker" "Установка Docker Engine и Compose…" install_docker
     choose_install_source
@@ -508,12 +554,25 @@ main() {
     _nm_run_gauge_fn "Репозиторий" "Клонирование / обновление ${BRANCH}…" clone_or_update_repo
     # После clone — полноценный UI-слой из репозитория
     _source_ui || true
+    _source_full_auto_preset || true
+    if declare -F nm_apply_full_auto_preset >/dev/null 2>&1; then
+        nm_apply_full_auto_preset
+    fi
     prepare_project
-    ask_firewall
-    if [[ "${ENABLE_UFW}" == "1" ]]; then
-        _nm_run_gauge_fn "Firewall" "Настройка правил UFW…" configure_firewall
+    if [[ "${NM_FULL_AUTO:-0}" == "1" ]]; then
+        if declare -F nm_disable_host_firewall >/dev/null 2>&1; then
+            nm_disable_host_firewall
+        else
+            ENABLE_UFW=0
+            configure_firewall
+        fi
     else
-        configure_firewall
+        ask_firewall
+        if [[ "${ENABLE_UFW}" == "1" ]]; then
+            _nm_run_gauge_fn "Firewall" "Настройка правил UFW…" configure_firewall
+        else
+            configure_firewall
+        fi
     fi
     start_stack
 }

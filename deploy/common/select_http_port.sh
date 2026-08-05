@@ -9,6 +9,7 @@
 #   HTTP_PORT=8080              — без вопросов
 #   NM_HTTP_PORT=8080           — алиас
 #   NM_AUTO_MODULES=1           — порт 80 по умолчанию
+#   NM_FULL_AUTO=1              — порт 8080 (через full_auto_preset.sh)
 #
 # После confirm_http_port: HTTP_PORT (1–65535)
 

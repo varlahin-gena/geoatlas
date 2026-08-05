@@ -199,6 +199,16 @@ chmod +x install_ubuntu.sh
 sudo ./install_ubuntu.sh
 ```
 
+**«Сделай мне хорошо» (полный авто):** без вопросов ставит последний релиз, все модули, порт **8080**, автопрофиль по ресурсам, выключает host firewall (UFW/firewalld) и запускает стек.
+
+```bash
+sudo NM_FULL_AUTO=1 ./install_ubuntu.sh
+# или
+sudo ./install_ubuntu.sh --full-auto
+```
+
+После установки UI: `http://<host>:8080`. В интерактивном TUI тот же режим — первый пункт radiolist «Сделай мне хорошо».
+
 **Что делает скрипт:**
 
 1. Обновляет списки пакетов
@@ -217,6 +227,7 @@ sudo ./install_ubuntu.sh
 | Переменная | Назначение |
 |------------|------------|
 | `NM_UI=whiptail\|dialog\|text` | принудительный бэкенд диалогов |
+| `NM_FULL_AUTO=1` / `--full-auto` | «Сделай мне хорошо»: релиз, все модули, порт 8080, автопрофиль, firewall OFF, старт стека |
 | `NM_AUTO_MODULES=1` | без вопросов: модули по умолчанию, порт 80, стабильный релиз |
 | нет TTY (CI/pipe) | то же, что авто-режим; gauge пишет прогресс в лог |
 
@@ -255,6 +266,8 @@ chmod +x install_oraclelinux.sh
 
 sudo ./install_oraclelinux.sh
 ```
+
+Полный авто (как на Ubuntu): `sudo NM_FULL_AUTO=1 ./install_oraclelinux.sh` или `sudo ./install_oraclelinux.sh --full-auto` → UI на порту **8080**, firewalld выключен.
 
 **Что делает скрипт:**
 
@@ -591,6 +604,32 @@ Network,Country,Region,City,Latitude,Longitude
 (форма с полями шаблона выше) и **«Выгрузить GeoIP CSV»** — скачивание актуальной базы.
 
 Без GeoIP-базы узлы на карте не отображаются (нет координат).
+
+### Загрузка GeoIP с сервера (рекомендуется для больших CSV)
+
+Большие базы (сотни МБ) через браузер часто упираются в ширину канала между рабочей станцией и сервером.
+Надёжнее положить CSV на сам хост и залить через API локально (нужен `API_AUTH_TOKEN` из `.env` или именованный токен scope **ops**/**admin**):
+
+```bash
+cd /opt/network-monitor
+# скопировать файл на сервер, например:
+# scp geoip.csv root@сервер:/opt/network-monitor/geoip.csv
+
+set -a; . ./.env; set +a
+
+curl -sS -w "\nHTTP %{http_code}\n" \
+  -H "Authorization: Bearer $API_AUTH_TOKEN" \
+  -H "Content-Type: text/csv" \
+  --data-binary @/opt/network-monitor/geoip.csv \
+  "http://127.0.0.1/upload-geo"
+# если UI на 8080 (full-auto): http://127.0.0.1:8080/upload-geo
+
+docker compose exec clickhouse clickhouse-client -q "SELECT count() FROM geo_ranges"
+docker compose logs backend --since=10m 2>&1 | grep -iE 'geo index loaded|geo csv|upload|overlap|error'
+```
+
+Ожидаете: JSON с `"ok":true,"ranges":N`, `count() > 0` и в логах `geo index loaded`.
+На большой базе backend может на 1–3 минуты занять много CPU/RAM — это нормально (парсинг и in-memory индекс).
 
 ---
 
