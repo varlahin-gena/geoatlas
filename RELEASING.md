@@ -4,7 +4,7 @@
 
 | Что | Где | Пример |
 |-----|-----|--------|
-| Продукт | `VERSION`, git tag `vX.Y.Z` | `1.1.1` |
+| Продукт | `VERSION`, git tag `vX.Y.Z` | `1.1.2` |
 | HTTP API (OpenAPI) | `openapi.yaml` → `info.version` | `1.3.0` |
 | Схема CH | `nm_schema_version` (Go Ensure*) | независимо |
 
@@ -22,10 +22,10 @@
 
 ```bash
 # убедиться что working tree clean и main запушен
-git tag -a v1.1.1 -m "ГеоАтлас v1.1.1"
-git push origin v1.1.1
+git tag -a v1.1.2 -m "ГеоАтлас v1.1.2"
+git push origin v1.1.2
 
-gh release create v1.1.1 --title "v1.1.1" --notes-file /tmp/release-notes-1.1.1.md
+gh release create v1.1.2 --title "v1.1.2" --notes-file /tmp/release-notes-1.1.2.md
 # или вручную на GitHub → Releases, вставить секцию из CHANGELOG
 ```
 

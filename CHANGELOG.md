@@ -3,6 +3,20 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/).
 Версии — [SemVer](https://semver.org/lang/ru/).
 
+## [1.1.2] — 2026-08-05
+
+Патч: карта снова читает daily geo-агрегаты; stats-collector корректно снимает MemoryTracking.
+
+### Fixed
+- Geo edges daily scan: `ORDER BY` по `src_ip`/`dst_ip` на таблицах `traffic_edges_{city|country}_daily` (там `src_key`/`dst_key`) — CH code 47 и постоянный fallback на cold `traffic_logs`
+- stats-collector: `system.metrics.MemoryTracking` (Int64) сканится через `toUInt64(value)` — без ошибки `converting Int64 to *uint64`
+
+### Notes
+- OpenAPI API doc version: **1.3.0** (без изменений)
+- Продуктовая версия: **1.1.2**
+- После обновления: пересобрать/перезапустить `backend` и `stats-collector`
+- 3 коммита с `v1.1.1`
+
 ## [1.1.1] — 2026-07-31
 
 Патч: снижение CPU ClickHouse при обновлении карты, единое админ-меню, доработки установщика и репутации.
@@ -88,6 +102,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[1.1.2]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.1.2
 [1.1.1]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.1.1
 [1.1.0]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.1.0
 [1.0.0]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.0.0

@@ -254,7 +254,7 @@ func scanGeoEdgesDays(
 		%s
 		%s
 		%s
-	`, table, having, sqlclause.OrderByAggFilterSQL(filter), limitClause(limit), AggSettings())
+	`, table, having, sqlclause.OrderByGeoAggFilterSQL(filter), limitClause(limit), AggSettings())
 
 	rows, err := ch.Query(qctx, q, days)
 	if err != nil {

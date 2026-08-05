@@ -41,6 +41,26 @@ func TestOrderByAggFilterSQL(t *testing.T) {
 	if !strings.Contains(OrderByAggFilterSQL("all"), "cnt DESC") {
 		t.Fatal(OrderByAggFilterSQL("all"))
 	}
+	if !strings.Contains(OrderByAggFilterSQL("all"), "src_ip") {
+		t.Fatal("IP edges order must use src_ip:", OrderByAggFilterSQL("all"))
+	}
+}
+
+func TestOrderByGeoAggFilterSQL(t *testing.T) {
+	got := OrderByGeoAggFilterSQL("all")
+	if !strings.HasPrefix(got, "ORDER BY coord_weight DESC") {
+		t.Fatalf("coord_weight first: %s", got)
+	}
+	if !strings.Contains(got, "src_key") || !strings.Contains(got, "dst_key") {
+		t.Fatalf("geo daily tables use src_key/dst_key: %s", got)
+	}
+	if strings.Contains(got, "src_ip") || strings.Contains(got, "dst_ip") {
+		t.Fatalf("must not reference src_ip/dst_ip: %s", got)
+	}
+	blocked := OrderByGeoAggFilterSQL("blocked")
+	if !strings.Contains(blocked, "blocked_cnt DESC") || strings.Contains(blocked, "src_ip") {
+		t.Fatal(blocked)
+	}
 }
 
 func TestOrderByMapAggFilterSQLPrefersGeo(t *testing.T) {

@@ -202,7 +202,8 @@ func (c *Collector) collectStorageMetrics(ctx context.Context, ts time.Time) []M
 		add("pipeline", "parse_errors", "count_1h", float64(v))
 	}
 
-	if v, ok := c.queryUint64(ctx, "SELECT value FROM system.metrics WHERE metric = 'MemoryTracking'"); ok && v > 0 {
+	// system.metrics.value — Int64; без toUInt64 clickhouse-go не сканит в uint64.
+	if v, ok := c.queryUint64(ctx, "SELECT toUInt64(value) FROM system.metrics WHERE metric = 'MemoryTracking'"); ok && v > 0 {
 		add("container", "clickhouse_internal", "mem_tracking_bytes", float64(v))
 	}
 
