@@ -631,6 +631,14 @@ docker compose logs backend --since=10m 2>&1 | grep -iE 'geo index loaded|geo cs
 Ожидаете: JSON с `"ok":true,"ranges":N`, `count() > 0` и в логах `geo index loaded`.
 На большой базе backend может на 1–3 минуты занять много CPU/RAM — это нормально (парсинг и in-memory индекс).
 
+### Повторная загрузка большой GeoIP и HTTP 502 / OOM
+
+Индекс GeoIP целиком держится в RAM backend. Повторный upload того же большого CSV (миллионы диапазонов), когда индекс уже загружен, снова парсит файл в память **поверх** существующего индекса → пик RAM удваивается → Docker cgroup может убить процесс (`oom-kill` / `Memory cgroup out of memory`). Снаружи это часто выглядит как **HTTP 502** в UI, а контейнер `backend` ненадолго перезапускается.
+
+- Если в ClickHouse уже есть нужное число строк (`SELECT count() FROM geo_ranges`) — **перезаливать не нужно**; после рестарта backend снова поднимет индекс из CH.
+- Замену базы делайте с сервера через `curl` (см. выше), не через браузер по узкому каналу.
+- Проверка OOM: `dmesg -T | grep -i oom` и `docker compose logs backend` вокруг момента 502.
+
 ---
 
 ## Веб-интерфейс
