@@ -219,10 +219,35 @@
     const meta = document.createElement('div');
     meta.className = 'nm-user-menu-meta';
     meta.innerHTML =
-      '<div class="nm-meta-name"></div><div class="nm-meta-role"></div>';
+      '<div class="nm-meta-name"></div><div class="nm-meta-role"></div><div class="nm-meta-version" hidden></div>';
     meta.querySelector('.nm-meta-name').textContent = displayName;
     meta.querySelector('.nm-meta-role').textContent =
       (fio ? '@' + user.username + ' · ' : '') + roleRu;
+
+    const versionEl = meta.querySelector('.nm-meta-version');
+    fetch('/api/system/version', { credentials: 'same-origin' })
+      .then(function (res) {
+        if (!res.ok) return null;
+        return res.json();
+      })
+      .then(function (data) {
+        if (!data || !versionEl) return;
+        const label = (data.display || data.ref || data.version || '').trim();
+        if (!label) return;
+        let text = 'Версия: ' + label;
+        if (data.source === 'main' && data.commit) {
+          text = 'Версия: main · ' + data.commit;
+        } else if (data.source === 'release' && data.version && label.indexOf(data.version) === -1) {
+          text = 'Версия: ' + label + ' (' + data.version + ')';
+        }
+        versionEl.textContent = text;
+        versionEl.hidden = false;
+        versionEl.title =
+          (data.ref ? 'ref: ' + data.ref : '') +
+          (data.commit ? '\ncommit: ' + data.commit : '') +
+          (data.version ? '\nproduct: ' + data.version : '');
+      })
+      .catch(function () { /* ignore */ });
 
     const themeBtn = document.createElement('button');
     themeBtn.type = 'button';

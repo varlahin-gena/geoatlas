@@ -417,6 +417,9 @@ choose_install_source() {
     _source_ui || true
     if _source_select_source && declare -F confirm_install_source >/dev/null 2>&1; then
         confirm_install_source
+        if declare -F apply_install_source >/dev/null 2>&1; then
+            apply_install_source "$PROJECT_DIR"
+        fi
         return 0
     fi
     log "select_source.sh недоступен — устанавливаем BRANCH=${BRANCH}."

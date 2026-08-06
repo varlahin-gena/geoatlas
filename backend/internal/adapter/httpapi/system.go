@@ -50,6 +50,22 @@ func (h *SystemHandler) GetSystemStatus(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, resp)
 }
 
+func (h *SystemHandler) GetSystemVersion(w http.ResponseWriter, r *http.Request) {
+	if h.systemUC == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "system service unavailable"})
+		return
+	}
+	meta := h.systemUC.InstallMeta()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":      true,
+		"version": meta.Version,
+		"source":  meta.Source,
+		"ref":     meta.Ref,
+		"commit":  meta.Commit,
+		"display": meta.Display,
+	})
+}
+
 func (h *SystemHandler) GetSystemHistory(w http.ResponseWriter, r *http.Request) {
 	if h.systemUC == nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "system service unavailable"})

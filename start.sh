@@ -74,6 +74,13 @@ prepare_mounts() {
     if [[ ! -f install-profile.json ]]; then
         echo '{}' > install-profile.json
     fi
+    if [[ -f "${SCRIPT_DIR}/deploy/common/install_meta.sh" ]]; then
+        # shellcheck source=deploy/common/install_meta.sh
+        source "${SCRIPT_DIR}/deploy/common/install_meta.sh"
+        nm_write_install_meta "$SCRIPT_DIR"
+    elif [[ ! -f install-meta.json ]]; then
+        echo '{"version":"unknown","source":"unknown","ref":"unknown","commit":"","display":"unknown"}' > install-meta.json
+    fi
 }
 
 # Compose profiles для опциональных сервисов (syslog / stats).

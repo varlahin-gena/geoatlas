@@ -71,6 +71,7 @@ type SystemAPI interface {
 	EdgesAgg(context.Context) usecasesystem.EdgesAggView
 	ScheduleMaintenanceBackfill(context.Context) bool
 	InstallProfile() (*usecasesystem.CapacityProfile, error)
+	InstallMeta() usecasesystem.InstallMeta
 }
 
 type RetentionAPI interface {

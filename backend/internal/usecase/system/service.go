@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"os"
 	"runtime"
 	"strings"
 	"time"
@@ -19,6 +20,7 @@ type Dependencies struct {
 	Profiles           ProfileLoader
 	Maintenance        MaintenanceScheduler
 	InstallProfilePath string
+	InstallMetaPath    string
 	StartupTime        time.Time
 }
 
@@ -29,6 +31,7 @@ type Service struct {
 	profiles           ProfileLoader
 	maintenance        MaintenanceScheduler
 	installProfilePath string
+	installMetaPath    string
 	startupTime        time.Time
 	rates              *RateSampler
 }
@@ -45,6 +48,7 @@ func New(deps Dependencies) *Service {
 		profiles:           deps.Profiles,
 		maintenance:        deps.Maintenance,
 		installProfilePath: deps.InstallProfilePath,
+		installMetaPath:    deps.InstallMetaPath,
 		startupTime:        startupTime,
 		rates:              &RateSampler{},
 	}
@@ -210,6 +214,51 @@ func (s *Service) InstallProfile() (*CapacityProfile, error) {
 		return nil, errors.New("install profile loader unavailable")
 	}
 	return s.profiles.Load(s.installProfilePath)
+}
+
+// InstallMeta loads install-meta.json (product version + git ref) for the UI.
+func (s *Service) InstallMeta() InstallMeta {
+	meta := InstallMeta{
+		Version: "unknown",
+		Source:  "unknown",
+		Ref:     "unknown",
+		Display: "unknown",
+	}
+	if s == nil {
+		return meta
+	}
+	path := strings.TrimSpace(s.installMetaPath)
+	if path == "" {
+		path = "/app/install-meta.json"
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return meta
+	}
+	var parsed InstallMeta
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		return meta
+	}
+	if parsed.Version != "" {
+		meta.Version = parsed.Version
+	}
+	if parsed.Source != "" {
+		meta.Source = parsed.Source
+	}
+	if parsed.Ref != "" {
+		meta.Ref = parsed.Ref
+	}
+	meta.Commit = parsed.Commit
+	if parsed.Display != "" {
+		meta.Display = parsed.Display
+	} else if meta.Source == "main" {
+		meta.Display = "main"
+	} else if meta.Ref != "" && meta.Ref != "unknown" {
+		meta.Display = meta.Ref
+	} else if meta.Version != "unknown" {
+		meta.Display = "v" + meta.Version
+	}
+	return meta
 }
 
 func (s *Service) Health(ctx context.Context, pinger ClickHousePinger) (HealthResult, error) {

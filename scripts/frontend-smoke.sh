@@ -43,6 +43,8 @@ grep -q 'nmAuthHeaders' frontend/auth.js || fail "auth.js: nmAuthHeaders"
 grep -q 'X-CSRF-Token' frontend/auth.js || fail "auth.js: CSRF header"
 grep -q 'nm_csrf' frontend/auth.js || fail "auth.js: CSRF cookie"
 grep -q "loginUrl" frontend/auth.js || fail "auth.js: loginUrl"
+grep -q 'nm-meta-version' frontend/auth.js || fail "auth.js: version in user menu"
+grep -q '/api/system/version' frontend/auth.js || fail "auth.js: system version fetch"
 ok "auth.js helpers"
 
 grep -q 'escapeHTML' frontend/common.js || fail "common.js: escapeHTML"

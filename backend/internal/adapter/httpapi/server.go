@@ -155,6 +155,9 @@ func NewServer(
 	r.Handle("/api/system/status",
 		withTimeout(chain(http.HandlerFunc(system.GetSystemStatus), loginMW), readTimeout),
 	).Methods("GET")
+	r.Handle("/api/system/version",
+		withTimeout(chain(http.HandlerFunc(system.GetSystemVersion), loginMW), healthTimeout),
+	).Methods("GET")
 	r.Handle("/api/geo-missing",
 		withTimeout(chain(http.HandlerFunc(geoH.GetGeoMissing), adminMW), readTimeout),
 	).Methods("GET")

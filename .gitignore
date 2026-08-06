@@ -5,6 +5,7 @@ docker-compose.override.yml
 !.env.example
 install-profile.json
 install-modules.json
+install-meta.json
 clickhouse/users.d/zz_install_limits.xml
 
 # TLS (свои сертификаты) — ключи не коммитить

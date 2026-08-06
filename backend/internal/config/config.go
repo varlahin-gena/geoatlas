@@ -169,6 +169,7 @@ type Config struct {
 	CHExternalSort       int64
 	CHMaxThreads         int
 	InstallProfilePath   string
+	InstallMetaPath      string
 
 	// Размеры пулов ClickHouse (отдельные Conn на write/read/background).
 	CHIngestMaxOpen     int
@@ -249,6 +250,7 @@ func FromEnv() Config {
 		CHExternalSort:       parser.int64("CH_EXTERNAL_SORT_BYTES", 256<<20),
 		CHMaxThreads:         parser.int("CH_MAX_THREADS", 2),
 		InstallProfilePath:   envOr("INSTALL_PROFILE_PATH", "/app/install-profile.json"),
+		InstallMetaPath:      envOr("INSTALL_META_PATH", "/app/install-meta.json"),
 
 		CHIngestMaxOpen:         parser.int("CH_INGEST_MAX_OPEN_CONNS", 4),
 		CHAPIMaxOpen:            parser.int("CH_API_MAX_OPEN_CONNS", 8),

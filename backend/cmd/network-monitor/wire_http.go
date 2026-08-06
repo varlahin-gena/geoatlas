@@ -37,6 +37,7 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 		Ingest:             &systemlive.IngestAdapter{Src: a.ingestSvc},
 		Profiles:           systemlive.ProfileAdapter{},
 		InstallProfilePath: cfg.InstallProfilePath,
+		InstallMetaPath:    cfg.InstallMetaPath,
 		Maintenance:        a.geoJobs,
 	})
 	authUC := usecaseauth.New(auth.users, auth.sessions)

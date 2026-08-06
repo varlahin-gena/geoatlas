@@ -31,6 +31,15 @@ type CapacityProfile struct {
 	Capacity     ProfileCapacity  `json:"capacity"`
 }
 
+// InstallMeta is written by start.sh (deploy/common/install_meta.sh).
+type InstallMeta struct {
+	Version string `json:"version"`
+	Source  string `json:"source"`
+	Ref     string `json:"ref"`
+	Commit  string `json:"commit,omitempty"`
+	Display string `json:"display"`
+}
+
 type ProfileHost struct {
 	CPUCores    int    `json:"cpu_cores"`
 	RAMMB       int    `json:"ram_mb"`

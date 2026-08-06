@@ -96,6 +96,7 @@ services:
       LOG_LEVEL: info
       LOG_FORMAT: text
       INSTALL_PROFILE_PATH: /app/install-profile.json
+      INSTALL_META_PATH: /app/install-meta.json
       # Обязателен, если API_AUTH_DISABLED не true. Генерируется в start.sh → .env
       # Плейсхолдер ниже отвергается backend'ом без NM_ALLOW_INSECURE=1.
       API_AUTH_TOKEN: ${API_AUTH_TOKEN:-dev-insecure-change-me}
@@ -116,6 +117,7 @@ services:
       TZ: Europe/Moscow
     volumes:
       - ./install-profile.json:/app/install-profile.json:ro
+      - ./install-meta.json:/app/install-meta.json:ro
       - auth-users:/app/data
     depends_on:
       clickhouse:

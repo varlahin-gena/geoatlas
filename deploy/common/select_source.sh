@@ -150,6 +150,33 @@ confirm_install_source() {
     export BRANCH NM_INSTALL_SOURCE NM_INSTALL_IS_TAG
 }
 
+# Записать NM_INSTALL_SOURCE / BRANCH в .env (для install-meta / UI).
+apply_install_source() {
+    local project_dir="${1:-.}"
+    local env_file="${project_dir}/.env"
+    local src="${NM_INSTALL_SOURCE:-main}"
+    local ref="${BRANCH:-main}"
+    local tmp
+
+    mkdir -p "$project_dir"
+    touch "$env_file"
+    tmp="$(mktemp)"
+    grep -vE '^[[:space:]]*(# --- Install source \(select_source\.sh\) ---|NM_INSTALL_SOURCE=|NM_INSTALL_REF=|NM_INSTALL_IS_TAG=)' \
+        "$env_file" >"$tmp" || true
+    while [[ -s "$tmp" ]] && [[ -z "$(tail -n1 "$tmp")" ]]; do
+        head -n -1 "$tmp" >"${tmp}.2" && mv "${tmp}.2" "$tmp"
+    done
+    cat >>"$tmp" <<EOF
+
+# --- Install source (select_source.sh) ---
+NM_INSTALL_SOURCE=${src}
+NM_INSTALL_REF=${ref}
+NM_INSTALL_IS_TAG=${NM_INSTALL_IS_TAG:-0}
+EOF
+    mv "$tmp" "$env_file"
+    _nm_src_log "Записан NM_INSTALL_SOURCE=${src} REF=${ref} → ${env_file}"
+}
+
 # Клонирование / обновление с учётом тега или ветки.
 # Требует: PROJECT_DIR, REPO_URL, BRANCH, NM_INSTALL_IS_TAG
 nm_clone_or_update_repo() {
