@@ -874,6 +874,35 @@ paths:
         "401":
           description: unauthorized
 
+  /api/system/version:
+    get:
+      tags: [system]
+      summary: Версия установки (main или release tag)
+      description: |
+        Любой залогиненный пользователь (administrator или operator).
+        Читает install-meta.json (product version, source, ref, commit, display).
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Install version metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  version: { type: string }
+                  source: { type: string }
+                  ref: { type: string }
+                  commit: { type: string }
+                  display: { type: string }
+        "401":
+          description: unauthorized
+        "503":
+          description: system service unavailable
+
   /api/system/stats:
     get:
       tags: [system]
