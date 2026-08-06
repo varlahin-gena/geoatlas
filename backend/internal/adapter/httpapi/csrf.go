@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"crypto/subtle"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -25,6 +26,13 @@ func csrfMW(ba bearerAuth, authDisabled bool) middleware {
 				return
 			}
 			if !csrfOriginOK(r) {
+				slog.Warn("csrf origin rejected",
+					"origin", r.Header.Get("Origin"),
+					"referer", r.Header.Get("Referer"),
+					"host", r.Host,
+					"x_forwarded_host", r.Header.Get("X-Forwarded-Host"),
+					"path", r.URL.Path,
+				)
 				writeJSON(w, http.StatusForbidden, map[string]any{"error": "csrf origin rejected"})
 				return
 			}
@@ -49,26 +57,67 @@ func safeMethod(m string) bool {
 	}
 }
 
-// csrfOriginOK: при наличии Origin/Referer — только same-origin (или пустой Host-less).
-// Запросы без Origin/Referer (curl, scripts) проходят при валидном CSRF header.
+// csrfOriginOK: при наличии Origin/Referer — same-origin (hostname; порт может отличаться
+// из‑за nginx $host). Запросы без Origin/Referer (curl) проходят при валидном CSRF header.
+//
+// Дополнительно: Origin с литеральным IP (типичный self-hosted UI :8080) принимаем —
+// Host за reverse-proxy часто backend:8080 / без порта; cookie SameSite=Strict уже
+// не пускает cross-site session, double-submit токен всё равно обязателен.
 func csrfOriginOK(r *http.Request) bool {
 	origin := strings.TrimSpace(r.Header.Get("Origin"))
 	if origin != "" {
-		return originHostMatches(origin, r.Host)
+		return originAllowed(origin, r)
 	}
 	ref := strings.TrimSpace(r.Header.Get("Referer"))
 	if ref == "" {
 		return true
 	}
-	return originHostMatches(ref, r.Host)
+	return originAllowed(ref, r)
 }
 
-func originHostMatches(raw, host string) bool {
+func originAllowed(raw string, r *http.Request) bool {
 	u, err := url.Parse(raw)
 	if err != nil || u.Host == "" {
 		return false
 	}
-	return csrfHostsEqual(u.Host, host)
+	for _, candidate := range csrfHostCandidates(r) {
+		if csrfHostsEqual(u.Host, candidate) {
+			return true
+		}
+	}
+	// Self-hosted по IP: Origin авторитетен при битом/внутреннем Host.
+	if hostIsLiteralIP(u.Hostname()) {
+		return true
+	}
+	return false
+}
+
+func csrfHostCandidates(r *http.Request) []string {
+	seen := make(map[string]struct{}, 4)
+	out := make([]string, 0, 4)
+	add := func(s string) {
+		for _, part := range strings.Split(s, ",") {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			key := strings.ToLower(part)
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			out = append(out, part)
+		}
+	}
+	add(r.Host)
+	add(r.Header.Get("X-Forwarded-Host"))
+	add(r.Header.Get("X-Original-Host"))
+	return out
+}
+
+func hostIsLiteralIP(host string) bool {
+	host = strings.Trim(host, "[]")
+	return net.ParseIP(host) != nil
 }
 
 // csrfHostsEqual — same-origin по hostname; порт может отсутствовать на одной стороне
