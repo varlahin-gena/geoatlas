@@ -581,7 +581,7 @@ main() {
     prepare_project
     if [[ "${NM_FULL_AUTO:-0}" == "1" ]]; then
         if declare -F nm_disable_host_firewall >/dev/null 2>&1; then
-            nm_disable_host_firewall
+            nm_disable_host_firewall "$PROJECT_DIR"
         else
             ENABLE_FIREWALL=0
             configure_firewall
@@ -595,6 +595,9 @@ main() {
         fi
     fi
     start_stack
+    if [[ "${NM_FULL_AUTO:-0}" == "1" ]] && declare -F nm_full_auto_finish >/dev/null 2>&1; then
+        nm_full_auto_finish "$PROJECT_DIR"
+    fi
 }
 
 main "$@"

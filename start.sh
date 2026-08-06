@@ -203,11 +203,14 @@ main() {
     log "Stack is up."
     if [[ "${HTTP_PORT}" == "80" ]]; then
         log "Web interface: http://${IP_ADDR}"
+        log "Login page   : http://${IP_ADDR}/login.html"
         log "Health check : http://${IP_ADDR}/api/health"
     else
         log "Web interface: http://${IP_ADDR}:${HTTP_PORT}"
+        log "Login page   : http://${IP_ADDR}:${HTTP_PORT}/login.html"
         log "Health check : http://${IP_ADDR}:${HTTP_PORT}/api/health"
     fi
+    log "Default login: admin / admin (смена пароля при первом входе)"
 }
 
 main "$@"

@@ -8,8 +8,8 @@
 # Env (CI / без TTY):
 #   HTTP_PORT=8080              — без вопросов
 #   NM_HTTP_PORT=8080           — алиас
-#   NM_AUTO_MODULES=1           — порт 80 по умолчанию
-#   NM_FULL_AUTO=1              — порт 8080 (через full_auto_preset.sh)
+#   NM_FULL_AUTO=1              — порт 8080 (даже если HTTP_PORT ещё не выставлен)
+#   NM_AUTO_MODULES=1           — порт 80 по умолчанию (не full-auto)
 #
 # После confirm_http_port: HTTP_PORT (1–65535)
 
@@ -90,6 +90,14 @@ confirm_http_port() {
         fi
         export HTTP_PORT
         _nm_port_log "Порт задан через NM_HTTP_PORT=${HTTP_PORT}."
+        return 0
+    fi
+
+    # «Сделай мне хорошо» — всегда 8080 (не путать с NM_AUTO_MODULES → 80).
+    if [[ "${NM_FULL_AUTO:-0}" == "1" ]]; then
+        HTTP_PORT=8080
+        export HTTP_PORT
+        _nm_port_log "NM_FULL_AUTO=1 — HTTP_PORT=8080."
         return 0
     fi
 

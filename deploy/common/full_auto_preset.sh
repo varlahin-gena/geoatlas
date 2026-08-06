@@ -5,6 +5,7 @@
 #   nm_parse_full_auto_argv "$@"
 #   nm_apply_full_auto_preset
 #   nm_disable_host_firewall   # при NM_FULL_AUTO=1
+#   nm_full_auto_finish /opt/network-monitor   # после start.sh
 #
 # Включение: NM_FULL_AUTO=1 или argv --full-auto
 # Даёт: релиз, все модули, HTTP 8080, автопрофиль, старт стека, firewall OFF.
@@ -56,8 +57,60 @@ nm_apply_full_auto_preset() {
     _nm_fa_log "режим «Сделай мне хорошо»: release=${NM_INSTALL_SOURCE}, HTTP_PORT=${HTTP_PORT}, auto profile, all modules, firewall OFF, start stack"
 }
 
+_nm_fa_http_port() {
+    local port="${HTTP_PORT:-}"
+    local project_dir="${1:-}"
+    local v=""
+    if [[ -z "$port" && -n "$project_dir" && -f "${project_dir}/.env" ]]; then
+        v="$(grep -E '^[[:space:]]*HTTP_PORT=' "${project_dir}/.env" 2>/dev/null | tail -n1 | cut -d= -f2- || true)"
+        [[ -n "$v" ]] && port="$v"
+    fi
+    echo "${port:-8080}"
+}
+
+_nm_fa_ufw_active() {
+    command -v ufw >/dev/null 2>&1 || return 1
+    ufw status 2>/dev/null | grep -qi "Status: active"
+}
+
+_nm_fa_firewalld_active() {
+    command -v firewall-cmd >/dev/null 2>&1 || return 1
+    firewall-cmd --state >/dev/null 2>&1
+}
+
+# Если host firewall всё ещё активен — открываем HTTP и syslog (иначе UI :8080 недоступен).
+_nm_fa_open_ports_if_fw_active() {
+    local port="$1"
+    local open_syslog="${2:-1}"
+
+    if _nm_fa_ufw_active; then
+        _nm_fa_log "UFW всё ещё active — открываем ${port}/tcp (fallback)"
+        ufw allow "${port}/tcp" >/dev/null 2>&1 || true
+        if [[ "$open_syslog" == "1" ]]; then
+            ufw allow 514/tcp >/dev/null 2>&1 || true
+            ufw allow 514/udp >/dev/null 2>&1 || true
+        fi
+        ufw reload >/dev/null 2>&1 || true
+    fi
+
+    if _nm_fa_firewalld_active; then
+        _nm_fa_log "firewalld всё ещё active — открываем ${port}/tcp (fallback)"
+        firewall-cmd --permanent --add-port="${port}/tcp" >/dev/null 2>&1 || true
+        if [[ "$open_syslog" == "1" ]]; then
+            firewall-cmd --permanent --add-port=514/tcp >/dev/null 2>&1 || true
+            firewall-cmd --permanent --add-port=514/udp >/dev/null 2>&1 || true
+        fi
+        firewall-cmd --reload >/dev/null 2>&1 || true
+    fi
+}
+
 # Активно выключает host firewall (UFW / firewalld). Ошибки не фатальны.
+# $1 — опционально PROJECT_DIR (чтобы взять HTTP_PORT из .env).
 nm_disable_host_firewall() {
+    local project_dir="${1:-}"
+    local port
+    port="$(_nm_fa_http_port "$project_dir")"
+
     _nm_fa_log "выключаем host firewall…"
 
     if command -v ufw >/dev/null 2>&1; then
@@ -77,5 +130,101 @@ nm_disable_host_firewall() {
                 _nm_fa_log "firewalld: disable/stop не удался (продолжаем)"
             fi
         fi
+    fi
+
+    # Если disable не сработал — иначе :8080 остаётся закрытым (правил allow нет).
+    local syslog_on=1
+    if [[ -n "$project_dir" && -f "${project_dir}/.env" ]]; then
+        local mod
+        mod="$(grep -E '^[[:space:]]*NM_MODULE_SYSLOG=' "${project_dir}/.env" 2>/dev/null | tail -n1 | cut -d= -f2- || true)"
+        [[ "$mod" == "0" ]] && syslog_on=0
+    elif [[ "${NM_MODULE_SYSLOG:-1}" == "0" ]]; then
+        syslog_on=0
+    fi
+    _nm_fa_open_ports_if_fw_active "$port" "$syslog_on"
+}
+
+_nm_fa_host_ip() {
+    local ip=""
+    ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+    [[ -n "$ip" ]] || ip="127.0.0.1"
+    echo "$ip"
+}
+
+_nm_fa_ui_url() {
+    local port="$1" ip="$2"
+    if [[ "$port" == "80" ]]; then
+        echo "http://${ip}"
+    else
+        echo "http://${ip}:${port}"
+    fi
+}
+
+# Проверка login.html, подсказка URL/логина, попытка открыть браузер.
+# $1 — PROJECT_DIR
+nm_full_auto_finish() {
+    if [[ "${NM_FULL_AUTO:-0}" != "1" ]]; then
+        return 0
+    fi
+
+    local project_dir="${1:-.}"
+    local port ip base login_url health_url ok=0
+    port="$(_nm_fa_http_port "$project_dir")"
+    ip="$(_nm_fa_host_ip)"
+    base="$(_nm_fa_ui_url "$port" "$ip")"
+    login_url="${base}/login.html"
+    health_url="${base}/api/health"
+
+    _nm_fa_log "проверяем UI: ${login_url}"
+    if command -v curl >/dev/null 2>&1; then
+        if curl -fsS --connect-timeout 3 --max-time 8 "$login_url" >/dev/null 2>&1; then
+            ok=1
+            _nm_fa_log "login.html OK"
+        elif curl -fsS --connect-timeout 3 --max-time 8 "http://127.0.0.1:${port}/login.html" >/dev/null 2>&1; then
+            ok=1
+            base="$(_nm_fa_ui_url "$port" "127.0.0.1")"
+            login_url="${base}/login.html"
+            _nm_fa_log "login.html OK на 127.0.0.1:${port} (внешний IP ${ip} может быть недоступен — SG/маршрут)"
+        else
+            _nm_fa_log "WARNING: login.html недоступен на :${port}"
+            _nm_fa_log "  Проверьте: grep HTTP_PORT ${project_dir}/.env; docker compose -f ${project_dir}/docker-compose.yml ps"
+            _nm_fa_log "  curl -I http://127.0.0.1:${port}/login.html"
+        fi
+    fi
+
+    # Попытка открыть браузер на хосте с GUI (на headless SSH обычно noop).
+    if [[ "$ok" == "1" ]] && [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]; then
+        if command -v xdg-open >/dev/null 2>&1; then
+            xdg-open "$login_url" >/dev/null 2>&1 || true
+        fi
+    fi
+
+    local msg
+    msg="Установка завершена.
+
+Веб-интерфейс: ${base}
+Вход:          ${login_url}
+
+Логин:  admin
+Пароль: admin
+(при первом входе система попросит сменить пароль)
+
+Health: ${health_url}"
+
+    if [[ "$ok" != "1" ]]; then
+        msg="${msg}
+
+⚠ Страница входа сейчас не отвечает на :${port}.
+На сервере: curl -I http://127.0.0.1:${port}/login.html
+Если заходите с другой машины — откройте TCP ${port} в Security Group / облачном фаерволе."
+    fi
+
+    echo "" >&2
+    echo "══════════════════════════════════════════════════════════" >&2
+    echo "$msg" >&2
+    echo "══════════════════════════════════════════════════════════" >&2
+
+    if declare -F nm_ui_msgbox >/dev/null 2>&1 && [[ -t 0 ]] && [[ "${NM_UI_BACKEND:-}" != "text" ]]; then
+        nm_ui_msgbox "ГеоАтлас готов" "$msg" || true
     fi
 }
