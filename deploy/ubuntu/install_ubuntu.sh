@@ -417,9 +417,7 @@ choose_install_source() {
     _source_ui || true
     if _source_select_source && declare -F confirm_install_source >/dev/null 2>&1; then
         confirm_install_source
-        if declare -F apply_install_source >/dev/null 2>&1; then
-            apply_install_source "$PROJECT_DIR"
-        fi
+        # .env пишем ПОСЛЕ clone — иначе mkdir+/.env ломает git clone в непустой каталог
         return 0
     fi
     log "select_source.sh недоступен — устанавливаем BRANCH=${BRANCH}."
@@ -632,7 +630,14 @@ main() {
     choose_install_source
     print_banner
     _nm_run_gauge_fn "Репозиторий" "Клонирование / обновление ${BRANCH}…" clone_or_update_repo
-    # После clone — полноценный UI-слой из репозитория
+    # После clone — источник установки в .env + UI-слой из репозитория
+    if declare -F apply_install_source >/dev/null 2>&1; then
+        apply_install_source "$PROJECT_DIR"
+    elif [[ -f "${PROJECT_DIR}/deploy/common/select_source.sh" ]]; then
+        # shellcheck source=deploy/common/select_source.sh
+        source "${PROJECT_DIR}/deploy/common/select_source.sh"
+        apply_install_source "$PROJECT_DIR"
+    fi
     _source_ui || true
     _source_full_auto_preset || true
     if declare -F nm_apply_full_auto_preset >/dev/null 2>&1; then

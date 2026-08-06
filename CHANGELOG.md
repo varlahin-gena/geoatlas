@@ -13,6 +13,7 @@
 - Установщик (Ubuntu / Oracle Linux): интерактивный шаг HTTPS (`select_https.sh`) в пошаговом режиме и в «Сделай мне хорошо»; env-overrides `NM_HTTPS_*` / `NM_SSL_*` / `NM_CERTS_DIR`
 - Fix: вопрос HTTPS не пропускается после whiptail (`/dev/tty` + цепочка из `select_http_port.sh`)
 - UI: версия в меню пользователя (`main` / тег релиза) — `install-meta.json`, `GET /api/system/version`
+- Fix: установщик не пишет `.env` до `git clone` (непустой `/opt/network-monitor` ломал клон → «docker-compose.yml not found»)
 
 ## [1.1.4] — 2026-08-06
 

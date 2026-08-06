@@ -184,6 +184,7 @@ nm_clone_or_update_repo() {
     local repo_url="${2:-${REPO_URL:?REPO_URL required}}"
     local ref="${3:-${BRANCH:-main}}"
     local is_tag="${4:-${NM_INSTALL_IS_TAG:-0}}"
+    local tmp_clone saved_env=""
 
     mkdir -p "$(dirname -- "$project_dir")"
 
@@ -204,13 +205,45 @@ nm_clone_or_update_repo() {
             git checkout "$ref"
             git pull --ff-only origin "$ref"
         fi
-    else
-        _nm_src_log "Клонирование ${repo_url} @ ${ref}..."
+        return 0
+    fi
+
+    # Каталог без .git (например, только .env от прерванной установки) —
+    # git clone в непустой путь падает. Клонируем во временный каталог.
+    if [[ -d "$project_dir" ]] && [[ -n "$(ls -A "$project_dir" 2>/dev/null || true)" ]]; then
+        _nm_src_log "Каталог ${project_dir} не пуст и без .git — клонируем во временный каталог…"
+        if [[ -f "${project_dir}/.env" ]]; then
+            saved_env="$(mktemp)"
+            cp -a "${project_dir}/.env" "$saved_env"
+        fi
+        tmp_clone="$(mktemp -d "${project_dir}.clone.XXXXXX")"
         if [[ "$is_tag" == "1" ]]; then
-            git clone --branch "$ref" "$repo_url" "$project_dir"
+            git clone --branch "$ref" "$repo_url" "$tmp_clone"
         else
-            git clone -b "$ref" "$repo_url" "$project_dir"
+            git clone -b "$ref" "$repo_url" "$tmp_clone"
+        fi
+        # Заменяем содержимое целевого каталога результатом клона.
+        find "$project_dir" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+        # shellcheck disable=SC2086
+        shopt -s dotglob nullglob
+        mv "$tmp_clone"/* "$project_dir"/
+        shopt -u dotglob nullglob
+        rmdir "$tmp_clone" 2>/dev/null || rm -rf "$tmp_clone"
+        if [[ -n "$saved_env" && -f "$saved_env" ]]; then
+            # Сохраняем прежний .env только если в клоне его нет (его и не должно быть в git).
+            cp -a "$saved_env" "${project_dir}/.env"
+            rm -f "$saved_env"
         fi
         cd "$project_dir"
+        _nm_src_log "Клонирование завершено → ${project_dir}"
+        return 0
     fi
+
+    _nm_src_log "Клонирование ${repo_url} @ ${ref}..."
+    if [[ "$is_tag" == "1" ]]; then
+        git clone --branch "$ref" "$repo_url" "$project_dir"
+    else
+        git clone -b "$ref" "$repo_url" "$project_dir"
+    fi
+    cd "$project_dir"
 }
