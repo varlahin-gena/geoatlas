@@ -183,6 +183,15 @@ HTTP_REDIRECT=1
 
 `HTTPS_ENABLED=auto` (дефолт) тоже включит TLS, если оба файла на месте.
 
+Установщик (Ubuntu / Oracle Linux) спрашивает HTTPS и в пошаговом режиме, и в «Сделай мне хорошо» (при TTY). Без вопросов / CI:
+
+| Env | Назначение |
+|-----|------------|
+| `NM_HTTPS_ENABLED` / `HTTPS_ENABLED` | `1` / `0` / `auto` |
+| `NM_HTTPS_PORT` / `HTTPS_PORT` | порт TLS (по умолчанию 443) |
+| `NM_SSL_CERT_SRC` + `NM_SSL_KEY_SRC` | пути к PEM для копирования в `certs/` |
+| `NM_CERTS_DIR` | каталог с `fullchain.pem`+`privkey.pem` (или `cert.pem`+`key.pem`) |
+
 3. Запуск через `./start.sh` / `./stop.sh` (или `deploy/common/compose.sh`) — подхватывает `docker-compose.https.yml` и публикует `:443`. Голый `docker compose` без `-f docker-compose.https.yml` порт `:443` не опубликует.
 4. UI: `https://<host>/`. HTTP при `HTTP_REDIRECT=1` уходит на HTTPS.
 
@@ -232,7 +241,7 @@ chmod +x install_ubuntu.sh
 sudo ./install_ubuntu.sh
 ```
 
-**«Сделай мне хорошо» (полный авто):** без вопросов ставит последний релиз, все модули, порт **8080**, автопрофиль по ресурсам, выключает host firewall (UFW/firewalld) и запускает стек.
+**«Сделай мне хорошо» (полный авто):** без вопросов ставит последний релиз, все модули, порт **8080**, автопрофиль по ресурсам, выключает host firewall (UFW/firewalld) и запускает стек. HTTPS при TTY всё равно спрашивается (или задайте `NM_HTTPS_ENABLED` / сертификаты через env).
 
 ```bash
 sudo NM_FULL_AUTO=1 ./install_ubuntu.sh
@@ -250,10 +259,11 @@ sudo ./install_ubuntu.sh --full-auto
 4. Спрашивает источник: **последний GitHub Release** или ветка **`main`** (все свежие коммиты)
 5. Клонирует или обновляет репозиторий в `/opt/network-monitor`
 6. Спрашивает, какие модули ставить (checklist: авторизация, API-токен, syslog-ng, stats-collector, репутация IP)
-7. Спрашивает **порт веб-интерфейса** (80 / 8080 / 443 / 8443 или свой)
-8. Запускает детектор ресурсов и предлагает профиль
-9. Настраивает UFW (выбранный HTTP-порт и при необходимости 514)
-10. Вызывает `./start.sh` (можно отказаться на последнем шаге)
+7. Спрашивает **порт веб-интерфейса** (80 / 8080 / 443 / 8443 или свой; 443/8443 — HTTP без TLS)
+8. Спрашивает **HTTPS** (свои PEM; можно пропустить)
+9. Запускает детектор ресурсов и предлагает профиль
+10. Настраивает UFW (HTTP, при HTTPS — TLS-порт, и при необходимости 514)
+11. Вызывает `./start.sh` (можно отказаться на последнем шаге)
 
 **TUI / неинтерактивный режим:**
 
@@ -272,7 +282,7 @@ sudo ./install_ubuntu.sh --full-auto
 | Ветка main | `NM_INSTALL_SOURCE=main` | `main` — последние изменения |
 | Явный ref | `BRANCH=v1.1.4` | указанная ветка/тег без вопроса |
 
-**Порт UI:** `HTTP_PORT=8080` (или `NM_HTTP_PORT`) — без вопроса; в compose: `${HTTP_PORT:-80}:80`. HTTPS — отдельно через `certs/` и `HTTPS_ENABLED` (см. выше).
+**Порт UI:** `HTTP_PORT=8080` (или `NM_HTTP_PORT`) — без вопроса; в compose: `${HTTP_PORT:-80}:80`. HTTPS — шаг установщика или env (`NM_HTTPS_ENABLED`, `NM_HTTPS_PORT`, `NM_SSL_CERT_SRC` / `NM_SSL_KEY_SRC`, `NM_CERTS_DIR`; см. [HTTPS](#https-свои-сертификаты)).
 
 **Выбор модулей (интерактивно или через env):**
 
@@ -307,7 +317,7 @@ sudo ./install_oraclelinux.sh
 1. Удаляет конфликтующие пакеты (`podman`, `buildah`, `runc`) при необходимости
 2. Устанавливает Docker CE из официального репозитория
 3. Настраивает SELinux (`container_manage_cgroup`) или переводит в permissive (опционально)
-4. Спрашивает источник (релиз / `main`), клонирует/обновляет репозиторий, предлагает модули и профиль, настраивает firewalld и запускает стек
+4. Спрашивает источник (релиз / `main`), клонирует/обновляет репозиторий, предлагает модули, HTTP-порт, HTTPS, профиль, настраивает firewalld и запускает стек
 
 ---
 

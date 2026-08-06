@@ -117,8 +117,8 @@ confirm_http_port() {
             "На каком порту открыть UI (nginx)?" \
             80 "HTTP :80" ON \
             8080 "HTTP :8080" OFF \
-            443 "Порт :443" OFF \
-            8443 "Порт :8443" OFF \
+            443 "HTTP :443 (не TLS)" OFF \
+            8443 "HTTP :8443 (не TLS)" OFF \
             custom "Указать вручную" OFF)"; then
             _nm_port_log "Установка отменена пользователем."
             exit 0

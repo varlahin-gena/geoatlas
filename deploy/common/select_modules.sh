@@ -446,7 +446,21 @@ confirm_firewall() {
 
     _nm_mod_ensure_ui || true
     echo "" >&2
-    if _nm_mod_yesno "Настроить правила firewall (порты ${HTTP_PORT:-80}, 514/tcp+udp)?" "${current}"; then
+    local ports="${HTTP_PORT:-80}"
+    local https_on=0
+    case "${HTTPS_ENABLED:-}" in
+        1|true|TRUE|yes|YES|on|ON|auto) https_on=1 ;;
+    esac
+    if [[ "$https_on" != "1" ]]; then
+        local root="${PROJECT_DIR:-.}"
+        if [[ -f "${root}/certs/fullchain.pem" && -f "${root}/certs/privkey.pem" ]]; then
+            https_on=1
+        fi
+    fi
+    if [[ "$https_on" == "1" ]]; then
+        ports="${ports}, ${HTTPS_PORT:-443}"
+    fi
+    if _nm_mod_yesno "Настроить правила firewall (порты ${ports}, 514/tcp+udp)?" "${current}"; then
         printf -v "$var_name" '%s' "1"
     else
         printf -v "$var_name" '%s' "0"

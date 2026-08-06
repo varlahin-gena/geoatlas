@@ -43,9 +43,10 @@ ${src_line}
   4. Клонирование репозитория
   5. Выбор модулей
   6. Порт веб-интерфейса
-  7. Профиль производительности
-  8. Firewall
-  9. Запуск стека
+  7. HTTPS
+  8. Профиль производительности
+  9. Firewall
+  10. Запуск стека
 EOF
 }
 
@@ -481,6 +482,21 @@ configure_http_port() {
     log "select_http_port.sh not found — HTTP_PORT=${HTTP_PORT}."
 }
 
+configure_https() {
+    local helper="${PROJECT_DIR}/deploy/common/select_https.sh"
+    if [[ ! -f "$helper" ]]; then
+        helper="${SCRIPT_DIR}/../common/select_https.sh"
+    fi
+    if [[ -f "$helper" ]]; then
+        # shellcheck source=deploy/common/select_https.sh
+        source "$helper"
+        confirm_https "$PROJECT_DIR"
+        apply_https "$PROJECT_DIR"
+        return 0
+    fi
+    log "select_https.sh not found — HTTPS step skipped."
+}
+
 configure_resources() {
     local detector="${PROJECT_DIR}/deploy/common/detect_resources.sh"
     if [[ ! -f "$detector" ]]; then
@@ -506,6 +522,7 @@ prepare_project() {
              deploy/common/select_modules.sh \
              deploy/common/select_source.sh \
              deploy/common/select_http_port.sh \
+             deploy/common/select_https.sh \
              deploy/common/full_auto_preset.sh \
              deploy/common/ui.sh \
              deploy/common/uninstall.sh \
@@ -522,6 +539,9 @@ prepare_project() {
     log "Selecting HTTP port for web UI..."
     configure_http_port
 
+    log "Selecting HTTPS for web UI..."
+    configure_https
+
     log "Detecting server resources and generating performance profile..."
     configure_resources
 
@@ -531,6 +551,9 @@ prepare_project() {
     fi
     if declare -F apply_http_port >/dev/null 2>&1; then
         apply_http_port "$PROJECT_DIR"
+    fi
+    if declare -F apply_https >/dev/null 2>&1; then
+        apply_https "$PROJECT_DIR"
     fi
 }
 
@@ -544,8 +567,20 @@ ask_firewall() {
     fi
     _source_ui || true
     if declare -F nm_ui_yesno >/dev/null 2>&1; then
+        local ports="${HTTP_PORT:-80}"
+        local https_on=0
+        case "${HTTPS_ENABLED:-}" in
+            1|true|TRUE|yes|YES|on|ON|auto) https_on=1 ;;
+        esac
+        if [[ "$https_on" != "1" ]] \
+            && [[ -f "${PROJECT_DIR}/certs/fullchain.pem" && -f "${PROJECT_DIR}/certs/privkey.pem" ]]; then
+            https_on=1
+        fi
+        if [[ "$https_on" == "1" ]]; then
+            ports="${ports}, ${HTTPS_PORT:-443}"
+        fi
         if nm_ui_yesno "Firewall" \
-            "Настроить правила firewalld (порты ${HTTP_PORT:-80}, 514)?" 1; then
+            "Настроить правила firewalld (порты ${ports}, 514)?" 1; then
             ENABLE_FIREWALL=1
         else
             ENABLE_FIREWALL=0
