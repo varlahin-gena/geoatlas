@@ -3,6 +3,24 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/).
 Версии — [SemVer](https://semver.org/lang/ru/).
 
+## [1.1.4] — 2026-08-06
+
+Патч: смена пароля и UI на порту **8080** (full-auto) — CSRF и доступность после установки.
+
+### Fixed
+- CSRF: `csrf origin rejected` при UI на нестандартном порту / по IP за nginx (`Host` без порта или `backend:8080`); литеральный IP в Origin и `X-Forwarded-Host`
+- Установщик «Сделай мне хорошо»: если firewall не выключился — fallback `allow` на HTTP-порт; `NM_FULL_AUTO` всегда фиксирует **8080**; после старта — проверка `/login.html`, URL и учётки
+
+### Changed
+- nginx: `Host` / `X-Forwarded-Host` = `$http_host` (с портом клиента)
+- `start.sh`: явно печатает login URL и default `admin` / `admin`
+
+### Notes
+- OpenAPI API doc version: **1.3.0** (без изменений)
+- Продуктовая версия: **1.1.4**
+- После обновления: `git fetch && git checkout v1.1.4` (или `main`), `docker compose up -d --build backend` и `docker compose up -d frontend`
+- 3 коммита с `v1.1.3`
+
 ## [1.1.3] — 2026-08-05
 
 Патч: установщик «Сделай мне хорошо», устойчивее GeoIP/старт backend, UX уведомлений и загрузки CSV.
@@ -125,6 +143,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[1.1.4]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.1.4
 [1.1.3]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.1.3
 [1.1.2]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.1.2
 [1.1.1]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.1.1

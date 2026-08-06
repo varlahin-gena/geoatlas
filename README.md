@@ -239,7 +239,7 @@ sudo ./install_ubuntu.sh --full-auto
 |-------|-----|--------------|
 | Последний релиз (по умолчанию в UI) | `NM_INSTALL_SOURCE=release` | тег с наибольшей semver-версией (`git ls-remote --tags`) |
 | Ветка main | `NM_INSTALL_SOURCE=main` | `main` — последние изменения |
-| Явный ref | `BRANCH=v1.1.3` | указанная ветка/тег без вопроса |
+| Явный ref | `BRANCH=v1.1.4` | указанная ветка/тег без вопроса |
 
 **Порт UI:** `HTTP_PORT=8080` (или `NM_HTTP_PORT`) — без вопроса; в compose: `${HTTP_PORT:-80}:80`.
 
