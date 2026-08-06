@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"crypto/subtle"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -67,5 +68,30 @@ func originHostMatches(raw, host string) bool {
 	if err != nil || u.Host == "" {
 		return false
 	}
-	return strings.EqualFold(u.Host, host)
+	return csrfHostsEqual(u.Host, host)
+}
+
+// csrfHostsEqual — same-origin по hostname; порт может отсутствовать на одной стороне
+// (nginx proxy_set_header Host $host без :8080, а Origin от браузера с портом).
+func csrfHostsEqual(a, b string) bool {
+	if strings.EqualFold(a, b) {
+		return true
+	}
+	ah, ap := splitHostPortLoose(a)
+	bh, bp := splitHostPortLoose(b)
+	if !strings.EqualFold(ah, bh) {
+		return false
+	}
+	if ap == "" || bp == "" || ap == bp {
+		return true
+	}
+	return false
+}
+
+func splitHostPortLoose(hostport string) (host, port string) {
+	h, p, err := net.SplitHostPort(hostport)
+	if err == nil {
+		return h, p
+	}
+	return strings.Trim(hostport, "[]"), ""
 }
