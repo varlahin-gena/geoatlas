@@ -15,6 +15,8 @@ ok() { echo "ok: $*"; }
 [[ -f frontend/favicon.svg ]] || fail "missing frontend/favicon.svg"
 [[ -f frontend/login.html ]] || fail "missing frontend/login.html"
 [[ -f frontend/nginx.conf ]] || fail "missing frontend/nginx.conf"
+[[ -f frontend/nginx-app.inc ]] || fail "missing frontend/nginx-app.inc"
+[[ -f frontend/docker-entrypoint.sh ]] || fail "missing frontend/docker-entrypoint.sh"
 [[ -f frontend/data/countries.geojson ]] || fail "missing frontend/data/countries.geojson"
 [[ -f frontend/index.css ]] || fail "missing frontend/index.css"
 [[ -f frontend/system.css ]] || fail "missing frontend/system.css"
@@ -127,14 +129,17 @@ for page in users.html parse-errors.html parser-test.html geo-missing.html; do
 done
 ok "pages share theme/favicon/admin shell"
 
-grep -q 'auth_request /auth-check' frontend/nginx.conf || fail "nginx: auth_request"
-grep -q '@login_redirect' frontend/nginx.conf || fail "nginx: login redirect"
-grep -q 'location = /index.html' frontend/nginx.conf || fail "nginx: index protected"
-grep -q 'error_page 401 = @login_redirect' frontend/nginx.conf || fail "nginx: 401→login"
-ok "nginx auth redirects"
+grep -q 'auth_request /auth-check' frontend/nginx-app.inc || fail "nginx-app: auth_request"
+grep -q '@login_redirect' frontend/nginx-app.inc || fail "nginx-app: login redirect"
+grep -q 'location = /index.html' frontend/nginx-app.inc || fail "nginx-app: index protected"
+grep -q 'error_page 401 = @login_redirect' frontend/nginx-app.inc || fail "nginx-app: 401→login"
+grep -q 'include /etc/nginx/includes/app.inc' frontend/nginx.conf || fail "nginx.conf: app.inc include"
+grep -q 'HTTPS_ENABLED' frontend/docker-entrypoint.sh || fail "entrypoint: HTTPS_ENABLED"
+grep -q 'listen 443 ssl' frontend/docker-entrypoint.sh || fail "entrypoint: listen 443 ssl"
+ok "nginx auth redirects / HTTPS entrypoint"
 
 for page in system.html users.html parse-errors.html parser-test.html geo-missing.html; do
-  grep -q "location = /${page}" frontend/nginx.conf || fail "nginx: missing ${page}"
+  grep -q "location = /${page}" frontend/nginx-app.inc || fail "nginx-app: missing ${page}"
 done
 ok "nginx admin locations"
 

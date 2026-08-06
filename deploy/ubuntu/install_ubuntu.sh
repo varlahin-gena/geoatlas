@@ -303,14 +303,31 @@ configure_firewall() {
     fi
 
     local http_port="${HTTP_PORT:-80}"
+    local https_port=""
+    local https_enabled=""
     if [[ -f "${PROJECT_DIR}/.env" ]]; then
         local v
         v="$(grep -E '^[[:space:]]*HTTP_PORT=' "${PROJECT_DIR}/.env" 2>/dev/null | tail -n1 | cut -d= -f2- || true)"
         [[ -n "$v" ]] && http_port="$v"
+        v="$(grep -E '^[[:space:]]*HTTPS_PORT=' "${PROJECT_DIR}/.env" 2>/dev/null | tail -n1 | cut -d= -f2- || true)"
+        [[ -n "$v" ]] && https_port="$v"
+        v="$(grep -E '^[[:space:]]*HTTPS_ENABLED=' "${PROJECT_DIR}/.env" 2>/dev/null | tail -n1 | cut -d= -f2- || true)"
+        [[ -n "$v" ]] && https_enabled="$v"
+    fi
+    [[ -z "$https_port" && -f "${PROJECT_DIR}/certs/fullchain.pem" && -f "${PROJECT_DIR}/certs/privkey.pem" ]] && https_port=443
+    if [[ -z "$https_enabled" || "$https_enabled" == "auto" ]]; then
+        [[ -f "${PROJECT_DIR}/certs/fullchain.pem" && -f "${PROJECT_DIR}/certs/privkey.pem" ]] && https_enabled=1
     fi
 
     log "Configuring UFW rules (HTTP ${http_port}/tcp)..."
     ufw allow "${http_port}/tcp" || true
+    case "${https_enabled}" in
+        1|true|TRUE|yes|YES|on|ON)
+            [[ -z "$https_port" ]] && https_port=443
+            log "UFW: HTTPS ${https_port}/tcp"
+            ufw allow "${https_port}/tcp" || true
+            ;;
+    esac
     if [[ "${NM_MODULE_SYSLOG:-1}" == "1" ]]; then
         ufw allow 514/tcp || true
         ufw allow 514/udp || true

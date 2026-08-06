@@ -354,6 +354,9 @@ write_env_file() {
     local reputation_fetch_enabled="${REPUTATION_FETCH_ENABLED:-true}"
     local compose_profiles="${NM_COMPOSE_PROFILES:-${COMPOSE_PROFILES:-syslog,stats}}"
     local http_port="${HTTP_PORT:-80}"
+    local https_enabled="${HTTPS_ENABLED:-auto}"
+    local https_port="${HTTPS_PORT:-443}"
+    local http_redirect="${HTTP_REDIRECT:-1}"
 
     if [[ -f "$env_file" ]]; then
         local v
@@ -373,6 +376,9 @@ write_env_file() {
             v="$(_nm_env_get "$env_file" REPUTATION_FETCH_ENABLED)"; [[ -n "$v" ]] && reputation_fetch_enabled="$v"
             v="$(_nm_env_get "$env_file" NM_ALLOW_INSECURE)"; [[ -n "$v" ]] && allow_insecure="$v"
             v="$(_nm_env_get "$env_file" HTTP_PORT)"; [[ -n "$v" ]] && http_port="$v"
+            v="$(_nm_env_get "$env_file" HTTPS_ENABLED)"; [[ -n "$v" ]] && https_enabled="$v"
+            v="$(_nm_env_get "$env_file" HTTPS_PORT)"; [[ -n "$v" ]] && https_port="$v"
+            v="$(_nm_env_get "$env_file" HTTP_REDIRECT)"; [[ -n "$v" ]] && http_redirect="$v"
             if grep -qE '^[[:space:]]*COMPOSE_PROFILES=' "$env_file" 2>/dev/null; then
                 compose_profiles="$(_nm_env_get "$env_file" COMPOSE_PROFILES)"
             fi
@@ -382,6 +388,9 @@ write_env_file() {
             [[ "${mod_reputation}" == "1" ]] && reputation_fetch_enabled="true" || reputation_fetch_enabled="false"
             compose_profiles="${NM_COMPOSE_PROFILES:-}"
             [[ -n "${HTTP_PORT:-}" ]] && http_port="$HTTP_PORT"
+            [[ -n "${HTTPS_ENABLED:-}" ]] && https_enabled="$HTTPS_ENABLED"
+            [[ -n "${HTTPS_PORT:-}" ]] && https_port="$HTTPS_PORT"
+            [[ -n "${HTTP_REDIRECT:-}" ]] && http_redirect="$HTTP_REDIRECT"
         fi
     elif [[ -n "${NM_MODULE_AUTH:-}" ]]; then
         [[ "${mod_auth}" == "1" ]] && auth_disabled="false" || auth_disabled="true"
@@ -389,6 +398,9 @@ write_env_file() {
         [[ "${mod_reputation}" == "1" ]] && reputation_fetch_enabled="true" || reputation_fetch_enabled="false"
         compose_profiles="${NM_COMPOSE_PROFILES:-}"
         [[ -n "${HTTP_PORT:-}" ]] && http_port="$HTTP_PORT"
+        [[ -n "${HTTPS_ENABLED:-}" ]] && https_enabled="$HTTPS_ENABLED"
+        [[ -n "${HTTPS_PORT:-}" ]] && https_port="$HTTPS_PORT"
+        [[ -n "${HTTP_REDIRECT:-}" ]] && http_redirect="$HTTP_REDIRECT"
     fi
 
     if [[ "$auth_disabled" == "true" || "$api_auth_disabled" == "true" ]]; then
@@ -427,8 +439,11 @@ REPUTATION_FETCH_ENABLED=${reputation_fetch_enabled}
 NM_ALLOW_INSECURE=${allow_insecure}
 COMPOSE_PROFILES=${compose_profiles}
 
-# --- HTTP port (select_http_port.sh) ---
+# --- HTTP / HTTPS (select_http_port.sh, certs/) ---
 HTTP_PORT=${http_port}
+HTTPS_ENABLED=${https_enabled}
+HTTPS_PORT=${https_port}
+HTTP_REDIRECT=${http_redirect}
 EOF
 }
 

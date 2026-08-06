@@ -7,6 +7,11 @@ install-profile.json
 install-modules.json
 clickhouse/users.d/zz_install_limits.xml
 
+# TLS (свои сертификаты) — ключи не коммитить
+certs/*
+!certs/.gitkeep
+!certs/README.md
+
 # Локальные инструменты разработки
 .tmp/
 .tmp_*

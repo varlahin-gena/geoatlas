@@ -4,6 +4,9 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 cd "$SCRIPT_DIR"
 
+# shellcheck source=deploy/common/compose.sh
+source "${SCRIPT_DIR}/deploy/common/compose.sh"
+
 REMOVE_DOCKER_VOLUMES="${REMOVE_DOCKER_VOLUMES:-0}"
 
 log() { echo "[$(date +'%F %T')] $*"; }
@@ -25,9 +28,9 @@ stop_stack() {
     log "Stopping Docker Compose stack..."
     if [[ "$REMOVE_DOCKER_VOLUMES" == "1" ]]; then
         log "WARNING: REMOVE_DOCKER_VOLUMES=1 — ClickHouse data will be DELETED!"
-        docker compose down -v --remove-orphans
+        nm_compose "$SCRIPT_DIR" down -v --remove-orphans
     else
-        docker compose down --remove-orphans
+        nm_compose "$SCRIPT_DIR" down --remove-orphans
         log "Docker volumes preserved (set REMOVE_DOCKER_VOLUMES=1 to delete)."
     fi
 }

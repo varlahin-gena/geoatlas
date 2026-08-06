@@ -606,7 +606,14 @@ _nm_stop_stack() {
         if [[ "$NM_DRY_RUN" == "1" ]]; then
             _nm_log "DRY-RUN: docker compose ${down_args[*]}"
         else
-            docker compose "${down_args[@]}" || true
+            local compose_helper="${NM_PROJECT_DIR}/deploy/common/compose.sh"
+            if [[ -f "$compose_helper" ]]; then
+                # shellcheck source=deploy/common/compose.sh
+                source "$compose_helper"
+                nm_compose "$NM_PROJECT_DIR" "${down_args[@]}" || true
+            else
+                docker compose "${down_args[@]}" || true
+            fi
         fi
         cd /
     else

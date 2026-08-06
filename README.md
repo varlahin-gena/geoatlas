@@ -11,6 +11,7 @@
 - [Возможности](#возможности)
 - [Архитектура](#архитектура)
 - [Требования](#требования)
+  - [HTTPS (свои сертификаты)](#https-свои-сертификаты)
 - [Быстрый старт](#быстрый-старт)
 - [Установка](#установка)
   - [Ubuntu (автоматическая)](#ubuntu-автоматическая)
@@ -44,6 +45,7 @@
 - Парсинг **UserGate, FortiGate, Cisco ASA, Cisco FTD (FirePower), Cowrie (honeypot)** и универсальный фолбэк (Generic KV)
 - **Осознанный пропуск** событий: распознанные, но несетевые строки (например, часть `cowrie.*`) не попадают в `parse_errors`
 - **Авторизация по умолчанию**: роли `administrator` / `operator`, cookie-сессии, CSRF, Bearer `API_AUTH_TOKEN` (+ `API_AUTH_PREVIOUS_TOKEN`); именованные API-токены со scopes `read`/`ops`/`admin` (UI `/api-tokens.html`); управление УЗ в UI
+- Опциональный **HTTPS** на nginx со своими PEM-сертификатами (редирект HTTP→HTTPS)
 - Загрузка и правка **GeoIP-базы** (CSV SIEM KUMA, страница `/geo-ranges.html`, IP без координат на `/geo-missing.html`); большие CSV — с сервера через `curl` (см. [GeoIP](#geoip))
 - Установка **«Сделай мне хорошо»** (`NM_FULL_AUTO` / `--full-auto`): релиз, все модули, порт 8080, автопрофиль, firewall off
 - Toast-уведомления без автоскрытия (крестик), сохраняются при смене страниц до ручного закрытия
@@ -84,7 +86,7 @@
  │ stats-collector│ ──────────────────────────────────────────────────────────► │ ClickHouse
  └────────────────┘   system_metrics   [профиль stats]                          │ (25.8)
                                                                           ┌─────▼───────┐
- браузер ──────────────── :80 ────────► frontend (nginx) ── /api/* ─────► │ traffic_*   │
+ браузер ────────── :80 / :443 ───────► frontend (nginx) ── /api/* ─────► │ traffic_*   │
                                       auth_request                        │ geo_ranges  │
                                                                           │ parse_errors│
                                                                           └─────────────┘
@@ -146,18 +148,45 @@
 
 - **ОС**: Linux (Ubuntu 20.04+, Oracle Linux 8+, Rocky/Alma/RHEL/CentOS)
 - **Docker Engine** 24+ с плагином **docker compose**
-- Открытые порты **80** (UI) и **514/tcp**, **514/udp** (syslog)
+- Открытые порты **80** (UI HTTP), при HTTPS — ещё **443**, и **514/tcp**, **514/udp** (syslog)
 - Доступ к `/proc` и `/sys/fs/cgroup` хоста (нужен `stats-collector`)
 
 ### Сетевые порты
 
 | Порт        | Протокол | Назначение              | Доступ снаружи |
 |-------------|----------|-------------------------|----------------|
-| 80          | TCP      | Веб-интерфейс           | Да             |
+| 80          | TCP      | Веб-интерфейс (HTTP)    | Да             |
+| 443         | TCP      | Веб-интерфейс (HTTPS)   | Опционально    |
 | 514         | TCP/UDP  | Syslog от МСЭ           | Да             |
 | 8080        | TCP      | Backend API             | Нет (docker)   |
 | 1514        | TCP      | Ingest от syslog-ng     | Нет (docker)   |
 | 8123 / 9000 | TCP      | ClickHouse HTTP/native  | Нет (docker)   |
+
+### HTTPS (свои сертификаты)
+
+1. Положите PEM в `certs/fullchain.pem` и `certs/privkey.pem` (см. `certs/README.md`).
+2. Переменные в `.env`:
+
+| Переменная     | По умолчанию | Назначение |
+|----------------|--------------|------------|
+| `HTTPS_ENABLED`| `auto`       | `1`/`true` — вкл.; `0` — выкл.; `auto` — вкл. если есть оба PEM |
+| `HTTPS_PORT`   | `443`        | Хостовый порт TLS |
+| `HTTP_REDIRECT`| `1`          | Редирект HTTP→HTTPS |
+| `HTTP_PORT`    | `80`         | HTTP (и редирект) |
+
+```env
+HTTPS_ENABLED=1
+HTTPS_PORT=443
+HTTP_PORT=80
+HTTP_REDIRECT=1
+```
+
+`HTTPS_ENABLED=auto` (дефолт) тоже включит TLS, если оба файла на месте.
+
+3. Запуск через `./start.sh` / `./stop.sh` (или `deploy/common/compose.sh`) — подхватывает `docker-compose.https.yml` и публикует `:443`. Голый `docker compose` без `-f docker-compose.https.yml` порт `:443` не опубликует.
+4. UI: `https://<host>/`. HTTP при `HTTP_REDIRECT=1` уходит на HTTPS.
+
+Ключи не коммитятся (`.gitignore`). Syslog на `:514` по-прежнему без TLS.
 
 ---
 
@@ -168,6 +197,8 @@
 ```
 http://<IP_сервера>/
 ```
+
+При HTTPS (сертификаты в `certs/` + `HTTPS_ENABLED`): `https://<IP_сервера>/`.
 
 По умолчанию включена UI-авторизация. Первый вход:
 
@@ -241,7 +272,7 @@ sudo ./install_ubuntu.sh --full-auto
 | Ветка main | `NM_INSTALL_SOURCE=main` | `main` — последние изменения |
 | Явный ref | `BRANCH=v1.1.4` | указанная ветка/тег без вопроса |
 
-**Порт UI:** `HTTP_PORT=8080` (или `NM_HTTP_PORT`) — без вопроса; в compose: `${HTTP_PORT:-80}:80`.
+**Порт UI:** `HTTP_PORT=8080` (или `NM_HTTP_PORT`) — без вопроса; в compose: `${HTTP_PORT:-80}:80`. HTTPS — отдельно через `certs/` и `HTTPS_ENABLED` (см. выше).
 
 **Выбор модулей (интерактивно или через env):**
 
@@ -311,11 +342,13 @@ chmod +x start.sh stop.sh scripts/tune-resources.sh \
 ```bash
 # Ubuntu (UFW)
 sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp   # если HTTPS
 sudo ufw allow 514/tcp
 sudo ufw allow 514/udp
 
 # Oracle Linux / RHEL (firewalld)
 sudo firewall-cmd --permanent --add-port=80/tcp
+sudo firewall-cmd --permanent --add-port=443/tcp   # если HTTPS
 sudo firewall-cmd --permanent --add-port=514/tcp
 sudo firewall-cmd --permanent --add-port=514/udp
 sudo firewall-cmd --reload
@@ -377,6 +410,8 @@ DO_BUILD=0 ./start.sh
 ```
 
 **Прямые команды Docker Compose:**
+
+> Голый `docker compose up` без `-f docker-compose.https.yml` не публикует HTTPS (`:443`). Предпочтительно `./start.sh` (или `deploy/common/compose.sh`).
 
 ```bash
 cd /opt/network-monitor
@@ -712,12 +747,14 @@ network_monitor/
 │   ├── migrate_*.sql                 # ops-fallback (не SoT; предпочтителен Ensure*)
 │   ├── backfill_edges_agg.sh
 │   └── reset_data.sql / reset_data.sh
+├── certs/                            # PEM (fullchain/privkey); README + .gitkeep; ключи в .gitignore
 ├── deploy/
 │   ├── uninstall.sh
-│   ├── common/                       # detect_resources, select_modules, ui, …
+│   ├── common/                       # detect_resources, select_modules, ui, compose.sh, …
 │   ├── ubuntu/
 │   └── oracle_linux/
 ├── docker-compose.yml
+├── docker-compose.https.yml          # публикация :443 при HTTPS
 ├── frontend/                         # nginx + статика
 │   ├── index.html / index.css        # карта / глобус
 │   ├── system.html / system.css      # мониторинг
@@ -730,7 +767,9 @@ network_monitor/
 │   ├── vendor/                       # MapLibre + deck.gl + uPlot (офлайн)
 │   ├── favicon.svg
 │   ├── data/countries.geojson        # контуры стран для карты
-│   └── nginx.conf
+│   ├── nginx.conf
+│   ├── nginx-app.inc                 # общий location/auth для HTTP и HTTPS
+│   └── docker-entrypoint.sh          # подключение TLS при наличии PEM
 ├── scripts/
 │   ├── tune-resources.sh
 │   ├── watch-ingest.sh               # EPS + drop/s

@@ -3,6 +3,14 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/).
 Версии — [SemVer](https://semver.org/lang/ru/).
 
+## [Unreleased]
+
+### Added
+- HTTPS на nginx со своими PEM: `certs/fullchain.pem` + `certs/privkey.pem`, `HTTPS_ENABLED` / `HTTPS_PORT` / `HTTP_REDIRECT`, `docker-compose.https.yml`
+- Entrypoint frontend генерирует `default.conf` (HTTP или HTTPS + редирект); общий `nginx-app.inc`
+- `deploy/common/compose.sh` (`nm_compose`) — start/stop/tune подключают HTTPS-override при наличии сертификатов
+- Firewall (UFW/firewalld) открывает HTTPS-порт при включённом TLS
+
 ## [1.1.4] — 2026-08-06
 
 Патч: смена пароля и UI на порту **8080** (full-auto) — CSRF и доступность после установки.

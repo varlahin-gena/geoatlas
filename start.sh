@@ -4,23 +4,54 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 cd "$SCRIPT_DIR"
 
+# shellcheck source=deploy/common/compose.sh
+source "${SCRIPT_DIR}/deploy/common/compose.sh"
+
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-120}"
 DO_BUILD="${DO_BUILD:-1}"          # 1 = пересобирать образы, 0 = только поднять
+
+_nm_env_get() {
+    local key="$1" v=""
+    if [[ -f .env ]]; then
+        v="$(grep -E "^[[:space:]]*${key}=" .env 2>/dev/null | tail -n1 | cut -d= -f2- || true)"
+    fi
+    echo "$v"
+}
+
 # Порт UI из .env (HTTP_PORT); HEALTH_URL можно переопределить явно.
 _nm_http_port_from_env() {
-    local p="80"
-    if [[ -f .env ]]; then
-        local v
-        v="$(grep -E '^[[:space:]]*HTTP_PORT=' .env 2>/dev/null | tail -n1 | cut -d= -f2- || true)"
-        [[ -n "$v" ]] && p="$v"
-    fi
+    local p
+    p="$(_nm_env_get HTTP_PORT)"
+    [[ -z "$p" ]] && p="80"
     echo "${HTTP_PORT:-$p}"
 }
+
+_nm_https_port_from_env() {
+    local p
+    p="$(_nm_env_get HTTPS_PORT)"
+    [[ -z "$p" ]] && p="443"
+    echo "${HTTPS_PORT:-$p}"
+}
+
 HTTP_PORT="$(_nm_http_port_from_env)"
-if [[ "${HTTP_PORT}" == "80" ]]; then
-    HEALTH_URL="${HEALTH_URL:-http://127.0.0.1/api/health}"
-else
-    HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:${HTTP_PORT}/api/health}"
+HTTPS_PORT="$(_nm_https_port_from_env)"
+HTTPS_ON=0
+if nm_https_active "$SCRIPT_DIR"; then
+    HTTPS_ON=1
+fi
+
+if [[ -z "${HEALTH_URL:-}" ]]; then
+    if (( HTTPS_ON == 1 )); then
+        if [[ "${HTTPS_PORT}" == "443" ]]; then
+            HEALTH_URL="https://127.0.0.1/api/health"
+        else
+            HEALTH_URL="https://127.0.0.1:${HTTPS_PORT}/api/health"
+        fi
+    elif [[ "${HTTP_PORT}" == "80" ]]; then
+        HEALTH_URL="http://127.0.0.1/api/health"
+    else
+        HEALTH_URL="http://127.0.0.1:${HTTP_PORT}/api/health"
+    fi
 fi
 
 log() { echo "[$(date +'%F %T')] $*"; }
@@ -39,7 +70,7 @@ require_docker() {
 }
 
 prepare_mounts() {
-    mkdir -p frontend
+    mkdir -p frontend certs
     if [[ ! -f install-profile.json ]]; then
         echo '{}' > install-profile.json
     fi
@@ -143,10 +174,15 @@ wait_for_health() {
     local url="$1"
     local timeout="$2"
     local elapsed=0
+    local curl_opts=(-fsS)
+    # Свои/самоподписанные сертификаты — не валим healthcheck на verify.
+    if [[ "$url" == https://* ]]; then
+        curl_opts+=(-k)
+    fi
 
     log "Waiting for health endpoint: $url (timeout ${timeout}s)..."
     while (( elapsed < timeout )); do
-        if curl -fsS "$url" >/dev/null 2>&1; then
+        if curl "${curl_opts[@]}" "$url" >/dev/null 2>&1; then
             log "Health OK."
             return 0
         fi
@@ -168,18 +204,24 @@ main() {
     check_auth_secrets
     ensure_compose_profiles
 
+    if (( HTTPS_ON == 1 )); then
+        log "HTTPS: enabled (certs present; host port ${HTTPS_PORT})"
+    else
+        log "HTTPS: off (put PEM in ./certs — see certs/README.md)"
+    fi
+
     log "Starting Docker Compose stack..."
     if [[ "$DO_BUILD" == "1" ]]; then
-        docker compose up -d --build
+        nm_compose "$SCRIPT_DIR" up -d --build
     else
-        docker compose up -d
+        nm_compose "$SCRIPT_DIR" up -d
     fi
 
     if ! wait_for_health "$HEALTH_URL" "$HEALTH_TIMEOUT"; then
         log "Backend did not become healthy in time."
-        docker compose ps || true
+        nm_compose "$SCRIPT_DIR" ps || true
         log "----- backend logs (tail) -----"
-        docker compose logs --tail=50 backend || true
+        nm_compose "$SCRIPT_DIR" logs --tail=50 backend || true
         exit 1
     fi
 
@@ -201,7 +243,17 @@ main() {
     fi
 
     log "Stack is up."
-    if [[ "${HTTP_PORT}" == "80" ]]; then
+    if (( HTTPS_ON == 1 )); then
+        if [[ "${HTTPS_PORT}" == "443" ]]; then
+            log "Web interface: https://${IP_ADDR}"
+            log "Login page   : https://${IP_ADDR}/login.html"
+            log "Health check : https://${IP_ADDR}/api/health"
+        else
+            log "Web interface: https://${IP_ADDR}:${HTTPS_PORT}"
+            log "Login page   : https://${IP_ADDR}:${HTTPS_PORT}/login.html"
+            log "Health check : https://${IP_ADDR}:${HTTPS_PORT}/api/health"
+        fi
+    elif [[ "${HTTP_PORT}" == "80" ]]; then
         log "Web interface: http://${IP_ADDR}"
         log "Login page   : http://${IP_ADDR}/login.html"
         log "Health check : http://${IP_ADDR}/api/health"

@@ -22,17 +22,23 @@ nm_remove_firewall_rules() {
     fi
 
     local http_port="80"
+    local https_port=""
     local project_dir="${PROJECT_DIR:-/opt/network-monitor}"
     if [[ -f "${project_dir}/.env" ]]; then
         local v
         v="$(grep -E '^[[:space:]]*HTTP_PORT=' "${project_dir}/.env" 2>/dev/null | tail -n1 | cut -d= -f2- || true)"
         [[ -n "$v" ]] && http_port="$v"
+        v="$(grep -E '^[[:space:]]*HTTPS_PORT=' "${project_dir}/.env" 2>/dev/null | tail -n1 | cut -d= -f2- || true)"
+        [[ -n "$v" ]] && https_port="$v"
     fi
+    [[ -z "$https_port" ]] && https_port="443"
 
     if command -v ufw >/dev/null 2>&1; then
         echo "[$(date +'%F %T')] Removing UFW rules..."
         ufw delete allow "${http_port}/tcp" || true
+        ufw delete allow "${https_port}/tcp" || true
         ufw delete allow 80/tcp   || true
+        ufw delete allow 443/tcp  || true
         ufw delete allow 514/tcp  || true
         ufw delete allow 514/udp  || true
         # Legacy rule from previous versions (backend was exposed on 8080):

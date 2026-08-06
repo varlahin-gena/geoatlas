@@ -13,14 +13,16 @@ fi
 
 # shellcheck source=../deploy/common/detect_resources.sh
 source "${PROJECT_DIR}/deploy/common/detect_resources.sh"
+# shellcheck source=../deploy/common/compose.sh
+source "${PROJECT_DIR}/deploy/common/compose.sh"
 
 log "Пересчёт конфигурации по ресурсам сервера..."
 apply_resource_profile "$PROJECT_DIR"
 
 if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
-    if docker compose -f "${PROJECT_DIR}/docker-compose.yml" ps --status running -q 2>/dev/null | grep -q .; then
+    if nm_compose "$PROJECT_DIR" ps --status running -q 2>/dev/null | grep -q .; then
         log "Стек уже запущен — перезапускаем с новыми лимитами..."
-        (cd "$PROJECT_DIR" && docker compose up -d)
+        nm_compose "$PROJECT_DIR" up -d
         log "Готово. Проверьте install-profile.json для деталей."
     else
         log "Стек не запущен. Запустите: ./start.sh"

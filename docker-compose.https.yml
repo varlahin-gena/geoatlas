@@ -1,0 +1,6 @@
+# Подключается start.sh / stop.sh, когда HTTPS активен (сертификаты + HTTPS_ENABLED).
+# Проброс хостового HTTPS_PORT → контейнер :443.
+services:
+  frontend:
+    ports:
+      - "${HTTPS_PORT:-443}:443"
