@@ -23,6 +23,18 @@ set -Eeuo pipefail
 
 _nm_https_log() { echo "[$(date +'%F %T')] [https] $*"; }
 
+# После whiptail/dialog [[ -t 0 ]] часто становится false — нельзя опираться только на stdin.
+_nm_https_can_ask() {
+    if [[ -r /dev/tty && -w /dev/tty ]]; then
+        return 0
+    fi
+    _nm_https_ensure_ui || true
+    case "${NM_UI_BACKEND:-}" in
+        whiptail|dialog) return 0 ;;
+    esac
+    return 1
+}
+
 _nm_https_ensure_ui() {
     if ! declare -F nm_ui_radiolist >/dev/null 2>&1; then
         local dir helper
@@ -291,9 +303,9 @@ confirm_https() {
         return 0
     fi
 
-    # Без TTY (CI / pipe) — не спрашиваем. При TTY спрашиваем всегда,
-    # в том числе при NM_FULL_AUTO=1 («Сделай мне хорошо»).
-    if [[ ! -t 0 ]]; then
+    # CI / pipe без /dev/tty — не спрашиваем. Иначе спрашиваем всегда
+    # (пошагово и «Сделай мне хорошо»), даже если после whiptail stdin уже не TTY.
+    if ! _nm_https_can_ask; then
         if _nm_https_certs_present "$project_dir"; then
             HTTPS_ENABLED=auto
         else
@@ -302,7 +314,7 @@ confirm_https() {
         HTTPS_PORT="${HTTPS_PORT:-${NM_HTTPS_PORT:-443}}"
         HTTP_REDIRECT="${HTTP_REDIRECT:-${NM_HTTP_REDIRECT:-1}}"
         export HTTPS_ENABLED HTTPS_PORT HTTP_REDIRECT
-        _nm_https_log "Нет TTY — HTTPS_ENABLED=${HTTPS_ENABLED}"
+        _nm_https_log "Нет интерактива (/dev/tty) — HTTPS_ENABLED=${HTTPS_ENABLED}"
         if _nm_https_truthy "$HTTPS_ENABLED" || [[ "$HTTPS_ENABLED" == "auto" ]]; then
             _nm_https_prompt_certs_when_enabled "$project_dir"
         fi
@@ -317,6 +329,7 @@ confirm_https() {
         default_off="OFF"
     fi
 
+    _nm_https_log "Спрашиваем про HTTPS (UI)…"
     if declare -F nm_ui_radiolist >/dev/null 2>&1; then
         if ! choice="$(nm_ui_radiolist \
             "HTTPS" \
@@ -333,7 +346,7 @@ confirm_https() {
         else
             choice="off"
         fi
-        _nm_https_log "UI недоступен — HTTPS_ENABLED=${choice}"
+        _nm_https_log "UI radiolist недоступен — HTTPS_ENABLED=${choice}"
     fi
 
     case "$choice" in

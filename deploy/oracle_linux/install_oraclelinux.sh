@@ -483,6 +483,13 @@ configure_http_port() {
 }
 
 configure_https() {
+    # Обычно уже вызван из confirm_http_port (цепочка). Повторно не спрашиваем.
+    if [[ "${NM_HTTPS_CONFIRMED:-0}" == "1" ]]; then
+        if declare -F apply_https >/dev/null 2>&1; then
+            apply_https "$PROJECT_DIR"
+        fi
+        return 0
+    fi
     local helper="${PROJECT_DIR}/deploy/common/select_https.sh"
     if [[ ! -f "$helper" ]]; then
         helper="${SCRIPT_DIR}/../common/select_https.sh"
@@ -491,6 +498,7 @@ configure_https() {
         # shellcheck source=deploy/common/select_https.sh
         source "$helper"
         confirm_https "$PROJECT_DIR"
+        export NM_HTTPS_CONFIRMED=1
         apply_https "$PROJECT_DIR"
         return 0
     fi
