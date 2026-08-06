@@ -600,7 +600,10 @@ docker compose exec clickhouse clickhouse-client --query "
 
 ### Обновление системы
 
-**Через повторный запуск install-скрипта** (рекомендуется — скрипт делает `git pull`):
+Данные ClickHouse и учётки UI сохраняются (тома Docker не трогаем), меняется только код в `/opt/network-monitor`.  
+Не используйте `REMOVE_DOCKER_VOLUMES=1` / `docker compose down -v` при обновлении.
+
+**Через повторный запуск install-скрипта** (спросит релиз / `main`, сделает `git fetch` / checkout):
 
 ```bash
 sudo ./deploy/ubuntu/install_ubuntu.sh
@@ -610,15 +613,60 @@ sudo ./deploy/oracle_linux/install_oraclelinux.sh
 
 Локальные изменения будут сохранены в `git stash` перед обновлением.
 
-**Вручную:**
+**Вручную (остаться на текущей ветке / теге и подтянуть изменения):**
 
 ```bash
 cd /opt/network-monitor
 ./stop.sh
-git fetch origin
-git pull --ff-only origin main
+git fetch origin --tags
+git pull --ff-only   # на ветке; на теге обычно checkout нового тега (см. ниже)
 ./start.sh
 ```
+
+#### Переключение: релиз → `main`
+
+```bash
+cd /opt/network-monitor
+./stop.sh
+git fetch origin --tags
+git checkout main
+git pull --ff-only origin main
+
+# чтобы в меню УЗ отображалось «main»
+grep -q '^NM_INSTALL_SOURCE=' .env \
+  && sed -i 's/^NM_INSTALL_SOURCE=.*/NM_INSTALL_SOURCE=main/' .env \
+  || echo 'NM_INSTALL_SOURCE=main' >> .env
+grep -q '^NM_INSTALL_REF=' .env \
+  && sed -i 's/^NM_INSTALL_REF=.*/NM_INSTALL_REF=main/' .env \
+  || echo 'NM_INSTALL_REF=main' >> .env
+
+./start.sh
+```
+
+#### Откат: `main` → релиз
+
+```bash
+cd /opt/network-monitor
+./stop.sh
+git fetch origin --tags
+
+# последний релиз по semver, либо явно: TAG=v1.1.4
+TAG=$(git tag -l 'v*' --sort=-v:refname | head -1)
+echo "Откат на $TAG"
+git checkout --force "$TAG"
+
+grep -q '^NM_INSTALL_SOURCE=' .env \
+  && sed -i "s/^NM_INSTALL_SOURCE=.*/NM_INSTALL_SOURCE=release/" .env \
+  || echo 'NM_INSTALL_SOURCE=release' >> .env
+grep -q '^NM_INSTALL_REF=' .env \
+  && sed -i "s/^NM_INSTALL_REF=.*/NM_INSTALL_REF=${TAG}/" .env \
+  || echo "NM_INSTALL_REF=${TAG}" >> .env
+
+./start.sh
+```
+
+Если есть локальные правки в дереве: `git stash -u` перед `checkout`.  
+`./start.sh` пересоберёт образы и обновит `install-meta.json` (строка версии в меню пользователя).
 
 ---
 
