@@ -23,12 +23,12 @@ type SystemStatsResponse struct {
 // It mirrors the external install-profile document without coupling the use case
 // to its file-format package.
 type CapacityProfile struct {
-	GeneratedAt  string           `json:"generated_at"`
-	Host         ProfileHost      `json:"host"`
-	Profile      string           `json:"profile"`
-	ProfileLabel string           `json:"profile_label"`
-	Limits       ProfileLimits    `json:"limits"`
-	Capacity     ProfileCapacity  `json:"capacity"`
+	GeneratedAt  string          `json:"generated_at"`
+	Host         ProfileHost     `json:"host"`
+	Profile      string          `json:"profile"`
+	ProfileLabel string          `json:"profile_label"`
+	Limits       ProfileLimits   `json:"limits"`
+	Capacity     ProfileCapacity `json:"capacity"`
 }
 
 // InstallMeta is written by start.sh (deploy/common/install_meta.sh).

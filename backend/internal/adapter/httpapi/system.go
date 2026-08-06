@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"network_monitor/internal/usecase/system"
 	usecaseretention "network_monitor/internal/usecase/retention"
+	"network_monitor/internal/usecase/system"
 )
 
 type systemStatsPayload struct {

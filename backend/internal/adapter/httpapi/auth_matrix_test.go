@@ -92,14 +92,14 @@ func TestAuthMatrixCoversServerRoutes(t *testing.T) {
 			MaxGeoUploadSize:        1 << 20,
 			MaxReputationUploadSize: 1 << 20,
 		},
-		nil, // ingest
+		nil,           // ingest
 		nil, nil, nil, // eventsUC, geoUC, reputationUC
-		nil,      // parseErrorsUC
-		nil,      // systemUC
-		nil,      // systemPinger
-		nil,      // parseTestUC
-		nil,      // retentionUC
-		nil,      // authUC
+		nil,           // parseErrorsUC
+		nil,           // systemUC
+		nil,           // systemPinger
+		nil,           // parseTestUC
+		nil,           // retentionUC
+		nil,           // authUC
 		nil, nil, nil, // users, sessions, apiTokens
 	)
 	router, ok := srv.httpSrv.Handler.(*mux.Router)
