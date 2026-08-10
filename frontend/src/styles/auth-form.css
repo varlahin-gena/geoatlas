@@ -1,13 +1,25 @@
 /* Auth form pages (login / change-password). */
 
 body.page-auth {
-  display: grid;
-  place-items: center;
-  padding: 24px;
+  min-height: 100%;
+  min-height: 100dvh;
+  padding: 0;
   background:
     radial-gradient(ellipse 80% 50% at 50% -20%, rgba(88, 166, 255, 0.18), transparent),
     var(--bg);
 }
+
+/* #root is height:100% for map/admin — center the form inside it on auth pages. */
+body.page-auth #root {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 100%;
+  min-height: 100dvh;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
 .auth-card {
   width: 100%;
   max-width: 380px;

@@ -245,6 +245,7 @@ export default function SystemPage() {
   const [period, setPeriod] = useState('1h');
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  const [themeTick, setThemeTick] = useState(0);
   const chartEvents = useRef<HTMLDivElement>(null);
   const chartLag = useRef<HTMLDivElement>(null);
   const chartCpu = useRef<HTMLDivElement>(null);
@@ -296,6 +297,12 @@ export default function SystemPage() {
       /* ignore */
     }
   }, [tab]);
+
+  useEffect(() => {
+    const onTheme = () => setThemeTick((n) => n + 1);
+    document.addEventListener('nm-theme-change', onTheme);
+    return () => document.removeEventListener('nm-theme-change', onTheme);
+  }, []);
 
   useEffect(() => {
     if (tab !== 'charts') {
@@ -367,7 +374,7 @@ export default function SystemPage() {
       plotsRef.current = [];
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, period, toast]);
+  }, [tab, period, toast, themeTick]);
 
   async function saveRetention(e: FormEvent) {
     e.preventDefault();
