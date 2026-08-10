@@ -1,0 +1,38 @@
+// Command genactionsql rewrites ACTION_VOCAB markers in clickhouse ops files
+// from model.AllowedInClause / BlockedInClause.
+package main
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+
+	"network_monitor/internal/model"
+)
+
+func main() {
+	root, err := repoRoot()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "genactionsql: %v\n", err)
+		os.Exit(1)
+	}
+	if err := model.SyncActionVocabOps(root); err != nil {
+		fmt.Fprintf(os.Stderr, "genactionsql: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("action vocab ops synced under", root)
+}
+
+func repoRoot() (string, error) {
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		return "", fmt.Errorf("runtime.Caller failed")
+	}
+	// …/backend/internal/model/genactionsql/main.go → repo root
+	root := filepath.Clean(filepath.Join(filepath.Dir(thisFile), "..", "..", "..", ".."))
+	if _, err := os.Stat(filepath.Join(root, "clickhouse", "init.sql")); err != nil {
+		return "", fmt.Errorf("repo root %s: %w", root, err)
+	}
+	return root, nil
+}

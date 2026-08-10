@@ -39,8 +39,17 @@ SELECT
     src_ip,
     dst_ip,
     count() AS cnt,
-    sum(if(lower(action) IN ('deny','denied','drop','dropped','reject','rejected','block','blocked','reset','discard','discarded'), toUInt64(1), toUInt64(0))) AS blocked_cnt,
-    sum(if(lower(action) NOT IN ('deny','denied','drop','dropped','reject','rejected','block','blocked','reset','discard','discarded') AND lower(action) NOT IN ('','unknown'), toUInt64(1), toUInt64(0))) AS allowed_cnt,
+    -- SoT blocked list: model.BlockedInClause(); go generate ./internal/model/...
+    sum(if(lower(action) IN (
+/* ACTION_VOCAB:BLOCKED_BEGIN */
+'block','blocked','denied','deny','discard','discarded','drop','dropped','reject','rejected','reset'
+/* ACTION_VOCAB:BLOCKED_END */
+    ), toUInt64(1), toUInt64(0))) AS blocked_cnt,
+    sum(if(lower(action) NOT IN (
+/* ACTION_VOCAB:BLOCKED_BEGIN */
+'block','blocked','denied','deny','discard','discarded','drop','dropped','reject','rejected','reset'
+/* ACTION_VOCAB:BLOCKED_END */
+    ) AND lower(action) NOT IN ('','unknown'), toUInt64(1), toUInt64(0))) AS allowed_cnt,
     sum(bytes_sent) AS bytes_sent,
     sum(bytes_recv) AS bytes_recv,
     sum(packets_sent) AS packets_sent,
