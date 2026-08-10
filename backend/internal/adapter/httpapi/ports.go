@@ -33,6 +33,8 @@ type EventsAPI interface {
 
 type GeoAPI interface {
 	UploadCSV(context.Context, io.Reader, bool) (usecasegeo.UploadResult, error)
+	PrecheckUpload(dryRun bool) error
+	IndexRangeCount() int
 	ListMissing(context.Context, usecasegeo.ListMissingInput) (usecasegeo.ListMissingResult, error)
 	FormatNetwork(uint32, uint32) string
 	ListRanges(context.Context, usecasegeo.ListRangesInput) (usecasegeo.ListRangesResult, error)

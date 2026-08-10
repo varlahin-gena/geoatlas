@@ -239,7 +239,7 @@ func FromEnv() Config {
 		MaxLogUploadSize: parser.int64("MAX_LOG_UPLOAD_SIZE", 1<<30), // 1 GiB
 		// GeoIP: временные дефолты (small/2 GiB); ResolveGeoUploadLimits подставит профиль.
 		MaxGeoUploadSize:   firstEnvInt64(&parser, 512<<20, "GEOIP_UPLOAD_MAX_BYTES", "MAX_GEO_UPLOAD_SIZE"),
-		MaxGeoUploadRanges: firstEnvInt(&parser, 2_000_000, "GEOIP_UPLOAD_MAX_RANGES"),
+		MaxGeoUploadRanges: firstEnvInt(&parser, 4_000_000, "GEOIP_UPLOAD_MAX_RANGES"),
 		IngestBatchSize:    parser.int("INGEST_BATCH_SIZE", 10000),
 		IngestQueueSize:      parser.int("INGEST_QUEUE_SIZE", 300000),
 		IngestQueueMaxBytes:  parser.int("INGEST_QUEUE_MAX_BYTES", 256<<20), // 256 MiB

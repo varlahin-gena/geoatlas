@@ -739,18 +739,21 @@ docker compose logs backend --since=10m 2>&1 | grep -iE 'geo index loaded|geo cs
 | Ограничение | Env | Откуда дефолт |
 |-------------|-----|----------------|
 | Размер тела `/upload-geo` | `GEOIP_UPLOAD_MAX_BYTES` (или `MAX_GEO_UPLOAD_SIZE`) | `install-profile.json` → `limits.backend.memory_gb` (small≈512 MiB, medium≈1 GiB, …) |
-| Число диапазонов в CSV | `GEOIP_UPLOAD_MAX_RANGES` | тот же профиль |
-| Replace поверх крупного индекса | — | 409 Conflict, если `index + upload` превышают лимит ranges |
+| Число диапазонов в CSV | `GEOIP_UPLOAD_MAX_RANGES` | тот же профиль (small≈4 M) |
+| Replace поверх крупного индекса | — | **409 до чтения body**, если индекс уже ≥ половины лимита ranges |
 
-Ответы: **413** (файл/число ranges слишком велики), **409** (опасный replace). `?dry_run=1` по-прежнему проверяет CSV, но не пишет в CH и не делает опасный replace-gate (лимит ranges всё равно действует).
+Ответы: **413** (файл/число ranges слишком велики), **409** (опасный replace — сразу, без парсинга CSV). `?dry_run=1` по-прежнему проверяет CSV, но не пишет в CH и не делает early replace-gate (лимит ranges после parse всё равно действует).
+
+Ход загрузки смотрите в логах: `geo upload start` → `geo csv parsed` / `geo upload early reject` / `geo upload rejected …`. Точечная правка одной строки — страница **База GeoIP** (`/geo-ranges`), не полный CSV.
 
 В логах после reload: `geo index loaded` с `ranges`, `heap_alloc_mb`, `heap_delta_mb`. Лимиты также в `GET /api/geo-ranges` → `limits.upload_max_*`.
 
 После такого рестарта backend заново поднимает индекс из ClickHouse (это может занять 1–3 минуты). Пока идёт загрузка индекса, HTTP API (в т.ч. auth для страниц) уже доступен; на карте geo-обогащение появится, когда в логах будет `geo index loaded`.
 
 - Если в ClickHouse уже есть нужное число строк (`SELECT count() FROM geo_ranges`) — **перезаливать не нужно**.
-- Замену базы делайте с сервера через `curl` (см. выше), не через браузер по узкому каналу; при необходимости временно поднимите `GEOIP_UPLOAD_MAX_*` и memory backend.
-- Проверка OOM: `dmesg -T | grep -i oom` и `docker compose logs backend` вокруг момента 502.
+- Одну строку меняйте в UI `/geo-ranges` (или API `PUT /api/geo-ranges`).
+- Замену всей базы делайте с сервера через `curl` (см. выше); при необходимости временно поднимите `GEOIP_UPLOAD_MAX_*` и memory backend, либо очистите индекс/`geo_ranges` перед replace.
+- Проверка OOM: `dmesg -T | grep -i oom` и `docker compose logs backend -f` (`grep -iE 'geo upload|geo index|oom'`).
 
 ---
 

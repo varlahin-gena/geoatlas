@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"sort"
@@ -41,8 +42,29 @@ type UploadResult struct {
 	Backfill string
 }
 
+// IndexRangeCount — число диапазонов в in-memory индексе (0 если индекса нет).
+func (s *Service) IndexRangeCount() int {
+	if s == nil || s.index == nil {
+		return 0
+	}
+	return s.index.RangeCount()
+}
+
+// PrecheckUpload отклоняет опасный full-replace до чтения тела (когда индекс уже крупный).
+// dry_run не блокирует — CSV можно проверить без записи.
+func (s *Service) PrecheckUpload(dryRun bool) error {
+	return s.rejectIfIndexTooLargeForReplace(dryRun)
+}
+
 func (s *Service) UploadCSV(ctx context.Context, r io.Reader, dryRun bool) (UploadResult, error) {
+	if err := s.rejectIfIndexTooLargeForReplace(dryRun); err != nil {
+		slog.Info("geo upload rejected before parse", "dry_run", dryRun, "index_ranges", s.IndexRangeCount(), "err", err.Error())
+		return UploadResult{}, err
+	}
+
+	started := time.Now()
 	ranges, err := s.codec.ReadCSV(r)
+	parseDur := time.Since(started)
 	if err != nil {
 		var maxBytes *http.MaxBytesError
 		if errors.As(err, &maxBytes) {
@@ -50,7 +72,14 @@ func (s *Service) UploadCSV(ctx context.Context, r io.Reader, dryRun bool) (Uplo
 		}
 		return UploadResult{}, apperr.InvalidCSV(err)
 	}
+	slog.Info("geo csv parsed",
+		"dry_run", dryRun,
+		"ranges", len(ranges),
+		"index_ranges", s.IndexRangeCount(),
+		"duration", parseDur.Round(time.Millisecond).String(),
+	)
 	if err := s.checkUploadLimits(len(ranges), dryRun); err != nil {
+		slog.Info("geo upload rejected after parse", "dry_run", dryRun, "ranges", len(ranges), "err", err.Error())
 		return UploadResult{}, err
 	}
 	if dryRun {
@@ -67,7 +96,22 @@ func (s *Service) UploadCSV(ctx context.Context, r io.Reader, dryRun bool) (Uplo
 	return UploadResult{Count: count, Reload: "applied", Backfill: "scheduled"}, nil
 }
 
-// checkUploadLimits отклоняет слишком большой CSV и опасный replace поверх уже крупного индекса.
+// rejectIfIndexTooLargeForReplace — early 409 до ReadCSV, чтобы не удваивать пик RAM.
+func (s *Service) rejectIfIndexTooLargeForReplace(dryRun bool) error {
+	if dryRun || s.maxRanges <= 0 || s.index == nil {
+		return nil
+	}
+	existing := s.index.RangeCount()
+	if existing >= s.maxRanges/2 {
+		return apperr.Conflict(fmt.Sprintf(
+			"geo index already large (index=%d, limit=%d); full replace would spike RAM — edit via /geo-ranges, or clear geo_ranges / raise GEOIP_UPLOAD_MAX_RANGES and backend memory",
+			existing, s.maxRanges,
+		))
+	}
+	return nil
+}
+
+// checkUploadLimits отклоняет слишком большой CSV и опасный replace после parse.
 func (s *Service) checkUploadLimits(n int, dryRun bool) error {
 	if s.maxRanges > 0 && n > s.maxRanges {
 		return apperr.TooLarge(fmt.Sprintf(
@@ -82,7 +126,7 @@ func (s *Service) checkUploadLimits(n int, dryRun bool) error {
 	if existing == 0 {
 		return nil
 	}
-	// Пик RAM ≈ existing + parsed upload до ReplaceRanges. Отказываем, если оба «крупные».
+	// Пик RAM ≈ existing + parsed upload до ReplaceRanges.
 	peak := existing + n
 	if peak > s.maxRanges && existing >= s.maxRanges/2 {
 		return apperr.Conflict(fmt.Sprintf(

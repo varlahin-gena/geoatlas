@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -14,11 +15,13 @@ import (
 )
 
 type uploadCodec struct {
-	ranges []model.GeoRange
-	err    error
+	ranges    []model.GeoRange
+	err       error
+	readCalls atomic.Int32
 }
 
-func (c uploadCodec) ReadCSV(r io.Reader) ([]model.GeoRange, error) {
+func (c *uploadCodec) ReadCSV(r io.Reader) ([]model.GeoRange, error) {
+	c.readCalls.Add(1)
 	if c.err != nil {
 		return nil, c.err
 	}
@@ -27,16 +30,16 @@ func (c uploadCodec) ReadCSV(r io.Reader) ([]model.GeoRange, error) {
 	copy(out, c.ranges)
 	return out, nil
 }
-func (uploadCodec) WriteCSV(io.Writer, []model.GeoRange) error { return nil }
-func (uploadCodec) Normalize(ranges []model.GeoRange) ([]model.GeoRange, int) {
+func (*uploadCodec) WriteCSV(io.Writer, []model.GeoRange) error { return nil }
+func (*uploadCodec) Normalize(ranges []model.GeoRange) ([]model.GeoRange, int) {
 	return ranges, 0
 }
-func (uploadCodec) CheckNonOverlapping([]model.GeoRange) error { return nil }
-func (uploadCodec) ParseEntry(string, string, string, string, float64, float64) (model.GeoRange, error) {
+func (*uploadCodec) CheckNonOverlapping([]model.GeoRange) error { return nil }
+func (*uploadCodec) ParseEntry(string, string, string, string, float64, float64) (model.GeoRange, error) {
 	return model.GeoRange{}, nil
 }
-func (uploadCodec) ParseNetwork(string) (uint32, uint32, bool) { return 0, 0, false }
-func (uploadCodec) FormatNetwork(uint32, uint32) string         { return "" }
+func (*uploadCodec) ParseNetwork(string) (uint32, uint32, bool) { return 0, 0, false }
+func (*uploadCodec) FormatNetwork(uint32, uint32) string         { return "" }
 
 type uploadStore struct {
 	replaced int
@@ -75,7 +78,8 @@ func nRanges(n int) []model.GeoRange {
 func TestUploadCSVRejectsTooManyRanges(t *testing.T) {
 	idx := geoip.New()
 	store := &uploadStore{}
-	svc := New(store, uploadMissing{}, idx, nil, uploadCodec{ranges: nRanges(10)}, 5)
+	codec := &uploadCodec{ranges: nRanges(10)}
+	svc := New(store, uploadMissing{}, idx, nil, codec, 5)
 
 	_, err := svc.UploadCSV(context.Background(), bytes.NewReader(nil), true)
 	if !errors.Is(err, apperr.ErrTooLarge) {
@@ -84,17 +88,24 @@ func TestUploadCSVRejectsTooManyRanges(t *testing.T) {
 	if store.replaced != 0 {
 		t.Fatal("persist should not run")
 	}
+	if codec.readCalls.Load() != 1 {
+		t.Fatalf("dry_run should parse CSV, reads=%d", codec.readCalls.Load())
+	}
 }
 
-func TestUploadCSVRejectsDangerousReplace(t *testing.T) {
+func TestUploadCSVEarlyRejectWithoutReadCSV(t *testing.T) {
 	idx := geoip.New()
-	idx.ReplaceRanges(nRanges(8))
+	idx.ReplaceRanges(nRanges(8)) // >= maxRanges/2
 	store := &uploadStore{}
-	svc := New(store, uploadMissing{}, idx, nil, uploadCodec{ranges: nRanges(8)}, 10)
+	codec := &uploadCodec{ranges: nRanges(8)}
+	svc := New(store, uploadMissing{}, idx, nil, codec, 10)
 
 	_, err := svc.UploadCSV(context.Background(), bytes.NewReader(nil), false)
 	if !errors.Is(err, apperr.ErrConflict) {
 		t.Fatalf("err=%v want ErrConflict", err)
+	}
+	if codec.readCalls.Load() != 0 {
+		t.Fatalf("ReadCSV must not run on early reject, reads=%d", codec.readCalls.Load())
 	}
 	if store.replaced != 0 {
 		t.Fatal("persist should not run")
@@ -105,7 +116,8 @@ func TestUploadCSVDryRunAllowsLargeIndex(t *testing.T) {
 	idx := geoip.New()
 	idx.ReplaceRanges(nRanges(8))
 	store := &uploadStore{}
-	svc := New(store, uploadMissing{}, idx, nil, uploadCodec{ranges: nRanges(8)}, 10)
+	codec := &uploadCodec{ranges: nRanges(8)}
+	svc := New(store, uploadMissing{}, idx, nil, codec, 10)
 
 	res, err := svc.UploadCSV(context.Background(), bytes.NewReader(nil), true)
 	if err != nil {
@@ -114,13 +126,17 @@ func TestUploadCSVDryRunAllowsLargeIndex(t *testing.T) {
 	if !res.DryRun || res.Count != 8 {
 		t.Fatalf("res=%+v", res)
 	}
+	if codec.readCalls.Load() != 1 {
+		t.Fatalf("dry_run should parse, reads=%d", codec.readCalls.Load())
+	}
 }
 
 func TestUploadCSVSmallReplaceOK(t *testing.T) {
 	idx := geoip.New()
-	idx.ReplaceRanges(nRanges(2))
+	idx.ReplaceRanges(nRanges(2)) // < maxRanges/2
 	store := &uploadStore{}
-	svc := New(store, uploadMissing{}, idx, nil, uploadCodec{ranges: nRanges(3)}, 10)
+	codec := &uploadCodec{ranges: nRanges(3)}
+	svc := New(store, uploadMissing{}, idx, nil, codec, 10)
 
 	res, err := svc.UploadCSV(context.Background(), bytes.NewReader(nil), false)
 	if err != nil {
@@ -128,5 +144,20 @@ func TestUploadCSVSmallReplaceOK(t *testing.T) {
 	}
 	if res.Count != 3 || store.replaced != 3 {
 		t.Fatalf("res=%+v replaced=%d", res, store.replaced)
+	}
+	if codec.readCalls.Load() != 1 {
+		t.Fatalf("reads=%d", codec.readCalls.Load())
+	}
+}
+
+func TestPrecheckUpload(t *testing.T) {
+	idx := geoip.New()
+	idx.ReplaceRanges(nRanges(8))
+	svc := New(&uploadStore{}, uploadMissing{}, idx, nil, &uploadCodec{}, 10)
+	if err := svc.PrecheckUpload(false); !errors.Is(err, apperr.ErrConflict) {
+		t.Fatalf("err=%v", err)
+	}
+	if err := svc.PrecheckUpload(true); err != nil {
+		t.Fatalf("dry_run precheck: %v", err)
 	}
 }

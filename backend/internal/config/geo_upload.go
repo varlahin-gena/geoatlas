@@ -15,20 +15,19 @@ func GeoUploadDefaultsForBackendMemoryGB(gb int) (maxBytes int64, maxRanges int)
 	if gb <= 0 {
 		gb = 2
 	}
-	// Байт-лимиты ориентированы на реальные GeoIP CSV (~400–500+ МиБ),
-	// которые на practice проходят без OOM при достаточной RAM backend.
-	// Пик при повторном replace по-прежнему режет checkUploadLimits (409).
+	// Байт-лимиты ориентированы на реальные GeoIP CSV (~400–500+ МиБ).
+	// Ranges — под базы ~3.4M+; пик при повторном replace режет early 409.
 	switch {
 	case gb <= 1:
-		return 256 << 20, 800_000 // tiny — тесно; лучше не 500+ МиБ
+		return 256 << 20, 2_000_000 // tiny
 	case gb <= 2:
-		return 512 << 20, 2_000_000 // small — типичный ~463 МиБ CSV
+		return 512 << 20, 4_000_000 // small — типичный ~463 МиБ / ~3.4M ranges
 	case gb <= 4:
-		return 1 << 30, 3_000_000 // medium
+		return 1 << 30, 5_000_000 // medium
 	case gb <= 8:
-		return 1536 << 20, 5_000_000 // large (~1.5 GiB)
+		return 1536 << 20, 8_000_000 // large (~1.5 GiB)
 	default:
-		return 2 << 30, 8_000_000 // xlarge
+		return 2 << 30, 12_000_000 // xlarge
 	}
 }
 
