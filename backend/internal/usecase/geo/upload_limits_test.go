@@ -49,6 +49,10 @@ func (s *uploadStore) Replace(ctx context.Context, ranges []model.GeoRange) (int
 	s.replaced = len(ranges)
 	return len(ranges), nil
 }
+func (s *uploadStore) Truncate(context.Context) error {
+	s.replaced = 0
+	return nil
+}
 func (*uploadStore) Load(context.Context) ([]model.GeoRange, error) { return nil, nil }
 func (*uploadStore) Count(context.Context) (int, error)             { return 0, nil }
 func (*uploadStore) FindByIP(context.Context, string) (model.GeoRange, bool, error) {
@@ -147,6 +151,27 @@ func TestUploadCSVSmallReplaceOK(t *testing.T) {
 	}
 	if codec.readCalls.Load() != 1 {
 		t.Fatalf("reads=%d", codec.readCalls.Load())
+	}
+}
+
+func TestClearAllResetsIndex(t *testing.T) {
+	idx := geoip.New()
+	idx.ReplaceRanges(nRanges(8))
+	store := &uploadStore{}
+	svc := New(store, uploadMissing{}, idx, nil, &uploadCodec{}, 10)
+
+	res, err := svc.ClearAll(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.IndexBefore != 8 {
+		t.Fatalf("IndexBefore=%d", res.IndexBefore)
+	}
+	if idx.RangeCount() != 0 {
+		t.Fatalf("index still %d", idx.RangeCount())
+	}
+	if err := svc.PrecheckUpload(false); err != nil {
+		t.Fatalf("after clear upload should be allowed: %v", err)
 	}
 }
 

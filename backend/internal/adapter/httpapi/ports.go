@@ -41,6 +41,7 @@ type GeoAPI interface {
 	AppendRange(context.Context, string, string, string, string, float64, float64) (usecasegeo.MutateRangeResult, error)
 	UpdateRange(context.Context, string, string, string, string, string, float64, float64) (usecasegeo.MutateRangeResult, error)
 	ExportCSV(context.Context, io.Writer) error
+	ClearAll(context.Context) (usecasegeo.ClearResult, error)
 }
 
 type ReputationAPI interface {

@@ -372,6 +372,13 @@ func (m *memRangeStore) Replace(_ context.Context, ranges []model.GeoRange) (int
 	}
 	return len(ranges), nil
 }
+func (m *memRangeStore) Truncate(context.Context) error {
+	m.ranges = nil
+	if m.idx != nil {
+		m.idx.ReplaceRanges(nil)
+	}
+	return nil
+}
 func (m *memRangeStore) Load(context.Context) ([]model.GeoRange, error) {
 	return append([]model.GeoRange(nil), m.ranges...), nil
 }

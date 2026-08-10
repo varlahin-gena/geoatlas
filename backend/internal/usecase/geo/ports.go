@@ -12,6 +12,7 @@ import (
 // RangeStore — персистентность geo_ranges в ClickHouse.
 type RangeStore interface {
 	Replace(ctx context.Context, ranges []model.GeoRange) (int, error)
+	Truncate(ctx context.Context) error
 	Load(ctx context.Context) ([]model.GeoRange, error)
 	Count(ctx context.Context) (int, error)
 	FindByIP(ctx context.Context, ipStr string) (model.GeoRange, bool, error)

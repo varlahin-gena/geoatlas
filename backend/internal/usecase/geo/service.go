@@ -306,6 +306,28 @@ func (s *Service) ExportCSV(ctx context.Context, w io.Writer) error {
 	return s.codec.WriteCSV(w, clean)
 }
 
+// ClearResult — итог полной очистки geo_ranges + in-memory индекса.
+type ClearResult struct {
+	IndexBefore int
+}
+
+// ClearAll truncate ClickHouse geo_ranges и обнуляет RAM-индекс (без рестарта процесса).
+// После этого POST /upload-geo снова принимает полный CSV без early 409.
+func (s *Service) ClearAll(ctx context.Context) (ClearResult, error) {
+	before := s.IndexRangeCount()
+	if s.store == nil {
+		return ClearResult{}, fmt.Errorf("geo store unavailable")
+	}
+	if err := s.store.Truncate(ctx); err != nil {
+		return ClearResult{}, err
+	}
+	if s.index != nil {
+		s.index.ReplaceRanges(nil)
+	}
+	slog.Info("geo ranges cleared", "index_before", before, "index_after", s.IndexRangeCount())
+	return ClearResult{IndexBefore: before}, nil
+}
+
 func (s *Service) FormatNetwork(start, end uint32) string {
 	if s.codec == nil {
 		return ""

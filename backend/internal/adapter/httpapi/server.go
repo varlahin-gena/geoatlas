@@ -164,6 +164,9 @@ func NewServer(
 	r.Handle("/api/geo-ranges/export",
 		withTimeout(chain(http.HandlerFunc(geoH.ExportGeoRangesCSV), opsMW), 10*time.Minute),
 	).Methods("GET")
+	r.Handle("/api/geo-ranges/clear",
+		chain(http.HandlerFunc(geoH.ClearGeoRanges), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
+	).Methods("POST")
 	r.Handle("/api/geo-ranges",
 		withTimeout(chain(http.HandlerFunc(geoH.ListGeoRanges), adminMW), readTimeout),
 	).Methods("GET")

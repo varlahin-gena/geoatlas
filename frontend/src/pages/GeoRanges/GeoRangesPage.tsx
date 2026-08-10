@@ -1,6 +1,6 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { apiFetch, apiFetchRaw } from '@/api/client';
+import { apiFetch, apiFetchRaw, authHeaders } from '@/api/client';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useToast } from '@/components/Toast';
 import { fmtNumber } from '@/lib/format';
@@ -49,6 +49,8 @@ export default function GeoRangesPage() {
     lat: '',
     lon: '',
   });
+  const [busy, setBusy] = useState(false);
+  const geoFileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     const ip = ipSearch.trim();
@@ -162,49 +164,153 @@ export default function GeoRangesPage() {
     }
   }
 
+  async function clearDatabase() {
+    if (
+      !window.confirm(
+        'Удалить ВСЮ базу GeoIP (geo_ranges) и обнулить индекс в памяти?\nКарта временно останется без координат, пока не зальёте CSV снова.',
+      )
+    ) {
+      return;
+    }
+    if (!window.confirm('Точно очистить? Это необратимо без повторной загрузки CSV.')) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const data = await apiFetch<{ index_before?: number }>('/api/geo-ranges/clear', {
+        method: 'POST',
+        body: '{}',
+      });
+      toast(
+        `База очищена (было в индексе: ${fmtNumber(Number(data.index_before) || 0)}). Можно загрузить CSV.`,
+        'success',
+      );
+      void load();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Ошибка очистки', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function uploadCsv(file: File) {
+    if (uploadMaxBytes > 0 && file.size > uploadMaxBytes) {
+      toast(
+        `Файл ${fmtNumber(file.size)} байт больше лимита ${fmtNumber(uploadMaxBytes)}`,
+        'error',
+      );
+      return;
+    }
+    if (totalInDb >= 400_000) {
+      const ok = window.confirm(
+        `В базе уже ${fmtNumber(totalInDb)} диапазонов. Полная заливка без очистки обычно даёт HTTP 409.\nСначала нажмите «Очистить базу», либо продолжите на свой риск.`,
+      );
+      if (!ok) return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch('/upload-geo', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: authHeaders({ 'Content-Type': 'text/csv' }),
+        body: file,
+      });
+      const ct = res.headers.get('content-type') || '';
+      const data = ct.includes('application/json')
+        ? await res.json().catch(() => ({}))
+        : await res.text();
+      if (!res.ok) {
+        const msg =
+          typeof data === 'object' && data && 'error' in data
+            ? String((data as { error: unknown }).error)
+            : `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+      const ranges =
+        typeof data === 'object' && data && 'ranges' in data
+          ? Number((data as { ranges: unknown }).ranges)
+          : 0;
+      toast(`GeoIP загружен${ranges ? `: ${fmtNumber(ranges)} диапазонов` : ''}`, 'success');
+      void load();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Ошибка загрузки', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <AdminLayout
       title="База GeoIP"
       actions={
-        <button
-          type="button"
-          className="btn primary"
-          onClick={async () => {
-            try {
-              const res = await apiFetchRaw('/api/geo-ranges/export');
-              if (!res.ok) throw new Error(`HTTP ${res.status}`);
-              const blob = await res.blob();
-              const cd = res.headers.get('Content-Disposition') || '';
-              const m = cd.match(/filename="?([^";]+)"?/i);
-              const name = (m && m[1]) || `geoip-${new Date().toISOString().slice(0, 10)}.csv`;
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = name;
-              a.click();
-              URL.revokeObjectURL(url);
-              toast('GeoIP CSV скачан', 'success');
-            } catch (e) {
-              toast(e instanceof Error ? e.message : 'Ошибка', 'error');
-            }
-          }}
-        >
-          Выгрузить CSV
-        </button>
+        <>
+          <input
+            ref={geoFileRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void uploadCsv(f);
+              e.target.value = '';
+            }}
+          />
+          <button
+            type="button"
+            className="btn danger"
+            disabled={busy}
+            onClick={() => void clearDatabase()}
+          >
+            Очистить базу
+          </button>
+          <button
+            type="button"
+            className="btn"
+            disabled={busy}
+            onClick={() => geoFileRef.current?.click()}
+          >
+            Загрузить CSV
+          </button>
+          <button
+            type="button"
+            className="btn primary"
+            disabled={busy}
+            onClick={async () => {
+              try {
+                const res = await apiFetchRaw('/api/geo-ranges/export');
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const blob = await res.blob();
+                const cd = res.headers.get('Content-Disposition') || '';
+                const m = cd.match(/filename="?([^";]+)"?/i);
+                const name = (m && m[1]) || `geoip-${new Date().toISOString().slice(0, 10)}.csv`;
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = name;
+                a.click();
+                URL.revokeObjectURL(url);
+                toast('GeoIP CSV скачан', 'success');
+              } catch (e) {
+                toast(e instanceof Error ? e.message : 'Ошибка', 'error');
+              }
+            }}
+          >
+            Выгрузить CSV
+          </button>
+        </>
       }
     >
       <div className="page-content-inner">
         <h1>База GeoIP</h1>
         <p className="page-lead">
-          Текущие диапазоны в таблице geo_ranges. Можно править записи или выгрузить CSV.
-          Загрузка большого CSV — с карты (sidebar «Обновить GeoIP»); сервер отклонит слишком
-          большой файл или опасный replace поверх уже крупного индекса (HTTP 413/409).
+          Текущие диапазоны в таблице geo_ranges. Точечные правки — через «изменить». Полная замена
+          базы: «Очистить базу» (снимает early 409), затем «Загрузить CSV». Рестарт backend не нужен.
         </p>
         {totalInDb >= 400_000 ? (
           <p className="hint" style={{ marginBottom: 12, color: 'var(--warn, #b45309)' }}>
             В базе уже {fmtNumber(totalInDb)} диапазонов
             {uploadMaxRanges > 0 ? ` (лимит upload ≈ ${fmtNumber(uploadMaxRanges)})` : ''}.
-            Повторная заливка того же CSV обычно не нужна и может упереться в лимит RAM backend.
+            Повторная заливка без очистки будет отклонена (HTTP 409).
             {uploadMaxBytes > 0
               ? ` Лимит размера файла: ${(uploadMaxBytes / (1024 * 1024)).toFixed(0)} МиБ.`
               : ''}

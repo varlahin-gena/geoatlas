@@ -752,8 +752,9 @@ docker compose logs backend --since=10m 2>&1 | grep -iE 'geo index loaded|geo cs
 
 - Если в ClickHouse уже есть нужное число строк (`SELECT count() FROM geo_ranges`) — **перезаливать не нужно**.
 - Одну строку меняйте в UI `/geo-ranges` (или API `PUT /api/geo-ranges`).
-- Замену всей базы делайте с сервера через `curl` (см. выше); при необходимости временно поднимите `GEOIP_UPLOAD_MAX_*` и memory backend, либо очистите индекс/`geo_ranges` перед replace.
-- Проверка OOM: `dmesg -T | grep -i oom` и `docker compose logs backend -f` (`grep -iE 'geo upload|geo index|oom'`).
+- Полная замена через UI: на `/geo-ranges` → **Очистить базу** (`POST /api/geo-ranges/clear`: TRUNCATE + сброс RAM-индекса, без рестарта) → **Загрузить CSV**. Без очистки повторный full upload даст **409**.
+- Замену с сервера через `curl` (см. выше) тоже можно; при необходимости временно поднимите `GEOIP_UPLOAD_MAX_*` и memory backend.
+- Проверка OOM: `dmesg -T | grep -i oom` и `docker compose logs backend -f` (`grep -iE 'geo upload|geo index|oom|geo ranges cleared'`).
 
 ---
 

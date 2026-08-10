@@ -220,6 +220,20 @@ func ReplaceGeoRanges(ctx context.Context, ch clickhouse.Conn, ranges []model.Ge
 	return count, nil
 }
 
+// TruncateGeoRanges очищает таблицу geo_ranges (полная замена через UI/API).
+func TruncateGeoRanges(ctx context.Context, ch clickhouse.Conn) error {
+	if ch == nil {
+		return fmt.Errorf("clickhouse conn is nil")
+	}
+	replaceGeoRangesMu.Lock()
+	defer replaceGeoRangesMu.Unlock()
+	if err := ch.Exec(ctx, "TRUNCATE TABLE IF EXISTS geo_ranges"); err != nil {
+		return fmt.Errorf("truncate geo_ranges: %w", err)
+	}
+	_ = ch.Exec(ctx, "DROP TABLE IF EXISTS geo_ranges__staging")
+	return nil
+}
+
 func insertGeoRangesInto(ctx context.Context, ch clickhouse.Conn, table string, ranges []model.GeoRange) (int, error) {
 	var (
 		batch driver.Batch

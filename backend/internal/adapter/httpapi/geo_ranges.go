@@ -183,3 +183,21 @@ func (h *GeoHandler) ExportGeoRangesCSV(w http.ResponseWriter, r *http.Request) 
 		slog.Error("geo export: write failed", "err", err)
 	}
 }
+
+func (h *GeoHandler) ClearGeoRanges(w http.ResponseWriter, r *http.Request) {
+	if h.geoUC == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "geo service unavailable"})
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+	defer cancel()
+
+	result, err := h.geoUC.ClearAll(ctx)
+	if err != nil {
+		writeDomainError(w, "geo clear failed", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok": true, "index_before": result.IndexBefore, "ranges": 0,
+	})
+}
