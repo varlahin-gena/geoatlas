@@ -42,9 +42,16 @@ func ApplyActionVocabMarkers(relPath, content string) (string, error) {
 
 // SyncActionVocabOps переписывает помеченные регионы в clickhouse/ ops-файлах.
 func SyncActionVocabOps(repoRoot string) error {
+	root, err := filepath.Abs(filepath.Clean(repoRoot))
+	if err != nil {
+		return fmt.Errorf("repo root: %w", err)
+	}
 	for _, rel := range ActionVocabOpsRelPaths {
-		path := filepath.Join(repoRoot, rel)
-		raw, err := os.ReadFile(path)
+		path, err := confinedRepoPath(root, rel)
+		if err != nil {
+			return err
+		}
+		raw, err := os.ReadFile(path) //nolint:gosec // G304/G703: path confined to repoRoot + fixed rel allowlist
 		if err != nil {
 			return fmt.Errorf("read %s: %w", path, err)
 		}
@@ -52,14 +59,30 @@ func SyncActionVocabOps(repoRoot string) error {
 		if err != nil {
 			return fmt.Errorf("%s: %w", rel, err)
 		}
-		if next == string(raw) {
+		if strings.ReplaceAll(next, "\r\n", "\n") == strings.ReplaceAll(string(raw), "\r\n", "\n") {
 			continue
 		}
-		if err := os.WriteFile(path, []byte(next), 0o600); err != nil {
+		if err := os.WriteFile(path, []byte(next), 0o600); err != nil { //nolint:gosec // G703: path confined to repoRoot + fixed rel allowlist
 			return fmt.Errorf("write %s: %w", path, err)
 		}
 	}
 	return nil
+}
+
+// confinedRepoPath joins root+rel and rejects anything that escapes root.
+func confinedRepoPath(repoRoot, rel string) (string, error) {
+	if rel == "" || filepath.IsAbs(rel) {
+		return "", fmt.Errorf("invalid rel path %q", rel)
+	}
+	path := filepath.Clean(filepath.Join(repoRoot, rel))
+	relOut, err := filepath.Rel(repoRoot, path)
+	if err != nil {
+		return "", fmt.Errorf("rel %s: %w", path, err)
+	}
+	if relOut == ".." || strings.HasPrefix(relOut, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("path escapes repo root: %s", rel)
+	}
+	return path, nil
 }
 
 func replaceMarkedRegions(src, begin, end, inner string) (string, error) {
