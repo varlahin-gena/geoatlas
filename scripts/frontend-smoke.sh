@@ -74,9 +74,13 @@ ok "countries.geojson"
 
 grep -q 'auth_request /auth-check' frontend/nginx-app.inc || fail "nginx-app: auth_request"
 grep -q '@login_redirect' frontend/nginx-app.inc || fail "nginx-app: login redirect"
-grep -q 'try_files \$uri /index.html' frontend/nginx-app.inc || fail "nginx-app: SPA try_files"
+grep -q 'try_files \$uri @spa' frontend/nginx-app.inc || fail "nginx-app: SPA try_files @spa"
+grep -q 'location @spa' frontend/nginx-app.inc || fail "nginx-app: @spa named location"
 grep -q 'return 302 /login' frontend/nginx-app.inc || fail "nginx-app: login redirect path"
 grep -q 'location = /system.html' frontend/nginx-app.inc || fail "nginx-app: legacy system.html redirect"
+if grep -q 'location = /index.html' frontend/nginx-app.inc; then
+  fail "nginx-app: /index.html must not redirect (SPA try_files loop)"
+fi
 grep -q 'include /etc/nginx/includes/app.inc' frontend/nginx.conf || fail "nginx.conf: app.inc include"
 grep -q 'HTTPS_ENABLED' frontend/docker-entrypoint.sh || fail "entrypoint: HTTPS_ENABLED"
 grep -q 'listen 443 ssl' frontend/docker-entrypoint.sh || fail "entrypoint: listen 443 ssl"

@@ -358,9 +358,10 @@
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    # Legacy HTML bookmarks → SPA routes
+    # Legacy HTML bookmarks → SPA routes.
+    # IMPORTANT: do NOT redirect /index.html here — SPA try_files falls back to
+    # /index.html internally; an external 302 to / would loop (ERR_TOO_MANY_REDIRECTS).
     location = /login.html { return 302 /login$is_args$args; }
-    location = /index.html { return 302 /$is_args$args; }
     location = /system.html { return 302 /system$is_args$args; }
     location = /parser-test.html { return 302 /parser-test$is_args$args; }
     location = /parse-errors.html { return 302 /parse-errors$is_args$args; }
@@ -384,8 +385,14 @@
         try_files $uri =404;
     }
 
-    # SPA shell (page auth is React Router; API still uses auth_request above)
+    # SPA shell (page auth is React Router; API still uses auth_request above).
+    # Named fallback avoids matching any exact-location redirects on /index.html.
     location / {
         add_header Cache-Control "no-store" always;
-        try_files $uri /index.html;
+        try_files $uri @spa;
+    }
+
+    location @spa {
+        add_header Cache-Control "no-store" always;
+        rewrite ^ /index.html last;
     }
