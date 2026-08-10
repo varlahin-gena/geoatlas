@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthContext';
-import { apiFetch } from '@/api/client';
+import { apiFetch, isAbortError } from '@/api/client';
 import type { SystemVersion } from '@/api/types';
 import { ROLE_ADMIN } from '@/api/types';
 import { themeLabel } from '@/auth/theme';
@@ -296,15 +296,22 @@ export function SystemHealthPill() {
 
   useEffect(() => {
     let cancelled = false;
+    let inFlight: AbortController | null = null;
     const tick = async () => {
+      inFlight?.abort();
+      const controller = new AbortController();
+      inFlight = controller;
       try {
-        const res = await fetch('/api/system/status', { credentials: 'same-origin' });
+        const res = await fetch('/api/system/status', {
+          credentials: 'same-origin',
+          signal: controller.signal,
+        });
         if (!res.ok) throw new Error(String(res.status));
         const data = (await res.json()) as {
           level?: string;
           alerts?: Array<{ level?: string; target?: string; message?: string }>;
         };
-        if (cancelled) return;
+        if (cancelled || controller.signal.aborted) return;
         const alerts = data.alerts || [];
         const count = alerts.length;
         const lvl = (data.level || 'ok').toLowerCase();
@@ -324,18 +331,18 @@ export function SystemHealthPill() {
           setText('Система ОК');
           setTitle(isAdmin ? 'Кликни, чтобы открыть мониторинг' : 'Состояние системы');
         }
-      } catch {
-        if (!cancelled) {
-          setLevel('bad');
-          setText('API недоступен');
-          setTitle('Не удалось получить статус системы');
-        }
+      } catch (e) {
+        if (isAbortError(e) || cancelled) return;
+        setLevel('bad');
+        setText('API недоступен');
+        setTitle('Не удалось получить статус системы');
       }
     };
     void tick();
-    const id = window.setInterval(tick, 5000);
+    const id = window.setInterval(() => void tick(), 5000);
     return () => {
       cancelled = true;
+      inFlight?.abort();
       window.clearInterval(id);
     };
   }, [isAdmin]);

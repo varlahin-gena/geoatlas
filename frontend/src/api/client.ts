@@ -29,6 +29,13 @@ export class ApiError extends Error {
   }
 }
 
+/** True for fetch/AbortController aborts (DOMException or Error named AbortError). */
+export function isAbortError(e: unknown): boolean {
+  if (e == null || typeof e !== 'object') return false;
+  const name = (e as { name?: unknown }).name;
+  return name === 'AbortError';
+}
+
 export async function apiFetch<T = unknown>(
   path: string,
   init: RequestInit = {},

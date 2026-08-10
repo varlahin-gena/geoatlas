@@ -263,7 +263,6 @@ export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
     layers.push(
       new GeoJsonLayer({
         id: 'countries',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         data: opts.countriesGeoJSON as any,
         pickable: countriesPickable,
         stroked: !isGlobe,
@@ -279,7 +278,6 @@ export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
             return [c[0], c[1], c[2], a];
           }
           return [landColor[0], landColor[1], landColor[2], 255];
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         }) as any,
         getLineColor: outlineColor,
         getLineWidth: 1,
@@ -309,7 +307,6 @@ export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
     layers.push(
       new GeoJsonLayer({
         id: 'countries-pick',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         data: opts.countriesGeoJSON as any,
         pickable: true,
         stroked: false,

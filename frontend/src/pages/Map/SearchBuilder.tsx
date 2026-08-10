@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { apiFetch } from '@/api/client';
+import { apiFetch, isAbortError } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
 import { useToast } from '@/components/Toast';
 import type { SearchField } from '@/lib/search';
@@ -57,20 +57,29 @@ export function SearchBuilder({
 
   useEffect(() => {
     if (!open || (tab !== 'mine' && tab !== 'all')) return;
-    void loadTemplates(tab);
+    const controller = new AbortController();
+    void loadTemplates(tab, controller.signal);
+    return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, tab]);
 
-  async function loadTemplates(which: 'mine' | 'all') {
+  async function loadTemplates(which: 'mine' | 'all', signal?: AbortSignal) {
     try {
       if (which === 'mine') {
-        const data = await apiFetch<{ templates?: Template[] }>('/api/me/search-templates');
+        const data = await apiFetch<{ templates?: Template[] }>('/api/me/search-templates', {
+          signal,
+        });
+        if (signal?.aborted) return;
         setMine(data.templates || []);
       } else {
-        const data = await apiFetch<{ templates?: Template[] }>('/api/me/search-templates?scope=all');
+        const data = await apiFetch<{ templates?: Template[] }>('/api/me/search-templates?scope=all', {
+          signal,
+        });
+        if (signal?.aborted) return;
         setAll(data.templates || []);
       }
     } catch (e) {
+      if (isAbortError(e)) return;
       toast(e instanceof Error ? e.message : 'Не удалось загрузить шаблоны', 'error');
     }
   }

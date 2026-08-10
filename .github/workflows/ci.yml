@@ -225,6 +225,9 @@ jobs:
       - name: npm ci
         run: npm ci
 
+      - name: lint
+        run: npm run lint
+
       - name: vitest
         run: npm test
 
