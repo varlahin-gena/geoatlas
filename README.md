@@ -819,7 +819,7 @@ network_monitor/
 │       ├── ingest/                   # syslog TCP, очередь, batch INSERT
 │       ├── installprofile/           # чтение install-profile.json
 │       ├── logging/                  # slog setup
-│       ├── model/                    # доменные структуры, action-списки
+│       ├── model/                    # доменные структуры; action vocab SoT (go generate → clickhouse ops)
 │       ├── mapagg/                   # агрегация рёбер/узлов для карты
 │       └── parser/                   # парсеры вендоров
 ├── pkg/
@@ -828,8 +828,8 @@ network_monitor/
 │   ├── config.d/override.xml
 │   ├── users.d/query_limits.xml
 │   ├── init.sql                      # cold bootstrap базовых таблиц
-│   ├── migrate_*.sql                 # ops-fallback (не SoT; предпочтителен Ensure*)
-│   ├── backfill_edges_agg.sh
+│   ├── migrate_*.sql                 # ops-fallback (не SoT; списки action — из model via go generate)
+│   ├── backfill_edges_agg.sh         # то же для BLOCKED=…
 │   └── reset_data.sql / reset_data.sh
 ├── certs/                            # PEM (fullchain/privkey); README + .gitkeep; ключи в .gitignore
 ├── deploy/

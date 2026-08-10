@@ -22,12 +22,12 @@ CREATE TABLE IF NOT EXISTS traffic_logs
     dst_port      UInt32,
 
     action        LowCardinality(String),
-    -- Должен совпадать с model.AllowedInClause() (backend/internal/model/actions.go).
+    -- SoT: model.AllowedInClause(); regenerate: go generate ./internal/model/...
     success       UInt8 MATERIALIZED
                   if(lower(action) IN (
-                      'accept','accepted','allow','allowed','built','close','decrypt',
-                      'forward','inspect','mirror','monitor','nat','pass','permit','permitted',
-                      'proxy','redirect','route','start','teardown','trust'
+/* ACTION_VOCAB:ALLOWED_BEGIN */
+'accept','accepted','allow','allowed','built','close','decrypt','forward','inspect','mirror','monitor','nat','pass','permit','permitted','proxy','redirect','route','start','teardown','trust'
+/* ACTION_VOCAB:ALLOWED_END */
                   ), 1, 0),
 
     rule          String,

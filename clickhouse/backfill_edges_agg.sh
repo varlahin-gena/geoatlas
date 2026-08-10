@@ -54,7 +54,10 @@ mapfile -t DAY_LIST <<< "$DAYS"
 TOTAL="${#DAY_LIST[@]}"
 log "Days to backfill: $TOTAL"
 
-BLOCKED="'deny','denied','drop','dropped','reject','rejected','block','blocked','reset','discard','discarded'"
+# SoT: model.BlockedInClause(); regenerate: cd backend && go generate ./internal/model/...
+# ACTION_VOCAB:BLOCKED_BEGIN
+BLOCKED="'block','blocked','denied','deny','discard','discarded','drop','dropped','reject','rejected','reset'"
+# ACTION_VOCAB:BLOCKED_END
 
 i=0
 for day in "${DAY_LIST[@]}"; do
