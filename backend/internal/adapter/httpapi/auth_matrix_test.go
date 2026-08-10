@@ -90,6 +90,7 @@ func TestAuthMatrixCoversServerRoutes(t *testing.T) {
 			APIAuthToken:            "test-token",
 			MaxLogUploadSize:        1 << 20,
 			MaxGeoUploadSize:        1 << 20,
+			MaxGeoUploadRanges:      100_000,
 			MaxReputationUploadSize: 1 << 20,
 		},
 		nil,           // ingest

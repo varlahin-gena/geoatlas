@@ -6,26 +6,29 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"sort"
 	"strings"
 	"time"
 
 	"network_monitor/internal/apperr"
-	"network_monitor/internal/model"
 	"network_monitor/internal/mapagg"
+	"network_monitor/internal/model"
 )
 
 // Service — application use cases для GeoIP.
 type Service struct {
-	store   RangeStore
-	missing MissingIPStore
-	index   GeoIndex
-	jobs    GeoJobScheduler
-	codec   RangeCodec
+	store     RangeStore
+	missing   MissingIPStore
+	index     GeoIndex
+	jobs      GeoJobScheduler
+	codec     RangeCodec
+	maxRanges int
 }
 
-func New(store RangeStore, missing MissingIPStore, index GeoIndex, jobs GeoJobScheduler, codec RangeCodec) *Service {
-	return &Service{store: store, missing: missing, index: index, jobs: jobs, codec: codec}
+// New создаёт GeoIP service. maxRanges — лимит строк CSV на upload (0 = без лимита ranges, только HTTP bytes).
+func New(store RangeStore, missing MissingIPStore, index GeoIndex, jobs GeoJobScheduler, codec RangeCodec, maxRanges int) *Service {
+	return &Service{store: store, missing: missing, index: index, jobs: jobs, codec: codec, maxRanges: maxRanges}
 }
 
 // --- Upload ---
@@ -41,7 +44,14 @@ type UploadResult struct {
 func (s *Service) UploadCSV(ctx context.Context, r io.Reader, dryRun bool) (UploadResult, error) {
 	ranges, err := s.codec.ReadCSV(r)
 	if err != nil {
+		var maxBytes *http.MaxBytesError
+		if errors.As(err, &maxBytes) {
+			return UploadResult{}, apperr.TooLarge(err.Error())
+		}
 		return UploadResult{}, apperr.InvalidCSV(err)
+	}
+	if err := s.checkUploadLimits(len(ranges), dryRun); err != nil {
+		return UploadResult{}, err
 	}
 	if dryRun {
 		sample := ranges
@@ -55,6 +65,32 @@ func (s *Service) UploadCSV(ctx context.Context, r io.Reader, dryRun bool) (Uplo
 		return UploadResult{}, err
 	}
 	return UploadResult{Count: count, Reload: "applied", Backfill: "scheduled"}, nil
+}
+
+// checkUploadLimits отклоняет слишком большой CSV и опасный replace поверх уже крупного индекса.
+func (s *Service) checkUploadLimits(n int, dryRun bool) error {
+	if s.maxRanges > 0 && n > s.maxRanges {
+		return apperr.TooLarge(fmt.Sprintf(
+			"geo csv has %d ranges, limit is %d (GEOIP_UPLOAD_MAX_RANGES); split the file or raise the limit / backend memory",
+			n, s.maxRanges,
+		))
+	}
+	if dryRun || s.maxRanges <= 0 || s.index == nil {
+		return nil
+	}
+	existing := s.index.RangeCount()
+	if existing == 0 {
+		return nil
+	}
+	// Пик RAM ≈ existing + parsed upload до ReplaceRanges. Отказываем, если оба «крупные».
+	peak := existing + n
+	if peak > s.maxRanges && existing >= s.maxRanges/2 {
+		return apperr.Conflict(fmt.Sprintf(
+			"geo replace would spike RAM (index=%d, upload=%d, limit=%d); skip re-upload if data is unchanged, or clear geo_ranges first / raise GEOIP_UPLOAD_MAX_RANGES",
+			existing, n, s.maxRanges,
+		))
+	}
+	return nil
 }
 
 // IsClientCSVError — совместимость: CSV-ошибки помечены ErrInvalidCSV.

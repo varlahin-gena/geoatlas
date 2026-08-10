@@ -52,7 +52,7 @@ func TestPostCASmoke(t *testing.T) {
 	geoStore := &memRangeStore{idx: geoIdx}
 	var reloadScheduled atomic.Int32
 	geoJobs := &stubGeoJobs{reload: &reloadScheduled}
-	geoUC := usecasegeo.New(geoStore, &stubMissing{}, geoIdx, geoJobs, geoipcodec.New())
+	geoUC := usecasegeo.New(geoStore, &stubMissing{}, geoIdx, geoJobs, geoipcodec.New(), 100_000)
 
 	eventsUC := usecaseevents.New(&stubTraffic{}, geoIdx, nil)
 
@@ -82,6 +82,7 @@ func TestPostCASmoke(t *testing.T) {
 		APIAuthToken:            "smoke-bearer-token",
 		MaxLogUploadSize:        1 << 20,
 		MaxGeoUploadSize:        1 << 20,
+		MaxGeoUploadRanges:      100_000,
 		MaxReputationUploadSize: 1 << 20,
 		QueryTimeout:            time.Minute,
 		IngestFlushSec:          1,

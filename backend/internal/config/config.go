@@ -155,7 +155,8 @@ type Config struct {
 	SearchTemplatesFile string
 
 	MaxLogUploadSize     int64
-	MaxGeoUploadSize     int64
+	MaxGeoUploadSize     int64 // байты тела /upload-geo (GEOIP_UPLOAD_MAX_BYTES или MAX_GEO_UPLOAD_SIZE)
+	MaxGeoUploadRanges   int   // макс. диапазонов в одном CSV (GEOIP_UPLOAD_MAX_RANGES)
 	IngestBatchSize      int
 	IngestQueueSize      int
 	IngestQueueMaxBytes  int
@@ -235,9 +236,11 @@ func FromEnv() Config {
 		APITokensFile:        envOr("API_TOKENS_FILE", "/app/data/api_tokens.json"),
 		RetentionFile:        envOr("RETENTION_FILE", "/app/data/retention.json"),
 		SearchTemplatesFile:  envOr("SEARCH_TEMPLATES_FILE", "/app/data/search_templates.json"),
-		MaxLogUploadSize:     parser.int64("MAX_LOG_UPLOAD_SIZE", 1<<30), // 1 GiB
-		MaxGeoUploadSize:     parser.int64("MAX_GEO_UPLOAD_SIZE", 1<<30), // 1 GiB
-		IngestBatchSize:      parser.int("INGEST_BATCH_SIZE", 10000),
+		MaxLogUploadSize: parser.int64("MAX_LOG_UPLOAD_SIZE", 1<<30), // 1 GiB
+		// GeoIP: временные дефолты (small/2 GiB); ResolveGeoUploadLimits подставит профиль.
+		MaxGeoUploadSize:   firstEnvInt64(&parser, 512<<20, "GEOIP_UPLOAD_MAX_BYTES", "MAX_GEO_UPLOAD_SIZE"),
+		MaxGeoUploadRanges: firstEnvInt(&parser, 2_000_000, "GEOIP_UPLOAD_MAX_RANGES"),
+		IngestBatchSize:    parser.int("INGEST_BATCH_SIZE", 10000),
 		IngestQueueSize:      parser.int("INGEST_QUEUE_SIZE", 300000),
 		IngestQueueMaxBytes:  parser.int("INGEST_QUEUE_MAX_BYTES", 256<<20), // 256 MiB
 		IngestWorkers:        parser.int("INGEST_WORKERS", 4),

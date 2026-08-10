@@ -9,6 +9,7 @@ var (
 	ErrNotFound     = errors.New("not found")
 	ErrConflict     = errors.New("conflict")
 	ErrInvalidCSV   = errors.New("invalid csv")
+	ErrTooLarge     = errors.New("too large")
 )
 
 type marked struct {
@@ -38,6 +39,13 @@ func Conflict(msg string) error {
 		return ErrConflict
 	}
 	return marked{kind: ErrConflict, msg: msg}
+}
+
+func TooLarge(msg string) error {
+	if msg == "" {
+		return ErrTooLarge
+	}
+	return marked{kind: ErrTooLarge, msg: msg}
 }
 
 // InvalidCSV помечает ошибку разбора CSV как клиентскую (HTTP 400).

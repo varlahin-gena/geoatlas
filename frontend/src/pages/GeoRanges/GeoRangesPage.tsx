@@ -36,6 +36,8 @@ export default function GeoRangesPage() {
   });
   const [rows, setRows] = useState<GeoRange[]>([]);
   const [totalInDb, setTotalInDb] = useState(0);
+  const [uploadMaxBytes, setUploadMaxBytes] = useState(0);
+  const [uploadMaxRanges, setUploadMaxRanges] = useState(0);
   const [ipLookupActive, setIpLookupActive] = useState(false);
   const [edit, setEdit] = useState<GeoRange | null>(null);
   const [form, setForm] = useState({
@@ -68,9 +70,14 @@ export default function GeoRangesPage() {
         ranges?: GeoRange[];
         count?: number;
         ip_hit?: boolean;
+        limits?: { upload_max_bytes?: number; upload_max_ranges?: number };
       }>(`/api/geo-ranges${qs.toString() ? `?${qs}` : ''}`);
       setRows(data.ranges || []);
       setTotalInDb(Number(data.count) || (data.ranges || []).length);
+      if (data.limits) {
+        setUploadMaxBytes(Number(data.limits.upload_max_bytes) || 0);
+        setUploadMaxRanges(Number(data.limits.upload_max_ranges) || 0);
+      }
       if (lookup) {
         setIpStatus(
           data.ip_hit
@@ -190,7 +197,19 @@ export default function GeoRangesPage() {
         <h1>База GeoIP</h1>
         <p className="page-lead">
           Текущие диапазоны в таблице geo_ranges. Можно править записи или выгрузить CSV.
+          Загрузка большого CSV — с карты (sidebar «Обновить GeoIP»); сервер отклонит слишком
+          большой файл или опасный replace поверх уже крупного индекса (HTTP 413/409).
         </p>
+        {totalInDb >= 400_000 ? (
+          <p className="hint" style={{ marginBottom: 12, color: 'var(--warn, #b45309)' }}>
+            В базе уже {fmtNumber(totalInDb)} диапазонов
+            {uploadMaxRanges > 0 ? ` (лимит upload ≈ ${fmtNumber(uploadMaxRanges)})` : ''}.
+            Повторная заливка того же CSV обычно не нужна и может упереться в лимит RAM backend.
+            {uploadMaxBytes > 0
+              ? ` Лимит размера файла: ${(uploadMaxBytes / (1024 * 1024)).toFixed(0)} МиБ.`
+              : ''}
+          </p>
+        ) : null}
         <div className="summary" style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
           <div>
             <div className="hint">Диапазонов в базе</div>

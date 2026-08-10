@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -23,6 +24,11 @@ func (h *GeoHandler) UploadGeo(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(ct, "multipart/form-data") {
 		file, _, err := r.FormFile("file")
 		if err != nil {
+			var maxBytes *http.MaxBytesError
+			if errors.As(err, &maxBytes) {
+				writeDomainError(w, "geo csv upload failed", err)
+				return
+			}
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "missing file"})
 			return
 		}

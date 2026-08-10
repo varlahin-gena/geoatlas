@@ -94,10 +94,16 @@ func (h *GeoHandler) ListGeoRanges(w http.ResponseWriter, r *http.Request) {
 		items = append(items, h.toGeoRangeDTO(g))
 	}
 
+	limits := map[string]any{
+		"upload_max_bytes":  h.cfg.MaxGeoUploadSize,
+		"upload_max_ranges": h.cfg.MaxGeoUploadRanges,
+	}
+
 	if result.IPLookup {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"ok": true, "count": result.Total, "filtered": result.Filtered,
 			"shown": len(items), "ip": result.IP, "ip_hit": result.IPHit, "ranges": items,
+			"limits": limits,
 		})
 		return
 	}
@@ -105,6 +111,7 @@ func (h *GeoHandler) ListGeoRanges(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok": true, "count": result.Total, "filtered": result.Filtered,
 		"shown": len(items), "truncated": result.Truncated, "ranges": items,
+		"limits": limits,
 	})
 }
 
