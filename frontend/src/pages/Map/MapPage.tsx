@@ -367,6 +367,7 @@ export default function MapPage() {
         if (settled || gen !== basemapGenRef.current || !mapRef.current) return;
         settled = true;
         basemapOkRef.current = true;
+        mapTilesFailedRef.current = false;
         setMapTilesFailed(false);
         try {
           map.jumpTo({ center, zoom, bearing, pitch });
@@ -392,6 +393,7 @@ export default function MapPage() {
         // empty fallback if we never had a successful remote style.
         if (basemapOkRef.current) return;
         settled = true;
+        mapTilesFailedRef.current = true;
         setMapTilesFailed(true);
         console.warn('Remote basemap slow/unavailable, keeping local style');
         try {
@@ -412,19 +414,24 @@ export default function MapPage() {
     [],
   );
 
-  // Init map once
+  // Init map once — start with remote basemap (CARTO). Empty style only as fallback.
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return;
     const host = mapContainer.current;
     host.innerHTML = '';
 
-    setMapTilesFailed(true);
+    const initialStyleUrl = theme === 'light' ? MAP_STYLE_LIGHT : MAP_STYLE_DARK;
+    lastThemeBasemapRef.current = theme;
+    setMapTilesFailed(false);
+    mapTilesFailedRef.current = false;
+    basemapOkRef.current = false;
+
     const vs = viewMode === 'globe' ? DEFAULT_GLOBE_VIEW : DEFAULT_MAP_VIEW;
     let map: maplibregl.Map;
     try {
       map = new maplibregl.Map({
         container: host,
-        style: emptyStyleFallback(viewMode) as maplibregl.StyleSpecification,
+        style: initialStyleUrl,
         center: [vs.longitude, vs.latitude],
         zoom: vs.zoom,
         bearing: vs.bearing,
@@ -444,17 +451,10 @@ export default function MapPage() {
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
     mapRef.current = map;
 
-    map.on('error', (e) => {
-      const msg = (e && e.error && e.error.message) || String(e.error || '');
-      if (!/Failed to fetch|NetworkError|AJAX|tile|style|load/i.test(msg) && !e.error) return;
-      // After a successful remote style, keep it — transient tile errors must not
-      // wipe the basemap to an empty black background (2D/globe both break).
-      if (basemapOkRef.current || mapTilesFailedRef.current) {
-        if (basemapOkRef.current) {
-          console.warn('Basemap tile/style warning (keeping remote style)', e.error || e);
-        }
-        return;
-      }
+    const fallbackToEmpty = (why: string) => {
+      if (basemapOkRef.current || mapTilesFailedRef.current) return;
+      console.warn('Basemap fallback:', why);
+      mapTilesFailedRef.current = true;
       setMapTilesFailed(true);
       try {
         map.setStyle(emptyStyleFallback(viewModeRef.current));
@@ -463,12 +463,28 @@ export default function MapPage() {
         /* ignore */
       }
       setLayersTick((t) => t + 1);
+    };
+
+    map.on('error', (e) => {
+      const msg = (e && e.error && e.error.message) || String(e.error || '');
+      if (!/Failed to fetch|NetworkError|AJAX|tile|style|load/i.test(msg) && !e.error) return;
+      if (basemapOkRef.current) {
+        console.warn('Basemap tile/style warning (keeping remote style)', e.error || e);
+        return;
+      }
+      fallbackToEmpty(msg || 'map error');
     });
 
     let readyOnce = false;
     const onReady = () => {
       if (readyOnce) return;
       readyOnce = true;
+      if (!mapTilesFailedRef.current) {
+        basemapOkRef.current = true;
+        mapTilesFailedRef.current = false;
+        setMapTilesFailed(false);
+      }
+
       if (viewModeRef.current === 'globe') {
         if (!applyMapProjection(map, 'globe')) {
           toast('Globe projection недоступен — остаёмся в 2D', 'error');
@@ -495,10 +511,6 @@ export default function MapPage() {
       overlayRef.current = overlay;
       setMapReady(true);
 
-      const remoteStyleUrl = theme === 'light' ? MAP_STYLE_LIGHT : MAP_STYLE_DARK;
-      lastThemeBasemapRef.current = theme;
-      beginRemoteBasemapUpgrade(remoteStyleUrl);
-
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           const enable = () => {
@@ -521,8 +533,12 @@ export default function MapPage() {
     if (map.isStyleLoaded()) onReady();
     else map.once('load', onReady);
     const t = window.setTimeout(() => {
-      if (!readyOnce) onReady();
-    }, 300);
+      if (!readyOnce) {
+        // Remote style never loaded — fall back so the UI still works.
+        fallbackToEmpty('initial style timeout');
+        onReady();
+      }
+    }, 12000);
 
     map.on('move', () => {
       const vsNow = readViewStateFromMap(map);
@@ -589,7 +605,8 @@ export default function MapPage() {
     beginRemoteBasemapUpgrade(styleUrl);
   }, [theme, mapReady, beginRemoteBasemapUpgrade]);
 
-  // View mode switch
+  // View mode switch — never setStyle(empty) here: that races the CARTO upgrade
+  // while mapTilesFailedRef is still true and wipes a loading/loaded basemap.
   useEffect(() => {
     const map = mapRef.current;
     if (!mapReady || !map) return;
@@ -601,26 +618,6 @@ export default function MapPage() {
         setViewMode('map');
         return;
       }
-      // Empty fallback must be globe-tinted (sphere = background). Re-apply when
-      // remote tiles failed so the globe is visible without GeoJSON fills.
-      if (mapTilesFailedRef.current) {
-        try {
-          map.setStyle(emptyStyleFallback('globe'));
-          map.once('style.load', () => {
-            applyMapProjection(map, 'globe');
-            const gvs = applyGlobeFitZoom(map, {
-              longitude: globeViewRef.current.longitude ?? DEFAULT_GLOBE_VIEW.longitude,
-              latitude: globeViewRef.current.latitude ?? DEFAULT_GLOBE_VIEW.latitude,
-              bearing: globeViewRef.current.bearing ?? DEFAULT_GLOBE_VIEW.bearing,
-            });
-            setGlobeView(gvs);
-            globeViewRef.current = gvs;
-            setLayersTick((t) => t + 1);
-          });
-        } catch {
-          /* ignore */
-        }
-      }
       const gvs = applyGlobeFitZoom(map, {
         longitude: globeViewRef.current.longitude ?? DEFAULT_GLOBE_VIEW.longitude,
         latitude: globeViewRef.current.latitude ?? DEFAULT_GLOBE_VIEW.latitude,
@@ -631,18 +628,6 @@ export default function MapPage() {
       if (autoRotate) startGlobeAutoRotate();
     } else {
       applyMapProjection(map, 'map');
-      if (mapTilesFailedRef.current) {
-        try {
-          map.setStyle(emptyStyleFallback('map'));
-          map.once('style.load', () => {
-            applyMapProjection(map, 'map');
-            applyMapFitZoom(map, { ...DEFAULT_MAP_VIEW });
-            setLayersTick((t) => t + 1);
-          });
-        } catch {
-          /* ignore */
-        }
-      }
       applyMapFitZoom(map, { ...DEFAULT_MAP_VIEW });
     }
     if (overlayRef.current) {
