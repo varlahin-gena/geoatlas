@@ -207,20 +207,38 @@ jobs:
       - name: Auth / nginx contract
         run: bash scripts/frontend-smoke.sh
 
-      - name: Login page smoke (static)
+  frontend:
+    name: frontend (build + test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: npm install
+        run: npm install
+
+      - name: vitest
+        run: npm test
+
+      - name: vite build
+        run: npm run build
+
+      - name: Login page smoke (built)
         run: |
-          python3 -m http.server 8765 --directory frontend >/tmp/http-frontend.log 2>&1 &
+          python3 -m http.server 8765 --directory dist >/tmp/http-frontend.log 2>&1 &
           echo $! > /tmp/http-frontend.pid
           for i in $(seq 1 30); do
-            curl -sf http://127.0.0.1:8765/login.html >/dev/null && break
+            curl -sf http://127.0.0.1:8765/ >/dev/null && break
             sleep 0.2
           done
-          html=$(curl -sf http://127.0.0.1:8765/login.html)
-          echo "$html" | grep -q 'id="username"'
-          echo "$html" | grep -q 'id="password"'
-          echo "$html" | grep -q '/api/auth/login'
-          auth=$(curl -sf http://127.0.0.1:8765/auth.js)
-          echo "$auth" | grep -q 'function requireLogin'
-          echo "$auth" | grep -q 'X-CSRF-Token'
-          echo "$auth" | grep -q 'nm_csrf'
+          html=$(curl -sf http://127.0.0.1:8765/)
+          echo "$html" | grep -q 'id="root"'
+          echo "$html" | grep -q '/config.js'
+          echo "$html" | grep -q 'nm.theme'
           kill "$(cat /tmp/http-frontend.pid)" || true

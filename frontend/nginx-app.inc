@@ -97,11 +97,11 @@
     }
 
     location @login_redirect {
-        return 302 /login.html?next=$request_uri;
+        return 302 /login?next=$request_uri;
     }
 
     location @forbidden_redirect {
-        return 302 /index.html;
+        return 302 /;
     }
 
     location = /health {
@@ -358,118 +358,34 @@
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    # Публичные: логин и статическая оболочка auth
-    location = /login.html {
-        add_header Cache-Control "no-store" always;
-        try_files /login.html =404;
-    }
+    # Legacy HTML bookmarks → SPA routes
+    location = /login.html { return 302 /login$is_args$args; }
+    location = /index.html { return 302 /$is_args$args; }
+    location = /system.html { return 302 /system$is_args$args; }
+    location = /parser-test.html { return 302 /parser-test$is_args$args; }
+    location = /parse-errors.html { return 302 /parse-errors$is_args$args; }
+    location = /geo-missing.html { return 302 /geo-missing$is_args$args; }
+    location = /geo-ranges.html { return 302 /geo-ranges$is_args$args; }
+    location = /reputation.html { return 302 /reputation$is_args$args; }
+    location = /users.html { return 302 /users$is_args$args; }
+    location = /api-tokens.html { return 302 /api-tokens$is_args$args; }
+    location = /change-password.html { return 302 /change-password$is_args$args; }
 
-    location = /auth.js {
-        add_header Cache-Control "no-store" always;
-        try_files /auth.js =404;
-    }
-
-    location = /index.html {
-        auth_request /auth-check;
-        error_page 401 = @login_redirect;
-        add_header Cache-Control "no-store" always;
-        try_files /index.html =404;
-    }
-
-    location = /system.html {
-        auth_request /auth-check-admin;
-        error_page 401 = @login_redirect;
-        error_page 403 = @forbidden_redirect;
-        add_header Cache-Control "no-store" always;
-        try_files /system.html =404;
-    }
-
-    location = /parser-test.html {
-        auth_request /auth-check-admin;
-        error_page 401 = @login_redirect;
-        error_page 403 = @forbidden_redirect;
-        add_header Cache-Control "no-store" always;
-        try_files /parser-test.html =404;
-    }
-
-    location = /parse-errors.html {
-        auth_request /auth-check-admin;
-        error_page 401 = @login_redirect;
-        error_page 403 = @forbidden_redirect;
-        add_header Cache-Control "no-store" always;
-        try_files /parse-errors.html =404;
-    }
-
-    location = /geo-missing.html {
-        auth_request /auth-check-admin;
-        error_page 401 = @login_redirect;
-        error_page 403 = @forbidden_redirect;
-        add_header Cache-Control "no-store" always;
-        try_files /geo-missing.html =404;
-    }
-
-    location = /geo-ranges.html {
-        auth_request /auth-check-admin;
-        error_page 401 = @login_redirect;
-        error_page 403 = @forbidden_redirect;
-        add_header Cache-Control "no-store" always;
-        try_files /geo-ranges.html =404;
-    }
-
-    location = /reputation.html {
-        auth_request /auth-check-admin;
-        error_page 401 = @login_redirect;
-        error_page 403 = @forbidden_redirect;
-        add_header Cache-Control "no-store" always;
-        try_files /reputation.html =404;
-    }
-
-    location = /users.html {
-        auth_request /auth-check-admin;
-        error_page 401 = @login_redirect;
-        error_page 403 = @forbidden_redirect;
-        add_header Cache-Control "no-store" always;
-        try_files /users.html =404;
-    }
-
-    location = /api-tokens.html {
-        auth_request /auth-check-admin;
-        error_page 401 = @login_redirect;
-        error_page 403 = @forbidden_redirect;
-        add_header Cache-Control "no-store" always;
-        try_files /api-tokens.html =404;
-    }
-
-    location = /change-password.html {
-        auth_request /auth-check;
-        error_page 401 = @login_redirect;
-        add_header Cache-Control "no-store" always;
-        try_files /change-password.html =404;
-    }
-
-    location = /common.js {
-        add_header Cache-Control "no-store" always;
-        try_files /common.js =404;
-    }
-
-    location = /common.css {
-        add_header Cache-Control "no-store" always;
-        try_files /common.css =404;
-    }
-
-    location /js/ {
-        add_header Cache-Control "no-store" always;
+    # Hashed Vite assets
+    location ^~ /assets/ {
+        expires 7d;
+        add_header Cache-Control "public, immutable";
         try_files $uri =404;
     }
 
-    location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|geojson)$ {
+    location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|geojson|map)$ {
         expires 1h;
         add_header Cache-Control "public";
         try_files $uri =404;
     }
 
+    # SPA shell (page auth is React Router; API still uses auth_request above)
     location / {
-        auth_request /auth-check;
-        error_page 401 = @login_redirect;
-        try_files $uri $uri/ /index.html;
+        add_header Cache-Control "no-store" always;
+        try_files $uri /index.html;
     }

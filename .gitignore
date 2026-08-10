@@ -38,3 +38,7 @@ frontend/_layout*_check.js
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Frontend (Vite)
+frontend/node_modules/
+frontend/dist/
