@@ -17,8 +17,9 @@ type RateSampler struct {
 	prevBufDrop int64
 	prevTS      time.Time
 
-	healthPrevDrop int64
-	healthPrevTS   time.Time
+	healthPrevDrop    int64
+	healthPrevBufDrop int64
+	healthPrevTS      time.Time
 }
 
 // ObserveRates обновляет counters и возвращает rate-метрики (events/drops per sec).
@@ -65,23 +66,38 @@ func (r *RateSampler) ObserveRates(snap IngestSnapshot) map[string]float64 {
 	return rate
 }
 
-// DropsPerSec — rate дропов между вызовами Health (отдельный ряд от ObserveRates).
+// HealthDropRates — admission и buffer drop rates между вызовами Health (один dt).
+func (r *RateSampler) HealthDropRates(droppedTotal, bufferDropsTotal int64) (dropsPerSec, bufferDropsPerSec float64) {
+	if r == nil {
+		return 0, 0
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	now := time.Now()
+	if !r.healthPrevTS.IsZero() {
+		if dt := now.Sub(r.healthPrevTS).Seconds(); dt > 0 {
+			dropsPerSec = float64(droppedTotal-r.healthPrevDrop) / dt
+			if dropsPerSec < 0 {
+				dropsPerSec = 0
+			}
+			bufferDropsPerSec = float64(bufferDropsTotal-r.healthPrevBufDrop) / dt
+			if bufferDropsPerSec < 0 {
+				bufferDropsPerSec = 0
+			}
+		}
+	}
+	r.healthPrevDrop, r.healthPrevBufDrop, r.healthPrevTS = droppedTotal, bufferDropsTotal, now
+	return dropsPerSec, bufferDropsPerSec
+}
+
+// DropsPerSec — совместимость (только admission). Для Health используйте HealthDropRates.
 func (r *RateSampler) DropsPerSec(droppedTotal int64) float64 {
 	if r == nil {
 		return 0
 	}
 	r.mu.Lock()
-	defer r.mu.Unlock()
-	now := time.Now()
-	var rate float64
-	if !r.healthPrevTS.IsZero() {
-		if dt := now.Sub(r.healthPrevTS).Seconds(); dt > 0 {
-			rate = float64(droppedTotal-r.healthPrevDrop) / dt
-			if rate < 0 {
-				rate = 0
-			}
-		}
-	}
-	r.healthPrevDrop, r.healthPrevTS = droppedTotal, now
-	return rate
+	bufPrev := r.healthPrevBufDrop
+	r.mu.Unlock()
+	d, _ := r.HealthDropRates(droppedTotal, bufPrev)
+	return d
 }

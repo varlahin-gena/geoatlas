@@ -106,10 +106,18 @@
 
 1. **Syslog**: МСЭ отправляет события на `<IP_сервера>:514` (TCP или UDP).
 2. **syslog-ng** принимает сообщения и пересылает их по TCP на `backend:1514` с маркерами транспорта (`@@nm/udp/@@` / `@@nm/tcp/@@`).
-3. **backend** снимает маркеры транспорта, парсит строки, обогащает GeoIP, пишет в ClickHouse; при старте `Ensure*` создаёт/обновляет агрегаты (`traffic_edges_*`, geo), применяет TTL из `retention.json` и при необходимости делает backfill. **Delivery contract — at-most-once / best-effort:** полная очередь ingest **не блокирует** TCP — лишние строки дропаются (`dropped_total`); при outage ClickHouse insert circuit ставит dequeue на паузу (очередь растёт → admission drops), а потери из processor-буфера учитываются отдельно (`buffer_drops_total`). Для более надёжной доставки используйте disk-буфер syslog-ng перед backend. Алерты — на `/system`.
+3. **backend** снимает маркеры транспорта, парсит строки, обогащает GeoIP, пишет в ClickHouse; при старте `Ensure*` создаёт/обновляет агрегаты (`traffic_edges_*`, geo), применяет TTL из `retention.json` и при необходимости делает backfill. **Delivery contract — at-most-once / best-effort:** полная очередь ingest **не блокирует** TCP — лишние строки дропаются (`dropped_total`); при outage ClickHouse insert circuit ставит dequeue на паузу (очередь растёт → admission drops), а потери из processor-буфера учитываются отдельно (`buffer_drops_total`). Перед backend **syslog-ng уже буферизует** (см. ниже). Алерты и live-метрики drops — на `/system`.
 4. **frontend** отдаёт статику и проксирует API-запросы на backend.
 5. **stats-collector** каждые 30 секунд собирает метрики CPU/RAM контейнеров и состояние пайплайна (включая разбивку UDP/TCP).
 
+**Буфер syslog-ng (включён по умолчанию):** в `syslog-ng.conf` у назначений UDP/TCP стоят `disk-buffer` — ~128 MiB mem + ~1 GiB disk на каждое (`reliable(no)`), каталоги в volume `syslog-ng-buffer` (`/var/lib/syslog-ng-buffer/...`). Это сглаживает краткие пики/рестарты backend; после буфера доставка в backend всё равно at-most-once (очередь может дропать). Смотрите drops на `/system` и `/api/ingest/stats`.
+
+### Product limits (appliance)
+
+| Ограничение | Суть |
+|-------------|------|
+| **IPv4-only** | Success path GeoIP / карта / lookup — IPv4. IPv6 не обогащается и не строится на карте. |
+| **Single-host control plane** | Учётки, API-токены, retention, reputation feeds — JSON-файлы на томе `/app/data` (`users.json` и др.). Не multi-instance / не shared store. |
 
 ### Хранение данных (TTL)
 
@@ -589,7 +597,7 @@ docker compose exec clickhouse clickhouse-client --query "
 | ClickHouse idle CPU высокий, мало данных | `system.trace_log`/`text_log` — см. `config.d/z_system_logs.xml`; `TRUNCATE`/`DROP` старых system-логов |
 | Нет метрик на странице «Система» | `docker compose logs stats-collector`, cgroup, `/proc` и `/sys/fs/cgroup` на хосте |
 | Превышена расчётная ёмкость      | `/system` → алёрты `capacity_high` / `capacity_exceeded`, пересчёт профиля |
-| Drops под нагрузкой / очередь полная | `/api/ingest/stats` → `dropped_total`, `buffer_drops_total`, `circuit_open`; `/system` → `ingest_dropping*`, `ingest_buffer_dropping*`, `ingest_circuit_open`; `./scripts/watch-ingest.sh` |
+| Drops под нагрузкой / очередь полная | `/system` (плитка Drops, карточка Ingest: admission + buffer drops, queue bytes); `/api/ingest/stats` → `dropped_total`, `buffer_drops_total`, `circuit_open`; алерты `ingest_dropping*`, `ingest_buffer_dropping*`, `ingest_circuit_open`; syslog-ng disk-buffer уже в compose; `./scripts/watch-ingest.sh` |
 | UDP/TCP EPS не разделяются       | Перезапустить `syslog-ng` (маркеры `@@nm/udp/@@` / `@@nm/tcp/@@`) |
 | GeoIP upload → 502 / OOM, backend перезапускается | Не заливать большой CSV поверх уже загруженного индекса через браузер; `dmesg`/`oom-kill`; см. [GeoIP](#geoip) |
 | GeoIP: `Failed to fetch` при смене страницы | Уход со страницы во время POST обрывает `fetch`; дождитесь окончания или `curl` с сервера |
@@ -769,7 +777,7 @@ docker compose logs backend --since=10m 2>&1 | grep -iE 'geo index loaded|geo cs
 | `/geo-missing`    | IP без GeoIP          | Адреса без координат; добавление в GeoIP; выгрузка CSV; мгновенная перефильтрация списка                                                             |
 | `/geo-ranges`     | База GeoIP            | Просмотр/правка диапазонов, выгрузка CSV                                                                                                             |
 | `/parser-test`    | Тест парсеров         | До 200 строк за запрос, пресеты по вендорам, статусы parsed/skipped/error                                                                            |
-| `/system`         | Системный мониторинг  | Обзор / Pipeline (EPS/drops/TTL) / Безопасность / Графики; алёрты, ёмкость, профиль установки                                                        |
+| `/system`         | Системный мониторинг  | Обзор / Pipeline (EPS/drops/queue bytes) / Безопасность / Графики; алёрты, ёмкость, профиль установки                                                        |
 | `/users`          | Учётные записи        | Список/создание УЗ (скрыто, если UI-auth выключен)                                                                                                   |
 | `/api-tokens`     | API-токены            | Именованные Bearer со scope read/ops/admin; секрет показывается один раз                                                                             |
 | `/change-password`| Смена пароля          | Смена своего пароля                                                                                                                                  |

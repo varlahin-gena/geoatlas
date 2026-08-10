@@ -141,16 +141,33 @@ function pipelineIngestStatus(
   queuePct: number,
 ): 'ok' | 'warn' | 'bad' {
   const drops = num(rate.drops_per_sec);
+  const bufDrops = num(rate.buffer_drops_per_sec);
   const dropped = num(ingest.dropped_total);
+  const bufDropped = num(ingest.buffer_drops_total);
   const buffered = num(ingest.buffered_lines);
-  if (drops >= 100) return 'bad';
+  if (drops >= 100 || bufDrops >= 100) return 'bad';
   if (queuePct >= 0.9) return 'bad';
   if (queuePct >= 0.75) return 'warn';
-  if (drops > 0 || dropped > 0) return 'warn';
+  if (drops > 0 || bufDrops > 0 || dropped > 0 || bufDropped > 0) return 'warn';
   if (buffered > 100000) return 'bad';
   if (buffered > 10000) return 'warn';
   if (num(ingest.circuit_open) >= 1) return 'warn';
   return 'ok';
+}
+
+function dropsTone(admPerSec: number, bufPerSec: number): 'ok' | 'warn' | 'bad' {
+  const total = admPerSec + bufPerSec;
+  if (total >= 100) return 'bad';
+  if (total > 0) return 'warn';
+  return 'ok';
+}
+
+function fmtDropAt(iso: unknown): string {
+  if (iso == null || iso === '') return '—';
+  const s = String(iso);
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return s;
+  return d.toLocaleString();
 }
 
 function edgesAggHint(edges?: EdgesAgg): string {
@@ -474,6 +491,14 @@ export default function SystemPage() {
   const qCap = num(ingest.queue_capacity);
   const queuePct = qCap > 0 ? qDepth / qCap : 0;
   const buffered = num(ingest.buffered_lines);
+  const dropsPerSec = num(rate.drops_per_sec);
+  const bufferDropsPerSec = num(rate.buffer_drops_per_sec);
+  const qBytes = num(ingest.queue_bytes);
+  const qBytesCap = num(ingest.queue_bytes_capacity);
+  const lastDropAt =
+    (stats?.health?.ingest?.last_drop_at as string | undefined) ||
+    (ingest.last_drop_at as unknown as string | undefined) ||
+    '';
   const epsMax = num(stats?.install_profile?.capacity?.expected_eps_max);
   const capPct = epsMax > 0 ? Math.round((eps / epsMax) * 100) : 0;
   const showInstallProfile = !!stats?.install_profile?.profile && !!epsMax && capPct > 90;
@@ -599,6 +624,16 @@ export default function SystemPage() {
                 <span className="sm-label">Буфер</span>
                 <span className={`sm-value ${toneClass(bufferTone(buffered))}`} id="statusBuffer">
                   {fmtNumber(buffered)}
+                </span>
+              </div>
+              <div className="status-metric">
+                <span className="sm-label">Drops</span>
+                <span
+                  className={`sm-value ${toneClass(dropsTone(dropsPerSec, bufferDropsPerSec))}`}
+                  id="statusDrops"
+                  title={`admission ${fmtNumber(dropsPerSec)}/s · buffer ${fmtNumber(bufferDropsPerSec)}/s`}
+                >
+                  {fmtNumber(dropsPerSec + bufferDropsPerSec)}/s
                 </span>
               </div>
               <div className="status-metric" id="statusCapacityWrap" hidden={!epsMax}>
@@ -836,7 +871,10 @@ export default function SystemPage() {
                         {fmtNumber(qDepth)}/{fmtNumber(qCap)}
                         {qCap > 0 ? ` (${fmtPercent(queuePct)})` : ''}
                         {num(ingest.dropped_total) > 0
-                          ? `, drop: ${fmtNumber(ingest.dropped_total)} (${fmtNumber(rate.drops_per_sec)}/s)`
+                          ? `, drop: ${fmtNumber(ingest.dropped_total)} (${fmtNumber(dropsPerSec)}/s)`
+                          : ''}
+                        {num(ingest.buffer_drops_total) > 0
+                          ? `, buffer_drop: ${fmtNumber(ingest.buffer_drops_total)} (${fmtNumber(bufferDropsPerSec)}/s)`
                           : ''}
                         {num(ingest.circuit_open) >= 1 ? ', circuit: open' : ''}
                       </div>
@@ -865,7 +903,22 @@ export default function SystemPage() {
                               qCap > 0 ? ` (${fmtPercent(queuePct)})` : ''
                             }`,
                           ],
+                          [
+                            'Queue bytes',
+                            qBytesCap > 0
+                              ? `${fmtBytes(qBytes)} / ${fmtBytes(qBytesCap)}`
+                              : fmtBytes(qBytes),
+                          ],
                           ['Buffered', fmtNumber(buffered)],
+                          [
+                            'Dropped',
+                            `${fmtNumber(ingest.dropped_total)} (${fmtNumber(dropsPerSec)}/s)`,
+                          ],
+                          [
+                            'Buffer drops',
+                            `${fmtNumber(ingest.buffer_drops_total)} (${fmtNumber(bufferDropsPerSec)}/s)`,
+                          ],
+                          ['Last drop', fmtDropAt(lastDropAt)],
                           ['Received', fmtNumber(ingest.received_total)],
                           ['Inserted', fmtNumber(ingest.inserted_total)],
                           ['Skipped', fmtNumber(ingest.skipped_total)],
