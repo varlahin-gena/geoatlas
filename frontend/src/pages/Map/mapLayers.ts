@@ -249,10 +249,14 @@ export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
   const countriesPickable = useHeat || opts.groupBy === 'country';
   const heavyOk = opts.heavyCountryLayersAllowed;
 
+  // На глобусе GeoJson-заливка стран даёт артефакты (иглы / ломаный wrap /
+  // диск через сферу) — даже как fallback без тайлов. Heatmap и land-fill
+  // только для 2D; на globe остаётся basemap (+ подписи/дуги).
   const showCountryFills =
     heavyOk &&
-    opts.countriesGeoJSON &&
-    (opts.mapTilesFailed || (useHeat && !isGlobe));
+    !!opts.countriesGeoJSON &&
+    !isGlobe &&
+    (opts.mapTilesFailed || useHeat);
 
   if (showCountryFills && opts.countriesGeoJSON) {
     const { max, heat } = statsCache;
