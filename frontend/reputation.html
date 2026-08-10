@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ГеоАтлас — Репутация IP</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem('nm.theme');
+    if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+})();
+</script>
+<link rel="stylesheet" href="/theme.css" />
+<link rel="stylesheet" href="/common.css" />
+<style>
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0 16px; }
+.err { color: var(--red); font-size: 12px; }
+.source-pill {
+  display: inline-block; padding: 1px 6px; border-radius: 4px;
+  font-size: 11px; background: var(--panel-3); color: var(--text-dim);
+}
+.section-title { font-size: 1.05rem; margin: 24px 0 8px; }
+.feed-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+  align-items: end;
+  margin: 12px 0 16px;
+  max-width: 960px;
+}
+.feed-form label {
+  display: flex; flex-direction: column; gap: 4px;
+  font-size: 12px; color: var(--text-dim);
+}
+.feed-form input, .feed-form select {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+}
+.feed-form .actions { display: flex; gap: 8px; align-items: center; }
+.url-cell { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+</style>
+</head>
+<body class="page-admin">
+<header id="adminTopbar"></header>
+
+<main class="page-content" id="main-content">
+  <div class="page-content-inner">
+    <h1>Репутация IP</h1>
+    <p class="hint">
+      URL-фиды хранятся в <code>reputation_feeds.json</code> и обновляются по расписанию.
+      Сиды по умолчанию и дополнительные источники — в каталоге ниже (удалённый список можно добавить снова).
+      Форматы: <code>netset</code>/<code>plain</code>, <code>spamhaus_json</code>, <code>csv_ip</code>.
+      Spamhaus eDROP слит в DROP (2024). SSLBL IP-blacklist на abuse.ch deprecated (2025) —
+      удалите <code>sslbl</code>/<code>sslbl_abusech</code>, если остались.
+    </p>
+
+    <div class="summary" id="summary"></div>
+
+    <div class="toolbar">
+      <button class="btn" id="refresh">Обновить</button>
+      <button class="btn primary" id="btnRefreshFeeds" title="Скачать фиды заново">Обновить фиды</button>
+      <button class="btn" id="btnUpload" title="CSV: Network,List,Category">Загрузить CSV</button>
+      <input type="file" id="fileInput" accept=".csv,text/csv,text/plain" hidden />
+    </div>
+
+    <h2 class="section-title">Каталог</h2>
+    <p class="hint" style="margin-top:0">Доступные пресеты (уже активные скрыты). «Добавить», затем — «Обновить фиды».</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Имя</th>
+            <th scope="col">Категория</th>
+            <th scope="col">Формат</th>
+            <th scope="col">URL</th>
+            <th scope="col"><span class="visually-hidden">Действия</span></th>
+          </tr>
+        </thead>
+        <tbody id="catalogBody">
+          <tr><td colspan="5" class="empty">Загрузка…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 class="section-title">Активные списки</h2>
+    <form class="feed-form" id="feedForm">
+      <label>Имя
+        <input name="name" required pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,63}" placeholder="spamhaus_drop" autocomplete="off" />
+      </label>
+      <label style="grid-column: span 2;">URL
+        <input name="url" type="url" required placeholder="https://…/list.netset" autocomplete="off" />
+      </label>
+      <label>Категория
+        <select name="category">
+          <option value="attacks">attacks</option>
+          <option value="c2">c2</option>
+          <option value="drop">drop</option>
+          <option value="block">block</option>
+          <option value="unknown">unknown</option>
+        </select>
+      </label>
+      <label>Формат
+        <select name="format">
+          <option value="netset">netset</option>
+          <option value="plain">plain</option>
+          <option value="spamhaus_json">spamhaus_json</option>
+          <option value="csv_ip">csv_ip</option>
+        </select>
+      </label>
+      <div class="actions">
+        <button type="submit" class="btn primary">Добавить фид</button>
+      </div>
+    </form>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Имя</th>
+            <th scope="col">Категория</th>
+            <th scope="col">Формат</th>
+            <th scope="col">URL</th>
+            <th scope="col">Диапазонов</th>
+            <th scope="col">Источник</th>
+            <th scope="col">Обновлён</th>
+            <th scope="col">Ошибка</th>
+            <th scope="col"><span class="visually-hidden">Действия</span></th>
+          </tr>
+        </thead>
+        <tbody id="activeBody">
+          <tr><td colspan="9" class="empty">Загрузка…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<div class="toast-host" id="toastHost" aria-live="polite"></div>
+
+<script src="/config.js"></script>
+<script src="/auth.js"></script>
+<script src="/common.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  window.__repCatalogAll = [];
+  window.__repActiveFeedNames = new Set();
+  window.__repFeeds = [];
+  window.__repLists = [];
+
+  function renderCatalog() {
+    const tbody = document.getElementById('catalogBody');
+    const all = window.__repCatalogAll || [];
+    const active = window.__repActiveFeedNames || new Set();
+    const available = all.filter(function (f) {
+      return f && f.name && !active.has(f.name);
+    });
+    if (!all.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">Каталог пуст</td></tr>';
+      return;
+    }
+    if (!available.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">Все пресеты уже в активных фидах</td></tr>';
+      return;
+    }
+    tbody.innerHTML = available.map(function (f) {
+      return '<tr>' +
+        '<td>' + NMUI.escapeHTML(f.name) + '</td>' +
+        '<td>' + NMUI.escapeHTML(f.category || '') + '</td>' +
+        '<td>' + NMUI.escapeHTML(f.format || 'netset') + '</td>' +
+        '<td class="url-cell" title="' + NMUI.escapeHTML(f.url || '') + '">' + NMUI.escapeHTML(f.url || '') + '</td>' +
+        '<td><button type="button" class="btn primary" data-add-catalog="' + NMUI.escapeHTML(f.name) + '">Добавить</button></td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  function renderActive() {
+    const tbody = document.getElementById('activeBody');
+    const summary = document.getElementById('summary');
+    const feeds = window.__repFeeds || [];
+    const lists = window.__repLists || [];
+    const byFeed = {};
+    const byList = {};
+    feeds.forEach(function (f) {
+      if (f && f.name) byFeed[f.name] = f;
+    });
+    lists.forEach(function (l) {
+      if (l && l.name) byList[l.name] = l;
+    });
+    const names = Object.keys(Object.assign({}, byFeed, byList)).sort();
+    const totalRanges = lists.reduce(function (s, x) { return s + (x.count || 0); }, 0);
+    summary.textContent = names.length
+      ? ('Списков: ' + names.length + ', диапазонов: ' + NMUI.fmtNumber(totalRanges))
+      : 'Списки ещё не загружены — добавьте фид, нажмите «Обновить фиды» или загрузите CSV.';
+
+    if (!names.length) {
+      tbody.innerHTML = '<tr><td colspan="9" class="empty">Нет активных списков</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = names.map(function (name) {
+      const f = byFeed[name];
+      const l = byList[name];
+      const category = (f && f.category) || (l && l.category) || '';
+      const format = f ? (f.format || 'netset') : '';
+      const url = f ? (f.url || '') : '';
+      const count = l ? (l.count || 0) : 0;
+      const source = l ? (l.source || '') : (f ? 'url' : '');
+      const updated = l ? NMUI.fmtDate(l.updated_at) : '—';
+      const err = (l && l.last_error) || '';
+      return '<tr>' +
+        '<td>' + NMUI.escapeHTML(name) + '</td>' +
+        '<td>' + NMUI.escapeHTML(category) + '</td>' +
+        '<td>' + NMUI.escapeHTML(format) + '</td>' +
+        '<td class="url-cell" title="' + NMUI.escapeHTML(url) + '">' + NMUI.escapeHTML(url) + '</td>' +
+        '<td>' + NMUI.fmtNumber(count) + '</td>' +
+        '<td>' + (source ? '<span class="source-pill">' + NMUI.escapeHTML(source) + '</span>' : '') + '</td>' +
+        '<td>' + NMUI.escapeHTML(updated) + '</td>' +
+        '<td class="err">' + NMUI.escapeHTML(err) + '</td>' +
+        '<td><button type="button" class="btn" data-del="' + NMUI.escapeHTML(name) + '">Удалить</button></td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  async function loadCatalog() {
+    const tbody = document.getElementById('catalogBody');
+    try {
+      const res = await fetch('/api/reputation/catalog', { credentials: 'same-origin', cache: 'no-store' });
+      if (res.status === 401) {
+        location.replace(NMAuth.loginUrl(location.pathname));
+        return;
+      }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      window.__repCatalogAll = data.feeds || [];
+      renderCatalog();
+    } catch (e) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">Ошибка: ' + NMUI.escapeHTML(e.message) + '</td></tr>';
+      NMUI.toast('Не удалось загрузить каталог', 'error');
+    }
+  }
+
+  async function loadFeeds() {
+    try {
+      const res = await fetch('/api/reputation/feeds', { credentials: 'same-origin', cache: 'no-store' });
+      if (res.status === 401) {
+        location.replace(NMAuth.loginUrl(location.pathname));
+        return;
+      }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const feeds = data.feeds || [];
+      window.__repFeeds = feeds;
+      window.__repActiveFeedNames = new Set(feeds.map(function (f) { return f.name; }).filter(Boolean));
+      renderActive();
+      renderCatalog();
+    } catch (e) {
+      NMUI.toast('Не удалось загрузить фиды', 'error');
+    }
+  }
+
+  async function loadLists() {
+    try {
+      const res = await fetch('/api/reputation/lists', { credentials: 'same-origin', cache: 'no-store' });
+      if (res.status === 401) {
+        location.replace(NMAuth.loginUrl(location.pathname));
+        return;
+      }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      window.__repLists = data.lists || [];
+      renderActive();
+    } catch (e) {
+      const tbody = document.getElementById('activeBody');
+      tbody.innerHTML = '<tr><td colspan="9" class="empty">Ошибка: ' + NMUI.escapeHTML(e.message) + '</td></tr>';
+      NMUI.toast('Не удалось загрузить списки', 'error');
+    }
+  }
+
+  async function reloadAll() {
+    await Promise.all([loadCatalog(), loadFeeds(), loadLists()]);
+  }
+
+  async function addFeedBody(body) {
+    const res = await fetch('/api/reputation/feeds', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: NMAuth.nmAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(function () { return {}; });
+    if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+    return data;
+  }
+
+  document.getElementById('refresh').addEventListener('click', reloadAll);
+  document.getElementById('btnUpload').addEventListener('click', function () {
+    document.getElementById('fileInput').click();
+  });
+  document.getElementById('fileInput').addEventListener('change', async function () {
+    const file = this.files && this.files[0];
+    this.value = '';
+    if (!file) return;
+    try {
+      const res = await fetch('/upload-reputation', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: NMAuth.nmAuthHeaders({ 'Content-Type': 'text/csv' }),
+        body: await file.text(),
+      });
+      const data = await res.json().catch(function () { return {}; });
+      if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+      NMUI.toast('Загружено диапазонов: ' + (data.ranges || 0), 'success');
+      loadLists();
+    } catch (e) {
+      NMUI.toast(e.message || String(e), 'error');
+    }
+  });
+  document.getElementById('btnRefreshFeeds').addEventListener('click', async function () {
+    const btn = document.getElementById('btnRefreshFeeds');
+    if (btn.disabled) return;
+    const prevLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Обновление…';
+    NMUI.toast('Обновление фидов… это может занять несколько минут', 'info', 8000);
+    try {
+      const res = await fetch('/api/reputation/refresh?force=1', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: NMAuth.nmAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: '{}',
+      });
+      const data = await res.json().catch(function () { return {}; });
+      if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+
+      const updated = Array.isArray(data.updated) ? data.updated : [];
+      const skipped = Array.isArray(data.skipped) ? data.skipped : [];
+      const failNames = Array.isArray(data.failed) ? data.failed : [];
+      const errMap = data.errors && typeof data.errors === 'object' ? data.errors : {};
+      const counts = data.counts && typeof data.counts === 'object' ? data.counts : {};
+
+      const lines = [];
+      if (updated.length) {
+        let totalRanges = 0;
+        const perFeed = updated.map(function (name) {
+          // removed:foo — prune obsolete lists, без counts
+          if (String(name).indexOf('removed:') === 0) {
+            return String(name).slice('removed:'.length) + ' (удалён устаревший)';
+          }
+          const n = Number(counts[name]) || 0;
+          totalRanges += n;
+          return name + ' — ' + NMUI.fmtNumber(n);
+        });
+        lines.push('Обновлено ' + updated.length + ' (диапазонов: ' + NMUI.fmtNumber(totalRanges) + ')');
+        lines.push(perFeed.join('\n'));
+      } else {
+        lines.push('Обновлено: 0');
+      }
+      if (skipped.length) {
+        lines.push('Без изменений: ' + skipped.length + ' (' + skipped.join(', ') + ')');
+      }
+      if (failNames.length) {
+        const details = failNames.map(function (name) {
+          const why = errMap[name] ? String(errMap[name]) : 'неизвестная ошибка';
+          return name + ' — ' + why;
+        });
+        lines.push('Ошибок: ' + failNames.length);
+        lines.push(details.join('\n'));
+      }
+
+      await reloadAll();
+      const msg = lines.join('\n');
+      const kind = failNames.length ? 'error' : 'success';
+      const ttl = Math.min(30000, 8000 + (updated.length + failNames.length) * 1500);
+      NMUI.toast(msg, kind, ttl);
+    } catch (e) {
+      NMUI.toast(e.message || String(e), 'error', 12000);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = prevLabel;
+    }
+  });
+  document.getElementById('feedForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const body = {
+      name: String(fd.get('name') || '').trim(),
+      url: String(fd.get('url') || '').trim(),
+      category: String(fd.get('category') || 'unknown'),
+      format: String(fd.get('format') || 'netset'),
+    };
+    try {
+      await addFeedBody(body);
+      NMUI.toast('Фид добавлен: ' + body.name + '. Нажмите «Обновить фиды».', 'success');
+      e.target.reset();
+      await loadFeeds();
+    } catch (err) {
+      NMUI.toast(err.message || String(err), 'error');
+    }
+  });
+  document.getElementById('catalogBody').addEventListener('click', async function (e) {
+    const btn = e.target.closest('[data-add-catalog]');
+    if (!btn) return;
+    const name = btn.getAttribute('data-add-catalog');
+    const feeds = window.__repCatalogAll || [];
+    const preset = feeds.find(function (f) { return f.name === name; });
+    if (!preset) {
+      NMUI.toast('Пресет не найден', 'error');
+      return;
+    }
+    try {
+      await addFeedBody({
+        name: preset.name,
+        url: preset.url,
+        category: preset.category || 'unknown',
+        format: preset.format || 'netset',
+      });
+      NMUI.toast('Добавлено из каталога: ' + preset.name + '. Нажмите «Обновить фиды».', 'success');
+      await loadFeeds();
+    } catch (err) {
+      NMUI.toast(err.message || String(err), 'error');
+    }
+  });
+  document.getElementById('activeBody').addEventListener('click', async function (e) {
+    const btn = e.target.closest('[data-del]');
+    if (!btn) return;
+    const name = btn.getAttribute('data-del');
+    if (!confirm('Удалить список «' + name + '»? URL-фид с тем же именем тоже будет снят.')) return;
+    try {
+      const res = await fetch('/api/reputation/lists/' + encodeURIComponent(name), {
+        method: 'DELETE',
+        credentials: 'same-origin',
+        headers: NMAuth.nmAuthHeaders(),
+      });
+      const data = await res.json().catch(function () { return {}; });
+      if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+      NMUI.toast('Удалено: ' + name, 'success');
+      reloadAll();
+    } catch (err) {
+      NMUI.toast(err.message || String(err), 'error');
+    }
+  });
+
+  (async function boot() {
+    const bar = NMUI.mountAdminTopbar('#adminTopbar', {
+      title: 'ГеоАтлас',
+      subtitle: '· Репутация IP',
+    });
+    const user = await NMAuth.requireLogin({ admin: true });
+    if (!user) return;
+    if (user.reputationEnabled === false) {
+      location.replace('/index.html');
+      return;
+    }
+    NMAuth.applyAdminVisibility(user);
+    NMAuth.renderUserBar(user, bar.userBarHost);
+    NMUI.startSystemHealthPolling({ isAdmin: true });
+    await reloadAll();
+  })();
+})();
+</script>
+</body>
+</html>

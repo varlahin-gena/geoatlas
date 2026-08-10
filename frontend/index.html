@@ -1,26 +1,332 @@
 <!DOCTYPE html>
 <html lang="ru">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ГеоАтлас</title>
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <script>
-      (function () {
-        try {
-          var t = localStorage.getItem('nm.theme');
-          if (t === 'light' || t === 'dark') {
-            document.documentElement.setAttribute('data-theme', t);
-          }
-        } catch (e) {}
-      })();
-    </script>
-    <script src="/config.js"></script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ГеоАтлас — SOC</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<script>
+(function () {
+    try {
+        var t = localStorage.getItem('nm.theme');
+        if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+})();
+</script>
+
+<link rel="preconnect" href="https://basemaps.cartocdn.com" crossorigin />
+<link rel="dns-prefetch" href="https://basemaps.cartocdn.com" />
+<link rel="stylesheet" href="/vendor/maplibre-gl.css" />
+<script defer src="/vendor/maplibre-gl.js"></script>
+<script defer src="/vendor/deck.gl.min.js"></script>
+<script defer src="/vendor/deck.gl-mapbox.min.js"></script>
+<link rel="stylesheet" href="/theme.css?v=20260728d" />
+<link rel="stylesheet" href="/common.css?v=20260728d" />
+<link rel="stylesheet" href="/index.css?v=20260728d" />
+</head>
+<body class="page-map">
+
+<a class="skip-link" href="#map-main">К содержимому</a>
+
+<div class="app" id="app">
+
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <img class="logo" src="/logo.png" alt="" width="28" height="28" />
+            <div class="title">ГеоАтлас</div>
+        </div>
+
+        <div class="sidebar-section collapse-hide">
+            <div class="sidebar-section-title">Режим</div>
+            <div class="mode-switch">
+                <button id="mode-map"   class="active">🗺 Map</button>
+                <button id="mode-globe"            >🌐 Globe</button>
+            </div>
+        </div>
+
+        <div class="sidebar-section">
+            <div class="mode-switch-icons">
+                <button id="mode-map-icon" class="active" title="Map (2D)">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6v15l7-3 8 3 7-3V3l-7 3-8-3-7 3z"/><path d="M8 3v15M16 6v15"/></svg>
+                </button>
+                <button id="mode-globe-icon" title="Globe (3D)">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="sidebar-section" data-admin-only>
+            <div class="sidebar-section-title">Загрузка</div>
+            <input type="file" id="logFile" accept=".log,.txt,.cef,.syslog" style="display:none;" />
+            <input type="file" id="geoFile" accept=".csv" style="display:none;" />
+            <button class="side-btn" id="btnUploadLogs" title="Загрузить логи">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+                <span class="label">Загрузить логи</span>
+            </button>
+            <button class="side-btn" id="btnUploadGeo" title="Обновить GeoIP">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></svg>
+                <span class="label">Обновить GeoIP</span>
+            </button>
+        </div>
+
+        <div class="sidebar-section">
+            <div class="sidebar-section-title">Вид</div>
+            <button class="side-btn" id="btnRefreshMap" title="Обновить">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                <span class="label">Обновить</span>
+            </button>
+            <button class="side-btn" id="btnResetView" title="Сбросить вид">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+                <span class="label">Сбросить вид</span>
+            </button>
+            <button class="side-btn" id="btnExportPng" title="Экспорт PNG">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                <span class="label">Экспорт PNG</span>
+            </button>
+        </div>
+
+        <div class="sidebar-section" id="adminNavSection" data-admin-only></div>
+
+        <div class="sidebar-section collapse-hide">
+            <div class="sidebar-section-title">Порог событий на связь</div>
+            <input type="range" id="minCount" class="side-range" min="1" max="50" value="1" />
+            <div class="side-range-label">
+                <span>от <b id="minCountVal">1</b> соб.</span>
+                <span id="arcCountInfo"></span>
+            </div>
+        </div>
+
+        <div class="sidebar-section collapse-hide">
+            <div class="sidebar-section-title">Лимит дуг</div>
+            <input type="range" id="maxArcs" class="side-range" min="100" max="20000" step="100" value="5000" />
+            <div class="side-range-label">
+                <span>до <b id="maxArcsVal">5 000</b> дуг</span>
+            </div>
+        </div>
+
+        <div class="sidebar-section collapse-hide">
+            <div class="sidebar-section-title">Отображение</div>
+            <label class="side-toggle">
+                <input type="checkbox" id="toggleLegendChk" checked />
+                <span>Легенда</span>
+            </label>
+            <label class="side-toggle">
+                <input type="checkbox" id="toggleStatsChk" checked />
+                <span>Статистика</span>
+            </label>
+            <label class="side-toggle" title="2D: заливка стран (на глобусе heatmap отключён)">
+                <input type="checkbox" id="toggleHeatmapChk" checked />
+                <span>Heatmap стран</span>
+            </label>
+            <label class="side-toggle">
+                <input type="checkbox" id="toggleCountryLabelsChk" checked />
+                <span>Названия стран</span>
+            </label>
+            <label class="side-toggle" title="Все дуги одним цветом. Удобно с фильтром «Разрешённые» / «Заблокированные»">
+                <input type="checkbox" id="toggleMonoArcsChk" />
+                <span>Один цвет линий</span>
+            </label>
+            <label class="side-toggle">
+                <input type="checkbox" id="autoRefresh" checked />
+                <span>Авто-обновление</span>
+            </label>
+            <label class="side-toggle" id="autoRotateWrap" style="display:none;">
+                <input type="checkbox" id="autoRotate" checked />
+                <span>Авто-вращение глобуса</span>
+            </label>
+        </div>
+
+        <div class="sidebar-collapse-btn">
+            <button class="side-btn" id="btnToggleSidebar" title="Развернуть / свернуть меню">
+                <svg class="icon" id="collapseIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+                <span class="label">Свернуть меню</span>
+            </button>
+        </div>
+    </aside>
+
+    <main class="main" id="map-main">
+        <header class="topbar">
+            <div class="search-box">
+                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                <input type="text" id="searchInput" placeholder="Поиск: IP, страна, city:Москва, rule:block…" />
+                <button type="button" id="btnSearchBuilder" class="search-builder-toggle" aria-label="Открыть расширенный поиск" aria-expanded="false" aria-controls="searchBuilderPanel" title="Расширенный поиск">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18"/><path d="M6 12h12"/><path d="M10 19h4"/></svg>
+                </button>
+                <div class="search-builder-panel" id="searchBuilderPanel">
+                    <div class="search-builder-tabs" role="tablist">
+                        <button type="button" class="search-builder-tab active" data-search-tab="builder" id="searchTabBuilder">Конструктор</button>
+                        <button type="button" class="search-builder-tab" data-search-tab="mine" id="searchTabMine">Мои запросы</button>
+                        <button type="button" class="search-builder-tab" data-search-tab="all" id="searchTabAll" style="display:none;">Все шаблоны</button>
+                    </div>
+                    <div class="search-builder-tab-panel" id="searchBuilderTabBuilder" data-search-tab-panel="builder">
+                        <div class="search-builder-head">
+                            <div class="search-builder-title">Конструктор запроса</div>
+                            <div class="search-builder-actions">
+                                <button type="button" id="btnSearchBuilderAdd">Добавить условие</button>
+                                <button type="button" id="btnSearchBuilderAddGroup">Добавить группу</button>
+                                <button type="button" id="btnSearchBuilderApply">Применить</button>
+                                <button type="button" id="btnSearchBuilderClear">Сбросить</button>
+                            </div>
+                        </div>
+                        <div class="search-builder-chips" id="searchBuilderChips" aria-label="Примеры запросов"></div>
+                        <div class="search-builder-hint" id="searchBuilderHint"></div>
+                        <div class="search-builder-notice" id="searchBuilderNotice" style="display:none;"></div>
+                        <div class="search-builder-rows" id="searchBuilderRows"></div>
+                    </div>
+                    <div class="search-builder-tab-panel" id="searchBuilderTabMine" data-search-tab-panel="mine" hidden>
+                        <div class="search-templates-toolbar">
+                            <button type="button" id="btnSearchTemplateSave">Сохранить текущий</button>
+                            <button type="button" id="btnSearchTemplateReload">Обновить</button>
+                        </div>
+                        <div class="search-templates-hint">Личные шаблоны хранятся на сервере и доступны только вашей учётной записи.</div>
+                        <div class="search-templates-list" id="searchTemplatesMine"></div>
+                    </div>
+                    <div class="search-builder-tab-panel" id="searchBuilderTabAll" data-search-tab-panel="all" hidden>
+                        <div class="search-templates-toolbar">
+                            <button type="button" id="btnSearchTemplateReloadAll">Обновить</button>
+                        </div>
+                        <div class="search-templates-hint">Шаблоны всех пользователей, сгруппированные по автору. Чужие можно только применить.</div>
+                        <div class="search-templates-list" id="searchTemplatesAll"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="group-control">
+                <span>Группа:</span>
+                <select id="groupBy">
+                    <option value="ip">IP</option>
+                    <option value="subnet">/24</option>
+                    <option value="city" selected>Город</option>
+                    <option value="country">Страна</option>
+                </select>
+            </div>
+            <div class="filter-tabs">
+                <button id="filter-all"     class="active">Все</button>
+                <button id="filter-allowed" class="allowed">Разрешённые</button>
+                <button id="filter-blocked" class="blocked">Заблокированные</button>
+            </div>
+            <div class="reputation-filter" id="reputationFilterWrap" data-reputation-only>
+                <button type="button" id="btnReputationFilter" class="rep-filter-btn" title="Фильтр по репутационным спискам">
+                    Репутация
+                    <span id="repFilterBadge" class="rep-badge" style="display:none;">0</span>
+                </button>
+                <div class="reputation-menu" id="reputationMenu" role="dialog" aria-label="Фильтр репутации">
+                    <div class="rep-menu-head">
+                        <span>Репутация</span>
+                        <button type="button" class="rep-clear" id="btnRepFilterClear">Сбросить</button>
+                    </div>
+                    <div class="rep-menu-side">
+                        <label for="repFilterSide">Сторона</label>
+                        <select id="repFilterSide">
+                            <option value="any">src или dst</option>
+                            <option value="src">только src</option>
+                            <option value="dst">только dst</option>
+                            <option value="both">оба конца</option>
+                        </select>
+                    </div>
+                    <label class="rep-color-toggle">
+                        <input type="checkbox" id="repColorArcsChk" />
+                        Окрашивать дуги с хитом
+                    </label>
+                    <p class="rep-menu-hint">Частные и спец. сети (RFC1918, CGNAT, loopback) не учитываются. В деталях дуги смотрите «диапазон».</p>
+                    <div class="rep-menu-body" id="reputationMenuBody"></div>
+                </div>
+            </div>
+            <div class="period-control">
+                <span>Период:</span>
+                <select id="periodPreset" title="Период данных">
+                    <option value="15m">15 минут</option>
+                    <option value="30m">30 минут</option>
+                    <option value="1h">1 час</option>
+                    <option value="3h">3 часа</option>
+                    <option value="6h">6 часов</option>
+                    <option value="12h">12 часов</option>
+                    <option value="1d" selected>1 день</option>
+                    <option value="3d">3 дня</option>
+                    <option value="7d">7 дней</option>
+                    <option value="14d">14 дней</option>
+                    <option value="30d">30 дней</option>
+                    <option value="custom">Свой диапазон…</option>
+                </select>
+                <div id="periodCustom" class="period-custom">
+                    <label for="periodFrom">От</label>
+                    <input type="datetime-local" id="periodFrom" />
+                    <label for="periodTo">До</label>
+                    <input type="datetime-local" id="periodTo" />
+                    <button type="button" class="period-apply-btn" id="btnPeriodApply">Применить</button>
+                </div>
+            </div>
+            <div class="topbar-spacer"></div>
+            <div id="userBarHost"></div>
+            <span id="systemHealthPill" class="status-pill" title="Состояние системы">
+                <span class="dot"></span>
+                <span id="systemHealthText">— загрузка —</span>
+            </span>
+        </header>
+
+        <div class="viz-area">
+            <div id="map-host" class="viz-host"></div>
+
+            <div class="viz-hint warn" id="arcsTruncHint" style="display:none;"></div>
+            <div class="viz-overlay" id="vizOverlay">
+                <div class="viz-overlay-card">
+                    <h4 id="vizOverlayTitle">Нет данных</h4>
+                    <p id="vizOverlayText"></p>
+                </div>
+            </div>
+            <div class="map-loading" id="mapLoading" aria-live="polite" aria-busy="false">
+                <div class="map-loading-spinner" aria-hidden="true"></div>
+                <span>Загрузка данных…</span>
+            </div>
+
+            <div class="legend" id="legendBox">
+                <div class="legend-title" id="legendTitle">Статус трафика</div>
+                <div id="legendByStatus">
+                    <div class="legend-row"><span class="legend-line" style="background: var(--green);"></span> Разрешённый</div>
+                    <div class="legend-row"><span class="legend-line" style="background: var(--red);"></span> Заблокированный</div>
+                    <div class="legend-row" id="legendRepRow" style="display:none;"><span class="legend-line" style="background: var(--orange);"></span> Репутационный хит</div>
+                </div>
+                <div id="legendMono" class="legend-row" style="display:none;">
+                    <span class="legend-line" style="background: var(--accent);"></span> Связь
+                </div>
+                <div class="legend-row" style="margin-top:6px;color:var(--text-muted);font-size:11px">Толщина линии / размер точки — кол-во событий</div>
+            </div>
+
+            <div class="stats-floating" id="statsFloating">
+                <div class="stats-item"><span class="lbl">Событий</span><span class="val" id="stat-total">0</span></div>
+                <div class="stats-item"><span class="lbl">Allowed</span><span class="val green" id="stat-allowed">0</span></div>
+                <div class="stats-item"><span class="lbl">Blocked</span><span class="val red" id="stat-blocked">0</span></div>
+                <div class="stats-item"><span class="lbl">Связей</span><span class="val" id="stat-edges">0</span></div>
+                <div class="stats-item"><span class="lbl">Узлов</span><span class="val" id="stat-nodes">0</span></div>
+                <div class="stats-item"><span class="lbl">Стран</span><span class="val" id="stat-countries">0</span></div>
+                <div class="stats-item"><span class="lbl">Городов</span><span class="val" id="stat-cities">0</span></div>
+            </div>
+
+            <aside class="detail-panel" id="detailPanel">
+                <div class="detail-header">
+                    <h3 id="detailTitle">Детали</h3>
+                    <button class="close-btn" id="btnCloseDetail" type="button" aria-label="Закрыть панель деталей">✕</button>
+                </div>
+                <div class="detail-actions" id="detailActions" style="display:none;"></div>
+                <div class="detail-body" id="detailBody"></div>
+            </aside>
+        </div>
+    </main>
+</div>
+
+<div class="toast-host" id="toastHost" aria-live="polite"></div>
+
+<script defer src="/config.js?v=20260728c"></script>
+<script defer src="/auth.js?v=20260728c"></script>
+<script defer src="/common.js?v=20260805u"></script>
+<script defer src="/js/map-state.js?v=20260728c"></script>
+<script defer src="/js/map-search.js?v=20260728c"></script>
+<script defer src="/js/map-reputation.js?v=20260728c"></script>
+<script defer src="/js/map-detail.js?v=20260728c"></script>
+<script defer src="/js/map-render.js?v=20260728c"></script>
+<script defer src="/js/map-filters.js?v=20260728c"></script>
+<script defer src="/js/map-uploads.js?v=20260805w"></script>
+<script defer src="/js/map-app.js?v=20260728c"></script>
+</body>
 </html>

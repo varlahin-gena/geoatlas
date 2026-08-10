@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Тест парсеров</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem('nm.theme');
+    if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+})();
+</script>
+<link rel="stylesheet" href="/theme.css" />
+<link rel="stylesheet" href="/common.css" />
+<style>
+.page-content { padding: 24px; }
+.page-lead { color: var(--text-dim); margin-bottom: 20px; }
+.presets { margin: 10px 0; }
+.presets .pk { text-transform: capitalize; }
+textarea {
+  width: 100%;
+  min-height: 160px;
+  margin-top: 8px;
+  resize: vertical;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 13px;
+}
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button.tool {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+button.tool:hover { border-color: var(--accent); }
+button.tool.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+.summary { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+.stat b { font-size: 18px; display: block; }
+td.raw {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  color: var(--text-dim);
+  max-width: 420px;
+  overflow-wrap: anywhere;
+}
+.b-ok { background: rgba(46,160,67,.15); color: var(--green); border: 1px solid var(--green); }
+.b-skip { background: rgba(176,136,0,.15); color: var(--orange); border: 1px solid var(--orange); }
+.b-err { background: rgba(214,69,69,.15); color: var(--red); border: 1px solid var(--red); }
+.act-allow { color: var(--green); }
+.act-deny { color: var(--red); }
+.act-other { color: var(--text-dim); }
+.warn { color: var(--orange); margin-top: 8px; }
+.muted { color: var(--text-dim); }
+.card label {
+  color: var(--text-dim);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+</style>
+</head>
+<body class="page-admin">
+<header id="adminTopbar"></header>
+
+<main class="page-content" id="main-content">
+  <h1>Тест парсеров</h1>
+  <div class="page-lead">Строки прогоняются через тот же реестр парсеров, что и боевой ingest (<code>/api/parse-test</code>).</div>
+
+  <div class="card">
+    <label>Примеры</label>
+    <div class="presets row" id="presets"><span class="muted">загрузка…</span></div>
+
+    <label>Строки логов (по одной в строке)</label>
+    <textarea id="input" placeholder="Вставьте строки логов…"></textarea>
+    <div class="row" style="margin-top:10px;">
+      <button class="tool primary" id="run">Проверить</button>
+      <button class="tool" id="clear">Очистить</button>
+      <span class="muted" id="limitNote"></span>
+    </div>
+  </div>
+
+  <div class="card" id="resultsCard" style="display:none;">
+    <div class="summary" id="summary"></div>
+    <div id="truncWarn" class="warn" style="display:none;"></div>
+    <div class="table-wrap">
+      <table id="results">
+        <thead><tr>
+          <th scope="col">#</th>
+          <th scope="col">Статус</th>
+          <th scope="col">Вендор</th>
+          <th scope="col">Src</th>
+          <th scope="col">Dst</th>
+          <th scope="col">Порты</th>
+          <th scope="col">Action</th>
+          <th scope="col">Proto</th>
+          <th scope="col">Страны</th>
+          <th scope="col">Строка / причина</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script src="/config.js"></script>
+<script src="/auth.js"></script>
+<script src="/common.js"></script>
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const esc = NMUI.escapeHTML;
+
+async function loadPresets() {
+  const box = $('#presets');
+  try {
+    const data = await (await fetch('/api/parse-samples')).json();
+    box.innerHTML = '';
+    Object.keys(data).sort().forEach(vendor => {
+      const b = document.createElement('button');
+      b.className = 'tool pk';
+      b.textContent = vendor;
+      b.onclick = () => { $('#input').value = data[vendor].join('\n'); };
+      box.appendChild(b);
+    });
+    const all = document.createElement('button');
+    all.className = 'tool';
+    all.textContent = 'все примеры';
+    all.onclick = () => { $('#input').value = Object.values(data).flat().join('\n'); };
+    box.appendChild(all);
+  } catch (e) {
+    box.innerHTML = '<span class="muted">не удалось загрузить примеры</span>';
+  }
+}
+
+function loadPrefill() {
+  try {
+    const pre = localStorage.getItem('nm.parserTest.prefill');
+    if (pre) {
+      $('#input').value = pre;
+      localStorage.removeItem('nm.parserTest.prefill');
+    }
+  } catch (e) {}
+}
+
+async function run() {
+  const text = $('#input').value;
+  if (!text.trim()) return;
+  const btn = $('#run'); btn.disabled = true; btn.textContent = 'Проверяю…';
+  try {
+    const resp = await fetch('/api/parse-test', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: NMAuth.nmAuthHeaders({ 'Content-Type': 'text/plain' }),
+      body: text,
+    });
+    const data = await resp.json();
+    if (!resp.ok) { alert(data.error || 'Ошибка'); return; }
+    render(data);
+  } catch (e) {
+    alert('Сетевая ошибка: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Проверить';
+  }
+}
+
+function statusBadge(r) {
+  if (r.parsed)  return '<span class="badge b-ok">✔ parsed</span>';
+  if (r.skipped) return '<span class="badge b-skip">⏭ skipped</span>';
+  return '<span class="badge b-err">✕ error</span>';
+}
+function actClass(a) {
+  a = (a || '').toLowerCase();
+  if (['allow','accept','accepted','permit','permitted','pass','built','teardown','trust'].includes(a)) return 'act-allow';
+  if (['deny','denied','drop','block','blocked','reject','reset'].includes(a)) return 'act-deny';
+  return 'act-other';
+}
+
+function render(d) {
+  $('#resultsCard').style.display = 'block';
+  $('#summary').innerHTML = `
+    <div class="stat"><b>${d.received}</b>получено</div>
+    <div class="stat"><b style="color:var(--green)">${d.parsed}</b>разобрано</div>
+    <div class="stat"><b style="color:var(--orange)">${d.skipped}</b>пропущено</div>
+    <div class="stat"><b style="color:var(--red)">${d.errors}</b>ошибок</div>`;
+
+  const tw = $('#truncWarn');
+  if (d.truncated) {
+    tw.style.display = 'block';
+    tw.textContent = `⚠ Показаны первые ${d.max_lines} строк — остальное обрезано.`;
+  } else tw.style.display = 'none';
+
+  const tb = $('#results').querySelector('tbody');
+  tb.innerHTML = (d.results || []).map(r => {
+    const ports = (r.src_port || r.dst_port) ? `${r.src_port||0} → ${r.dst_port||0}` : '';
+    const countries = [r.src_country, r.dst_country].filter(Boolean).join(' → ');
+    const tail = (r.parsed)
+      ? `<span class="muted">${esc(r.line)}</span>`
+      : `${esc(r.reason)}<br><span class="muted">${esc(r.line)}</span>`;
+    return `<tr>
+      <td>${r.n}</td>
+      <td>${statusBadge(r)}</td>
+      <td>${esc(r.vendor)}</td>
+      <td>${esc(r.src_ip)}</td>
+      <td>${esc(r.dst_ip)}</td>
+      <td>${ports}</td>
+      <td class="${actClass(r.action)}">${esc(r.action)}</td>
+      <td>${esc(r.proto)}</td>
+      <td>${esc(countries)}</td>
+      <td class="raw">${tail}</td>
+    </tr>`;
+  }).join('');
+}
+
+$('#run').onclick = run;
+$('#clear').onclick = () => { $('#input').value=''; $('#resultsCard').style.display='none'; };
+
+(async function boot() {
+  const bar = NMUI.mountAdminTopbar('#adminTopbar', {
+    title: 'ГеоАтлас',
+    subtitle: '· Тест парсеров',
+  });
+  const user = await NMAuth.requireLogin({ admin: true });
+  if (!user) return;
+  NMAuth.renderUserBar(user, bar.userBarHost);
+  NMUI.startSystemHealthPolling({ isAdmin: true });
+  loadPresets();
+  loadPrefill();
+})();
+</script>
+</body>
+</html>

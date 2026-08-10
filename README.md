@@ -44,14 +44,14 @@
 - Ручная загрузка логов через веб-интерфейс
 - Парсинг **UserGate, FortiGate, Cisco ASA, Cisco FTD (FirePower), Cowrie (honeypot)** и универсальный фолбэк (Generic KV)
 - **Осознанный пропуск** событий: распознанные, но несетевые строки (например, часть `cowrie.*`) не попадают в `parse_errors`
-- **Авторизация по умолчанию**: роли `administrator` / `operator`, cookie-сессии, CSRF, Bearer `API_AUTH_TOKEN` (+ `API_AUTH_PREVIOUS_TOKEN`); именованные API-токены со scopes `read`/`ops`/`admin` (UI `/api-tokens`); управление УЗ в UI
+- **Авторизация по умолчанию**: роли `administrator` / `operator`, cookie-сессии, CSRF, Bearer `API_AUTH_TOKEN` (+ `API_AUTH_PREVIOUS_TOKEN`); именованные API-токены со scopes `read`/`ops`/`admin` (UI `/api-tokens.html`); управление УЗ в UI
 - Опциональный **HTTPS** на nginx со своими PEM-сертификатами (редирект HTTP→HTTPS)
 - Загрузка и правка **GeoIP-базы** (CSV SIEM KUMA, страница `/geo-ranges.html`, IP без координат на `/geo-missing.html`); большие CSV — с сервера через `curl` (см. [GeoIP](#geoip))
 - Установка **«Сделай мне хорошо»** (`NM_FULL_AUTO` / `--full-auto`): релиз, все модули, порт 8080, автопрофиль, firewall off
 - Toast-уведомления без автоскрытия (крестик), сохраняются при смене страниц до ручного закрытия
 - **Репутация IP** (модуль опционален при установке): offline-списки и URL-фиды (`/reputation.html`), каталог публичных источников, фильтр и подсветка дуг на карте; приватные IP не помечаются
 - Хранение и аналитика в **ClickHouse**; дневные geo-агрегаты для пресетов `1d+` (city/country)
-- **Настраиваемый TTL (retention)** таблиц из UI `/system`
+- **Настраиваемый TTL (retention)** таблиц из UI `/system.html`
 - Построение связей на карте (2D MapLibre) и глобусе (3D MapLibre Globe); на карту попадают только узлы/рёбра с координатами
 - Полный mesh дуг + viewport-fit zoom; heatmap стран (на глобусе отключён) + sparkline по клику на страну; экспорт PNG; светлая/тёмная тема
 - Фильтрация: все / разрешённые / заблокированные (на клиенте); опционально «один цвет линий»
@@ -60,7 +60,7 @@
 - **Тест парсеров** в браузере: статусы parsed / skipped / error, гео-обогащение, пресеты по вендорам
 - **Журнал ошибок парсинга**: поиск, выборочное и полное удаление, передача строк в «Тест парсеров»
 - Страница системного мониторинга (вкладки Обзор / Pipeline / Безопасность / Графики): метрики контейнеров, пайплайна (в т.ч. **UDP/TCP EPS**, drops, circuit breaker), **форма TTL**, неуспешные логины, хранилище, профиль установки, **индикатор ёмкости**, алёрты; ручной maintenance backfill агрегатов
-- Индикатор здоровья системы на главной странице (ссылка на `/system`)
+- Индикатор здоровья системы на главной странице (ссылка на `/system.html`)
 - Контракт HTTP API: [`openapi.yaml`](openapi.yaml) (OpenAPI **1.3.0**)
 
 ---
@@ -106,14 +106,14 @@
 
 1. **Syslog**: МСЭ отправляет события на `<IP_сервера>:514` (TCP или UDP).
 2. **syslog-ng** принимает сообщения и пересылает их по TCP на `backend:1514` с маркерами транспорта (`@@nm/udp/@@` / `@@nm/tcp/@@`).
-3. **backend** снимает маркеры транспорта, парсит строки, обогащает GeoIP, пишет в ClickHouse; при старте `Ensure*` создаёт/обновляет агрегаты (`traffic_edges_*`, geo), применяет TTL из `retention.json` и при необходимости делает backfill. **Delivery contract — at-most-once / best-effort:** полная очередь ingest **не блокирует** TCP — лишние строки дропаются (`dropped_total`); при outage ClickHouse insert circuit ставит dequeue на паузу (очередь растёт → admission drops), а потери из processor-буфера учитываются отдельно (`buffer_drops_total`). Для более надёжной доставки используйте disk-буфер syslog-ng перед backend. Алерты — на `/system`.
+3. **backend** снимает маркеры транспорта, парсит строки, обогащает GeoIP, пишет в ClickHouse; при старте `Ensure*` создаёт/обновляет агрегаты (`traffic_edges_*`, geo), применяет TTL из `retention.json` и при необходимости делает backfill. **Delivery contract — at-most-once / best-effort:** полная очередь ingest **не блокирует** TCP — лишние строки дропаются (`dropped_total`); при outage ClickHouse insert circuit ставит dequeue на паузу (очередь растёт → admission drops), а потери из processor-буфера учитываются отдельно (`buffer_drops_total`). Для более надёжной доставки используйте disk-буфер syslog-ng перед backend. Алерты — на `/system.html`.
 4. **frontend** отдаёт статику и проксирует API-запросы на backend.
 5. **stats-collector** каждые 30 секунд собирает метрики CPU/RAM контейнеров и состояние пайплайна (включая разбивку UDP/TCP).
 
 
 ### Хранение данных (TTL)
 
-Дефолты ниже, менять можно в UI (`/system` → Pipeline → «Срок хранения»).
+Дефолты ниже, менять можно в UI (`/system.html` → Pipeline → «Срок хранения»).
 
 | Таблица / объект                    | Срок по умолчанию | Источник дефолта                             |
 |-------------------------------------|-------------------|----------------------------------------------|
@@ -518,7 +518,7 @@ TTL таблиц ClickHouse настраивается без правки `init
 
 Диапазон каждого поля: **1…730** дней. `geo_ranges` без TTL.
 
-**UI:** `/system` → вкладка **Pipeline** → блок «Срок хранения (TTL)» (только administrator).
+**UI:** `/system.html` → вкладка **Pipeline** → блок «Срок хранения (TTL)» (только administrator).
 
 ---
 
@@ -588,8 +588,8 @@ docker compose exec clickhouse clickhouse-client --query "
 | ClickHouse CPU скачет при обновлении карты | abort предыдущих `/api/events`; `CH_MAX_THREADS` / `max_threads` в профиле; логи backend `geo edges agg: ready`; периоды `1h`/`6h` всегда читают `traffic_logs` |
 | ClickHouse idle CPU высокий, мало данных | `system.trace_log`/`text_log` — см. `config.d/z_system_logs.xml`; `TRUNCATE`/`DROP` старых system-логов |
 | Нет метрик на странице «Система» | `docker compose logs stats-collector`, cgroup, `/proc` и `/sys/fs/cgroup` на хосте |
-| Превышена расчётная ёмкость      | `/system` → алёрты `capacity_high` / `capacity_exceeded`, пересчёт профиля |
-| Drops под нагрузкой / очередь полная | `/api/ingest/stats` → `dropped_total`, `buffer_drops_total`, `circuit_open`; `/system` → `ingest_dropping*`, `ingest_buffer_dropping*`, `ingest_circuit_open`; `./scripts/watch-ingest.sh` |
+| Превышена расчётная ёмкость      | `/system.html` → алёрты `capacity_high` / `capacity_exceeded`, пересчёт профиля |
+| Drops под нагрузкой / очередь полная | `/api/ingest/stats` → `dropped_total`, `buffer_drops_total`, `circuit_open`; `/system.html` → `ingest_dropping*`, `ingest_buffer_dropping*`, `ingest_circuit_open`; `./scripts/watch-ingest.sh` |
 | UDP/TCP EPS не разделяются       | Перезапустить `syslog-ng` (маркеры `@@nm/udp/@@` / `@@nm/tcp/@@`) |
 | GeoIP upload → 502 / OOM, backend перезапускается | Не заливать большой CSV поверх уже загруженного индекса через браузер; `dmesg`/`oom-kill`; см. [GeoIP](#geoip) |
 | GeoIP: `Failed to fetch` при смене страницы | Уход со страницы во время POST обрывает `fetch`; дождитесь окончания или `curl` с сервера |
@@ -746,19 +746,19 @@ docker compose logs backend --since=10m 2>&1 | grep -iE 'geo index loaded|geo cs
 
 | URL                    | Страница              | Основные возможности                                                                                                                                 |
 |------------------------|-----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `/login`               | Вход                  | Логин (роли admin / operator); смена пароля при `must_reset_password`                                                                                |
-| `/`                    | Карта / глобус        | 2D/3D, группировка, фильтры, поиск, порог событий, загрузка логов/GeoIP, health pill                                                                   |
-| `/reputation`          | Репутация IP          | Списки и URL-фиды, каталог источников, refresh, ручная загрузка; модуль можно отключить при установке                                                  |
-| `/parse-errors`        | Журнал ошибок парсинга| Поиск, удаление выбранных / всех, отправка в тест парсеров                                                                                           |
-| `/geo-missing`         | IP без GeoIP          | Адреса без координат; добавление в GeoIP; выгрузка CSV                                                                                               |
-| `/geo-ranges`          | База GeoIP            | Просмотр/добавление диапазонов, выгрузка CSV                                                                                                         |
-| `/parser-test`         | Тест парсеров         | Пресеты, статусы parsed / skipped / error                                                                                                            |
-| `/system`              | Системный мониторинг  | Обзор / Pipeline (EPS/drops/TTL) / Безопасность / Графики; алёрты, ёмкость                                                                            |
-| `/users`               | Учётные записи        | Список/создание УЗ (скрыто, если UI-auth выключен)                                                                                                   |
-| `/api-tokens`          | API-токены            | Именованные Bearer со scope read/ops/admin; секрет показывается один раз                                                                             |
-| `/change-password`     | Смена пароля          | Смена своего пароля                                                                                                                                  |
+| `/login.html`          | Вход                  | Логин (роли admin / operator); смена пароля при `must_reset_password`                                                                                |
+| `/`                    | Карта / глобус        | 2D/3D, группировка, фильтры status/репутации, конструктор поиска и шаблоны, порог событий, mono-дуги, экспорт PNG, загрузка логов/GeoIP, health pill |
+| `/reputation.html`     | Репутация IP          | Списки и URL-фиды, каталог источников, refresh по расписанию, ручная загрузка; модуль можно отключить при установке                                  |
+| `/parse-errors.html`   | Журнал ошибок парсинга| Поиск, удаление выбранных / всех, отправка в тест парсеров                                                                                           |
+| `/geo-missing.html`    | IP без GeoIP          | Адреса без координат; добавление в GeoIP; выгрузка CSV; мгновенная перефильтрация списка                                                             |
+| `/geo-ranges.html`     | База GeoIP            | Просмотр/правка диапазонов, выгрузка CSV                                                                                                             |
+| `/parser-test.html`    | Тест парсеров         | До 200 строк за запрос, пресеты по вендорам, статусы parsed/skipped/error                                                                            |
+| `/system.html`         | Системный мониторинг  | Обзор / Pipeline (EPS/drops/TTL) / Безопасность / Графики; алёрты, ёмкость, профиль установки                                                        |
+| `/users.html`          | Учётные записи        | Список/создание УЗ (скрыто, если UI-auth выключен)                                                                                                   |
+| `/api-tokens.html`     | API-токены            | Именованные Bearer со scope read/ops/admin; секрет показывается один раз                                                                             |
+| `/change-password.html`| Смена пароля          | Смена своего пароля                                                                                                                                  |
 
-Старые URL `*.html` редиректятся на пути выше. Page-level доступ — React Router; API/uploads — nginx `auth_request` + backend.
+Nginx: карта и смена пароля — любой залогиненный; system / parsers / geo / reputation / users / api-tokens — только **administrator**.
 
 ### HTTP API
 
@@ -813,26 +813,26 @@ network_monitor/
 │   └── oracle_linux/
 ├── docker-compose.yml
 ├── docker-compose.https.yml          # публикация :443 при HTTPS
-├── frontend/                         # React + Vite SPA (nginx serves dist/)
-│   ├── Dockerfile                    # multi-stage: node build → nginx
-│   ├── index.html                    # SPA shell
-│   ├── package.json / vite.config.ts
-│   ├── nginx-app.inc                 # API auth_request + SPA try_files
-│   ├── docker-entrypoint.sh          # TLS + /config.js
-│   ├── public/                       # favicon, logo, countries.geojson
-│   └── src/
-│       ├── main.tsx / App.tsx
-│       ├── api/                      # fetch + CSRF
-│       ├── auth/                     # AuthProvider, RequireAuth, theme
-│       ├── components/               # layout, toast, nav, user menu
-│       ├── pages/                    # Map, System, Login, admin pages
-│       ├── lib/                      # search AST, format helpers
-│       └── styles/                   # theme/common/page CSS
+├── frontend/                         # nginx + статика
+│   ├── index.html / index.css        # карта / глобус
+│   ├── system.html / system.css      # мониторинг
+│   ├── login.html / change-password.html / auth-form.css
+│   ├── users.html / api-tokens.html / reputation.html
+│   ├── parse-errors.html / geo-missing.html / geo-ranges.html / parser-test.html / system.html
+│   ├── auth.js / common.js           # auth + общие UI-хелперы
+│   ├── theme.css / common.css        # токены тем + общий каркас
+│   ├── js/                           # map-*.js, system-app.js
+│   ├── vendor/                       # MapLibre + deck.gl + uPlot (офлайн)
+│   ├── favicon.svg
+│   ├── data/countries.geojson        # контуры стран для карты
+│   ├── nginx.conf
+│   ├── nginx-app.inc                 # общий location/auth для HTTP и HTTPS
+│   └── docker-entrypoint.sh          # подключение TLS при наличии PEM
 ├── scripts/
 │   ├── tune-resources.sh
 │   ├── watch-ingest.sh               # EPS + drop/s
 │   ├── soak-queue-drops.sh           # smoke нагрузка + проверка drops/alerts
-│   └── frontend-smoke.sh             # контракт SPA/auth/nginx
+│   └── frontend-smoke.sh             # контракт auth/статики без полного стека
 ├── stats-collector/                  # Go: системные метрики
 │   ├── main.go
 │   └── internal/
@@ -854,5 +854,3 @@ network_monitor/
 ├── install-profile.json          # Сводка установки
 └── clickhouse/users.d/zz_install_limits.xml
 ```
-
-Frontend: локальная разработка — `cd frontend && npm install && npm run dev` (см. [`frontend/README.md`](frontend/README.md)). UI-маршруты: `/`, `/login`, `/system`, …; старые `*.html` редиректятся.

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ГеоАтлас — Вход</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem('nm.theme');
+    if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+})();
+</script>
+<link rel="stylesheet" href="/theme.css" />
+<link rel="stylesheet" href="/common.css" />
+<link rel="stylesheet" href="/auth-form.css" />
+</head>
+<body class="page-auth">
+  <a class="skip-link" href="#loginForm">К форме входа</a>
+  <form class="auth-card" id="loginForm" autocomplete="on">
+    <div class="auth-brand">
+      <img class="logo" src="/logo.png" alt="" width="40" height="40" />
+      <div>
+        <h1>ГеоАтлас</h1>
+        <p>Локальный вход</p>
+      </div>
+    </div>
+    <div class="auth-error" id="error" role="alert"></div>
+    <label for="username">Логин</label>
+    <input id="username" name="username" type="text" autocomplete="username" required autofocus />
+    <label for="password">Пароль</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required />
+    <button type="submit" id="submitBtn">Войти</button>
+  </form>
+<script>
+'use strict';
+(function () {
+  const params = new URLSearchParams(location.search);
+  const next = params.get('next') || '/index.html';
+  const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : '/index.html';
+
+  fetch('/api/auth/me', { credentials: 'same-origin' })
+    .then((r) => r.ok ? r.json() : null)
+    .then((u) => {
+      if (!u) return;
+      if (u.must_reset_password) {
+        location.replace('/change-password.html?next=' + encodeURIComponent(safeNext));
+        return;
+      }
+      location.replace(safeNext);
+    })
+    .catch(() => {});
+
+  const form = document.getElementById('loginForm');
+  const err = document.getElementById('error');
+  const btn = document.getElementById('submitBtn');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    err.classList.remove('show');
+    err.textContent = '';
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: document.getElementById('username').value.trim(),
+          password: document.getElementById('password').value,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        err.textContent = data.error === 'invalid credentials'
+          ? 'Неверный логин или пароль'
+          : (data.error || 'Ошибка входа');
+        err.classList.add('show');
+        return;
+      }
+      if (data.must_reset_password) {
+        location.replace('/change-password.html?next=' + encodeURIComponent(safeNext));
+        return;
+      }
+      location.replace(safeNext);
+    } catch (ex) {
+      err.textContent = 'Сервер недоступен';
+      err.classList.add('show');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>
