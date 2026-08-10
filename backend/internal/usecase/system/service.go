@@ -283,6 +283,7 @@ func (s *Service) Health(ctx context.Context, pinger ClickHousePinger) (HealthRe
 				"state": snap.State, "queue_depth": snap.QueueDepth, "queue_capacity": snap.QueueCapacity,
 				"queue_bytes": snap.QueueBytes, "queue_bytes_capacity": snap.QueueBytesCapacity,
 				"queue_ratio": queueRatio(snap), "dropped_total": snap.DroppedTotal, "drops_per_sec": dropsPerSec,
+				"buffer_drops_total": snap.BufferDropsTotal,
 			}
 			if snap.LastError != "" {
 				ingestInfo["last_error"] = snap.LastError
@@ -453,8 +454,9 @@ func queueRatio(snap IngestSnapshot) float64 {
 
 func classifyIngest(snap IngestSnapshot, rates *RateSampler) (status string, reasons []string, dropsPerSec float64) {
 	status = "healthy"
+	var bufferDropsPerSec float64
 	if rates != nil {
-		dropsPerSec = rates.DropsPerSec(snap.DroppedTotal)
+		dropsPerSec, bufferDropsPerSec = rates.HealthDropRates(snap.DroppedTotal, snap.BufferDropsTotal)
 	}
 	ratio := queueRatio(snap)
 	if snap.State == "error" {
@@ -477,10 +479,10 @@ func classifyIngest(snap IngestSnapshot, rates *RateSampler) (status string, rea
 		}
 		status, reasons = "degraded", append(reasons, reason)
 	}
-	if dropsPerSec >= 100 {
+	if dropsPerSec >= 100 || bufferDropsPerSec >= 100 {
 		return "overloaded", append(reasons, "dropping_critical"), dropsPerSec
 	}
-	if dropsPerSec > 0 {
+	if dropsPerSec > 0 || bufferDropsPerSec > 0 {
 		status, reasons = "degraded", append(reasons, "dropping")
 	}
 	return status, reasons, dropsPerSec

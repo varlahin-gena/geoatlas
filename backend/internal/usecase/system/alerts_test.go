@@ -137,6 +137,23 @@ func TestClassifyIngestHealthy(t *testing.T) {
 	}
 }
 
+func TestClassifyIngestBufferDropping(t *testing.T) {
+	rates := &RateSampler{}
+	_, _, _ = classifyIngest(IngestSnapshot{
+		State: "running", QueueDepth: 1, QueueCapacity: 1000, BufferDropsTotal: 0,
+	}, rates)
+	time.Sleep(30 * time.Millisecond)
+	st, reasons, _ := classifyIngest(IngestSnapshot{
+		State: "running", QueueDepth: 1, QueueCapacity: 1000, BufferDropsTotal: 5,
+	}, rates)
+	if st != "degraded" && st != "overloaded" {
+		t.Fatalf("status=%s want degraded/overloaded, reasons=%v", st, reasons)
+	}
+	if !containsReason(reasons, "dropping") && !containsReason(reasons, "dropping_critical") {
+		t.Fatalf("reasons=%v want dropping*", reasons)
+	}
+}
+
 func containsReason(reasons []string, want string) bool {
 	for _, r := range reasons {
 		if r == want {
