@@ -575,3 +575,12 @@ tbody tr:hover { background: var(--panel-2); }
   color: var(--muted, #94a3b8);
   font-size: 14px;
 }
+
+/* SPA root: keep full-viewport height for map/admin layouts. */
+html, body, #root {
+  height: 100%;
+}
+#root {
+  min-height: 100%;
+  min-height: 100dvh;
+}

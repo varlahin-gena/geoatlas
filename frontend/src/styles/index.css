@@ -11,11 +11,20 @@ html, body {
     overflow: hidden;
 }
 
+/* React mount point must fill the viewport — otherwise .app { height:100% }
+   collapses to content height when the sidebar is collapsed (ERR: map strip). */
+#root {
+    height: 100%;
+    min-height: 100%;
+    min-height: 100dvh;
+}
+
 .app {
     display: grid;
     grid-template-columns: var(--sidebar-w-open) 1fr;
     height: 100%;
     max-height: 100%;
+    min-height: 0;
     overflow: hidden;
     transition: grid-template-columns 0.2s ease;
 }
