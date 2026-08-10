@@ -784,6 +784,8 @@ docker compose logs backend --since=10m 2>&1 | grep -iE 'geo index loaded|geo cs
 
 SPA (React Router): page-auth в UI; nginx `auth_request` для `/api/*`. Карта и смена пароля — любой залогиненный; system / parsers / geo / reputation / users / api-tokens — только **administrator**. Legacy `*.html` редиректятся на clean paths.
 
+Unit-тесты карты (репутация / heatmap focus / coords helpers): `cd frontend && npm test` (vitest). Контрактные grep-проверки UI: `bash scripts/frontend-smoke.sh`.
+
 ### HTTP API
 
 Контракт REST API (в т.ч. auth, events, geo, reputation, retention, tokens, search-templates): [`openapi.yaml`](openapi.yaml), версия документа **1.3.0**. Проверка живости: `GET /api/health` (публичный). Остальные эндпоинты — cookie-сессия и/или Bearer (`API_AUTH_TOKEN` / именованный токен со scope).

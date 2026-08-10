@@ -61,7 +61,21 @@ grep -q 'countries.geojson\|loadCountriesGeoJSON\|mapHeatmap' frontend/src/pages
 grep -q 'autoRotate\|startGlobeAutoRotate\|auto-rotate' frontend/src/pages/Map/MapPage.tsx frontend/src/pages/Map/mapViewport.ts || fail "auto-rotate"
 grep -q 'reputation' frontend/src/pages/Map/mapReputation.ts || fail "map reputation"
 grep -q 'events/series\|sparkline' frontend/src/pages/Map/mapDetail.tsx || fail "detail sparkline"
+grep -q 'upload-geo' frontend/src/pages/Map/MapPage.tsx || fail "map upload-geo"
+[[ -f frontend/src/pages/Map/mapReputation.test.ts ]] || fail "missing mapReputation.test.ts"
+[[ -f frontend/src/pages/Map/mapHeatmap.test.ts ]] || fail "missing mapHeatmap.test.ts"
+[[ -f frontend/src/pages/Map/mapLayers.test.ts ]] || fail "missing mapLayers.test.ts"
 ok "auth/ui/search/map contracts"
+
+grep -q 'statusDrops\|id="statusDrops"' frontend/src/pages/System/SystemPage.tsx || fail "system: statusDrops tile"
+grep -q 'Buffer drops' frontend/src/pages/System/SystemPage.tsx || fail "system: Buffer drops kv"
+grep -q 'Queue bytes\|queue_bytes' frontend/src/pages/System/SystemPage.tsx || fail "system: queue_bytes"
+ok "system ingest drop visibility"
+
+grep -q 'geo-ranges/clear' frontend/src/pages/GeoRanges/GeoRangesPage.tsx || fail "geo-ranges clear API"
+grep -q 'Очистить базу' frontend/src/pages/GeoRanges/GeoRangesPage.tsx || fail "geo-ranges clear button"
+grep -q 'Загрузить CSV' frontend/src/pages/GeoRanges/GeoRangesPage.tsx || fail "geo-ranges upload button"
+ok "geo-ranges clear/upload"
 
 if grep -qE 'unpkg\.com|jsdelivr\.net' frontend/index.html frontend/src/pages/Map/MapPage.tsx frontend/src/pages/System/SystemPage.tsx; then
   fail "CDN script references still present"
