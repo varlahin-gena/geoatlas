@@ -230,13 +230,27 @@ export function mapBaseCss(): string {
   return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
 }
 
-export function emptyStyleFallback() {
-  const bg = mapBaseCss();
+export function emptyStyleFallback(mode: 'map' | 'globe' = 'map') {
+  // On globe, background paints the sphere — must contrast with fog/space,
+  // otherwise the globe is invisible and only deck arcs remain.
+  const bg =
+    mode === 'globe'
+      ? cssVar('--map-ocean', '#15202b')
+      : mapBaseCss();
   return {
     version: 8 as const,
     sources: {},
     layers: [{ id: 'background', type: 'background' as const, paint: { 'background-color': bg } }],
   };
+}
+
+function cssVar(name: string, fallback: string): string {
+  try {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return v || fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 /** Match vanilla buildPeriodQuery — backend expects minutes/hours/days, not period=. */

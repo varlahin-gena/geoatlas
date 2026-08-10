@@ -9,7 +9,7 @@ import { filterNav, isNavActive, PAGE_NAV } from './nav';
 
 const SIDEBAR_KEY = 'nm.adminSidebarCollapsed';
 
-function NavIcon({ kind }: { kind: string }) {
+export function NavIcon({ kind }: { kind: string }) {
   const common = {
     className: 'icon',
     viewBox: '0 0 24 24',
@@ -88,7 +88,7 @@ function NavIcon({ kind }: { kind: string }) {
   }
 }
 
-const NAV_ICONS: Record<string, string> = {
+export const NAV_ICONS: Record<string, string> = {
   '/': 'map',
   '/system': 'system',
   '/parser-test': 'parser',

@@ -4,7 +4,7 @@ import { MapboxOverlay } from '@deck.gl/mapbox';
 import { Link, useLocation } from 'react-router-dom';
 import { apiFetch, authHeaders } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
-import { SystemHealthPill, UserMenu } from '@/components/Shell';
+import { SystemHealthPill, UserMenu, NavIcon, NAV_ICONS } from '@/components/Shell';
 import { filterNav, isNavActive, PAGE_NAV } from '@/components/nav';
 import { useToast } from '@/components/Toast';
 import { compileSearchQuery, evaluateSearchAst } from '@/lib/search';
@@ -131,8 +131,8 @@ export default function MapPage() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [showLegend, setShowLegend] = useState(true);
   const [showStats, setShowStats] = useState(true);
-  const [showHeatmap, setShowHeatmap] = useState(true);
-  const [showCountryLabels, setShowCountryLabels] = useState(true);
+  const [showHeatmap, setShowHeatmap] = useState(false);
+  const [showCountryLabels, setShowCountryLabels] = useState(false);
   const [monoArcs, setMonoArcs] = useState(false);
   const [autoRotate, setAutoRotate] = useState(true);
   const [countriesGeoJSON, setCountriesGeoJSON] = useState<GeoFeatureCollection | null>(null);
@@ -368,6 +368,7 @@ export default function MapPage() {
         try {
           map.jumpTo({ center, zoom, bearing, pitch });
           applyMapProjection(map, viewModeRef.current);
+          map.triggerRepaint();
         } catch {
           /* ignore */
         }
@@ -388,7 +389,8 @@ export default function MapPage() {
         setMapTilesFailed(true);
         console.warn('Remote basemap slow/unavailable, keeping local style');
         try {
-          map.setStyle(emptyStyleFallback());
+          map.setStyle(emptyStyleFallback(viewModeRef.current));
+          applyMapProjection(map, viewModeRef.current);
         } catch {
           /* ignore */
         }
@@ -416,7 +418,7 @@ export default function MapPage() {
     try {
       map = new maplibregl.Map({
         container: host,
-        style: emptyStyleFallback() as maplibregl.StyleSpecification,
+        style: emptyStyleFallback(viewMode) as maplibregl.StyleSpecification,
         center: [vs.longitude, vs.latitude],
         zoom: vs.zoom,
         bearing: vs.bearing,
@@ -442,7 +444,8 @@ export default function MapPage() {
         if (!mapTilesFailedRef.current) {
           setMapTilesFailed(true);
           try {
-            map.setStyle(emptyStyleFallback());
+            map.setStyle(emptyStyleFallback(viewModeRef.current));
+            applyMapProjection(map, viewModeRef.current);
           } catch {
             /* ignore */
           }
@@ -579,6 +582,26 @@ export default function MapPage() {
         setViewMode('map');
         return;
       }
+      // Empty fallback must be globe-tinted (sphere = background). Re-apply when
+      // remote tiles failed so the globe is visible without GeoJSON fills.
+      if (mapTilesFailedRef.current) {
+        try {
+          map.setStyle(emptyStyleFallback('globe'));
+          map.once('style.load', () => {
+            applyMapProjection(map, 'globe');
+            const gvs = applyGlobeFitZoom(map, {
+              longitude: globeViewRef.current.longitude ?? DEFAULT_GLOBE_VIEW.longitude,
+              latitude: globeViewRef.current.latitude ?? DEFAULT_GLOBE_VIEW.latitude,
+              bearing: globeViewRef.current.bearing ?? DEFAULT_GLOBE_VIEW.bearing,
+            });
+            setGlobeView(gvs);
+            globeViewRef.current = gvs;
+            setLayersTick((t) => t + 1);
+          });
+        } catch {
+          /* ignore */
+        }
+      }
       const gvs = applyGlobeFitZoom(map, {
         longitude: globeViewRef.current.longitude ?? DEFAULT_GLOBE_VIEW.longitude,
         latitude: globeViewRef.current.latitude ?? DEFAULT_GLOBE_VIEW.latitude,
@@ -589,6 +612,18 @@ export default function MapPage() {
       if (autoRotate) startGlobeAutoRotate();
     } else {
       applyMapProjection(map, 'map');
+      if (mapTilesFailedRef.current) {
+        try {
+          map.setStyle(emptyStyleFallback('map'));
+          map.once('style.load', () => {
+            applyMapProjection(map, 'map');
+            applyMapFitZoom(map, { ...DEFAULT_MAP_VIEW });
+            setLayersTick((t) => t + 1);
+          });
+        } catch {
+          /* ignore */
+        }
+      }
       applyMapFitZoom(map, { ...DEFAULT_MAP_VIEW });
     }
     if (overlayRef.current) {
@@ -601,12 +636,18 @@ export default function MapPage() {
       } catch {
         /* ignore */
       }
+      applyMapProjection(map, viewModeRef.current);
       if (viewModeRef.current === 'globe') {
         const gvs = applyGlobeFitZoom(map);
         setGlobeView(gvs);
         globeViewRef.current = gvs;
       } else {
         applyMapFitZoom(map);
+      }
+      try {
+        map.triggerRepaint();
+      } catch {
+        /* ignore */
       }
       setLayersTick((t) => t + 1);
     }, 100);
@@ -1083,6 +1124,7 @@ export default function MapPage() {
                   aria-current={active ? 'page' : undefined}
                   title={item.label}
                 >
+                  <NavIcon kind={NAV_ICONS[item.href] || 'map'} />
                   <span className="label">{item.label}</span>
                 </Link>
               );
