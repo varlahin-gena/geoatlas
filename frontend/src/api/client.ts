@@ -1,0 +1,67 @@
+export function csrfToken(): string {
+  const m = document.cookie.match(/(?:^|;\s*)nm_csrf=([^;]*)/);
+  return m ? decodeURIComponent(m[1]) : '';
+}
+
+export function authHeaders(extra?: HeadersInit): Record<string, string> {
+  const h: Record<string, string> = {};
+  if (extra) {
+    const e = new Headers(extra);
+    e.forEach((v, k) => {
+      h[k] = v;
+    });
+  }
+  const token = window.NM_CONFIG?.apiAuthToken || '';
+  if (token) h.Authorization = `Bearer ${token}`;
+  const csrf = csrfToken();
+  if (csrf) h['X-CSRF-Token'] = csrf;
+  return h;
+}
+
+export class ApiError extends Error {
+  status: number;
+  body: unknown;
+
+  constructor(status: number, message: string, body?: unknown) {
+    super(message);
+    this.status = status;
+    this.body = body;
+  }
+}
+
+export async function apiFetch<T = unknown>(
+  path: string,
+  init: RequestInit = {},
+): Promise<T> {
+  const headers = authHeaders(init.headers);
+  if (init.body && !(init.body instanceof FormData) && !headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json';
+  }
+  const res = await fetch(path, {
+    ...init,
+    credentials: 'same-origin',
+    headers,
+  });
+  if (res.status === 204) return undefined as T;
+  const ct = res.headers.get('content-type') || '';
+  const data = ct.includes('application/json')
+    ? await res.json().catch(() => ({}))
+    : await res.text();
+  if (!res.ok) {
+    const msg =
+      typeof data === 'object' && data && 'error' in data
+        ? String((data as { error: unknown }).error)
+        : `HTTP ${res.status}`;
+    throw new ApiError(res.status, msg, data);
+  }
+  return data as T;
+}
+
+export async function apiFetchRaw(path: string, init: RequestInit = {}): Promise<Response> {
+  const headers = authHeaders(init.headers);
+  return fetch(path, {
+    ...init,
+    credentials: 'same-origin',
+    headers,
+  });
+}

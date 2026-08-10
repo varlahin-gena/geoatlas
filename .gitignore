@@ -33,6 +33,10 @@ frontend/_run_*.js
 frontend/_srv*
 frontend/_layout*_check.js
 
+# Frontend build artifacts
+frontend/node_modules/
+frontend/dist/
+
 # IDE / OS
 .idea/
 .vscode/

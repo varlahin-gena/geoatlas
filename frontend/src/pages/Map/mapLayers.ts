@@ -1,0 +1,428 @@
+import { ArcLayer, GeoJsonLayer, ScatterplotLayer, TextLayer } from '@deck.gl/layers';
+import { LABEL_CHARSET, cssRgb } from './mapConstants';
+import {
+  buildCountryCentroids,
+  getCountryStatsCache,
+  heatmapColorRGB,
+  matchCountryFeature,
+  resolveCountryKeyFromFeature,
+  type GeoFeature,
+  type GeoFeatureCollection,
+} from './mapHeatmap';
+import { lineHasReputationHits } from './mapReputation';
+import type {
+  CountryCentroid,
+  MapLine,
+  MapPoint,
+  MapPointEntry,
+  ViewState,
+} from './mapTypes';
+
+export function statusRGB(status: string | undefined): [number, number, number] {
+  if (status === 'blocked') return [248, 81, 73];
+  if (status === 'unknown') return [110, 118, 129];
+  return [63, 185, 80];
+}
+
+function monoArcRGB(): [number, number, number] {
+  return [88, 166, 255];
+}
+
+export function arcRGB(
+  status: string | undefined,
+  line: MapLine,
+  monoArcColor: boolean,
+  repColorArcs: boolean,
+): [number, number, number] {
+  if (monoArcColor) return monoArcRGB();
+  if (repColorArcs && lineHasReputationHits(line)) return [210, 153, 34];
+  return statusRGB(status);
+}
+
+export function hasCoords(line: MapLine): boolean {
+  return (
+    typeof line.src_lat === 'number' &&
+    typeof line.src_lon === 'number' &&
+    typeof line.dst_lat === 'number' &&
+    typeof line.dst_lon === 'number' &&
+    !(line.src_lat === 0 && line.src_lon === 0) &&
+    !(line.dst_lat === 0 && line.dst_lon === 0)
+  );
+}
+
+export function nodeLonLat(
+  key: string,
+  fallbackLon: number | undefined,
+  fallbackLat: number | undefined,
+  allPoints: Record<string, MapPoint>,
+): [number, number] {
+  const p = allPoints[key];
+  if (p && !(p.lat === 0 && p.lon === 0)) return [p.lon, p.lat];
+  return [fallbackLon ?? 0, fallbackLat ?? 0];
+}
+
+export function topByCount(arr: MapLine[], max: number): MapLine[] {
+  if (!max || arr.length <= max) return arr;
+  return [...arr].sort((a, b) => (b.count || 0) - (a.count || 0)).slice(0, max);
+}
+
+export function decorateFlowLines(lines: MapLine[]): MapLine[] {
+  if (!lines.length) return lines;
+  const sorted = [...lines].sort((a, b) => (b.count || 0) - (a.count || 0));
+  const n = sorted.length;
+  const corridorTilt = new Map<string, number>();
+  return sorted.map((line, idx) => {
+    const rankT = n <= 1 ? 1 : 1 - idx / (n - 1);
+    const alpha = Math.round(60 + rankT * 150);
+    const pairKey = [String(line.src_country || ''), String(line.dst_country || '')]
+      .sort()
+      .join('>');
+    let tilt = corridorTilt.get(pairKey);
+    if (tilt === undefined) {
+      let h = 0;
+      for (let i = 0; i < pairKey.length; i++) h = (h * 31 + pairKey.charCodeAt(i)) | 0;
+      tilt = ((h % 7) - 3) * 2;
+      corridorTilt.set(pairKey, tilt);
+    }
+    return { ...line, _flowAlpha: alpha, _flowTilt: tilt, _flowRank: idx };
+  });
+}
+
+function arcTilt(d: MapLine): number {
+  if (typeof d._flowTilt === 'number') return d._flowTilt;
+  let h = 0;
+  const s = (d.src || '') + '>' + (d.dst || '');
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return ((h % 7) - 3) * 2;
+}
+
+function mapArcHeight(d: MapLine, allPoints: Record<string, MapPoint>): number {
+  const [sLon, sLat] = nodeLonLat(d.src, d.src_lon, d.src_lat, allPoints);
+  const [tLon, tLat] = nodeLonLat(d.dst, d.dst_lon, d.dst_lat, allPoints);
+  let dLon = Math.abs(tLon - sLon);
+  if (dLon > 180) dLon = 360 - dLon;
+  const dist = Math.max(1, Math.hypot(dLon, Math.abs(tLat - sLat)));
+  return Math.max(0.15, Math.min(0.35, 0.1 + dist / 160));
+}
+
+function globeArcHeight(d: MapLine, allPoints: Record<string, MapPoint>): number {
+  const [sLon, sLat] = nodeLonLat(d.src, d.src_lon, d.src_lat, allPoints);
+  const [tLon, tLat] = nodeLonLat(d.dst, d.dst_lon, d.dst_lat, allPoints);
+  let dLon = Math.abs(tLon - sLon);
+  if (dLon > 180) dLon = 360 - dLon;
+  const dist = Math.max(1, Math.hypot(dLon, Math.abs(tLat - sLat)));
+  return Math.max(0.06, Math.min(0.18, 0.04 + dist / 380));
+}
+
+export function isOnVisibleGlobeHemisphere(
+  lon: number,
+  lat: number,
+  viewLon: number,
+  viewLat: number,
+): boolean {
+  const toRad = Math.PI / 180;
+  const φ1 = (viewLat || 0) * toRad;
+  const λ1 = (viewLon || 0) * toRad;
+  const φ2 = lat * toRad;
+  const λ2 = lon * toRad;
+  const cosC =
+    Math.sin(φ1) * Math.sin(φ2) + Math.cos(φ1) * Math.cos(φ2) * Math.cos(λ2 - λ1);
+  return cosC > 0.22;
+}
+
+function globeAngularDistanceRad(lon1: number, lat1: number, lon2: number, lat2: number): number {
+  const toRad = Math.PI / 180;
+  const φ1 = lat1 * toRad;
+  const φ2 = lat2 * toRad;
+  const dλ = (lon2 - lon1) * toRad;
+  const cosC =
+    Math.sin(φ1) * Math.sin(φ2) + Math.cos(φ1) * Math.cos(φ2) * Math.cos(dλ);
+  return Math.acos(Math.max(-1, Math.min(1, cosC)));
+}
+
+export function isArcVisibleOnGlobe(
+  line: MapLine,
+  viewLon: number,
+  viewLat: number,
+  allPoints: Record<string, MapPoint>,
+): boolean {
+  const [sLon, sLat] = nodeLonLat(line.src, line.src_lon, line.src_lat, allPoints);
+  const [tLon, tLat] = nodeLonLat(line.dst, line.dst_lon, line.dst_lat, allPoints);
+  const srcVis = isOnVisibleGlobeHemisphere(sLon, sLat, viewLon, viewLat);
+  const dstVis = isOnVisibleGlobeHemisphere(tLon, tLat, viewLon, viewLat);
+  if (!srcVis || !dstVis) return false;
+  if (globeAngularDistanceRad(sLon, sLat, tLon, tLat) > Math.PI * 0.55) return false;
+
+  let dLon = tLon - sLon;
+  if (dLon > 180) dLon -= 360;
+  if (dLon < -180) dLon += 360;
+
+  const samples = 10;
+  for (let i = 1; i < samples; i++) {
+    const t = i / samples;
+    const lon = sLon + dLon * t;
+    const lat = sLat + (tLat - sLat) * t;
+    if (!isOnVisibleGlobeHemisphere(lon, lat, viewLon, viewLat)) return false;
+  }
+  return true;
+}
+
+export function getVisiblePointsFromLines(
+  lines: MapLine[],
+  allPoints: Record<string, MapPoint>,
+): MapPointEntry[] {
+  const active = new Set<string>();
+  lines.forEach((l) => {
+    active.add(l.src);
+    active.add(l.dst);
+  });
+  const result: MapPointEntry[] = [];
+  Object.entries(allPoints).forEach(([key, p]) => {
+    if (!p) return;
+    if (!active.has(key)) return;
+    if (p.lat === 0 && p.lon === 0) return;
+    result.push({ key, ...p });
+  });
+  return result;
+}
+
+export interface BuildLayersOpts {
+  mode: 'map' | 'globe';
+  lines: MapLine[];
+  points: Record<string, MapPoint>;
+  countriesGeoJSON: GeoFeatureCollection | null;
+  showHeatmap: boolean;
+  showCountryLabels: boolean;
+  monoArcColor: boolean;
+  repColorArcs: boolean;
+  groupBy: string;
+  focusedCountry: string | null;
+  mapTilesFailed: boolean;
+  heavyCountryLayersAllowed: boolean;
+  theme: string;
+  globeView: ViewState;
+  maxArcs: number;
+  onLineClick: (line: MapLine) => void;
+  onPointClick: (point: MapPointEntry) => void;
+  onCountryClick: (countryKey: string, feature: GeoFeature) => void;
+}
+
+export interface BuildLayersResult {
+  layers: unknown[];
+  shown: number;
+  total: number;
+}
+
+export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
+  const isGlobe = opts.mode === 'globe';
+  const viewLon = isGlobe ? opts.globeView.longitude || 0 : 0;
+  const viewLat = isGlobe ? opts.globeView.latitude || 0 : 0;
+
+  let lines = opts.lines;
+  const totalBeforeLimit = lines.length;
+  const arcLimit = opts.heavyCountryLayersAllowed
+    ? opts.maxArcs
+    : Math.min(opts.maxArcs, 800);
+
+  // Country heatmap stats use full visible set (before top-N), matching vanilla getStatsCache.
+  const statsPoints = getVisiblePointsFromLines(lines, opts.points);
+  const statsCache = getCountryStatsCache(statsPoints, opts.countriesGeoJSON);
+
+  lines = decorateFlowLines(topByCount(lines, arcLimit));
+  const drawnForCount = lines.length;
+  if (isGlobe) {
+    lines = lines.filter((l) => isArcVisibleOnGlobe(l, viewLon, viewLat, opts.points));
+  }
+
+  let points = getVisiblePointsFromLines(lines, opts.points);
+  if (isGlobe) {
+    points = points.filter((p) =>
+      isOnVisibleGlobeHemisphere(p.lon, p.lat, viewLon, viewLat),
+    );
+  }
+
+  const layers: unknown[] = [];
+  const landColor = cssRgb('--map-land-rgb', opts.mapTilesFailed ? 220 : 0);
+  const outlineColor = cssRgb('--map-outline-rgb', opts.mapTilesFailed ? 255 : 140);
+  const outlineSoft = cssRgb('--map-outline-rgb', 160);
+  const useHeat = opts.showHeatmap;
+  const countriesPickable = useHeat || opts.groupBy === 'country';
+  const heavyOk = opts.heavyCountryLayersAllowed;
+
+  const showCountryFills =
+    heavyOk &&
+    opts.countriesGeoJSON &&
+    (opts.mapTilesFailed || (useHeat && !isGlobe));
+
+  if (showCountryFills && opts.countriesGeoJSON) {
+    const { max, heat } = statsCache;
+    layers.push(
+      new GeoJsonLayer({
+        id: 'countries',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        data: opts.countriesGeoJSON as any,
+        pickable: countriesPickable,
+        stroked: !isGlobe,
+        filled: true,
+        wrapLongitude: !isGlobe,
+        getFillColor: ((f: GeoFeature): [number, number, number, number] => {
+          if (useHeat) {
+            const c = heatmapColorRGB(heat.get(f) || 0, max, opts.mapTilesFailed);
+            const a = c[3] ?? 210;
+            if (opts.focusedCountry && matchCountryFeature(f, opts.focusedCountry)) {
+              return [c[0], c[1], c[2], 255];
+            }
+            return [c[0], c[1], c[2], a];
+          }
+          return [landColor[0], landColor[1], landColor[2], 255];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+        getLineColor: outlineColor,
+        getLineWidth: 1,
+        lineWidthMinPixels: 0.5,
+        updateTriggers: {
+          getFillColor: [
+            opts.showHeatmap,
+            opts.groupBy,
+            statsCache.max,
+            isGlobe,
+            opts.theme,
+            opts.focusedCountry,
+            opts.mapTilesFailed,
+          ],
+          getLineColor: [opts.theme, opts.mapTilesFailed],
+        },
+        onClick: (info: { object?: GeoFeature }) => {
+          if (!info.object || !countriesPickable) return;
+          opts.onCountryClick(
+            resolveCountryKeyFromFeature(info.object, statsCache.stats),
+            info.object,
+          );
+        },
+      }),
+    );
+  } else if (heavyOk && opts.countriesGeoJSON && countriesPickable && !isGlobe) {
+    layers.push(
+      new GeoJsonLayer({
+        id: 'countries-pick',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        data: opts.countriesGeoJSON as any,
+        pickable: true,
+        stroked: false,
+        filled: true,
+        wrapLongitude: true,
+        getFillColor: [0, 0, 0, 1] as [number, number, number, number],
+        onClick: (info: { object?: GeoFeature }) => {
+          if (!info.object) return;
+          opts.onCountryClick(
+            resolveCountryKeyFromFeature(info.object, statsCache.stats),
+            info.object,
+          );
+        },
+      }),
+    );
+  }
+
+  if (heavyOk && opts.showCountryLabels) {
+    let centroids: CountryCentroid[] = buildCountryCentroids(opts.countriesGeoJSON);
+    if (isGlobe) {
+      centroids = centroids.filter((c) =>
+        isOnVisibleGlobeHemisphere(c.lon, c.lat, viewLon, viewLat),
+      );
+    }
+    const labelAlt = isGlobe ? 8e4 : 0;
+    const labelColor: [number, number, number, number] =
+      opts.theme === 'light' ? [31, 35, 40, 230] : [220, 226, 234, 230];
+    layers.push(
+      new TextLayer({
+        id: 'country-labels',
+        data: centroids,
+        pickable: false,
+        billboard: true,
+        characterSet: LABEL_CHARSET,
+        getPosition: (d: CountryCentroid) => [d.lon, d.lat, labelAlt],
+        getText: (d: CountryCentroid) => d.label,
+        getSize: (d: CountryCentroid) => 14 - (d.rank || 3),
+        sizeUnits: 'pixels',
+        sizeMinPixels: 9,
+        sizeMaxPixels: 18,
+        getColor: labelColor,
+        outlineColor: [...outlineColor, 255] as [number, number, number, number],
+        outlineWidth: 4,
+        fontSettings: { sdf: true, fontSize: 64, buffer: 4 },
+        fontFamily: 'Arial, "Segoe UI", Roboto, sans-serif',
+        fontWeight: 700,
+        getTextAnchor: 'middle',
+        getAlignmentBaseline: 'center',
+        parameters: isGlobe ? { cullMode: 'none', depthTest: false } : undefined,
+      }),
+    );
+  }
+
+  const nodeOpacity = 150;
+  layers.push(
+    new ArcLayer({
+      id: 'arcs',
+      data: lines,
+      pickable: true,
+      greatCircle: false,
+      wrapLongitude: !isGlobe,
+      getSourcePosition: (d: MapLine) =>
+        nodeLonLat(d.src, d.src_lon, d.src_lat, opts.points),
+      getTargetPosition: (d: MapLine) =>
+        nodeLonLat(d.dst, d.dst_lon, d.dst_lat, opts.points),
+      getSourceColor: (d: MapLine) => [
+        ...arcRGB(d.status, d, opts.monoArcColor, opts.repColorArcs),
+        d._flowAlpha || 210,
+      ],
+      getTargetColor: (d: MapLine) => [
+        ...arcRGB(d.status, d, opts.monoArcColor, opts.repColorArcs),
+        d._flowAlpha || 210,
+      ],
+      getWidth: (d: MapLine) =>
+        Math.max(1.2, Math.min(7, 1.2 + Math.log2((d.count || 1) + 1) * 0.9)),
+      widthUnits: 'pixels',
+      getHeight: (d: MapLine) =>
+        isGlobe ? globeArcHeight(d, opts.points) : mapArcHeight(d, opts.points),
+      getTilt: isGlobe ? 0 : (d: MapLine) => arcTilt(d) * 0.5,
+      autoHighlight: true,
+      highlightColor: [255, 255, 255, 140],
+      parameters: isGlobe ? { cullMode: 'none' } : { depthTest: false },
+      onClick: (info: { object?: MapLine }) => {
+        if (info.object) opts.onLineClick(info.object);
+      },
+    }),
+  );
+
+  layers.push(
+    new ScatterplotLayer({
+      id: 'nodes',
+      data: points,
+      pickable: true,
+      stroked: true,
+      filled: true,
+      radiusUnits: 'pixels',
+      getPosition: (d: MapPointEntry) => [d.lon, d.lat],
+      getRadius: (d: MapPointEntry) =>
+        Math.max(1.5, Math.min(8, 1.5 + Math.sqrt(d.count || 1) * 0.6)),
+      getFillColor: [88, 166, 255, nodeOpacity],
+      getLineColor: outlineSoft,
+      lineWidthUnits: 'pixels',
+      getLineWidth: 0.7,
+      radiusMinPixels: 1.5,
+      radiusMaxPixels: 14,
+      parameters: isGlobe ? { cullMode: 'none' } : undefined,
+      onClick: (info: { object?: MapPointEntry }) => {
+        if (info.object) opts.onPointClick(info.object);
+      },
+    }),
+  );
+
+  return { layers, shown: drawnForCount, total: totalBeforeLimit };
+}
+
+export function escapeHTML(v: unknown): string {
+  return String(v ?? '').replace(/[&<>"']/g, (ch) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch] || ch,
+  );
+}
