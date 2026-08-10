@@ -86,7 +86,9 @@ func TestActionVocabOpsUpToDate(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", rel, err)
 		}
-		if next != string(raw) {
+		got := strings.ReplaceAll(next, "\r\n", "\n")
+		want := strings.ReplaceAll(string(raw), "\r\n", "\n")
+		if got != want {
 			t.Errorf("%s is out of date; run: cd backend && go generate ./internal/model/...", rel)
 		}
 	}
