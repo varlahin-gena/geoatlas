@@ -26,7 +26,7 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 		repLookuper = bg.repIdx
 	}
 	eventsUC := usecaseevents.New(trafficRepo, bg.geo, repLookuper)
-	geoUC := usecasegeo.New(geoRepo, trafficRepo, bg.geo, a.geoJobs, geoipcodec.New())
+	geoUC := usecasegeo.New(geoRepo, trafficRepo, bg.geo, a.geoJobs, geoipcodec.New(), cfg.MaxGeoUploadRanges)
 	parseErrorsUC := parseerrors.New(chadapter.NewParseErrorRepository(a.pools.API, a.pools.Ingest))
 	parseTestAdapter := parseradapter.NewParseTest(parsers)
 	parseTestUC := parsetest.New(parseTestAdapter, bg.geo, parseTestAdapter)

@@ -5,27 +5,31 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
+	"net/http"
 	"sort"
 	"strings"
 	"time"
 
 	"network_monitor/internal/apperr"
-	"network_monitor/internal/model"
 	"network_monitor/internal/mapagg"
+	"network_monitor/internal/model"
 )
 
 // Service — application use cases для GeoIP.
 type Service struct {
-	store   RangeStore
-	missing MissingIPStore
-	index   GeoIndex
-	jobs    GeoJobScheduler
-	codec   RangeCodec
+	store     RangeStore
+	missing   MissingIPStore
+	index     GeoIndex
+	jobs      GeoJobScheduler
+	codec     RangeCodec
+	maxRanges int
 }
 
-func New(store RangeStore, missing MissingIPStore, index GeoIndex, jobs GeoJobScheduler, codec RangeCodec) *Service {
-	return &Service{store: store, missing: missing, index: index, jobs: jobs, codec: codec}
+// New создаёт GeoIP service. maxRanges — лимит строк CSV на upload (0 = без лимита ranges, только HTTP bytes).
+func New(store RangeStore, missing MissingIPStore, index GeoIndex, jobs GeoJobScheduler, codec RangeCodec, maxRanges int) *Service {
+	return &Service{store: store, missing: missing, index: index, jobs: jobs, codec: codec, maxRanges: maxRanges}
 }
 
 // --- Upload ---
@@ -38,10 +42,45 @@ type UploadResult struct {
 	Backfill string
 }
 
+// IndexRangeCount — число диапазонов в in-memory индексе (0 если индекса нет).
+func (s *Service) IndexRangeCount() int {
+	if s == nil || s.index == nil {
+		return 0
+	}
+	return s.index.RangeCount()
+}
+
+// PrecheckUpload отклоняет опасный full-replace до чтения тела (когда индекс уже крупный).
+// dry_run не блокирует — CSV можно проверить без записи.
+func (s *Service) PrecheckUpload(dryRun bool) error {
+	return s.rejectIfIndexTooLargeForReplace(dryRun)
+}
+
 func (s *Service) UploadCSV(ctx context.Context, r io.Reader, dryRun bool) (UploadResult, error) {
+	if err := s.rejectIfIndexTooLargeForReplace(dryRun); err != nil {
+		slog.Info("geo upload rejected before parse", "dry_run", dryRun, "index_ranges", s.IndexRangeCount(), "err", err.Error())
+		return UploadResult{}, err
+	}
+
+	started := time.Now()
 	ranges, err := s.codec.ReadCSV(r)
+	parseDur := time.Since(started)
 	if err != nil {
+		var maxBytes *http.MaxBytesError
+		if errors.As(err, &maxBytes) {
+			return UploadResult{}, apperr.TooLarge(err.Error())
+		}
 		return UploadResult{}, apperr.InvalidCSV(err)
+	}
+	slog.Info("geo csv parsed",
+		"dry_run", dryRun,
+		"ranges", len(ranges),
+		"index_ranges", s.IndexRangeCount(),
+		"duration", parseDur.Round(time.Millisecond).String(),
+	)
+	if err := s.checkUploadLimits(len(ranges), dryRun); err != nil {
+		slog.Info("geo upload rejected after parse", "dry_run", dryRun, "ranges", len(ranges), "err", err.Error())
+		return UploadResult{}, err
 	}
 	if dryRun {
 		sample := ranges
@@ -55,6 +94,47 @@ func (s *Service) UploadCSV(ctx context.Context, r io.Reader, dryRun bool) (Uplo
 		return UploadResult{}, err
 	}
 	return UploadResult{Count: count, Reload: "applied", Backfill: "scheduled"}, nil
+}
+
+// rejectIfIndexTooLargeForReplace — early 409 до ReadCSV, чтобы не удваивать пик RAM.
+func (s *Service) rejectIfIndexTooLargeForReplace(dryRun bool) error {
+	if dryRun || s.maxRanges <= 0 || s.index == nil {
+		return nil
+	}
+	existing := s.index.RangeCount()
+	if existing >= s.maxRanges/2 {
+		return apperr.Conflict(fmt.Sprintf(
+			"geo index already large (index=%d, limit=%d); full replace would spike RAM — edit via /geo-ranges, or clear geo_ranges / raise GEOIP_UPLOAD_MAX_RANGES and backend memory",
+			existing, s.maxRanges,
+		))
+	}
+	return nil
+}
+
+// checkUploadLimits отклоняет слишком большой CSV и опасный replace после parse.
+func (s *Service) checkUploadLimits(n int, dryRun bool) error {
+	if s.maxRanges > 0 && n > s.maxRanges {
+		return apperr.TooLarge(fmt.Sprintf(
+			"geo csv has %d ranges, limit is %d (GEOIP_UPLOAD_MAX_RANGES); split the file or raise the limit / backend memory",
+			n, s.maxRanges,
+		))
+	}
+	if dryRun || s.maxRanges <= 0 || s.index == nil {
+		return nil
+	}
+	existing := s.index.RangeCount()
+	if existing == 0 {
+		return nil
+	}
+	// Пик RAM ≈ existing + parsed upload до ReplaceRanges.
+	peak := existing + n
+	if peak > s.maxRanges && existing >= s.maxRanges/2 {
+		return apperr.Conflict(fmt.Sprintf(
+			"geo replace would spike RAM (index=%d, upload=%d, limit=%d); skip re-upload if data is unchanged, or clear geo_ranges first / raise GEOIP_UPLOAD_MAX_RANGES",
+			existing, n, s.maxRanges,
+		))
+	}
+	return nil
 }
 
 // IsClientCSVError — совместимость: CSV-ошибки помечены ErrInvalidCSV.
@@ -224,6 +304,28 @@ func (s *Service) ExportCSV(ctx context.Context, w io.Writer) error {
 		return clean[i].StartIP < clean[j].StartIP
 	})
 	return s.codec.WriteCSV(w, clean)
+}
+
+// ClearResult — итог полной очистки geo_ranges + in-memory индекса.
+type ClearResult struct {
+	IndexBefore int
+}
+
+// ClearAll truncate ClickHouse geo_ranges и обнуляет RAM-индекс (без рестарта процесса).
+// После этого POST /upload-geo снова принимает полный CSV без early 409.
+func (s *Service) ClearAll(ctx context.Context) (ClearResult, error) {
+	before := s.IndexRangeCount()
+	if s.store == nil {
+		return ClearResult{}, fmt.Errorf("geo store unavailable")
+	}
+	if err := s.store.Truncate(ctx); err != nil {
+		return ClearResult{}, err
+	}
+	if s.index != nil {
+		s.index.ReplaceRanges(nil)
+	}
+	slog.Info("geo ranges cleared", "index_before", before, "index_after", s.IndexRangeCount())
+	return ClearResult{IndexBefore: before}, nil
 }
 
 func (s *Service) FormatNetwork(start, end uint32) string {

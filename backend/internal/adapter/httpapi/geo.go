@@ -2,10 +2,15 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"io"
+	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
+
+	"network_monitor/internal/apperr"
 )
 
 func (h *GeoHandler) UploadGeo(w http.ResponseWriter, r *http.Request) {
@@ -17,12 +22,40 @@ func (h *GeoHandler) UploadGeo(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	dryRun := isDryRun(r)
+	indexRanges := h.geoUC.IndexRangeCount()
+	slog.Info("geo upload start",
+		"dry_run", dryRun,
+		"content_length", r.ContentLength,
+		"index_ranges", indexRanges,
+	)
+
+	// Early 409 до чтения body — иначе клиент успеет залить сотни МиБ впустую.
+	if err := h.geoUC.PrecheckUpload(dryRun); err != nil {
+		slog.Info("geo upload early reject", "dry_run", dryRun, "index_ranges", indexRanges, "err", err.Error())
+		writeDomainError(w, "geo csv upload failed", err)
+		return
+	}
+
+	if max := h.cfg.MaxGeoUploadSize; max > 0 && r.ContentLength > max {
+		err := apperr.TooLarge(
+			"request body too large (Content-Length " + strconv.FormatInt(r.ContentLength, 10) +
+				", limit " + strconv.FormatInt(max, 10) + " bytes; GEOIP_UPLOAD_MAX_BYTES / MAX_GEO_UPLOAD_SIZE)",
+		)
+		slog.Info("geo upload early reject", "dry_run", dryRun, "content_length", r.ContentLength, "err", err.Error())
+		writeDomainError(w, "geo csv upload failed", err)
+		return
+	}
 
 	var reader io.Reader
 	ct := r.Header.Get("Content-Type")
 	if strings.HasPrefix(ct, "multipart/form-data") {
 		file, _, err := r.FormFile("file")
 		if err != nil {
+			var maxBytes *http.MaxBytesError
+			if errors.As(err, &maxBytes) {
+				writeDomainError(w, "geo csv upload failed", err)
+				return
+			}
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "missing file"})
 			return
 		}

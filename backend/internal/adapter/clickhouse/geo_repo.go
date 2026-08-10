@@ -32,6 +32,10 @@ func (r *GeoRepository) Replace(ctx context.Context, ranges []model.GeoRange) (i
 	return ReplaceGeoRanges(ctx, r.writeCH, ranges)
 }
 
+func (r *GeoRepository) Truncate(ctx context.Context) error {
+	return TruncateGeoRanges(ctx, r.writeCH)
+}
+
 func (r *GeoRepository) Load(ctx context.Context) ([]model.GeoRange, error) {
 	return LoadGeoRanges(ctx, r.writeCH)
 }

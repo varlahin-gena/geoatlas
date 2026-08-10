@@ -13,6 +13,7 @@ import (
 func main() {
 	cfg := config.FromEnv()
 	logging.Setup(cfg.LogLevel, cfg.LogFormat)
+	cfg.ResolveGeoUploadLimits()
 
 	if err := cfg.ValidateConfig(); err != nil {
 		slog.Error("configuration", "err", err)

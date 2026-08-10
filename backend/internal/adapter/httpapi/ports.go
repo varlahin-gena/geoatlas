@@ -33,12 +33,15 @@ type EventsAPI interface {
 
 type GeoAPI interface {
 	UploadCSV(context.Context, io.Reader, bool) (usecasegeo.UploadResult, error)
+	PrecheckUpload(dryRun bool) error
+	IndexRangeCount() int
 	ListMissing(context.Context, usecasegeo.ListMissingInput) (usecasegeo.ListMissingResult, error)
 	FormatNetwork(uint32, uint32) string
 	ListRanges(context.Context, usecasegeo.ListRangesInput) (usecasegeo.ListRangesResult, error)
 	AppendRange(context.Context, string, string, string, string, float64, float64) (usecasegeo.MutateRangeResult, error)
 	UpdateRange(context.Context, string, string, string, string, string, float64, float64) (usecasegeo.MutateRangeResult, error)
 	ExportCSV(context.Context, io.Writer) error
+	ClearAll(context.Context) (usecasegeo.ClearResult, error)
 }
 
 type ReputationAPI interface {

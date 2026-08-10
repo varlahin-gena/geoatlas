@@ -550,6 +550,25 @@ paths:
         "403":
           description: forbidden
 
+  /api/geo-ranges/clear:
+    post:
+      tags: [geo]
+      summary: Очистить базу GeoIP (CH + in-memory индекс)
+      description: |
+        Только administrator. TRUNCATE `geo_ranges` и обнуление RAM-индекса
+        без рестарта backend — после этого можно снова залить полный CSV через
+        `/upload-geo` без HTTP 409 (dangerous replace).
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: cleared
+        "401":
+          description: unauthorized
+        "403":
+          description: forbidden
+
   /api/ingest/stats:
     get:
       tags: [ingest]

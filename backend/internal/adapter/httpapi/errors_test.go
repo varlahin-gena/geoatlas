@@ -23,6 +23,7 @@ func TestWriteDomainErrorMapping(t *testing.T) {
 		{"invalid csv", apperr.InvalidCSV(errors.New("missing required columns")), http.StatusBadRequest, "missing required columns"},
 		{"not found", apperr.NotFound("gone"), http.StatusNotFound, "gone"},
 		{"conflict", apperr.Conflict("overlap"), http.StatusConflict, "overlap"},
+		{"too large", apperr.TooLarge("geo too big"), http.StatusRequestEntityTooLarge, "geo too big"},
 		{"parse ids", parseerrors.ErrNoIDs, http.StatusBadRequest, parseerrors.ErrNoIDs.Error()},
 		{"retention", usecaseretention.ErrInvalidDays, http.StatusBadRequest, usecaseretention.ErrInvalidDays.Error()},
 		{"unknown", errors.New("clickhouse down"), http.StatusInternalServerError, "internal server error"},

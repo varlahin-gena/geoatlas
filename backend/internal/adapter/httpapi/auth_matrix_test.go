@@ -37,6 +37,7 @@ func expectedAuthMatrix() map[string]authTier {
 		"GET /api/system/version":                   tierLogin,
 		"GET /api/geo-missing":                      tierAdmin,
 		"GET /api/geo-ranges/export":                tierOps,
+		"POST /api/geo-ranges/clear":                tierAdmin,
 		"GET /api/geo-ranges":                       tierAdmin,
 		"POST /api/geo-ranges":                      tierOps,
 		"PUT /api/geo-ranges":                       tierOps,
@@ -90,6 +91,7 @@ func TestAuthMatrixCoversServerRoutes(t *testing.T) {
 			APIAuthToken:            "test-token",
 			MaxLogUploadSize:        1 << 20,
 			MaxGeoUploadSize:        1 << 20,
+			MaxGeoUploadRanges:      100_000,
 			MaxReputationUploadSize: 1 << 20,
 		},
 		nil,           // ingest

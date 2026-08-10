@@ -94,10 +94,16 @@ func (h *GeoHandler) ListGeoRanges(w http.ResponseWriter, r *http.Request) {
 		items = append(items, h.toGeoRangeDTO(g))
 	}
 
+	limits := map[string]any{
+		"upload_max_bytes":  h.cfg.MaxGeoUploadSize,
+		"upload_max_ranges": h.cfg.MaxGeoUploadRanges,
+	}
+
 	if result.IPLookup {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"ok": true, "count": result.Total, "filtered": result.Filtered,
 			"shown": len(items), "ip": result.IP, "ip_hit": result.IPHit, "ranges": items,
+			"limits": limits,
 		})
 		return
 	}
@@ -105,6 +111,7 @@ func (h *GeoHandler) ListGeoRanges(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok": true, "count": result.Total, "filtered": result.Filtered,
 		"shown": len(items), "truncated": result.Truncated, "ranges": items,
+		"limits": limits,
 	})
 }
 
@@ -175,4 +182,22 @@ func (h *GeoHandler) ExportGeoRangesCSV(w http.ResponseWriter, r *http.Request) 
 	if err := h.geoUC.ExportCSV(ctx, w); err != nil {
 		slog.Error("geo export: write failed", "err", err)
 	}
+}
+
+func (h *GeoHandler) ClearGeoRanges(w http.ResponseWriter, r *http.Request) {
+	if h.geoUC == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "geo service unavailable"})
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+	defer cancel()
+
+	result, err := h.geoUC.ClearAll(ctx)
+	if err != nil {
+		writeDomainError(w, "geo clear failed", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok": true, "index_before": result.IndexBefore, "ranges": 0,
+	})
 }
