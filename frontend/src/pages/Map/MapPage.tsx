@@ -231,6 +231,14 @@ export default function MapPage() {
   }, [visibleLines, points]);
 
   const location = useLocation();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('nm.mapSidebarCollapsed') === '1';
+    } catch {
+      return false;
+    }
+  });
+
   const adminLinks = filterNav(PAGE_NAV, {
     isAdmin,
     reputationEnabled,
@@ -238,14 +246,26 @@ export default function MapPage() {
     adminLinksOnly: true,
   });
 
+  function toggleSidebar() {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('nm.mapSidebarCollapsed', next ? '1' : '0');
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }
+
   return (
-    <div className="app map-app">
+    <div className={`app map-app${sidebarCollapsed ? ' sidebar-collapsed' : ''}`} id="app">
       <aside className="sidebar" aria-label="Навигация">
         <div className="sidebar-header">
           <img className="logo" src="/logo.png" alt="" width={28} height={28} />
           <div className="title">ГеоАтлас</div>
         </div>
-        <div className="sidebar-section">
+        <div className="sidebar-section collapse-hide">
           <div className="sidebar-section-title">Карта</div>
           <label className="field">
             Период
@@ -378,11 +398,33 @@ export default function MapPage() {
             })}
           </div>
         ) : null}
+        <div className="sidebar-collapse-btn">
+          <button
+            type="button"
+            className="side-btn"
+            id="btnToggleSidebar"
+            title="Развернуть / свернуть меню"
+            onClick={toggleSidebar}
+          >
+            <svg
+              className="icon"
+              id="collapseIcon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+            <span className="label">Свернуть меню</span>
+          </button>
+        </div>
       </aside>
       <div className="main">
         <header className="topbar map-topbar">
+          <div className="topbar-spacer" />
           <SystemHealthPill />
-          <div id="userBar">
+          <div id="userBarHost">
             <UserMenu />
           </div>
         </header>

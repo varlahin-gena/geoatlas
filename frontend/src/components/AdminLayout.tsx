@@ -22,10 +22,11 @@ export function AdminLayout({
       <AdminSidebar />
       <div className="admin-main">
         <header id="adminTopbar" className="topbar">
-          <div className="topbar-title">{title}</div>
-          <div className="topbar-actions">
+          <div className="topbar-title title">{title}</div>
+          <div className="topbar-spacer" />
+          <div className="topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {actions}
-            <div id="userBar">
+            <div id="userBarHost">
               <UserMenu />
             </div>
           </div>

@@ -208,6 +208,14 @@ body.page-admin .topbar .title .sub {
   margin-left: 6px;
 }
 .topbar-spacer { flex: 1; }
+body.page-map .topbar .topbar-spacer,
+body.page-map .map-topbar .topbar-spacer { flex: 1; min-width: 8px; }
+body.page-map .map-topbar #userBarHost,
+body.page-map .map-topbar #userBar {
+  display: flex;
+  align-items: center;
+  margin-left: 0;
+}
 
 /* Индикатор состояния системы (карта + админ-страницы). */
 a.status-pill { transition: background 0.15s; color: var(--text-dim); }
