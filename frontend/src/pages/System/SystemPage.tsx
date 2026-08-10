@@ -3,7 +3,7 @@ import uPlot from 'uplot';
 import { apiFetch } from '@/api/client';
 import { AdminSidebar, UserMenu } from '@/components/Shell';
 import { useToast } from '@/components/Toast';
-import { fmtDate, fmtNumber } from '@/lib/format';
+import { fmtDate, fmtNumber, escapeHTML } from '@/lib/format';
 import { getTheme } from '@/auth/theme';
 import 'uplot/dist/uPlot.min.css';
 import '@/styles/system.css';
@@ -101,6 +101,33 @@ function fmtBytes(bytes: unknown): string {
   if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} КБ`;
   if (b < 1024 * 1024 * 1024) return `${(b / (1024 * 1024)).toFixed(1)} МБ`;
   return `${(b / (1024 * 1024 * 1024)).toFixed(2)} ГБ`;
+}
+
+/** Axis ticks share one unit (from max split) so labels stay ordered and readable. */
+function fmtBytesAxisTicks(splits: number[]): string[] {
+  const finite = splits.filter((v) => v != null && Number.isFinite(v));
+  const maxAbs = finite.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+  let div = 1;
+  let suffix = 'Б';
+  let digits = 0;
+  if (maxAbs >= 1024 * 1024 * 1024) {
+    div = 1024 * 1024 * 1024;
+    suffix = 'ГБ';
+    digits = 2;
+  } else if (maxAbs >= 1024 * 1024) {
+    div = 1024 * 1024;
+    suffix = 'МБ';
+    digits = 1;
+  } else if (maxAbs >= 1024) {
+    div = 1024;
+    suffix = 'КБ';
+    digits = 1;
+  }
+  return splits.map((v) => {
+    if (v == null || !Number.isFinite(v)) return '';
+    if (div === 1) return `${fmtNumber(v)} ${suffix}`;
+    return `${(v / div).toFixed(digits)} ${suffix}`;
+  });
 }
 
 function fmtLag(sec: unknown): string {
@@ -232,51 +259,117 @@ function alignSeries(
   return { xs, ys };
 }
 
+type ChartFormatOpts = { isBytes?: boolean; isPercent?: boolean; isInt?: boolean };
+
+function formatSeriesValue(v: number | null | undefined, opts?: ChartFormatOpts): string {
+  if (v == null || Number.isNaN(Number(v))) return '—';
+  if (opts?.isPercent) return `${Number(v).toFixed(2)}%`;
+  if (opts?.isBytes) return fmtBytes(v);
+  if (opts?.isInt) return fmtNumber(Math.round(Number(v)));
+  const n = Number(v);
+  if (Math.abs(n) < 1) return n.toFixed(3);
+  if (Math.abs(n) < 100) return n.toFixed(1);
+  return fmtNumber(Math.round(n));
+}
+
+function buildChartLegend(labels: string[], colors: string[]): HTMLDivElement {
+  const legend = document.createElement('div');
+  legend.className = 'chart-legend';
+  labels.forEach((label, i) => {
+    const item = document.createElement('div');
+    item.className = 'chart-legend-item';
+    const color = colors[i % colors.length];
+    item.innerHTML =
+      `<span class="chart-legend-marker" style="background:${escapeHTML(color)};"></span>` +
+      `<span class="chart-legend-label">${escapeHTML(label)}</span>` +
+      `<span class="chart-legend-value">—</span>`;
+    legend.appendChild(item);
+  });
+  return legend;
+}
+
+function updateCustomLegend(u: uPlot, legendEl: HTMLElement, opts?: ChartFormatOpts): void {
+  const valueEls = legendEl.querySelectorAll('.chart-legend-value');
+  const idx = u.cursor?.idx ?? null;
+  const data = u.data || [];
+  valueEls.forEach((el, i) => {
+    const seriesIdx = i + 1;
+    const series = data[seriesIdx];
+    let v: number | null = null;
+    if (idx != null && series) {
+      const raw = series[idx];
+      v = raw == null || Number.isNaN(raw) ? null : raw;
+    } else if (series?.length) {
+      for (let j = series.length - 1; j >= 0; j--) {
+        const raw = series[j];
+        if (raw != null && !Number.isNaN(raw)) {
+          v = raw;
+          break;
+        }
+      }
+    }
+    el.textContent = formatSeriesValue(v, opts);
+  });
+}
+
 function makeChart(
   host: HTMLElement,
   title: string,
   labels: string[],
   xs: number[],
   ys: number[][],
-  opts?: { isBytes?: boolean; isPercent?: boolean },
+  opts?: ChartFormatOpts,
 ): uPlot {
   host.innerHTML = '';
-  const legend = document.createElement('div');
-  legend.className = 'chart-legend';
-  legend.textContent = title;
+  const titleEl = document.createElement('div');
+  titleEl.className = 'chart-title';
+  titleEl.textContent = title;
+  const colors = ['#38bdf8', '#a78bfa', '#fbbf24', '#2dd4bf', '#f472b6', '#94a3b8'];
+  const legend = buildChartLegend(labels, colors);
   const plotHost = document.createElement('div');
   plotHost.className = 'chart-plot-host';
+  host.appendChild(titleEl);
   host.appendChild(legend);
   host.appendChild(plotHost);
 
-  const colors = ['#38bdf8', '#a78bfa', '#fbbf24', '#2dd4bf', '#f472b6', '#94a3b8'];
-  const series: uPlot.Series[] = [{}];
+  const series: uPlot.Series[] = [{ label: 'Время' }];
   labels.forEach((label, i) => {
     series.push({
       label,
       stroke: colors[i % colors.length],
       width: 1.5,
       fill: i === 0 && labels.length === 1 ? `${colors[0]}22` : undefined,
+      points: { show: false },
     });
   });
 
-  const height = Math.max(160, host.clientHeight - 28 || 220);
-  return new uPlot(
+  const chromeH = titleEl.offsetHeight + legend.offsetHeight + 8;
+  const height = Math.max(140, (host.clientHeight || 220) - chromeH);
+  const plot = new uPlot(
     {
       width: host.clientWidth || 480,
       height,
       series,
+      legend: { show: false },
+      cursor: { drag: { x: false, y: false } },
+      hooks: {
+        setCursor: [(u) => updateCustomLegend(u, legend, opts)],
+        setData: [(u) => updateCustomLegend(u, legend, opts)],
+      },
       axes: [
         { stroke: chartAxisStroke(), grid: { stroke: 'rgba(148,163,184,0.12)' } },
         {
           stroke: chartAxisStroke(),
           grid: { stroke: 'rgba(148,163,184,0.12)' },
-          values: (_u, splits) =>
-            splits.map((v) => {
-              if (opts?.isBytes) return fmtBytes(v);
+          values: (_u, splits) => {
+            if (opts?.isBytes) return fmtBytesAxisTicks(splits);
+            return splits.map((v) => {
+              if (v == null || Number.isNaN(v)) return '';
               if (opts?.isPercent) return `${v.toFixed(1)}%`;
-              return String(Math.round(v * 100) / 100);
-            }),
+              if (opts?.isInt) return fmtNumber(Math.round(v));
+              return formatSeriesValue(v, opts);
+            });
+          },
         },
       ],
       scales: { x: { time: true } },
@@ -284,6 +377,8 @@ function makeChart(
     [xs, ...ys],
     plotHost,
   );
+  updateCustomLegend(plot, legend, opts);
+  return plot;
 }
 
 export default function SystemPage() {
@@ -374,18 +469,15 @@ export default function SystemPage() {
         title: string,
         labels: string[],
         keys: string[],
-        opts?: { isBytes?: boolean; isPercent?: boolean; scale?: (v: number) => number },
+        opts?: ChartFormatOpts,
       ) => {
         if (!ref.current) return;
         const { xs, ys } = alignSeries(data.series, keys);
-        const scaled = opts?.scale
-          ? ys.map((arr) => arr.map((v) => (v == null ? v : opts.scale!(v))))
-          : ys;
         if (!xs.length) {
-          ref.current.innerHTML = `<div class="chart-legend">${title}</div><div class="empty" style="padding:24px">Нет данных</div>`;
+          ref.current.innerHTML = `<div class="chart-title">${title}</div><div class="empty" style="padding:24px">Нет данных</div>`;
           return;
         }
-        plotsRef.current.push(makeChart(ref.current, title, labels, xs, scaled, opts));
+        plotsRef.current.push(makeChart(ref.current, title, labels, xs, ys, opts));
       };
 
       mk(chartEvents, 'События / сек', ['Ingest rate (live)', 'DB ingest (1m avg)'], [
@@ -407,13 +499,19 @@ export default function SystemPage() {
         CONTAINERS.map((c) => `container.${c}.mem_bytes`),
         { isBytes: true },
       );
-      mk(chartBuffer, 'Буфер импортера', ['Buffered lines'], ['pipeline.ingest.buffered_lines']);
+      mk(
+        chartBuffer,
+        'Буфер импортера',
+        ['Buffered lines'],
+        ['pipeline.ingest.buffered_lines'],
+        { isInt: true },
+      );
       mk(
         chartStorage,
         'Размер хранилища',
-        ['traffic_logs (MB)'],
+        ['traffic_logs'],
         ['storage.traffic_logs.bytes_on_disk'],
-        { scale: (v) => v / (1024 * 1024) },
+        { isBytes: true },
       );
     },
     [],
