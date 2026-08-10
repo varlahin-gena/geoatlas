@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthContext';
 import { ApiError } from '@/api/client';
 import { safeNext } from '@/lib/format';
@@ -93,9 +93,6 @@ export default function LoginPage() {
         <button type="submit" id="submitBtn" disabled={busy}>
           Войти
         </button>
-        <p className="auth-foot">
-          <Link to="/">На карту</Link>
-        </p>
       </form>
     </>
   );
