@@ -84,11 +84,20 @@ export default function ReputationPage() {
             }
           }}
         >
-          Refresh
+          Обновить фиды
         </button>
       }
     >
       <div className="page-content-inner">
+        <h1>Репутация IP</h1>
+        <p className="page-lead">
+          URL-фиды хранятся в <code>reputation_feeds.json</code> и обновляются по расписанию. Форматы:{' '}
+          <code>netset/plain</code>, <code>spamhaus_json</code>, <code>csv_ip</code>.
+        </p>
+        <p className="hint">
+          Списков: {fmtNumber(feeds.length)}, диапазонов:{' '}
+          {fmtNumber(lists.reduce((s, l) => s + (l.ranges || 0), 0))}
+        </p>
         <div className="card">
           <h2>Добавить фид</h2>
           <form className="form-row" onSubmit={onAddFeed}>

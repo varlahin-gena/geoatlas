@@ -90,13 +90,19 @@ export default function GeoMissingPage() {
       }
     >
       <div className="page-content-inner">
+        <h1>Адреса, которые не удалось поставить на карту</h1>
+        <p className="page-lead">
+          Уникальные IP из трафика без координат. Публичные можно добавить в базу GeoIP; приватные
+          обычно на карте не нужны.
+        </p>
         <div className="toolbar" style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
           <select value={period} onChange={(e) => setPeriod(e.target.value)}>
-            <option value="1h">1ч</option>
-            <option value="6h">6ч</option>
-            <option value="1d">1д</option>
-            <option value="7d">7д</option>
-            <option value="30d">30д</option>
+            <option value="1h">1 час</option>
+            <option value="6h">6 часов</option>
+            <option value="12h">12 часов</option>
+            <option value="1d">1 день</option>
+            <option value="7d">7 дней</option>
+            <option value="30d">30 дней</option>
           </select>
           <select value={limit} onChange={(e) => setLimit(e.target.value)}>
             {[100, 200, 500, 1000].map((n) => (
@@ -122,7 +128,7 @@ export default function GeoMissingPage() {
               {!rows.length ? (
                 <tr>
                   <td colSpan={3} className="empty">
-                    Нет IP без координат
+                    Нет IP без geo за выбранный период / фильтр
                   </td>
                 </tr>
               ) : (

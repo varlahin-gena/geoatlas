@@ -62,9 +62,14 @@ export default function ParseErrorsPage() {
   return (
     <AdminLayout title="Ошибки парсинга">
       <div className="page-content-inner">
+        <h1>Строки, которые не удалось нормализовать</h1>
+        <p className="page-lead">
+          Сюда попадают строки логов, которые ingest не смог разобрать. TTL — 7 дней; записи можно
+          удалить вручную.
+        </p>
         <div className="toolbar" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
           <input
-            placeholder="Поиск…"
+            placeholder="Поиск по строке или причине…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -121,9 +126,9 @@ export default function ParseErrorsPage() {
                   />
                 </th>
                 <th scope="col">Время</th>
-                <th scope="col">Вендор</th>
+                <th scope="col">Vendor</th>
                 <th scope="col">Причина</th>
-                <th scope="col">Строка</th>
+                <th scope="col">Строка (raw)</th>
                 <th scope="col"> </th>
               </tr>
             </thead>

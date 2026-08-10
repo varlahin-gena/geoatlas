@@ -68,6 +68,8 @@ export default function UsersPage() {
   return (
     <AdminLayout title="Пользователи">
       <div className="page-content-inner narrow">
+        <h1>Пользователи</h1>
+        <p className="page-lead">локальные учётные записи</p>
         <div className="card">
           <h2>Создать учётную запись</h2>
           <form className="form-row" onSubmit={onCreate}>

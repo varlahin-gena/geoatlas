@@ -15,7 +15,7 @@ export default function ApiTokensPage() {
   const { toast } = useToast();
   const [tokens, setTokens] = useState<TokenRow[]>([]);
   const [name, setName] = useState('');
-  const [scope, setScope] = useState('read');
+  const [scope, setScope] = useState('ops');
   const [secret, setSecret] = useState('');
   const [error, setError] = useState('');
 
@@ -54,11 +54,21 @@ export default function ApiTokensPage() {
     <AdminLayout title="API-токены">
       <div className="page-content-inner narrow">
         <div className="card">
-          <h2>Создать токен</h2>
+          <h2>Создать API-токен</h2>
+          <p className="hint" style={{ marginTop: 0 }}>
+            Scope: <b>read</b> — карта; <b>ops</b> — ingest/upload; <b>admin</b> — как env Bearer (полный
+            API).
+          </p>
           <form className="form-row" onSubmit={onCreate}>
             <div className="field">
               <label htmlFor="cName">Имя</label>
-              <input id="cName" required value={name} onChange={(e) => setName(e.target.value)} />
+              <input
+                id="cName"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="ci-bot / grafana"
+              />
             </div>
             <div className="field">
               <label htmlFor="cScope">Scope</label>

@@ -86,11 +86,15 @@ export default function GeoRangesPage() {
             }
           }}
         >
-          CSV
+          Выгрузить CSV
         </button>
       }
     >
       <div className="page-content-inner">
+        <h1>База GeoIP</h1>
+        <p className="page-lead">
+          Текущие диапазоны в таблице geo_ranges. Можно править записи или выгрузить CSV.
+        </p>
         <div className="card">
           <h2>Добавить диапазон</h2>
           <form className="form-row" onSubmit={onCreate}>
@@ -112,7 +116,7 @@ export default function GeoRangesPage() {
         </div>
         <div className="card" style={{ marginTop: 16 }}>
           <input
-            placeholder="Поиск…"
+            placeholder="Поиск по Network, стране, городу…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             style={{ marginBottom: 12 }}
@@ -123,16 +127,17 @@ export default function GeoRangesPage() {
                 <tr>
                   <th scope="col">Network</th>
                   <th scope="col">Country</th>
+                  <th scope="col">Region</th>
                   <th scope="col">City</th>
-                  <th scope="col">Lat</th>
-                  <th scope="col">Lon</th>
+                  <th scope="col">Latitude</th>
+                  <th scope="col">Longitude</th>
                 </tr>
               </thead>
               <tbody>
                 {!rows.length ? (
                   <tr>
-                    <td colSpan={5} className="empty">
-                      Пусто
+                    <td colSpan={6} className="empty">
+                      Нет диапазонов — загрузите CSV или добавьте со страницы IP без GeoIP
                     </td>
                   </tr>
                 ) : (
@@ -140,6 +145,7 @@ export default function GeoRangesPage() {
                     <tr key={r.network}>
                       <td>{r.network}</td>
                       <td>{r.country}</td>
+                      <td>{r.region}</td>
                       <td>{r.city}</td>
                       <td>{r.latitude}</td>
                       <td>{r.longitude}</td>

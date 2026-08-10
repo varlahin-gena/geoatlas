@@ -53,28 +53,48 @@ export default function ParserTestPage() {
   return (
     <AdminLayout title="Тест парсеров">
       <div className="page-content-inner">
+        <h1>Тест парсеров</h1>
         <p className="page-lead">
           Строки прогоняются через тот же реестр парсеров, что и боевой ingest (
           <code>/api/parse-test</code>).
         </p>
         <div className="card">
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+          <div className="chrome-section-head" style={{ marginBottom: 8 }}>
+            <span>Примеры</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
             {Object.keys(samples).map((k) => (
               <button key={k} type="button" className="btn" onClick={() => setText(samples[k])}>
                 {k}
               </button>
             ))}
+            {Object.keys(samples).length > 1 ? (
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setText(Object.values(samples).join('\n'))}
+              >
+                все примеры
+              </button>
+            ) : null}
           </div>
+          <label className="field-label" htmlFor="parseText" style={{ display: 'block', marginBottom: 6 }}>
+            СТРОКИ ЛОГОВ (ПО ОДНОЙ В СТРОКЕ)
+          </label>
           <textarea
+            id="parseText"
             rows={12}
             style={{ width: '100%' }}
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="Вставьте строки логов…"
           />
-          <div style={{ marginTop: 8 }}>
+          <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
             <button type="button" className="btn primary" disabled={busy} onClick={() => void run()}>
-              Разобрать
+              Проверить
+            </button>
+            <button type="button" className="btn" disabled={busy} onClick={() => { setText(''); setResults([]); }}>
+              Очистить
             </button>
           </div>
         </div>

@@ -8,6 +8,9 @@
 html, body {
     height: 100%;
     margin: 0;
+}
+
+body.page-map {
     overflow: hidden;
 }
 
@@ -352,6 +355,14 @@ html, body {
 .topbar .search-builder-remove {
     background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
     border-radius: 6px; padding: 5px 8px; font-size: 12px; cursor: pointer;
+}
+.topbar .search-builder-actions button.primary {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.topbar .search-builder-actions button.primary:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
 .topbar .search-builder-actions button:hover,
 .topbar .search-builder-remove:hover {

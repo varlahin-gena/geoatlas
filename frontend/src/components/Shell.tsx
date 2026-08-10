@@ -291,7 +291,7 @@ export function UserMenu() {
 export function SystemHealthPill() {
   const { isAdmin } = useAuth();
   const [text, setText] = useState('— загрузка —');
-  const [ok, setOk] = useState<boolean | null>(null);
+  const [level, setLevel] = useState<'ok' | 'warn' | 'bad' | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -299,14 +299,28 @@ export function SystemHealthPill() {
       try {
         const res = await fetch('/api/system/status', { credentials: 'same-origin' });
         if (!res.ok) throw new Error(String(res.status));
-        const data = (await res.json()) as { ok?: boolean; status?: string; message?: string };
+        const data = (await res.json()) as {
+          level?: string;
+          alert_count?: number;
+          alerts?: unknown[];
+        };
         if (cancelled) return;
-        setOk(data.ok !== false);
-        setText(data.message || data.status || (data.ok === false ? 'проблемы' : 'OK'));
+        const count = data.alert_count ?? data.alerts?.length ?? 0;
+        const lvl = (data.level || 'ok').toLowerCase();
+        if (lvl === 'error') {
+          setLevel('bad');
+          setText(`⚠ ${count} проблем`);
+        } else if (lvl === 'warn') {
+          setLevel('warn');
+          setText(`${count} предупр.`);
+        } else {
+          setLevel('ok');
+          setText('Система ОК');
+        }
       } catch {
         if (!cancelled) {
-          setOk(false);
-          setText('нет связи');
+          setLevel('bad');
+          setText('API недоступен');
         }
       }
     };
@@ -318,7 +332,7 @@ export function SystemHealthPill() {
     };
   }, []);
 
-  const cls = `status-pill${ok === false ? ' bad' : ok ? ' ok' : ''}`;
+  const cls = `status-pill${level === 'bad' ? ' bad' : level === 'warn' ? ' warn' : level === 'ok' ? ' ok' : ''}`;
   const content = (
     <>
       <span className="dot" />
@@ -331,13 +345,19 @@ export function SystemHealthPill() {
 
   if (isAdmin) {
     return (
-      <Link to="/system" id="systemHealthPill" className={cls} style={{ textDecoration: 'none', cursor: 'pointer' }} title="Открыть мониторинг системы">
+      <Link
+        to="/system"
+        id="systemHealthPill"
+        className={cls}
+        style={{ textDecoration: 'none', cursor: 'pointer' }}
+        title="Кликни, чтобы открыть мониторинг"
+      >
         {content}
       </Link>
     );
   }
   return (
-    <span id="systemHealthPill" className={cls} title="Статус системы">
+    <span id="systemHealthPill" className={cls} title="Состояние системы">
       {content}
     </span>
   );

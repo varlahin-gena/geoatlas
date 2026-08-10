@@ -1,7 +1,7 @@
-import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import uPlot from 'uplot';
 import { apiFetch } from '@/api/client';
-import { AdminLayout } from '@/components/AdminLayout';
+import { AdminSidebar, UserMenu } from '@/components/Shell';
 import { useToast } from '@/components/Toast';
 import { fmtDate, fmtNumber } from '@/lib/format';
 import { getTheme } from '@/auth/theme';
@@ -10,12 +10,63 @@ import '@/styles/system.css';
 
 type Tab = 'overview' | 'pipeline' | 'security' | 'charts';
 
+const CONTAINERS = ['backend', 'clickhouse', 'syslog-ng', 'frontend'] as const;
+const PERIODS = [
+  ['1h', '1ч'],
+  ['6h', '6ч'],
+  ['24h', '24ч'],
+  ['7d', '7д'],
+] as const;
+
+interface Alert {
+  level?: string;
+  code?: string;
+  target?: string;
+  message?: string;
+}
+
+interface FailedLogin {
+  username?: string;
+  ip?: string;
+  count?: number;
+  first_at?: string;
+  last_at?: string;
+  locked?: boolean;
+  locked_until?: string;
+}
+
+interface EdgesAgg {
+  state?: string;
+  phase?: string;
+  message?: string;
+  raw_rows?: number;
+  agg_rows?: number;
+  days_total?: number;
+  days_done?: number;
+  map_source?: string;
+  prefer_agg?: boolean;
+  geo_prefer_agg?: boolean;
+  started_at?: string;
+  updated_at?: string;
+}
+
 interface SystemStats {
-  alerts?: { id: string; severity?: string; message?: string }[];
-  ingest?: Record<string, number | string | boolean>;
-  containers?: { name: string; cpu?: number; mem?: number; status?: string }[];
-  capacity?: { level?: string; message?: string };
-  auth_fails?: { username?: string; ip?: string; at?: string; count?: number }[];
+  alerts?: Alert[];
+  containers?: Record<string, { cpu_pct?: number; mem_bytes?: number }>;
+  health?: Record<string, Record<string, unknown>>;
+  pipeline?: Record<string, Record<string, number>>;
+  storage?: Record<string, Record<string, number>>;
+  backend_info?: { num_goroutine?: number; heap_alloc_mb?: number; go_version?: string };
+  install_profile?: {
+    profile?: string;
+    profile_label?: string;
+    host?: Record<string, unknown>;
+    limits?: Record<string, unknown>;
+    capacity?: { expected_eps_min?: number; expected_eps_max?: number };
+  };
+  edges_agg?: EdgesAgg;
+  failed_logins?: FailedLogin[];
+  timestamp?: string;
 }
 
 interface Retention {
@@ -26,8 +77,153 @@ interface Retention {
   updated_at?: string;
 }
 
+interface HistoryPoint {
+  t: string;
+  v: number;
+}
+
+interface HistoryPayload {
+  period?: string;
+  from?: string;
+  to?: string;
+  series?: Record<string, HistoryPoint[]>;
+}
+
+function num(v: unknown): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function fmtBytes(bytes: unknown): string {
+  const b = num(bytes);
+  if (b < 1024) return `${fmtNumber(b)} Б`;
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} КБ`;
+  if (b < 1024 * 1024 * 1024) return `${(b / (1024 * 1024)).toFixed(1)} МБ`;
+  return `${(b / (1024 * 1024 * 1024)).toFixed(2)} ГБ`;
+}
+
+function fmtLag(sec: unknown): string {
+  if (sec == null || sec === '') return '—';
+  const s = num(sec);
+  if (s < 1) return '<1 с';
+  if (s < 60) return `${Math.round(s)} с`;
+  if (s < 3600) return `${Math.round(s / 60)} мин`;
+  return `${(s / 3600).toFixed(1)} ч`;
+}
+
+function fmtUptime(sec: unknown): string {
+  const s = num(sec);
+  if (s < 60) return `${Math.round(s)} с`;
+  if (s < 3600) return `${Math.round(s / 60)} мин`;
+  return `${(s / 3600).toFixed(1)} ч`;
+}
+
+function toneClass(kind: 'ok' | 'warn' | 'bad' | ''): string {
+  return kind || '';
+}
+
+function queueTone(depth: number, capacity: number): 'ok' | 'warn' | 'bad' {
+  if (!capacity) return 'ok';
+  const r = depth / capacity;
+  if (r >= 0.9) return 'bad';
+  if (r >= 0.75) return 'warn';
+  return 'ok';
+}
+
+function lagTone(sec: number): 'ok' | 'warn' | 'bad' | '' {
+  if (!sec) return '';
+  if (sec >= 60) return 'bad';
+  if (sec >= 10) return 'warn';
+  return 'ok';
+}
+
+function bufferTone(n: number): 'ok' | 'warn' | 'bad' {
+  if (n >= 100000) return 'bad';
+  if (n >= 10000) return 'warn';
+  return 'ok';
+}
+
+function capacityTone(pct: number): 'ok' | 'warn' | 'bad' {
+  if (pct >= 125) return 'bad';
+  if (pct >= 90) return 'warn';
+  return 'ok';
+}
+
 function chartAxisStroke(): string {
   return getTheme() === 'light' ? '#334155' : '#94a3b8';
+}
+
+function alignSeries(
+  series: Record<string, HistoryPoint[]> | undefined,
+  keys: string[],
+): { xs: number[]; ys: number[][] } {
+  const maps = keys.map((k) => {
+    const m = new Map<number, number>();
+    for (const p of series?.[k] || []) {
+      const t = Math.floor(new Date(p.t).getTime() / 1000);
+      if (Number.isFinite(t)) m.set(t, num(p.v));
+    }
+    return m;
+  });
+  const xs = Array.from(
+    new Set(maps.flatMap((m) => Array.from(m.keys()))),
+  ).sort((a, b) => a - b);
+  const ys = maps.map((m) => xs.map((t) => (m.has(t) ? (m.get(t) as number) : null as unknown as number)));
+  return { xs, ys };
+}
+
+function makeChart(
+  host: HTMLElement,
+  title: string,
+  labels: string[],
+  xs: number[],
+  ys: number[][],
+  opts?: { isBytes?: boolean; isPercent?: boolean },
+): uPlot {
+  host.innerHTML = '';
+  const legend = document.createElement('div');
+  legend.className = 'chart-legend';
+  legend.textContent = title;
+  const plotHost = document.createElement('div');
+  plotHost.className = 'chart-plot-host';
+  host.appendChild(legend);
+  host.appendChild(plotHost);
+
+  const colors = ['#38bdf8', '#a78bfa', '#fbbf24', '#2dd4bf', '#f472b6', '#94a3b8'];
+  const series: uPlot.Series[] = [{}];
+  labels.forEach((label, i) => {
+    series.push({
+      label,
+      stroke: colors[i % colors.length],
+      width: 1.5,
+      fill: i === 0 && labels.length === 1 ? `${colors[0]}22` : undefined,
+    });
+  });
+
+  const height = Math.max(160, host.clientHeight - 28 || 220);
+  return new uPlot(
+    {
+      width: host.clientWidth || 480,
+      height,
+      series,
+      axes: [
+        { stroke: chartAxisStroke(), grid: { stroke: 'rgba(148,163,184,0.12)' } },
+        {
+          stroke: chartAxisStroke(),
+          grid: { stroke: 'rgba(148,163,184,0.12)' },
+          values: (_u, splits) =>
+            splits.map((v) => {
+              if (opts?.isBytes) return fmtBytes(v);
+              if (opts?.isPercent) return `${v.toFixed(1)}%`;
+              return String(Math.round(v * 100) / 100);
+            }),
+        },
+      ],
+      scales: { x: { time: true } },
+    },
+    [xs, ...ys],
+    plotHost,
+  );
 }
 
 export default function SystemPage() {
@@ -46,14 +242,22 @@ export default function SystemPage() {
     parse_errors_days: 7,
     system_metrics_days: 7,
   });
-  const [period, setPeriod] = useState('24h');
-  const plotHost = useRef<HTMLDivElement>(null);
-  const plotRef = useRef<uPlot | null>(null);
+  const [period, setPeriod] = useState('1h');
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  const chartEvents = useRef<HTMLDivElement>(null);
+  const chartLag = useRef<HTMLDivElement>(null);
+  const chartCpu = useRef<HTMLDivElement>(null);
+  const chartMem = useRef<HTMLDivElement>(null);
+  const chartBuffer = useRef<HTMLDivElement>(null);
+  const chartStorage = useRef<HTMLDivElement>(null);
+  const plotsRef = useRef<uPlot[]>([]);
 
   const loadStats = useCallback(async () => {
     try {
       const data = await apiFetch<SystemStats>('/api/system/stats');
       setStats(data);
+      setUpdatedAt(new Date());
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Ошибка stats', 'error');
     }
@@ -61,20 +265,29 @@ export default function SystemPage() {
 
   const loadRetention = useCallback(async () => {
     try {
-      const data = await apiFetch<{ retention?: Retention }>('/api/system/retention');
+      const data = await apiFetch<{ retention?: Retention } & Retention>('/api/system/retention');
       setRetention(data.retention || data);
-    } catch (e) {
-      console.warn('retention load failed', e);
+    } catch {
+      /* optional */
     }
   }, []);
 
   useEffect(() => {
     document.title = 'ГеоАтлас — Мониторинг';
+    document.body.classList.add('page-admin');
+    return () => document.body.classList.remove('page-admin');
+  }, []);
+
+  useEffect(() => {
     void loadStats();
     void loadRetention();
-    const id = window.setInterval(() => void loadStats(), 10000);
-    return () => window.clearInterval(id);
   }, [loadStats, loadRetention]);
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const id = window.setInterval(() => void loadStats(), 5000);
+    return () => window.clearInterval(id);
+  }, [autoRefresh, loadStats]);
 
   useEffect(() => {
     try {
@@ -85,53 +298,75 @@ export default function SystemPage() {
   }, [tab]);
 
   useEffect(() => {
-    if (tab !== 'charts' || !plotHost.current) return;
+    if (tab !== 'charts') {
+      plotsRef.current.forEach((p) => p.destroy());
+      plotsRef.current = [];
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
-        const data = await apiFetch<{
-          series?: { t: string; cpu?: number; mem?: number }[];
-        }>(`/api/system/history?period=${encodeURIComponent(period)}`);
-        if (cancelled || !plotHost.current) return;
-        const series = data.series || [];
-        const xs = series.map((s) => Math.floor(new Date(s.t).getTime() / 1000));
-        const cpu = series.map((s) => Number(s.cpu) || 0);
-        const mem = series.map((s) => Number(s.mem) || 0);
-        plotRef.current?.destroy();
-        plotRef.current = new uPlot(
-          {
-            width: plotHost.current.clientWidth || 640,
-            height: 280,
-            series: [
-              {},
-              { label: 'CPU %', stroke: '#38bdf8' },
-              { label: 'Mem %', stroke: '#a78bfa' },
-            ],
-            axes: [
-              { stroke: chartAxisStroke() },
-              { stroke: chartAxisStroke() },
-            ],
-          },
-          [xs, cpu, mem],
-          plotHost.current,
+        const data = await apiFetch<HistoryPayload>(
+          `/api/system/history?period=${encodeURIComponent(period)}`,
+        );
+        if (cancelled) return;
+        plotsRef.current.forEach((p) => p.destroy());
+        plotsRef.current = [];
+
+        const mk = (
+          ref: RefObject<HTMLDivElement | null>,
+          title: string,
+          labels: string[],
+          keys: string[],
+          opts?: { isBytes?: boolean; isPercent?: boolean; scale?: (v: number) => number },
+        ) => {
+          if (!ref.current) return;
+          const { xs, ys } = alignSeries(data.series, keys);
+          const scaled = opts?.scale ? ys.map((arr) => arr.map((v) => (v == null ? v : opts.scale!(v)))) : ys;
+          if (!xs.length) {
+            ref.current.innerHTML = `<div class="chart-legend">${title}</div><div class="empty" style="padding:24px">Нет данных</div>`;
+            return;
+          }
+          plotsRef.current.push(makeChart(ref.current, title, labels, xs, scaled, opts));
+        };
+
+        mk(chartEvents, 'События / сек', ['Ingest rate (live)', 'DB ingest (1m avg)'], [
+          'pipeline.rate.events_per_sec',
+          'pipeline.ingest.events_per_sec_db',
+        ]);
+        mk(chartLag, 'Лаг ingest (сек)', ['Lag (sec)'], ['pipeline.ingest.lag_sec']);
+        mk(
+          chartCpu,
+          'CPU контейнеров (%)',
+          [...CONTAINERS],
+          CONTAINERS.map((c) => `container.${c}.cpu_pct`),
+          { isPercent: true },
+        );
+        mk(
+          chartMem,
+          'Память контейнеров',
+          [...CONTAINERS],
+          CONTAINERS.map((c) => `container.${c}.mem_bytes`),
+          { isBytes: true },
+        );
+        mk(chartBuffer, 'Буфер импортера', ['Buffered lines'], ['pipeline.ingest.buffered_lines']);
+        mk(
+          chartStorage,
+          'Размер хранилища',
+          ['traffic_logs (MB)'],
+          ['storage.traffic_logs.bytes_on_disk'],
+          { scale: (v) => v / (1024 * 1024) },
         );
       } catch (e) {
         toast(e instanceof Error ? e.message : 'Ошибка history', 'error');
       }
     })();
-
-    const onTheme = () => {
-      if (plotRef.current) {
-        plotRef.current.redraw();
-      }
-    };
-    document.addEventListener('nm-theme-change', onTheme);
     return () => {
       cancelled = true;
-      document.removeEventListener('nm-theme-change', onTheme);
-      plotRef.current?.destroy();
-      plotRef.current = null;
+      plotsRef.current.forEach((p) => p.destroy());
+      plotsRef.current = [];
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, period, toast]);
 
   async function saveRetention(e: FormEvent) {
@@ -139,7 +374,12 @@ export default function SystemPage() {
     try {
       const data = await apiFetch<{ retention?: Retention }>('/api/system/retention', {
         method: 'PUT',
-        body: JSON.stringify(retention),
+        body: JSON.stringify({
+          traffic_logs_days: retention.traffic_logs_days,
+          edges_days: retention.edges_days,
+          parse_errors_days: retention.parse_errors_days,
+          system_metrics_days: retention.system_metrics_days,
+        }),
       });
       setRetention(data.retention || retention);
       toast('TTL сохранён', 'success');
@@ -148,187 +388,528 @@ export default function SystemPage() {
     }
   }
 
-  const ingest = stats?.ingest || {};
+  const pipeline = stats?.pipeline || {};
+  const ingest = pipeline.ingest || {};
+  const rate = pipeline.rate || {};
+  const storage = stats?.storage || {};
+  const alerts = stats?.alerts || [];
+  const failed = stats?.failed_logins || [];
+  const edges = stats?.edges_agg;
+
+  const eps = num(rate.input_events_per_sec ?? rate.events_per_sec);
+  const lag = num(ingest.lag_sec);
+  const qDepth = num(ingest.queue_depth);
+  const qCap = num(ingest.queue_capacity) || 200000;
+  const buffered = num(ingest.buffered_lines);
+  const epsMax = num(stats?.install_profile?.capacity?.expected_eps_max);
+  const capPct = epsMax > 0 ? Math.round((eps / epsMax) * 100) : 0;
+
+  const healthLevel = useMemo(() => {
+    const hasError = alerts.some((a) => a.level === 'error');
+    const hasWarn = alerts.some((a) => a.level === 'warn');
+    if (hasError) return 'bad' as const;
+    if (hasWarn) return 'warn' as const;
+    return 'ok' as const;
+  }, [alerts]);
+
+  const healthText =
+    healthLevel === 'bad'
+      ? `${alerts.filter((a) => a.level === 'error').length} проблем`
+      : healthLevel === 'warn'
+        ? `${alerts.filter((a) => a.level === 'warn').length} предупр.`
+        : 'Всё ОК';
+
+  const backendHealth = stats?.health?.backend || {};
+  const ingestHealth = stats?.health?.ingest || {};
 
   return (
-    <AdminLayout title="Мониторинг системы">
-      <div className="page-content-inner">
-        <div className="view-tabs">
-          {(
-            [
-              ['overview', 'Обзор'],
-              ['pipeline', 'Pipeline'],
-              ['security', 'Безопасность'],
-              ['charts', 'Графики'],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              data-tab={id}
-              className={tab === id ? 'active' : ''}
-              onClick={() => setTab(id)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {tab === 'overview' ? (
-          <div className="tab-panel" data-tab="overview">
-            <div className="card">
-              <h2>Алёрты</h2>
-              {!stats?.alerts?.length ? (
-                <p className="empty">Нет активных алёртов</p>
-              ) : (
-                <ul>
-                  {stats.alerts.map((a) => (
-                    <li key={a.id}>
-                      <span className={`badge ${a.severity || ''}`}>{a.severity}</span> {a.message}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <div className="card" style={{ marginTop: 12 }}>
-              <h2>Контейнеры</h2>
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th scope="col">Имя</th>
-                      <th scope="col">CPU</th>
-                      <th scope="col">RAM</th>
-                      <th scope="col">Статус</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(stats?.containers || []).map((c) => (
-                      <tr key={c.name}>
-                        <td>{c.name}</td>
-                        <td>{fmtNumber(c.cpu)}</td>
-                        <td>{fmtNumber(c.mem)}</td>
-                        <td>{c.status}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {stats?.capacity?.message ? (
-                <p className="hint">Ёмкость: {stats.capacity.message}</p>
-              ) : null}
-            </div>
+    <div id="adminApp" className="app">
+      <AdminSidebar />
+      <div className="admin-main">
+        <header className="header">
+          <div className="title-block">
+            <h1>Мониторинг системы</h1>
+            <div className="subtitle">ГеоАтлас · pipeline / containers / storage</div>
           </div>
-        ) : null}
-
-        {tab === 'pipeline' ? (
-          <div className="tab-panel" data-tab="pipeline">
-            <div className="card">
-              <h2>Ingest</h2>
-              <pre style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(ingest, null, 2)}</pre>
-            </div>
-            <div className="card" style={{ marginTop: 12 }}>
-              <h2>Срок хранения (TTL)</h2>
-              <form id="retentionForm" className="form-row" onSubmit={saveRetention}>
-                {(
-                  [
-                    ['traffic_logs_days', 'traffic_logs'],
-                    ['edges_days', 'edges'],
-                    ['parse_errors_days', 'parse_errors'],
-                    ['system_metrics_days', 'system_metrics'],
-                  ] as const
-                ).map(([key, label]) => (
-                  <div className="field" key={key}>
-                    <label htmlFor={key}>{label} (дней)</label>
-                    <input
-                      id={key}
-                      type="number"
-                      min={1}
-                      max={730}
-                      value={Number(retention[key] ?? 1)}
-                      onChange={(e) =>
-                        setRetention({ ...retention, [key]: Number(e.target.value) })
-                      }
-                    />
-                  </div>
-                ))}
-                <button type="submit" className="btn primary" id="retentionSaveBtn">
-                  Сохранить
-                </button>
-              </form>
-              <p className="hint" id="retentionUpdatedAt">
-                Обновлено: {fmtDate(retention.updated_at)}
-              </p>
-            </div>
-            <div className="card" style={{ marginTop: 12 }}>
+          <div className="spacer" />
+          <div className="period-tabs" id="periodTabs" hidden={tab !== 'charts'}>
+            {PERIODS.map(([v, label]) => (
               <button
+                key={v}
                 type="button"
-                className="btn"
-                onClick={async () => {
-                  try {
-                    await apiFetch('/api/system/maintenance/backfill', { method: 'POST' });
-                    toast('Backfill запущен', 'success');
-                  } catch (e) {
-                    toast(e instanceof Error ? e.message : 'Ошибка', 'error');
-                  }
-                }}
+                data-period={v}
+                className={period === v ? 'active' : ''}
+                onClick={() => setPeriod(v)}
               >
-                Maintenance backfill
+                {label}
               </button>
-            </div>
+            ))}
           </div>
-        ) : null}
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={autoRefresh}
+              onChange={(e) => setAutoRefresh(e.target.checked)}
+            />{' '}
+            Авто-обновление
+          </label>
+          <div className={`health-pill ${healthLevel}`} id="healthPill">
+            <span className="dot" />
+            <span id="healthText">{stats ? healthText : '— загрузка —'}</span>
+          </div>
+          <div id="userBarHost">
+            <UserMenu />
+          </div>
+        </header>
 
-        {tab === 'security' ? (
-          <div className="tab-panel" data-tab="security">
-            <div className="card">
-              <h2>Неуспешные логины</h2>
-              <div className="table-wrap">
-                <table className="auth-fails-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">Время</th>
-                      <th scope="col">Логин</th>
-                      <th scope="col">IP</th>
-                      <th scope="col">Count</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(stats?.auth_fails || []).map((f, i) => (
-                      <tr key={i}>
-                        <td>{fmtDate(f.at)}</td>
-                        <td>{f.username}</td>
-                        <td>{f.ip}</td>
-                        <td>{fmtNumber(f.count)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+        <main className="content" id="system-main">
+          <div className="content-chrome">
+            <section
+              className={`chrome-section chrome-alerts${alerts.length ? '' : ' chrome-alerts--empty'}`}
+              id="chromeAlerts"
+            >
+              <div className="chrome-section-head">
+                <span className="accent-dot" style={{ background: 'var(--orange)' }} />
+                <span>Алёрты</span>
+                <span className="chrome-section-meta" id="alertsCount">
+                  {alerts.length ? alerts.length : ''}
+                </span>
+              </div>
+              <div className="alerts" id="alertsList">
+                {!alerts.length ? (
+                  <div className="alert-row info">
+                    <span className="empty">Активных алертов нет</span>
+                  </div>
+                ) : (
+                  alerts.map((a, i) => (
+                    <div key={`${a.code}-${i}`} className={`alert-row ${a.level || ''}`}>
+                      <span className="level">{a.level}</span>
+                      {a.code ? <span className="code">{a.code}</span> : null}
+                      {a.target ? <span className="target">{a.target}</span> : null}
+                      <span>{a.message}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
+
+            <div className="status-strip" id="statusStrip" aria-label="Ключевые метрики">
+              <div className="status-metric">
+                <span className="sm-label">EPS</span>
+                <span className="sm-value" id="statusEps">
+                  {fmtNumber(eps)}
+                </span>
+              </div>
+              <div className="status-metric">
+                <span className="sm-label">Лаг</span>
+                <span className={`sm-value ${toneClass(lagTone(lag))}`} id="statusLag">
+                  {fmtLag(ingest.lag_sec)}
+                </span>
+              </div>
+              <div className="status-metric">
+                <span className="sm-label">Очередь</span>
+                <span className={`sm-value ${toneClass(queueTone(qDepth, qCap))}`} id="statusQueue">
+                  {fmtNumber(qDepth)} / {fmtNumber(qCap)}
+                </span>
+              </div>
+              <div className="status-metric">
+                <span className="sm-label">Буфер</span>
+                <span className={`sm-value ${toneClass(bufferTone(buffered))}`} id="statusBuffer">
+                  {fmtNumber(buffered)}
+                </span>
+              </div>
+              <div className="status-metric" id="statusCapacityWrap" hidden={!epsMax}>
+                <span className="sm-label">Ёмкость</span>
+                <span className={`sm-value ${toneClass(capacityTone(capPct))}`} id="statusCapacity">
+                  {capPct}%
+                </span>
               </div>
             </div>
-          </div>
-        ) : null}
 
-        {tab === 'charts' ? (
-          <div className="tab-panel" data-tab="charts">
-            <div className="period-tabs" style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-              {['1h', '6h', '24h', '7d'].map((p) => (
+            <nav className="view-tabs" id="viewTabs" role="tablist" aria-label="Разделы мониторинга">
+              {(
+                [
+                  ['overview', 'Обзор'],
+                  ['pipeline', 'Pipeline'],
+                  ['security', 'Безопасность'],
+                  ['charts', 'Графики'],
+                ] as const
+              ).map(([id, label]) => (
                 <button
-                  key={p}
+                  key={id}
                   type="button"
-                  className={period === p ? 'active' : ''}
-                  onClick={() => setPeriod(p)}
+                  role="tab"
+                  data-tab={id}
+                  className={tab === id ? 'active' : ''}
+                  aria-selected={tab === id}
+                  onClick={() => setTab(id)}
                 >
-                  {p}
+                  {label}
+                  {id === 'security' && failed.length ? (
+                    <span className="tab-badge" id="securityTabBadge">
+                      {failed.length}
+                    </span>
+                  ) : null}
                 </button>
               ))}
-            </div>
-            <div className="card">
-              <div ref={plotHost} />
-            </div>
+            </nav>
           </div>
-        ) : null}
+
+          <div className="tab-panels">
+            {tab === 'overview' ? (
+              <div className="tab-panel active" id="tab-overview" role="tabpanel">
+                {stats?.install_profile ? (
+                  <section className="card card-compact" id="installProfileSection">
+                    <h3 className="card-title">
+                      Профиль установки{' '}
+                      <span className="profile-badge" id="profileBadge">
+                        {stats.install_profile.profile_label || stats.install_profile.profile || '—'}
+                      </span>
+                    </h3>
+                    {epsMax ? (
+                      <div className="capacity-meter" id="capacityMeter">
+                        <div className="meter-label">
+                          Нагрузка к ёмкости: <span id="capacityLabel">{capPct}%</span>
+                        </div>
+                        <div className="capacity-track">
+                          <div
+                            className="capacity-fill"
+                            id="capacityFill"
+                            style={{ width: `${Math.min(capPct, 100)}%` }}
+                          />
+                        </div>
+                        <div className="capacity-hint" id="capacityHint">
+                          EPS {fmtNumber(eps)} / лимит {fmtNumber(epsMax)}
+                        </div>
+                      </div>
+                    ) : null}
+                  </section>
+                ) : null}
+
+                <section className="row cols-2">
+                  <div className="card card-compact">
+                    <h3 className="card-title">Health компонентов</h3>
+                    <div className="health-grid" id="componentHealthGrid">
+                      <div
+                        className={`health-card ${backendHealth.up === false ? 'bad' : 'ok'}`}
+                      >
+                        <div className="health-head">
+                          <span className="health-name">Backend</span>
+                          <span className="health-state">
+                            {String(backendHealth.state_text || backendHealth.state || (backendHealth.up === false ? 'DOWN' : 'UP'))}
+                          </span>
+                        </div>
+                        <div className="health-meta">
+                          goroutines: {fmtNumber(stats?.backend_info?.num_goroutine)} · heap:{' '}
+                          {stats?.backend_info?.heap_alloc_mb != null
+                            ? `${Number(stats.backend_info.heap_alloc_mb).toFixed(1)} MB`
+                            : '—'}
+                        </div>
+                      </div>
+                      <div className={`health-card ${ingestHealth.up === false ? 'bad' : 'ok'}`}>
+                        <div className="health-head">
+                          <span className="health-name">Ingest</span>
+                          <span className="health-state">
+                            {String(ingestHealth.state_text || ingestHealth.state || 'RUNNING')}
+                          </span>
+                        </div>
+                        <div className="health-meta">
+                          conn: {fmtNumber(ingest.connections)} · lag: {fmtLag(ingest.lag_sec)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="card card-compact">
+                    <h3 className="card-title">Контейнеры</h3>
+                    <div className="container-strip" id="containersRow">
+                      {CONTAINERS.map((name) => {
+                        const c = stats?.containers?.[name];
+                        const up = num(c?.mem_bytes) > 0;
+                        return (
+                          <div key={name} className={`container-chip${up ? ' up' : ''}`}>
+                            <span className="dot" />
+                            <span className="name">{name}</span>
+                            <span className="metrics">
+                              CPU {c?.cpu_pct != null ? `${Number(c.cpu_pct).toFixed(1)}%` : '—'} · Mem{' '}
+                              {c?.mem_bytes != null ? fmtBytes(c.mem_bytes) : '—'}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </section>
+
+                <section className="card card-compact edges-card" id="edgesAggSection">
+                  <h3 className="card-title">
+                    Агрегаты рёбер{' '}
+                    <span className="profile-badge" id="edgesAggBadge">
+                      {(edges?.state || '—').toUpperCase()}
+                    </span>
+                  </h3>
+                  <div className="kv-grid cols-3" id="edgesAggPrimary">
+                    <div className="kv">
+                      <span className="k">Raw / agg</span>
+                      <span className="v">
+                        {fmtNumber(edges?.raw_rows)} / {fmtNumber(edges?.agg_rows)}
+                      </span>
+                    </div>
+                    <div className="kv">
+                      <span className="k">Карта</span>
+                      <span className="v">{edges?.map_source || '—'}</span>
+                    </div>
+                    <div className="kv">
+                      <span className="k">Backfill</span>
+                      <span className="v">
+                        {edges?.days_done != null
+                          ? `${edges.days_done} / ${edges.days_total ?? '—'}`
+                          : '—'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="capacity-hint" id="edgesAggHint">
+                    {edges?.message ||
+                      (edges?.prefer_agg
+                        ? 'Агрегаты готовы — /api/events предпочитает edges_daily.'
+                        : '—')}
+                  </div>
+                  <details className="details-toggle" id="edgesAggDetails">
+                    <summary>+ Подробности</summary>
+                    <div className="kv-grid cols-2" id="edgesAggSecondary">
+                      <div className="kv">
+                        <span className="k">Phase</span>
+                        <span className="v">{edges?.phase || '—'}</span>
+                      </div>
+                      <div className="kv">
+                        <span className="k">prefer_agg</span>
+                        <span className="v">{String(!!edges?.prefer_agg)}</span>
+                      </div>
+                      <div className="kv">
+                        <span className="k">Обновлено</span>
+                        <span className="v">{fmtDate(edges?.updated_at)}</span>
+                      </div>
+                      <div className="kv">
+                        <span className="k">Старт</span>
+                        <span className="v">{fmtDate(edges?.started_at)}</span>
+                      </div>
+                    </div>
+                  </details>
+                </section>
+
+                <div className="footer-info" id="footerInfoOverview">
+                  обновлено: {updatedAt ? updatedAt.toLocaleString('ru-RU') : '—'}
+                  {stats?.backend_info
+                    ? ` · backend heap: ${Number(stats.backend_info.heap_alloc_mb || 0).toFixed(1)} MB · goroutines: ${fmtNumber(stats.backend_info.num_goroutine)}`
+                    : ''}
+                </div>
+              </div>
+            ) : null}
+
+            {tab === 'pipeline' ? (
+              <div className="tab-panel active" id="tab-pipeline" role="tabpanel">
+                <section className="card card-compact">
+                  <h3 className="card-title">Pipeline</h3>
+                  <div className="pipeline" id="pipelineRow">
+                    <div className="pipeline-stage ok">
+                      <div className="stage-name">syslog-ng</div>
+                      <div className="stage-value">{fmtNumber(rate.input_events_per_sec ?? rate.events_per_sec)} eps</div>
+                      <div className="stage-meta">
+                        udp: {fmtNumber(rate.udp_events_per_sec)}/s · tcp:{' '}
+                        {fmtNumber(rate.tcp_events_per_sec)}/s
+                      </div>
+                    </div>
+                    <div className="pipeline-arrow">→</div>
+                    <div className="pipeline-stage ok">
+                      <div className="stage-name">backend ingest</div>
+                      <div className="stage-value">{fmtNumber(ingest.events_per_sec ?? eps)} eps</div>
+                      <div className="stage-meta">
+                        conn: {fmtNumber(ingest.connections)}, buf: {fmtNumber(buffered)}, q:{' '}
+                        {fmtNumber(qDepth)}/{fmtNumber(qCap)} (
+                        {qCap ? ((qDepth / qCap) * 100).toFixed(1) : '0.0'}%)
+                      </div>
+                    </div>
+                    <div className="pipeline-arrow">→</div>
+                    <div className="pipeline-stage ok">
+                      <div className="stage-name">clickhouse</div>
+                      <div className="stage-value">
+                        {fmtNumber(storage.traffic_logs?.row_count)}
+                      </div>
+                      <div className="stage-meta">строк в БД</div>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="row cols-2">
+                  <div className="card card-compact">
+                    <h3 className="card-title">Ingest</h3>
+                    <div className="kv-grid cols-2" id="ingestList">
+                      {(
+                        [
+                          ['Лаг', fmtLag(ingest.lag_sec)],
+                          ['Очередь', `${fmtNumber(qDepth)}/${fmtNumber(qCap)}`],
+                          ['Inserted', fmtNumber(ingest.inserted_total)],
+                          ['Parse err.', fmtNumber(ingest.parse_errors_total)],
+                          ['Parse (1h)', fmtNumber(ingest.parse_errors_1h)],
+                          ['Buffered', fmtNumber(buffered)],
+                          ['Received', fmtNumber(ingest.received_total)],
+                          ['Skipped', fmtNumber(ingest.skipped_total)],
+                          ['Connections', fmtNumber(ingest.connections)],
+                          ['Uptime', fmtUptime(ingest.uptime_sec)],
+                        ] as const
+                      ).map(([k, v]) => (
+                        <div className="kv" key={k}>
+                          <span className="k">{k}</span>
+                          <span className="v">{v}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="card card-compact">
+                    <h3 className="card-title">Хранилище</h3>
+                    <div className="kv-grid cols-2" id="storageList">
+                      <div className="kv">
+                        <span className="k">traffic_logs</span>
+                        <span className="v">
+                          {fmtNumber(storage.traffic_logs?.row_count)} /{' '}
+                          {fmtBytes(storage.traffic_logs?.bytes_on_disk)}
+                        </span>
+                      </div>
+                      <div className="kv">
+                        <span className="k">active parts</span>
+                        <span className="v">{fmtNumber(storage.clickhouse?.active_parts)}</span>
+                      </div>
+                      <div className="kv">
+                        <span className="k">geo_ranges</span>
+                        <span className="v">
+                          {fmtNumber(storage.geo_ranges?.row_count)} диапазонов
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="card card-compact">
+                  <h3 className="card-title">Срок хранения</h3>
+                  <form id="retentionForm" className="form-row" onSubmit={saveRetention}>
+                    {(
+                      [
+                        ['traffic_logs_days', 'Логи трафика (дни)', 'retTrafficLogs'],
+                        ['edges_days', 'Агрегаты рёбер (дни)', 'retEdges'],
+                        ['parse_errors_days', 'Ошибки парсинга (дни)', 'retParseErrors'],
+                        ['system_metrics_days', 'Метрики системы (дни)', 'retSystemMetrics'],
+                      ] as const
+                    ).map(([key, label, id]) => (
+                      <div className="field" key={key}>
+                        <label htmlFor={id}>{label}</label>
+                        <input
+                          id={id}
+                          name={key}
+                          type="number"
+                          min={1}
+                          max={730}
+                          value={Number(retention[key] ?? 1)}
+                          onChange={(e) =>
+                            setRetention({ ...retention, [key]: Number(e.target.value) })
+                          }
+                        />
+                        <span className="hint">сейчас: {Number(retention[key] ?? 0)} дн.</span>
+                      </div>
+                    ))}
+                    <button type="submit" className="btn primary" id="retentionSaveBtn">
+                      Сохранить
+                    </button>
+                  </form>
+                  <p className="hint" id="retentionUpdatedAt">
+                    Уменьшение TTL удалит старые партиции при следующем merge/drop в ClickHouse.
+                    {retention.updated_at ? ` Обновлено: ${fmtDate(retention.updated_at)}` : ''}
+                  </p>
+                </section>
+              </div>
+            ) : null}
+
+            {tab === 'security' ? (
+              <div className="tab-panel active" id="tab-security" role="tabpanel">
+                <section className="card" id="failedLoginsSection">
+                  <details className="section-details" id="failedLoginsDetails" open>
+                    <summary className="card-title" style={{ color: 'var(--red)' }}>
+                      ■ Неуспешные попытки входа{' '}
+                      <span id="failedLoginsCount">({failed.length ? failed.length : 'нет'})</span>
+                    </summary>
+                    <div id="failedLoginsHost">
+                      {!failed.length ? (
+                        <p className="auth-fails-empty empty">Нет неуспешных попыток</p>
+                      ) : (
+                        <div className="table-wrap">
+                          <table className="auth-fails-table">
+                            <thead>
+                              <tr>
+                                <th scope="col">Логин</th>
+                                <th scope="col">IP</th>
+                                <th scope="col">Count</th>
+                                <th scope="col">Первая</th>
+                                <th scope="col">Последняя</th>
+                                <th scope="col">Блок</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {failed.map((f, i) => (
+                                <tr key={i}>
+                                  <td>{f.username}</td>
+                                  <td>{f.ip}</td>
+                                  <td>{fmtNumber(f.count)}</td>
+                                  <td>{fmtDate(f.first_at)}</td>
+                                  <td>{fmtDate(f.last_at)}</td>
+                                  <td>
+                                    {f.locked ? (
+                                      <span className="badge-locked">locked</span>
+                                    ) : (
+                                      '—'
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </details>
+                </section>
+              </div>
+            ) : null}
+
+            {tab === 'charts' ? (
+              <div className="tab-panel active" id="tab-charts" role="tabpanel">
+                <section className="row cols-2">
+                  <div className="card chart-card">
+                    <div className="chart-host" ref={chartEvents} style={{ height: 240 }} />
+                  </div>
+                  <div className="card chart-card">
+                    <div className="chart-host" ref={chartLag} style={{ height: 240 }} />
+                  </div>
+                </section>
+                <section className="row cols-2">
+                  <div className="card chart-card">
+                    <div className="chart-host" ref={chartCpu} style={{ height: 280 }} />
+                  </div>
+                  <div className="card chart-card">
+                    <div className="chart-host" ref={chartMem} style={{ height: 280 }} />
+                  </div>
+                </section>
+                <section className="row cols-2">
+                  <div className="card chart-card">
+                    <div className="chart-host" ref={chartBuffer} style={{ height: 200 }} />
+                  </div>
+                  <div className="card chart-card">
+                    <div className="chart-host" ref={chartStorage} style={{ height: 200 }} />
+                  </div>
+                </section>
+              </div>
+            ) : null}
+          </div>
+        </main>
       </div>
-    </AdminLayout>
+    </div>
   );
 }

@@ -1,14 +1,16 @@
 import { useEffect, type ReactNode } from 'react';
-import { AdminSidebar, UserMenu } from './Shell';
+import { AdminSidebar, SystemHealthPill, UserMenu } from './Shell';
 
 export function AdminLayout({
   title,
   children,
   actions,
+  showSystemHealth = true,
 }: {
   title: string;
   children: ReactNode;
   actions?: ReactNode;
+  showSystemHealth?: boolean;
 }) {
   useEffect(() => {
     document.body.classList.add('page-admin');
@@ -29,6 +31,7 @@ export function AdminLayout({
             <div id="userBarHost">
               <UserMenu />
             </div>
+            {showSystemHealth ? <SystemHealthPill /> : null}
           </div>
         </header>
         <main className="page-content">{children}</main>
