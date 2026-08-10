@@ -58,10 +58,20 @@ grep -q 'chartAxisStroke' frontend/src/pages/System/SystemPage.tsx || fail "syst
 grep -q 'nm-theme-change' frontend/src/pages/System/SystemPage.tsx || fail "system: theme listener"
 grep -q 'id="map-main"' frontend/src/pages/Map/MapPage.tsx || fail "map main landmark"
 grep -q 'countries.geojson\|loadCountriesGeoJSON\|mapHeatmap' frontend/src/pages/Map/mapHeatmap.ts || fail "heatmap geojson"
-grep -q 'autoRotate\|startGlobeAutoRotate\|auto-rotate' frontend/src/pages/Map/MapPage.tsx frontend/src/pages/Map/mapViewport.ts || fail "auto-rotate"
+grep -q 'autoRotate\|startGlobeAutoRotate\|auto-rotate' \
+  frontend/src/pages/Map/MapPage.tsx \
+  frontend/src/pages/Map/useGlobeAutoRotate.ts \
+  frontend/src/pages/Map/mapViewport.ts || fail "auto-rotate"
 grep -q 'reputation' frontend/src/pages/Map/mapReputation.ts || fail "map reputation"
 grep -q 'events/series\|sparkline' frontend/src/pages/Map/mapDetail.tsx || fail "detail sparkline"
-grep -q 'upload-geo' frontend/src/pages/Map/MapPage.tsx || fail "map upload-geo"
+grep -q 'upload-geo' \
+  frontend/src/pages/Map/MapPage.tsx \
+  frontend/src/pages/Map/useMapUploads.ts \
+  frontend/src/pages/Map/MapSidebar.tsx || fail "map upload-geo"
+[[ -f frontend/src/pages/Map/useMapEvents.ts ]] || fail "missing useMapEvents"
+[[ -f frontend/src/pages/Map/MapSidebar.tsx ]] || fail "missing MapSidebar"
+[[ -f frontend/src/pages/Map/MapTopbar.tsx ]] || fail "missing MapTopbar"
+[[ -f frontend/eslint.config.js ]] || fail "missing eslint.config.js"
 [[ -f frontend/src/pages/Map/mapReputation.test.ts ]] || fail "missing mapReputation.test.ts"
 [[ -f frontend/src/pages/Map/mapHeatmap.test.ts ]] || fail "missing mapHeatmap.test.ts"
 [[ -f frontend/src/pages/Map/mapLayers.test.ts ]] || fail "missing mapLayers.test.ts"
