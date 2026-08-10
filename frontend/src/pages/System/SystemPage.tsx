@@ -259,13 +259,13 @@ function alignSeries(
   return { xs, ys };
 }
 
-function formatSeriesValue(
-  v: number | null | undefined,
-  opts?: { isBytes?: boolean; isPercent?: boolean },
-): string {
+type ChartFormatOpts = { isBytes?: boolean; isPercent?: boolean; isInt?: boolean };
+
+function formatSeriesValue(v: number | null | undefined, opts?: ChartFormatOpts): string {
   if (v == null || Number.isNaN(Number(v))) return '—';
   if (opts?.isPercent) return `${Number(v).toFixed(2)}%`;
   if (opts?.isBytes) return fmtBytes(v);
+  if (opts?.isInt) return fmtNumber(Math.round(Number(v)));
   const n = Number(v);
   if (Math.abs(n) < 1) return n.toFixed(3);
   if (Math.abs(n) < 100) return n.toFixed(1);
@@ -288,11 +288,7 @@ function buildChartLegend(labels: string[], colors: string[]): HTMLDivElement {
   return legend;
 }
 
-function updateCustomLegend(
-  u: uPlot,
-  legendEl: HTMLElement,
-  opts?: { isBytes?: boolean; isPercent?: boolean },
-): void {
+function updateCustomLegend(u: uPlot, legendEl: HTMLElement, opts?: ChartFormatOpts): void {
   const valueEls = legendEl.querySelectorAll('.chart-legend-value');
   const idx = u.cursor?.idx ?? null;
   const data = u.data || [];
@@ -322,7 +318,7 @@ function makeChart(
   labels: string[],
   xs: number[],
   ys: number[][],
-  opts?: { isBytes?: boolean; isPercent?: boolean },
+  opts?: ChartFormatOpts,
 ): uPlot {
   host.innerHTML = '';
   const titleEl = document.createElement('div');
@@ -366,13 +362,14 @@ function makeChart(
           stroke: chartAxisStroke(),
           grid: { stroke: 'rgba(148,163,184,0.12)' },
           values: (_u, splits) => {
-              if (opts?.isBytes) return fmtBytesAxisTicks(splits);
-              return splits.map((v) => {
-                if (v == null || Number.isNaN(v)) return '';
-                if (opts?.isPercent) return `${v.toFixed(1)}%`;
-                return formatSeriesValue(v, opts);
-              });
-            },
+            if (opts?.isBytes) return fmtBytesAxisTicks(splits);
+            return splits.map((v) => {
+              if (v == null || Number.isNaN(v)) return '';
+              if (opts?.isPercent) return `${v.toFixed(1)}%`;
+              if (opts?.isInt) return fmtNumber(Math.round(v));
+              return formatSeriesValue(v, opts);
+            });
+          },
         },
       ],
       scales: { x: { time: true } },
@@ -472,18 +469,15 @@ export default function SystemPage() {
         title: string,
         labels: string[],
         keys: string[],
-        opts?: { isBytes?: boolean; isPercent?: boolean; scale?: (v: number) => number },
+        opts?: ChartFormatOpts,
       ) => {
         if (!ref.current) return;
         const { xs, ys } = alignSeries(data.series, keys);
-        const scaled = opts?.scale
-          ? ys.map((arr) => arr.map((v) => (v == null ? v : opts.scale!(v))))
-          : ys;
         if (!xs.length) {
           ref.current.innerHTML = `<div class="chart-title">${title}</div><div class="empty" style="padding:24px">Нет данных</div>`;
           return;
         }
-        plotsRef.current.push(makeChart(ref.current, title, labels, xs, scaled, opts));
+        plotsRef.current.push(makeChart(ref.current, title, labels, xs, ys, opts));
       };
 
       mk(chartEvents, 'События / сек', ['Ingest rate (live)', 'DB ingest (1m avg)'], [
@@ -505,13 +499,19 @@ export default function SystemPage() {
         CONTAINERS.map((c) => `container.${c}.mem_bytes`),
         { isBytes: true },
       );
-      mk(chartBuffer, 'Буфер импортера', ['Buffered lines'], ['pipeline.ingest.buffered_lines']);
+      mk(
+        chartBuffer,
+        'Буфер импортера',
+        ['Buffered lines'],
+        ['pipeline.ingest.buffered_lines'],
+        { isInt: true },
+      );
       mk(
         chartStorage,
         'Размер хранилища',
-        ['traffic_logs (MB)'],
+        ['traffic_logs'],
         ['storage.traffic_logs.bytes_on_disk'],
-        { scale: (v) => v / (1024 * 1024) },
+        { isBytes: true },
       );
     },
     [],
