@@ -110,6 +110,8 @@ export default function MapPage() {
   const userInteractingRef = useRef(false);
   const lastGlobeCullKeyRef = useRef('');
   const mapTilesFailedRef = useRef(true);
+  const basemapOkRef = useRef(false);
+  const lastThemeBasemapRef = useRef<string | null>(null);
   const heavyLayersRef = useRef(false);
   const basemapGenRef = useRef(0);
   const layersRefreshBusy = useRef(false);
@@ -364,6 +366,7 @@ export default function MapPage() {
       const finishOk = () => {
         if (settled || gen !== basemapGenRef.current || !mapRef.current) return;
         settled = true;
+        basemapOkRef.current = true;
         setMapTilesFailed(false);
         try {
           map.jumpTo({ center, zoom, bearing, pitch });
@@ -385,6 +388,9 @@ export default function MapPage() {
 
       window.setTimeout(() => {
         if (settled || gen !== basemapGenRef.current || !mapRef.current) return;
+        // style.load never arrived — stay on whatever is current; only force
+        // empty fallback if we never had a successful remote style.
+        if (basemapOkRef.current) return;
         settled = true;
         setMapTilesFailed(true);
         console.warn('Remote basemap slow/unavailable, keeping local style');
@@ -401,7 +407,7 @@ export default function MapPage() {
           /* ignore */
         }
         setLayersTick((t) => t + 1);
-      }, 6000);
+      }, 12000);
     },
     [],
   );
@@ -440,18 +446,23 @@ export default function MapPage() {
 
     map.on('error', (e) => {
       const msg = (e && e.error && e.error.message) || String(e.error || '');
-      if (/Failed to fetch|NetworkError|AJAX|tile|style|load/i.test(msg) || e.error) {
-        if (!mapTilesFailedRef.current) {
-          setMapTilesFailed(true);
-          try {
-            map.setStyle(emptyStyleFallback(viewModeRef.current));
-            applyMapProjection(map, viewModeRef.current);
-          } catch {
-            /* ignore */
-          }
-          setLayersTick((t) => t + 1);
+      if (!/Failed to fetch|NetworkError|AJAX|tile|style|load/i.test(msg) && !e.error) return;
+      // After a successful remote style, keep it — transient tile errors must not
+      // wipe the basemap to an empty black background (2D/globe both break).
+      if (basemapOkRef.current || mapTilesFailedRef.current) {
+        if (basemapOkRef.current) {
+          console.warn('Basemap tile/style warning (keeping remote style)', e.error || e);
         }
+        return;
       }
+      setMapTilesFailed(true);
+      try {
+        map.setStyle(emptyStyleFallback(viewModeRef.current));
+        applyMapProjection(map, viewModeRef.current);
+      } catch {
+        /* ignore */
+      }
+      setLayersTick((t) => t + 1);
     });
 
     let readyOnce = false;
@@ -485,6 +496,7 @@ export default function MapPage() {
       setMapReady(true);
 
       const remoteStyleUrl = theme === 'light' ? MAP_STYLE_LIGHT : MAP_STYLE_DARK;
+      lastThemeBasemapRef.current = theme;
       beginRemoteBasemapUpgrade(remoteStyleUrl);
 
       requestAnimationFrame(() => {
@@ -563,9 +575,16 @@ export default function MapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Theme basemap
+  // Theme basemap — first load is handled in onReady; only react to later theme changes.
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
+    if (lastThemeBasemapRef.current === null) {
+      lastThemeBasemapRef.current = theme;
+      return;
+    }
+    if (lastThemeBasemapRef.current === theme) return;
+    lastThemeBasemapRef.current = theme;
+    basemapOkRef.current = false;
     const styleUrl = theme === 'light' ? MAP_STYLE_LIGHT : MAP_STYLE_DARK;
     beginRemoteBasemapUpgrade(styleUrl);
   }, [theme, mapReady, beginRemoteBasemapUpgrade]);

@@ -750,17 +750,17 @@ export default function SystemPage() {
                     </span>
                   </h3>
                   <div className="kv-grid cols-3" id="edgesAggPrimary">
-                    <div className="kv">
+                    <div className="kv-row">
                       <span className="k">Raw / agg</span>
                       <span className="v">
                         {fmtNumber(edges?.raw_rows)} / {fmtNumber(edges?.agg_rows)}
                       </span>
                     </div>
-                    <div className="kv">
+                    <div className="kv-row">
                       <span className="k">Карта</span>
                       <span className="v">{edges?.map_source || '—'}</span>
                     </div>
-                    <div className="kv">
+                    <div className="kv-row">
                       <span className="k">Backfill</span>
                       <span className="v">
                         {edges?.days_total
@@ -779,23 +779,23 @@ export default function SystemPage() {
                   >
                     <summary>+ Подробности</summary>
                     <div className="kv-grid cols-2" id="edgesAggSecondary">
-                      <div className="kv">
+                      <div className="kv-row">
                         <span className="k">Сообщение</span>
                         <span className="v">{edges?.message || '—'}</span>
                       </div>
-                      <div className="kv">
+                      <div className="kv-row">
                         <span className="k">prefer_agg</span>
                         <span className="v">{edges?.prefer_agg ? 'да' : 'нет'}</span>
                       </div>
-                      <div className="kv">
+                      <div className="kv-row">
                         <span className="k">geo prefer_agg</span>
                         <span className="v">{edges?.geo_prefer_agg ? 'да' : 'нет'}</span>
                       </div>
-                      <div className="kv">
+                      <div className="kv-row">
                         <span className="k">Обновлено</span>
                         <span className="v">{fmtDate(edges?.updated_at)}</span>
                       </div>
-                      <div className="kv">
+                      <div className="kv-row">
                         <span className="k">Старт</span>
                         <span className="v">{fmtDate(edges?.started_at)}</span>
                       </div>
@@ -876,7 +876,7 @@ export default function SystemPage() {
                           ['Uptime', fmtUptime(uptimeSec)],
                         ] as const
                       ).map(([k, v]) => (
-                        <div className="kv" key={k}>
+                        <div className="kv-row" key={k}>
                           <span className="k">{k}</span>
                           <span className="v">{v}</span>
                         </div>
@@ -886,18 +886,18 @@ export default function SystemPage() {
                   <div className="card card-compact">
                     <h3 className="card-title">Хранилище</h3>
                     <div className="kv-grid cols-2" id="storageList">
-                      <div className="kv">
+                      <div className="kv-row">
                         <span className="k">traffic_logs</span>
                         <span className="v">
                           {fmtNumber(storage.traffic_logs?.row_count)} /{' '}
                           {fmtBytes(storage.traffic_logs?.bytes_on_disk)}
                         </span>
                       </div>
-                      <div className="kv">
+                      <div className="kv-row">
                         <span className="k">active parts</span>
                         <span className="v">{fmtNumber(storage.clickhouse?.active_parts)}</span>
                       </div>
-                      <div className="kv">
+                      <div className="kv-row">
                         <span className="k">geo_ranges</span>
                         <span className="v">
                           {fmtNumber(storage.geo_ranges?.row_count)} диапазонов

@@ -366,22 +366,27 @@ body.page-admin {
 }
 .kv-grid.cols-2 { grid-template-columns: 1fr 1fr; }
 .kv-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
-.kv-row {
+.kv-row,
+.kv {
     display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
     padding: 4px 0;
     border-bottom: 1px solid var(--border);
     font-size: 11px;
 }
-.kv-row:last-child { border-bottom: none; }
-.kv-grid .kv-row {
+.kv-row:last-child,
+.kv:last-child { border-bottom: none; }
+.kv-grid .kv-row,
+.kv-grid .kv {
     padding: 3px 8px;
     border-bottom: none;
     background: var(--panel-2);
     border-radius: 4px;
     border: 1px solid transparent;
 }
-.kv-row .k { color: var(--text-muted); flex-shrink: 0; }
-.kv-row .v {
+.kv-row .k,
+.kv .k { color: var(--text-muted); flex-shrink: 0; }
+.kv-row .v,
+.kv .v {
     color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums;
     text-align: right; min-width: 0;
     overflow: hidden; text-overflow: ellipsis;
