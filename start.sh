@@ -102,17 +102,23 @@ ensure_compose_profiles() {
     log "Compose profiles (default): ${COMPOSE_PROFILES}"
 }
 
-# Генерирует API_AUTH_TOKEN и SESSION_SECRET в .env, если ещё нет.
+# Генерирует API_AUTH_TOKEN, SESSION_SECRET и seed-пароли в .env, если ещё нет.
 ensure_api_auth_token() {
     local env_file=".env"
-    local need_token=1 need_session=1
+    local need_token=1 need_session=1 need_admin=1 need_operator=1
     if [[ -f "$env_file" ]] && grep -qE '^[[:space:]]*API_AUTH_TOKEN=' "$env_file"; then
         need_token=0
     fi
     if [[ -f "$env_file" ]] && grep -qE '^[[:space:]]*SESSION_SECRET=' "$env_file"; then
         need_session=0
     fi
-    if (( need_token == 0 && need_session == 0 )); then
+    if [[ -f "$env_file" ]] && grep -qE '^[[:space:]]*AUTH_ADMIN_PASSWORD=' "$env_file"; then
+        need_admin=0
+    fi
+    if [[ -f "$env_file" ]] && grep -qE '^[[:space:]]*AUTH_OPERATOR_PASSWORD=' "$env_file"; then
+        need_operator=0
+    fi
+    if (( need_token == 0 && need_session == 0 && need_admin == 0 && need_operator == 0 )); then
         return 0
     fi
     local rand
@@ -132,10 +138,14 @@ ensure_api_auth_token() {
             echo "# Сгенерировано start.sh — секрет cookie-сессий UI"
             echo "SESSION_SECRET=${rand}"
         fi
-        if ! grep -qE '^[[:space:]]*AUTH_ADMIN_PASSWORD=' "$env_file" 2>/dev/null; then
+        if (( need_admin == 1 || need_operator == 1 )); then
             echo "# Смените пароли после первого входа"
+        fi
+        if (( need_admin == 1 )); then
             echo "AUTH_ADMIN_USER=admin"
             echo "AUTH_ADMIN_PASSWORD=admin"
+        fi
+        if (( need_operator == 1 )); then
             echo "AUTH_OPERATOR_USER=operator"
             echo "AUTH_OPERATOR_PASSWORD=operator"
         fi
@@ -143,37 +153,55 @@ ensure_api_auth_token() {
     log "Generated auth secrets in .env (API_AUTH_TOKEN / SESSION_SECRET / default users if missing)"
 }
 
-# Не даём поднять стек с compose-плейсхолдерами, если забыли сгенерировать .env.
+# Не даём поднять стек без секретов / с legacy-плейсхолдерами.
 # Обход только через NM_ALLOW_INSECURE=1 (local/dev).
 check_auth_secrets() {
     local env_file=".env"
     local allow="${NM_ALLOW_INSECURE:-0}"
     local token="" secret=""
+    local admin_pass="" operator_pass=""
 
     if [[ -f "$env_file" ]]; then
         allow="$(grep -E '^[[:space:]]*NM_ALLOW_INSECURE=' "$env_file" 2>/dev/null | tail -n1 | cut -d= -f2- || true)"
         [[ -z "$allow" ]] && allow="${NM_ALLOW_INSECURE:-0}"
         token="$(grep -E '^[[:space:]]*API_AUTH_TOKEN=' "$env_file" | tail -n1 | cut -d= -f2- || true)"
         secret="$(grep -E '^[[:space:]]*SESSION_SECRET=' "$env_file" | tail -n1 | cut -d= -f2- || true)"
+        admin_pass="$(grep -E '^[[:space:]]*AUTH_ADMIN_PASSWORD=' "$env_file" | tail -n1 | cut -d= -f2- || true)"
+        operator_pass="$(grep -E '^[[:space:]]*AUTH_OPERATOR_PASSWORD=' "$env_file" | tail -n1 | cut -d= -f2- || true)"
     else
         token="${API_AUTH_TOKEN:-}"
         secret="${SESSION_SECRET:-}"
+        admin_pass="${AUTH_ADMIN_PASSWORD:-}"
+        operator_pass="${AUTH_OPERATOR_PASSWORD:-}"
     fi
     # Env overrides file when set explicitly for this run.
     [[ -n "${NM_ALLOW_INSECURE:-}" ]] && allow="$NM_ALLOW_INSECURE"
     [[ -n "${API_AUTH_TOKEN:-}" ]] && token="$API_AUTH_TOKEN"
     [[ -n "${SESSION_SECRET:-}" ]] && secret="$SESSION_SECRET"
+    [[ -n "${AUTH_ADMIN_PASSWORD:-}" ]] && admin_pass="$AUTH_ADMIN_PASSWORD"
+    [[ -n "${AUTH_OPERATOR_PASSWORD:-}" ]] && operator_pass="$AUTH_OPERATOR_PASSWORD"
 
     if [[ "$allow" == "1" || "$allow" == "true" || "$allow" == "yes" ]]; then
         log "WARNING: NM_ALLOW_INSECURE=$allow — insecure placeholders allowed (dev only)"
         return 0
     fi
 
+    if [[ -z "$token" || -z "$secret" ]]; then
+        log "ERROR: API_AUTH_TOKEN and SESSION_SECRET are required in .env."
+        log "  Run via ./start.sh (generates secrets) or set them manually."
+        log "  For local only: NM_ALLOW_INSECURE=1 ./start.sh"
+        exit 1
+    fi
+
     if [[ "$token" == "dev-insecure-change-me" || "$secret" == "dev-session-secret-change-me" ]]; then
-        log "ERROR: .env still has docker-compose placeholder secrets."
+        log "ERROR: .env still has legacy insecure placeholder secrets."
         log "  Run via ./start.sh (generates token/secret) or set unique API_AUTH_TOKEN / SESSION_SECRET."
         log "  For local only: NM_ALLOW_INSECURE=1 ./start.sh"
         exit 1
+    fi
+
+    if [[ "$admin_pass" == "admin" || "$operator_pass" == "operator" ]]; then
+        log "WARNING: default seed passwords in .env (admin/operator) — change after first login"
     fi
 }
 

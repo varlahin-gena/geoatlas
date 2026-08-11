@@ -86,6 +86,7 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
+    image: network_monitor-backend:latest
     container_name: backend
     expose:
       - "8080"
@@ -120,17 +121,16 @@ services:
       INSTALL_PROFILE_PATH: /app/install-profile.json
       INSTALL_META_PATH: /app/install-meta.json
       # Обязателен, если API_AUTH_DISABLED не true. Генерируется в start.sh → .env
-      # Плейсхолдер ниже отвергается backend'ом без NM_ALLOW_INSECURE=1.
-      API_AUTH_TOKEN: ${API_AUTH_TOKEN:-dev-insecure-change-me}
+      API_AUTH_TOKEN: ${API_AUTH_TOKEN:?set API_AUTH_TOKEN in .env}
       API_AUTH_DISABLED: ${API_AUTH_DISABLED:-false}
-      # Локальный логин (роли administrator / operator). Пароли — в .env.
+      # Локальный логин (роли administrator / operator). Пароли — в .env (start.sh).
       AUTH_DISABLED: ${AUTH_DISABLED:-false}
-      SESSION_SECRET: ${SESSION_SECRET:-dev-session-secret-change-me}
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
       SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-12}
       AUTH_ADMIN_USER: ${AUTH_ADMIN_USER:-admin}
-      AUTH_ADMIN_PASSWORD: ${AUTH_ADMIN_PASSWORD:-admin}
+      AUTH_ADMIN_PASSWORD: ${AUTH_ADMIN_PASSWORD:?set AUTH_ADMIN_PASSWORD in .env}
       AUTH_OPERATOR_USER: ${AUTH_OPERATOR_USER:-operator}
-      AUTH_OPERATOR_PASSWORD: ${AUTH_OPERATOR_PASSWORD:-operator}
+      AUTH_OPERATOR_PASSWORD: ${AUTH_OPERATOR_PASSWORD:?set AUTH_OPERATOR_PASSWORD in .env}
       AUTH_USERS_FILE: /app/data/users.json
       RETENTION_FILE: /app/data/retention.json
       REPUTATION_FEEDS_FILE: /app/data/reputation_feeds.json
@@ -140,7 +140,7 @@ services:
       BACKUP_INCLUDE_EDGES: ${BACKUP_INCLUDE_EDGES:-true}
       BACKUP_INCLUDE_AUTH: ${BACKUP_INCLUDE_AUTH:-true}
       BACKUP_SCHEDULE_FILE: /app/data/backup_schedule.json
-      # Только local/dev: плейсхолдеры секретов и/или AUTH_DISABLED / API_AUTH_DISABLED
+      # Только local/dev: legacy placeholders и/или AUTH_DISABLED / API_AUTH_DISABLED
       NM_ALLOW_INSECURE: ${NM_ALLOW_INSECURE:-0}
       TZ: Europe/Moscow
     volumes:
@@ -162,6 +162,8 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - ALL
     deploy:
       resources:
         limits:
@@ -177,6 +179,7 @@ services:
     build:
       context: .
       dockerfile: stats-collector/Dockerfile
+    image: network_monitor-stats-collector:latest
     container_name: stats-collector
     profiles: ["stats"]
     depends_on:
@@ -193,7 +196,7 @@ services:
       COLLECT_INTERVAL: "30"
       BACKEND_HEALTH_URL: http://backend:8080/health
       INGEST_STATS_URL: http://backend:8080/api/ingest/stats
-      API_AUTH_TOKEN: ${API_AUTH_TOKEN:-dev-insecure-change-me}
+      API_AUTH_TOKEN: ${API_AUTH_TOKEN:?set API_AUTH_TOKEN in .env}
       CGROUP_ROOT: /sys/fs/cgroup
       HOST_PROC: /host/proc
       TZ: Europe/Moscow
@@ -203,6 +206,8 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - ALL
     read_only: true
     tmpfs:
       - /tmp
@@ -231,15 +236,26 @@ services:
       HTTP_REDIRECT: ${HTTP_REDIRECT:-1}
       SSL_CERT_FILE: ${SSL_CERT_FILE:-/etc/nginx/certs/fullchain.pem}
       SSL_KEY_FILE: ${SSL_KEY_FILE:-/etc/nginx/certs/privkey.pem}
-    entrypoint: ["/bin/sh", "/docker-entrypoint-nm.sh"]
     volumes:
       - ./certs:/etc/nginx/certs:ro
     depends_on:
       backend:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
     deploy:
       resources:
         limits:

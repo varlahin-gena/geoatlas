@@ -13,6 +13,7 @@ ok() { echo "ok: $*"; }
 [[ -f frontend/vite.config.ts ]] || fail "missing frontend/vite.config.ts"
 [[ -f frontend/index.html ]] || fail "missing frontend/index.html"
 [[ -f frontend/Dockerfile ]] || fail "missing frontend/Dockerfile"
+[[ -f .dockerignore ]] || fail "missing root .dockerignore"
 [[ -f frontend/nginx.conf ]] || fail "missing frontend/nginx.conf"
 [[ -f frontend/nginx-app.inc ]] || fail "missing frontend/nginx-app.inc"
 [[ -f frontend/docker-entrypoint.sh ]] || fail "missing frontend/docker-entrypoint.sh"

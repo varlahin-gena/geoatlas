@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Известные insecure-плейсхолдеры из docker-compose.yml (обход start.sh).
+// Legacy insecure placeholders (старые дефолты compose / ручная подстановка).
 var (
 	insecureAPIAuthTokens = []string{
 		"dev-insecure-change-me",
@@ -16,7 +16,7 @@ var (
 )
 
 // ValidateSecurity проверяет секреты перед стартом.
-// Плейсхолдеры из compose и флаги *_DISABLED запрещены без NM_ALLOW_INSECURE=1.
+// Legacy placeholders и флаги *_DISABLED запрещены без NM_ALLOW_INSECURE=1.
 // Слабые seed-пароли (admin/admin) не блокируют старт — у них must_reset_password;
 // см. SecurityWarnings.
 func (c Config) ValidateSecurity() error {
@@ -38,7 +38,7 @@ func (c Config) ValidateSecurity() error {
 			return fmt.Errorf("API_AUTH_TOKEN is required; set API_AUTH_DISABLED=1 only for local/dev (with NM_ALLOW_INSECURE=1)")
 		}
 		if !allowInsecure && isListed(token, insecureAPIAuthTokens) {
-			return fmt.Errorf("API_AUTH_TOKEN is a known insecure placeholder from docker-compose; generate via start.sh or set a unique token (NM_ALLOW_INSECURE=1 to override)")
+			return fmt.Errorf("API_AUTH_TOKEN is a known insecure legacy placeholder; generate via start.sh or set a unique token (NM_ALLOW_INSECURE=1 to override)")
 		}
 		prev := strings.TrimSpace(c.APIAuthPreviousToken)
 		if prev != "" && !allowInsecure && isListed(prev, insecureAPIAuthTokens) {
@@ -52,7 +52,7 @@ func (c Config) ValidateSecurity() error {
 			return fmt.Errorf("SESSION_SECRET is required when AUTH_DISABLED is not set")
 		}
 		if !allowInsecure && isListed(secret, insecureSessionSecrets) {
-			return fmt.Errorf("SESSION_SECRET is a known insecure placeholder from docker-compose; generate via start.sh (NM_ALLOW_INSECURE=1 to override)")
+			return fmt.Errorf("SESSION_SECRET is a known insecure legacy placeholder; generate via start.sh (NM_ALLOW_INSECURE=1 to override)")
 		}
 	}
 

@@ -5,6 +5,10 @@
 
 ## [Unreleased]
 
+### Changed
+- Docker hardening: root `.dockerignore`, hermetic backend build (no `go mod tidy` fallback), non-root `stats-collector`, `cap_drop: ALL` on app services, frontend healthcheck + tmpfs
+- Compose fail-closed secrets: `API_AUTH_TOKEN` / `SESSION_SECRET` / seed passwords require `.env` (`:?`); prefer `./start.sh`
+
 ### Added
 - HTTPS на nginx со своими PEM: `certs/fullchain.pem` + `certs/privkey.pem`, `HTTPS_ENABLED` / `HTTPS_PORT` / `HTTP_REDIRECT`, `docker-compose.https.yml`
 - Entrypoint frontend генерирует `default.conf` (HTTP или HTTPS + редирект); общий `nginx-app.inc`

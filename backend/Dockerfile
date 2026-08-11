@@ -8,21 +8,11 @@ COPY pkg/chconn ./pkg/chconn
 COPY backend/go.mod backend/go.sum ./backend/
 
 WORKDIR /src/backend
-RUN go mod download || true
+RUN go mod download
 
 COPY backend/ .
-
-RUN set -e; \
-    build() { \
-        CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
-            -o /out/network-monitor ./cmd/network-monitor; \
-    }; \
-    if ! build; then \
-        echo ">>> Первая сборка не удалась, вероятно go.mod рассинхронизирован."; \
-        echo ">>> Запускаю 'go mod tidy' (fallback) и повторяю сборку..."; \
-        go mod tidy; \
-        build; \
-    fi
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
+    -o /out/network-monitor ./cmd/network-monitor
 
 # ---------- runtime stage ----------
 FROM alpine:3.20
@@ -35,6 +25,5 @@ RUN apk add --no-cache ca-certificates tzdata && \
 USER app
 WORKDIR /app
 COPY --from=build /out/network-monitor /app/network-monitor
-VOLUME ["/app/data"]
 EXPOSE 8080 1514
 ENTRYPOINT ["/app/network-monitor"]

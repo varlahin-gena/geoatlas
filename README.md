@@ -226,7 +226,8 @@ http://<IP_сервера>/
 | `operator` | `operator` | operator      |
 
 Обе учётки создаются с `must_reset_password: true` — после входа нужно сменить пароль (мин. 8 символов).
-`./start.sh` при необходимости генерирует `API_AUTH_TOKEN` и `SESSION_SECRET` в `.env`.
+`./start.sh` при необходимости генерирует `API_AUTH_TOKEN`, `SESSION_SECRET` и seed-пароли в `.env`.
+Голый `docker compose up` без этих переменных в `.env` не стартует (fail-closed).
 
 ---
 
@@ -430,7 +431,9 @@ DO_BUILD=0 ./start.sh
 
 **Прямые команды Docker Compose:**
 
-> Голый `docker compose up` без `-f docker-compose.https.yml` не публикует HTTPS (`:443`). Предпочтительно `./start.sh` (или `deploy/common/compose.sh`).
+> Предпочтительно `./start.sh` (генерирует секреты в `.env`, подключает HTTPS-override).
+> Голый `docker compose up` без `.env` с `API_AUTH_TOKEN` / `SESSION_SECRET` / паролями — ошибка подстановки.
+> Без `-f docker-compose.https.yml` порт `:443` не публикуется.
 
 ```bash
 cd /opt/network-monitor
@@ -438,7 +441,7 @@ cd /opt/network-monitor
 # Статус контейнеров
 docker compose ps
 
-# Запуск в фоне
+# Запуск в фоне (нужен заполненный .env)
 docker compose up -d
 
 # Запуск с пересборкой
