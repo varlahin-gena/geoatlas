@@ -5,6 +5,24 @@
 
 ## [Unreleased]
 
+## [1.2.1] — 2026-08-11
+
+Патч после 1.2.0: порядок шагов установщика (HTTPS → HTTP-порт), uninstall под тома 1.2.0, удаление мёртвого кода.
+
+### Fixed
+- Установщик: вопрос HTTPS идёт **до** выбора HTTP-порта (цепочка `select_https` → `confirm_http_port`); full-auto согласован
+- Uninstall: cleanup firewall/томов по `NM_PROJECT_DIR` и составу volumes 1.2.0 (в т.ч. `clickhouse-backups`)
+- Install: `chmod` на backup/ops-скрипты при установке
+
+### Changed
+- Удалены мёртвый backend/GeoIP/reputation код, one-shot CH migrate SQL и дублирующие frontend-ассеты (иконки/GeoJSON вне SPA `public/`)
+
+### Notes
+- OpenAPI API doc version: **1.4.0** (без изменений)
+- Продуктовая версия: **1.2.1**
+- После обновления: `git fetch && git checkout v1.2.1` (или `main`), `./start.sh`
+- 2 коммита с `v1.2.0`
+
 ## [1.2.0] — 2026-08-11
 
 Минорный релиз: React SPA, HTTPS, резервное копирование ClickHouse, лимиты GeoIP upload и hardening Docker.
@@ -180,6 +198,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[1.2.1]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.2.1
 [1.2.0]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.2.0
 [1.1.4]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.1.4
 [1.1.3]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.1.3
