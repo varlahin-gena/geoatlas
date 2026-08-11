@@ -8,6 +8,7 @@
 ### Changed
 - Docker hardening: root `.dockerignore`, hermetic backend build (no `go mod tidy` fallback), non-root `stats-collector`, `cap_drop: ALL` on app services, frontend healthcheck + tmpfs
 - Compose fail-closed secrets: `API_AUTH_TOKEN` / `SESSION_SECRET` / seed passwords require `.env` (`:?`); prefer `./start.sh`
+- Fix: frontend `cap_add: NET_BIND_SERVICE` — иначе nginx не биндит `:80`/`:443` после `cap_drop: ALL`
 
 ### Added
 - HTTPS на nginx со своими PEM: `certs/fullchain.pem` + `certs/privkey.pem`, `HTTPS_ENABLED` / `HTTPS_PORT` / `HTTP_REDIRECT`, `docker-compose.https.yml`
