@@ -55,13 +55,23 @@ func (r *BackupRunner) BackupTables(ctx context.Context, name string, tables []s
 	if len(safe) == 0 {
 		return fmt.Errorf("no tables")
 	}
-	sql := fmt.Sprintf("BACKUP TABLE %s TO Disk('backups', '%s')", strings.Join(safe, ", "), name)
+	sql := backupTablesSQL(safe, name)
 	qctx, cancel := context.WithTimeout(ctx, 2*time.Hour)
 	defer cancel()
 	if err := r.ch.Exec(qctx, sql); err != nil {
 		return fmt.Errorf("backup: %w", err)
 	}
 	return nil
+}
+
+// backupTablesSQL — CH 25: перед каждым объектом нужен keyword TABLE
+// (`BACKUP TABLE a, TABLE b TO …`), не `BACKUP TABLE a, b`.
+func backupTablesSQL(tables []string, name string) string {
+	parts := make([]string, 0, len(tables))
+	for _, t := range tables {
+		parts = append(parts, "TABLE "+t)
+	}
+	return fmt.Sprintf("BACKUP %s TO Disk('backups', '%s')", strings.Join(parts, ", "), name)
 }
 
 func isSafeIdent(s string) bool {

@@ -77,7 +77,15 @@ if [[ ${#EXISTING[@]} -eq 0 ]]; then
 fi
 
 LIST="$(IFS=,; echo "${EXISTING[*]}")"
-SQL="BACKUP TABLE ${LIST} TO Disk('backups', '${NAME}')"
+# CH 25: BACKUP TABLE a, TABLE b — keyword TABLE перед каждым объектом.
+TABLE_LIST=""
+for t in "${EXISTING[@]}"; do
+  if [[ -n "$TABLE_LIST" ]]; then
+    TABLE_LIST+=", "
+  fi
+  TABLE_LIST+="TABLE ${t}"
+done
+SQL="BACKUP ${TABLE_LIST} TO Disk('backups', '${NAME}')"
 echo "backup: $SQL"
 $COMPOSE exec -T "$CLICKHOUSE_SERVICE" clickhouse-client --receive_timeout 3600 --send_timeout 3600 -q "$SQL"
 echo "backup: clickhouse ok → Disk('backups', '$NAME')"
