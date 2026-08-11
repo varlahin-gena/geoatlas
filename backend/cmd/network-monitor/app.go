@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	chadapter "network_monitor/internal/adapter/clickhouse"
+	"network_monitor/internal/adapter/backupjob"
 	"network_monitor/internal/adapter/geojob"
 	httpapi "network_monitor/internal/adapter/httpapi"
 	"network_monitor/internal/adapter/reputationjob"
@@ -18,6 +19,7 @@ type app struct {
 	srv        *httpapi.Server
 	geoJobs    *geojob.Scheduler
 	repJobs    *reputationjob.Scheduler
+	backupJobs *backupjob.Scheduler
 	bgCancel   context.CancelFunc
 	bgWg       sync.WaitGroup
 	ingestDone chan error
@@ -55,6 +57,9 @@ func buildApp(ctx context.Context, cfg config.Config) (*app, error) {
 	a.srv = buildHTTP(cfg, a, authParts, bg, parsers)
 	if a.repJobs != nil {
 		a.repJobs.Start(bgCtx)
+	}
+	if a.backupJobs != nil {
+		a.backupJobs.Start(bgCtx)
 	}
 	return a, nil
 }

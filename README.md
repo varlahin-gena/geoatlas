@@ -563,12 +563,15 @@ docker compose up -d backend
 
 | Переменная | Дефолт | Смысл |
 |------------|--------|--------|
-| `BACKUP_ENABLED` | `1` | `0` — no-op (удобно для cron) |
-| `BACKUP_KEEP` | `7` | сколько полных `nm-*` каталогов оставить |
-| `BACKUP_INCLUDE_EDGES` | `1` | `0` — без `traffic_edges_*` (потом backfill) |
-| `BACKUP_INCLUDE_AUTH` | `1` | писать `<name>.auth.tgz` |
+| `BACKUP_ENABLED` | `1` | kill-switch: `0` запрещает ручное и автосоздание |
+| `BACKUP_KEEP` | `7` | дефолт глубины, пока не сохранён schedule из UI |
+| `BACKUP_INCLUDE_EDGES` | `1` | дефолт состава |
+| `BACKUP_INCLUDE_AUTH` | `1` | дефолт auth tarball |
+| `BACKUP_SCHEDULE_FILE` | `/app/data/backup_schedule.json` | расписание + политика (том auth-users) |
 
-**Cron (пример):**
+**Расписание (UI):** `/system` → **Резервное копирование** — ежедневно `hour:minute` + IANA timezone, keep (1…90), edges/auth. API: `GET/PUT /api/system/backup-schedule`. При включённом автобэкапе host-cron `backup-clickhouse.sh` не обязателен (не дублируйте оба без нужды).
+
+**Cron (альтернатива, если UI-schedule выключен):**
 
 ```bash
 30 2 * * * cd /opt/network-monitor && ./scripts/backup-clickhouse.sh >>/var/log/nm-backup.log 2>&1
@@ -586,7 +589,7 @@ RESTORE_ALLOW_NONEMPTY=1 ./scripts/restore-clickhouse.sh nm-20260411T023000Z
 
 Планируйте место на диске: том бэкапов ≈ N × размер hot-данных. `down -v` / uninstall `--volumes` удалит и `clickhouse-backups`.
 
-**UI:** `/system` → вкладка **Резервное копирование** (administrator): список, статус, «Создать бэкап», **Подключить / Отключить / Удалить**.
+**UI:** `/system` → вкладка **Резервное копирование** (administrator): список, статус, «Создать бэкап», расписание, **Подключить / Отключить / Удалить**.
 
 - **Подключить** — `RESTORE … AS nm_bak_*` (shadow для карты). Live и ingest не трогаются.
 - **Отключить** — `DROP nm_bak_*`; бэкап на диске и live сохраняются.

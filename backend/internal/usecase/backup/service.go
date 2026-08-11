@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -36,16 +37,18 @@ type Status struct {
 
 // Catalog — список + настройки для UI.
 type Catalog struct {
-	OK           bool    `json:"ok"`
-	Enabled      bool    `json:"enabled"`
-	DirReady     bool    `json:"dir_ready"`
-	Keep         int     `json:"keep"`
-	IncludeEdges bool    `json:"include_edges"`
-	IncludeAuth  bool    `json:"include_auth"`
-	Attached     string  `json:"attached,omitempty"`
-	Backups      []Entry `json:"backups"`
-	Status       Status  `json:"status"`
-	Hint         string  `json:"hint,omitempty"`
+	OK           bool      `json:"ok"`
+	Enabled      bool      `json:"enabled"`
+	DirReady     bool      `json:"dir_ready"`
+	Keep         int       `json:"keep"`
+	IncludeEdges bool      `json:"include_edges"`
+	IncludeAuth  bool      `json:"include_auth"`
+	Attached     string    `json:"attached,omitempty"`
+	Schedule     Schedule  `json:"schedule"`
+	NextRunAt    string    `json:"next_run_at,omitempty"`
+	Backups      []Entry   `json:"backups"`
+	Status       Status    `json:"status"`
+	Hint         string    `json:"hint,omitempty"`
 }
 
 // Runner — native BACKUP / RESTORE / DROP в ClickHouse.
@@ -70,7 +73,7 @@ type Store interface {
 	SetAttached(name string) error
 }
 
-// Options — из config.
+// Options — из config (env defaults / kill-switch).
 type Options struct {
 	Enabled      bool
 	Dir          string
@@ -80,23 +83,28 @@ type Options struct {
 	IncludeAuth  bool
 }
 
-// Service — list + async create / attach / detach.
+// Service — list + async create / attach / detach + schedule.
 type Service struct {
-	opts   Options
-	runner Runner
-	store  Store
-	job    *Job
+	opts     Options
+	runner   Runner
+	store    Store
+	schedule ScheduleStore
+	job      *Job
+
+	mu           sync.Mutex
+	lastFireDate string // in-memory dedupe на случай гонки тика
 }
 
-func New(opts Options, runner Runner, store Store) *Service {
+func New(opts Options, runner Runner, store Store, schedule ScheduleStore) *Service {
 	if opts.Keep < 1 {
 		opts.Keep = 7
 	}
 	return &Service{
-		opts:   opts,
-		runner: runner,
-		store:  store,
-		job:    NewJob(),
+		opts:     opts,
+		runner:   runner,
+		store:    store,
+		schedule: schedule,
+		job:      NewJob(),
 	}
 }
 
@@ -104,15 +112,20 @@ func (s *Service) Catalog() (Catalog, error) {
 	if s == nil {
 		return Catalog{}, ErrUnavailable
 	}
+	sch, _ := s.GetSchedule()
 	cat := Catalog{
 		OK:           true,
 		Enabled:      s.opts.Enabled,
 		DirReady:     s.store != nil && s.store.DirReady(),
-		Keep:         s.opts.Keep,
-		IncludeEdges: s.opts.IncludeEdges,
-		IncludeAuth:  s.opts.IncludeAuth,
+		Keep:         sch.Keep,
+		IncludeEdges: sch.IncludeEdges,
+		IncludeAuth:  sch.IncludeAuth,
+		Schedule:     sch,
 		Backups:      []Entry{},
 		Status:       s.job.Status(),
+	}
+	if sch.Enabled && s.opts.Enabled && cat.DirReady {
+		cat.NextRunAt = NextRunAt(sch, time.Now().UTC()).Format(time.RFC3339)
 	}
 	if !cat.DirReady {
 		cat.Hint = "Том clickhouse-backups не смонтирован в backend (BACKUP_DIR). Перезапустите compose."
@@ -136,8 +149,10 @@ func (s *Service) Catalog() (Catalog, error) {
 	cat.Backups = entries
 	if attached != "" {
 		cat.Hint = "Подключён " + attached + ": данные в shadow-таблицах nm_bak_*. Live и ingest не трогаются. На карте переключите источник на «Бэкап»."
+	} else if sch.Enabled && cat.Enabled {
+		cat.Hint = "Автобэкап включён. Внешний cron scripts/backup-clickhouse.sh не обязателен."
 	} else {
-		cat.Hint = "«Подключить» копирует данные бэкапа в nm_bak_* (live не меняется). На карте можно смотреть Live или Бэкап. Auth — снимок /app/data (*.auth.tgz), не трафик."
+		cat.Hint = "«Подключить» копирует данные бэкапа в nm_bak_* (live не меняется). Расписание — в блоке ниже."
 	}
 	return cat, nil
 }
@@ -159,6 +174,84 @@ func (s *Service) AttachedName() string {
 		return ""
 	}
 	return name
+}
+
+func (s *Service) GetSchedule() (Schedule, error) {
+	if s == nil {
+		return Schedule{}, ErrUnavailable
+	}
+	if s.schedule == nil {
+		return DefaultsSchedule(s.opts), nil
+	}
+	out, err := s.schedule.Load()
+	if err != nil {
+		return Schedule{}, err
+	}
+	normalized, err := ValidateSchedule(out)
+	if err != nil {
+		seed := DefaultsSchedule(s.opts)
+		seed.LastRunAt = out.LastRunAt
+		seed.LastRunDate = out.LastRunDate
+		return seed, nil
+	}
+	normalized.LastRunAt = out.LastRunAt
+	normalized.LastRunDate = out.LastRunDate
+	return normalized, nil
+}
+
+func (s *Service) UpdateSchedule(in Schedule) (Schedule, error) {
+	if s == nil || s.schedule == nil {
+		return Schedule{}, ErrUnavailable
+	}
+	out, err := ValidateSchedule(in)
+	if err != nil {
+		return Schedule{}, err
+	}
+	prev, _ := s.GetSchedule()
+	out.LastRunAt = prev.LastRunAt
+	out.LastRunDate = prev.LastRunDate
+	out.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	if err := s.schedule.Save(out); err != nil {
+		return Schedule{}, err
+	}
+	return out, nil
+}
+
+// TickAutoCreate — вызов из backupjob; запускает бэкап если пора.
+func (s *Service) TickAutoCreate(parent context.Context, now time.Time) {
+	if s == nil || !s.opts.Enabled {
+		return
+	}
+	sch, err := s.GetSchedule()
+	if err != nil || !sch.Enabled {
+		return
+	}
+	fire, dateKey := ShouldFire(sch, now)
+	if !fire {
+		return
+	}
+	s.mu.Lock()
+	if s.lastFireDate == dateKey {
+		s.mu.Unlock()
+		return
+	}
+	s.lastFireDate = dateKey
+	s.mu.Unlock()
+
+	if err := s.ScheduleCreate(parent); err != nil {
+		if errors.Is(err, ErrBusy) {
+			return
+		}
+		s.mu.Lock()
+		if s.lastFireDate == dateKey {
+			s.lastFireDate = ""
+		}
+		s.mu.Unlock()
+		return
+	}
+	sch.LastRunAt = now.UTC().Format(time.RFC3339)
+	sch.LastRunDate = dateKey
+	_ = s.schedule.Save(sch)
 }
 
 // ScheduleCreate ставит полный бэкап в очередь (не блокирует HTTP).
@@ -263,13 +356,23 @@ func detachContext(_ context.Context, d time.Duration) (context.Context, context
 	return context.WithTimeout(context.Background(), d)
 }
 
+func (s *Service) effectivePolicy() (keep int, includeEdges, includeAuth bool) {
+	sch, err := s.GetSchedule()
+	if err != nil {
+		return s.opts.Keep, s.opts.IncludeEdges, s.opts.IncludeAuth
+	}
+	return sch.Keep, sch.IncludeEdges, sch.IncludeAuth
+}
+
 func (s *Service) runCreate(ctx context.Context) {
 	defer s.job.Finish()
 
 	name := "nm-" + time.Now().UTC().Format("20060102T150405Z")
 	s.job.SetRunning(name, "backup started")
 
-	tables, err := s.resolveTables(ctx, s.opts.IncludeEdges)
+	keep, includeEdges, includeAuth := s.effectivePolicy()
+
+	tables, err := s.resolveTables(ctx, includeEdges)
 	if err != nil {
 		s.job.SetError(name, err.Error())
 		return
@@ -289,7 +392,7 @@ func (s *Service) runCreate(ctx context.Context) {
 		return
 	}
 
-	if s.opts.IncludeAuth && s.opts.DataDir != "" {
+	if includeAuth && s.opts.DataDir != "" {
 		s.job.SetRunning(name, "auth tarball…")
 		if err := s.store.WriteAuthTarball(name, s.opts.DataDir); err != nil {
 			s.job.SetError(name, "auth tarball: "+err.Error())
@@ -297,7 +400,7 @@ func (s *Service) runCreate(ctx context.Context) {
 		}
 	}
 
-	if err := s.store.Prune(s.opts.Keep); err != nil {
+	if err := s.store.Prune(keep); err != nil {
 		s.job.SetError(name, "prune: "+err.Error())
 		return
 	}
@@ -308,7 +411,6 @@ func (s *Service) runAttach(ctx context.Context, name string) {
 	defer s.job.Finish()
 	s.job.SetRunning(name, "RESTORE в nm_bak_*…")
 
-	// Импорт здесь нельзя (цикл) — пары задаём явно, зеркало query.MapShadowPairs.
 	pairs := [][2]string{
 		{"traffic_logs", "nm_bak_traffic_logs"},
 		{"traffic_edges_city_daily", "nm_bak_traffic_edges_city_daily"},
@@ -316,7 +418,6 @@ func (s *Service) runAttach(ctx context.Context, name string) {
 	}
 	if err := s.runner.RestoreTablesAs(ctx, name, pairs); err != nil {
 		_ = s.store.SetAttached("")
-		// ctx мог быть уже отменён — cleanup без cancel, но с тем же деревом значений.
 		dropCtx, dropCancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
 		_ = s.runner.DropTables(dropCtx, []string{
 			"nm_bak_traffic_logs",

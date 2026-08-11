@@ -139,6 +139,7 @@ services:
       BACKUP_KEEP: ${BACKUP_KEEP:-7}
       BACKUP_INCLUDE_EDGES: ${BACKUP_INCLUDE_EDGES:-true}
       BACKUP_INCLUDE_AUTH: ${BACKUP_INCLUDE_AUTH:-true}
+      BACKUP_SCHEDULE_FILE: /app/data/backup_schedule.json
       # Только local/dev: плейсхолдеры секретов и/или AUTH_DISABLED / API_AUTH_DISABLED
       NM_ALLOW_INSECURE: ${NM_ALLOW_INSECURE:-0}
       TZ: Europe/Moscow

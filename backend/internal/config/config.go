@@ -190,11 +190,12 @@ type Config struct {
 	SkipStartupBackfill bool
 
 	// Backup: UI + native BACKUP TO Disk('backups').
-	BackupEnabled      bool
-	BackupDir          string // смонтированный том clickhouse-backups
-	BackupKeep         int
-	BackupIncludeEdges bool
-	BackupIncludeAuth  bool
+	BackupEnabled       bool
+	BackupDir           string // смонтированный том clickhouse-backups
+	BackupKeep          int
+	BackupIncludeEdges  bool
+	BackupIncludeAuth   bool
+	BackupScheduleFile  string // BACKUP_SCHEDULE_FILE
 
 	// Reputation: офлайн-списки (FireHOL и др.).
 	MaxReputationUploadSize int64
@@ -274,6 +275,7 @@ func FromEnv() Config {
 		BackupKeep:              parser.int("BACKUP_KEEP", 7),
 		BackupIncludeEdges:      parser.bool("BACKUP_INCLUDE_EDGES", true),
 		BackupIncludeAuth:       parser.bool("BACKUP_INCLUDE_AUTH", true),
+		BackupScheduleFile:      envOr("BACKUP_SCHEDULE_FILE", "/app/data/backup_schedule.json"),
 		MaxReputationUploadSize: parser.int64("MAX_REPUTATION_UPLOAD_SIZE", 1<<30),
 		ReputationFetchEnabled:  parser.bool("REPUTATION_FETCH_ENABLED", true),
 		ReputationFetchInterval: parser.durationFlexible("REPUTATION_FETCH_INTERVAL", 6*time.Hour),

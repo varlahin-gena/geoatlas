@@ -2,9 +2,12 @@ package main
 
 import (
 	"path/filepath"
+	"time"
 
 	chadapter "network_monitor/internal/adapter/clickhouse"
 	"network_monitor/internal/adapter/backupfs"
+	"network_monitor/internal/adapter/backupjob"
+	"network_monitor/internal/adapter/backupschedulefile"
 	"network_monitor/internal/adapter/geoipcodec"
 	httpapi "network_monitor/internal/adapter/httpapi"
 	"network_monitor/internal/adapter/parseradapter"
@@ -49,14 +52,17 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 	if dataDir == "." || dataDir == "" {
 		dataDir = "/app/data"
 	}
-	backupUC := usecasebackup.New(usecasebackup.Options{
+	opts := usecasebackup.Options{
 		Enabled:      cfg.BackupEnabled,
 		Dir:          cfg.BackupDir,
 		DataDir:      dataDir,
 		Keep:         cfg.BackupKeep,
 		IncludeEdges: cfg.BackupIncludeEdges,
 		IncludeAuth:  cfg.BackupIncludeAuth,
-	}, chadapter.NewBackupRunner(a.pools.Background), backupfs.New(cfg.BackupDir))
+	}
+	schedStore := backupschedulefile.New(cfg.BackupScheduleFile, usecasebackup.DefaultsSchedule(opts))
+	backupUC := usecasebackup.New(opts, chadapter.NewBackupRunner(a.pools.Background), backupfs.New(cfg.BackupDir), schedStore)
+	a.backupJobs = backupjob.NewFromService(backupUC, time.Minute)
 	return httpapi.NewServer(
 		cfg, a.ingestSvc, eventsUC, geoUC, bg.repUC, parseErrorsUC, systemUC, systemRepo,
 		parseTestUC, bg.retentionUC, backupUC, authUC, auth.users, auth.sessions, auth.apiTokens,

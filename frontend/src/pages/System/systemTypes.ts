@@ -84,6 +84,19 @@ export interface BackupEntry {
   attached?: boolean;
 }
 
+export interface BackupSchedule {
+  enabled?: boolean;
+  hour?: number;
+  minute?: number;
+  timezone?: string;
+  keep?: number;
+  include_edges?: boolean;
+  include_auth?: boolean;
+  updated_at?: string;
+  last_run_at?: string;
+  last_run_date?: string;
+}
+
 export interface BackupCatalog {
   ok?: boolean;
   enabled?: boolean;
@@ -92,6 +105,8 @@ export interface BackupCatalog {
   include_edges?: boolean;
   include_auth?: boolean;
   attached?: string;
+  schedule?: BackupSchedule;
+  next_run_at?: string;
   backups?: BackupEntry[];
   status?: BackupStatus;
   hint?: string;

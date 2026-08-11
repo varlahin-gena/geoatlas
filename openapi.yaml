@@ -1183,6 +1183,52 @@ paths:
         "409":
           description: Подключён или занят job
 
+  /api/system/backup-schedule:
+    get:
+      tags: [system]
+      summary: Расписание и политика автобэкапов
+      description: |
+        Только administrator. Файл `/app/data/backup_schedule.json` (BACKUP_SCHEDULE_FILE).
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Текущее расписание
+    put:
+      tags: [system]
+      summary: Обновить расписание автобэкапов
+      description: |
+        Только administrator (+ CSRF). Ежедневно в hour:minute timezone; keep 1…90;
+        include_edges / include_auth. BACKUP_ENABLED=0 запрещает создание.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: X-CSRF-Token
+          in: header
+          required: false
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled: { type: boolean }
+                hour: { type: integer, minimum: 0, maximum: 23 }
+                minute: { type: integer, minimum: 0, maximum: 59 }
+                timezone: { type: string, example: Europe/Moscow }
+                keep: { type: integer, minimum: 1, maximum: 90 }
+                include_edges: { type: boolean }
+                include_auth: { type: boolean }
+      responses:
+        "200":
+          description: Сохранено
+        "400":
+          description: Невалидные поля
+
   /api/parse-errors:
     get:
       tags: [parse]

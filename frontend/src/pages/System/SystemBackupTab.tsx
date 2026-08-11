@@ -3,7 +3,13 @@ import { apiFetch } from '@/api/client';
 import { useToast } from '@/components/Toast';
 import { fmtDate, fmtNumber } from '@/lib/format';
 import { fmtBytes } from './systemFormat';
-import type { BackupCatalog, BackupEntry } from './systemTypes';
+import type { BackupCatalog, BackupEntry, BackupSchedule } from './systemTypes';
+
+const TZ_PRESETS = ['Europe/Moscow', 'UTC', 'Europe/Berlin', 'Asia/Yekaterinburg'];
+
+function pad2(n: number) {
+  return String(n).padStart(2, '0');
+}
 
 export function SystemBackupTab() {
   const { toast } = useToast();
@@ -11,11 +17,34 @@ export function SystemBackupTab() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [busyName, setBusyName] = useState<string | null>(null);
+  const [savingSchedule, setSavingSchedule] = useState(false);
+  const [sched, setSched] = useState<BackupSchedule>({
+    enabled: false,
+    hour: 2,
+    minute: 30,
+    timezone: 'Europe/Moscow',
+    keep: 7,
+    include_edges: true,
+    include_auth: true,
+  });
 
   const load = useCallback(async () => {
     try {
       const data = await apiFetch<BackupCatalog>('/api/system/backups');
       setCat(data);
+      if (data.schedule) {
+        setSched({
+          enabled: !!data.schedule.enabled,
+          hour: data.schedule.hour ?? 2,
+          minute: data.schedule.minute ?? 30,
+          timezone: data.schedule.timezone || 'Europe/Moscow',
+          keep: data.schedule.keep ?? 7,
+          include_edges: data.schedule.include_edges !== false,
+          include_auth: data.schedule.include_auth !== false,
+          last_run_at: data.schedule.last_run_at,
+          last_run_date: data.schedule.last_run_date,
+        });
+      }
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Ошибка списка бэкапов', 'error');
     } finally {
@@ -43,6 +72,30 @@ export function SystemBackupTab() {
       toast(e instanceof Error ? e.message : 'Не удалось запустить бэкап', 'error');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const saveSchedule = async () => {
+    setSavingSchedule(true);
+    try {
+      await apiFetch<{ ok?: boolean; schedule?: BackupSchedule }>('/api/system/backup-schedule', {
+        method: 'PUT',
+        body: JSON.stringify({
+          enabled: !!sched.enabled,
+          hour: Number(sched.hour) || 0,
+          minute: Number(sched.minute) || 0,
+          timezone: (sched.timezone || 'UTC').trim(),
+          keep: Number(sched.keep) || 7,
+          include_edges: !!sched.include_edges,
+          include_auth: !!sched.include_auth,
+        }),
+      });
+      toast('Расписание сохранено', 'success');
+      await load();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Не удалось сохранить расписание', 'error');
+    } finally {
+      setSavingSchedule(false);
     }
   };
 
@@ -119,6 +172,7 @@ export function SystemBackupTab() {
   const status = cat?.status;
   const running = status?.state === 'running' || creating || busyName !== null;
   const backups: BackupEntry[] = cat?.backups || [];
+  const timeValue = `${pad2(sched.hour ?? 0)}:${pad2(sched.minute ?? 0)}`;
 
   return (
     <div className="tab-panel active" id="tab-backup" role="tabpanel">
@@ -179,18 +233,145 @@ export function SystemBackupTab() {
               <span className="k">Подключён</span>
               <span className="v">{cat.attached ? <code>{cat.attached}</code> : 'нет'}</span>
             </div>
+            <div className="kv-row">
+              <span className="k">След. авто</span>
+              <span className="v">{cat.next_run_at ? fmtDate(cat.next_run_at) : '—'}</span>
+            </div>
           </div>
         ) : null}
         {cat?.hint ? <p className="hint">{cat.hint}</p> : null}
       </section>
 
       <section className="card card-compact">
+        <h3 className="card-title">Расписание и политика</h3>
+        <p className="hint">
+          Ежедневный автобэкап в указанное локальное время. При включённом расписании внешний cron{' '}
+          <code>scripts/backup-clickhouse.sh</code> не обязателен. Kill-switch:{' '}
+          <code>BACKUP_ENABLED=0</code>.
+        </p>
+        <div className="kv-grid cols-2" style={{ marginTop: 12 }}>
+          <div className="kv-row">
+            <span className="k">Автобэкап</span>
+            <span className="v">
+              <label className="side-toggle" style={{ margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={!!sched.enabled}
+                  onChange={(e) => setSched((s) => ({ ...s, enabled: e.target.checked }))}
+                />
+                <span>{sched.enabled ? 'вкл' : 'выкл'}</span>
+              </label>
+            </span>
+          </div>
+          <div className="kv-row">
+            <span className="k">Время</span>
+            <span className="v">
+              <input
+                type="time"
+                value={timeValue}
+                onChange={(e) => {
+                  const [hh, mm] = (e.target.value || '02:30').split(':');
+                  setSched((s) => ({
+                    ...s,
+                    hour: Math.min(23, Math.max(0, Number(hh) || 0)),
+                    minute: Math.min(59, Math.max(0, Number(mm) || 0)),
+                  }));
+                }}
+              />
+            </span>
+          </div>
+          <div className="kv-row">
+            <span className="k">Timezone</span>
+            <span className="v" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <select
+                value={TZ_PRESETS.includes(sched.timezone || '') ? sched.timezone : '__custom__'}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === '__custom__') return;
+                  setSched((s) => ({ ...s, timezone: v }));
+                }}
+              >
+                {TZ_PRESETS.map((tz) => (
+                  <option key={tz} value={tz}>
+                    {tz}
+                  </option>
+                ))}
+                <option value="__custom__">другое…</option>
+              </select>
+              <input
+                type="text"
+                style={{ minWidth: 160 }}
+                value={sched.timezone || ''}
+                onChange={(e) => setSched((s) => ({ ...s, timezone: e.target.value }))}
+                placeholder="IANA, напр. Asia/Tomsk"
+              />
+            </span>
+          </div>
+          <div className="kv-row">
+            <span className="k">Глубина (keep)</span>
+            <span className="v">
+              <input
+                type="number"
+                min={1}
+                max={90}
+                value={sched.keep ?? 7}
+                onChange={(e) =>
+                  setSched((s) => ({ ...s, keep: Math.min(90, Math.max(1, Number(e.target.value) || 1)) }))
+                }
+              />
+            </span>
+          </div>
+          <div className="kv-row">
+            <span className="k">Edges</span>
+            <span className="v">
+              <label className="side-toggle" style={{ margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={!!sched.include_edges}
+                  onChange={(e) => setSched((s) => ({ ...s, include_edges: e.target.checked }))}
+                />
+                <span>traffic_edges_*</span>
+              </label>
+            </span>
+          </div>
+          <div className="kv-row">
+            <span className="k">Auth tarball</span>
+            <span className="v">
+              <label className="side-toggle" style={{ margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={!!sched.include_auth}
+                  onChange={(e) => setSched((s) => ({ ...s, include_auth: e.target.checked }))}
+                />
+                <span>*.auth.tgz (/app/data)</span>
+              </label>
+            </span>
+          </div>
+          <div className="kv-row">
+            <span className="k">Последний авто</span>
+            <span className="v">
+              {sched.last_run_at ? fmtDate(sched.last_run_at) : '—'}
+              {sched.last_run_date ? ` (${sched.last_run_date})` : ''}
+            </span>
+          </div>
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <button
+            type="button"
+            className="btn primary"
+            disabled={savingSchedule || cat?.enabled === false}
+            onClick={() => void saveSchedule()}
+          >
+            {savingSchedule ? 'Сохранение…' : 'Сохранить расписание'}
+          </button>
+        </div>
+      </section>
+
+      <section className="card card-compact">
         <h3 className="card-title">Список бэкапов</h3>
         <p className="hint">
           Колонка <strong>Auth</strong> — есть ли рядом снимок <code>/app/data</code> (users,
-          retention, feeds) как <code>*.auth.tgz</code>. Это не трафик: «нет» значит tarball не
-          записался (часто из‑за ошибки прав на ранних попытках) или бэкап оборвался после
-          ClickHouse BACKUP. На «Подключить / Отключить» auth не влияет.
+          retention, feeds) как <code>*.auth.tgz</code>. Это не трафик.
         </p>
         {backups.length === 0 ? (
           <p className="hint">Пока нет бэкапов.</p>

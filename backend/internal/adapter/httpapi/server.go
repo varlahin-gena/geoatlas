@@ -240,6 +240,12 @@ func NewServer(
 	r.Handle("/api/system/backups/{name}",
 		chain(http.HandlerFunc(system.DeleteBackup), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
 	).Methods("DELETE")
+	r.Handle("/api/system/backup-schedule",
+		withTimeout(chain(http.HandlerFunc(system.GetBackupSchedule), adminMW), healthTimeout),
+	).Methods("GET")
+	r.Handle("/api/system/backup-schedule",
+		chain(http.HandlerFunc(system.PutBackupSchedule), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
+	).Methods("PUT")
 	r.Handle("/api/parse-errors",
 		withTimeout(chain(http.HandlerFunc(parse.ListParseErrors), adminMW), readTimeout),
 	).Methods("GET")

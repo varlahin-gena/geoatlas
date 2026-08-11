@@ -87,6 +87,8 @@ type BackupAPI interface {
 	Catalog() (usecasebackup.Catalog, error)
 	Status() usecasebackup.Status
 	AttachedName() string
+	GetSchedule() (usecasebackup.Schedule, error)
+	UpdateSchedule(usecasebackup.Schedule) (usecasebackup.Schedule, error)
 	ScheduleCreate(context.Context) error
 	ScheduleAttach(context.Context, string) error
 	ScheduleDetach(context.Context, string) error

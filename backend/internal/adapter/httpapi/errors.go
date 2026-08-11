@@ -37,7 +37,8 @@ func writeDomainError(w http.ResponseWriter, logMsg string, err error) {
 		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error()})
 	case errors.Is(err, usecasebackup.ErrNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": err.Error()})
-	case errors.Is(err, usecasebackup.ErrNotAttached):
+	case errors.Is(err, usecasebackup.ErrNotAttached),
+		errors.Is(err, usecasebackup.ErrInvalidSchedule):
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 	case errors.Is(err, usecasebackup.ErrDisabled),
 		errors.Is(err, usecasebackup.ErrUnavailable):

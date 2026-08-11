@@ -234,6 +234,71 @@ func (h *SystemHandler) DeleteBackup(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "deleted": name})
 }
 
+func (h *SystemHandler) GetBackupSchedule(w http.ResponseWriter, r *http.Request) {
+	if h.backupUC == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "backup service unavailable"})
+		return
+	}
+	sch, err := h.backupUC.GetSchedule()
+	if err != nil {
+		writeInternalError(w, "backup schedule get failed", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "schedule": sch})
+}
+
+func (h *SystemHandler) PutBackupSchedule(w http.ResponseWriter, r *http.Request) {
+	if h.backupUC == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "backup service unavailable"})
+		return
+	}
+	var body struct {
+		Enabled      *bool  `json:"enabled"`
+		Hour         *int   `json:"hour"`
+		Minute       *int   `json:"minute"`
+		Timezone     string `json:"timezone"`
+		Keep         *int   `json:"keep"`
+		IncludeEdges *bool  `json:"include_edges"`
+		IncludeAuth  *bool  `json:"include_auth"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid JSON"})
+		return
+	}
+	cur, err := h.backupUC.GetSchedule()
+	if err != nil {
+		writeInternalError(w, "backup schedule get failed", err)
+		return
+	}
+	if body.Enabled != nil {
+		cur.Enabled = *body.Enabled
+	}
+	if body.Hour != nil {
+		cur.Hour = *body.Hour
+	}
+	if body.Minute != nil {
+		cur.Minute = *body.Minute
+	}
+	if strings.TrimSpace(body.Timezone) != "" {
+		cur.Timezone = strings.TrimSpace(body.Timezone)
+	}
+	if body.Keep != nil {
+		cur.Keep = *body.Keep
+	}
+	if body.IncludeEdges != nil {
+		cur.IncludeEdges = *body.IncludeEdges
+	}
+	if body.IncludeAuth != nil {
+		cur.IncludeAuth = *body.IncludeAuth
+	}
+	out, err := h.backupUC.UpdateSchedule(cur)
+	if err != nil {
+		writeDomainError(w, "backup schedule update failed", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "schedule": out})
+}
+
 func failedLoginsSnapshot() []FailedLoginEvent {
 	out := defaultLoginLimiter.snapshotFailures()
 	if out == nil {
