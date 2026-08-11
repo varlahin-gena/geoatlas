@@ -289,7 +289,9 @@ export function SystemBackupTab() {
             <div className="kv-row">
               <span className="k">След. авто</span>
               <span className="v">
-                {scheduleActive && cat.next_run_at ? fmtDate(cat.next_run_at) : '—'}
+                {scheduleActive && cat.next_run_at
+                  ? fmtDate(cat.next_run_at, savedSched.timezone)
+                  : '—'}
               </span>
             </div>
           </div>
@@ -332,7 +334,8 @@ export function SystemBackupTab() {
           </span>
         </div>
         <p className="hint">
-          Ежедневный автобэкап в указанное локальное время. При включённом расписании внешний cron{' '}
+          Ежедневный автобэкап в указанное время выбранного пояса (в нём же «Применено» /
+          «След. авто» / «Последний авто»). При включённом расписании внешний cron{' '}
           <code>scripts/backup-clickhouse.sh</code> не обязателен. Kill-switch:{' '}
           <code>BACKUP_ENABLED=0</code>.
         </p>
@@ -343,7 +346,7 @@ export function SystemBackupTab() {
             </>
           ) : savedSched.updated_at ? (
             <>
-              Применено: {fmtDate(savedSched.updated_at)}
+              Применено: {fmtDate(savedSched.updated_at, savedSched.timezone)}
               {savedSched.enabled
                 ? ` · активно · ${formatLocalTime(savedSched)} · keep ${fmtNumber(savedSched.keep)}`
                 : ' · автобэкап выключен'}
@@ -473,7 +476,9 @@ export function SystemBackupTab() {
           <div className="kv-row">
             <span className="k">Последний авто</span>
             <span className="v">
-              {sched.last_run_at ? fmtDate(sched.last_run_at) : '—'}
+              {sched.last_run_at
+                ? fmtDate(sched.last_run_at, savedSched.timezone || sched.timezone)
+                : '—'}
               {sched.last_run_date ? ` (${sched.last_run_date})` : ''}
             </span>
           </div>

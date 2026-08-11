@@ -15,10 +15,19 @@ export function fmtNumber(n: unknown): string {
   return (Number(n) || 0).toLocaleString('ru-RU');
 }
 
-export function fmtDate(iso: unknown): string {
+/** ISO → локаль ru-RU. timeZone — IANA (напр. Europe/Moscow); иначе пояс браузера. */
+export function fmtDate(iso: unknown, timeZone?: string): string {
   if (!iso) return '—';
   try {
-    return new Date(String(iso)).toLocaleString('ru-RU');
+    const d = new Date(String(iso));
+    if (Number.isNaN(d.getTime())) return String(iso);
+    const opts: Intl.DateTimeFormatOptions = {};
+    const tz = typeof timeZone === 'string' ? timeZone.trim() : '';
+    if (tz) {
+      opts.timeZone = tz;
+      opts.timeZoneName = 'short';
+    }
+    return d.toLocaleString('ru-RU', opts);
   } catch {
     return String(iso);
   }
