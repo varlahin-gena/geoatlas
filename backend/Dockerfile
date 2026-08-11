@@ -26,8 +26,11 @@ RUN set -e; \
 
 # ---------- runtime stage ----------
 FROM alpine:3.20
+# uid/gid 101 = clickhouse/clickhouse-server — общий том clickhouse-backups
+# (иначе auth *.tgz и prune падают с permission denied).
 RUN apk add --no-cache ca-certificates tzdata && \
-    adduser -D -u 10001 app && \
+    addgroup -g 101 app && \
+    adduser -D -u 101 -G app app && \
     mkdir -p /app/data && chown -R app:app /app
 USER app
 WORKDIR /app

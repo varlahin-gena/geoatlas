@@ -547,9 +547,16 @@ Native `BACKUP` / `RESTORE` на отдельный Docker-том `clickhouse-ba
 
 ```bash
 cd /opt/network-monitor
-docker compose up -d clickhouse   # подхватить mount + backups.xml
+docker compose up -d --build   # volume-perms (uid 101) + mount + backups.xml + backend
 chmod +x scripts/backup-clickhouse.sh scripts/restore-clickhouse.sh
 ./scripts/backup-clickhouse.sh
+```
+
+Backend и ClickHouse пишут в `clickhouse-backups` под **одним uid 101**. Сервис `volume-perms` при старте делает `chown 101:101` на томах `clickhouse-backups` и `auth-users` (миграция со старого backend uid 10001). Если снова `permission denied` на `*.auth.tgz`:
+
+```bash
+docker compose run --rm volume-perms
+docker compose up -d backend
 ```
 
 **Env (backup):**
