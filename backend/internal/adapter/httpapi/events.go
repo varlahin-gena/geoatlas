@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"context"
 	"net/http"
 	"strconv"
 	"strings"
@@ -159,21 +158,6 @@ func normalizeDataSource(v string) string {
 	return "live"
 }
 
-func (h *EventsHandler) eventsQueryContext(r *http.Request, source string) (ctx context.Context, attached string, errMsg string, code int) {
-	ctx = r.Context()
-	attached = ""
-	if h.backupUC != nil {
-		attached = h.backupUC.AttachedName()
-	}
-	if source == "backup" {
-		if attached == "" {
-			return ctx, attached, "backup not attached; connect a backup in System → Резервное копирование", http.StatusBadRequest
-		}
-		ctx = query.WithTables(ctx, query.BackupTables())
-	}
-	return ctx, attached, "", 0
-}
-
 func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	if h.eventsUC == nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "events service unavailable"})
@@ -187,10 +171,19 @@ func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	dataSource := normalizeDataSource(q.Get("source"))
-	ctx, attached, errMsg, code := h.eventsQueryContext(r, dataSource)
-	if errMsg != "" {
-		writeJSON(w, code, map[string]any{"error": errMsg})
-		return
+	attached := ""
+	if h.backupUC != nil {
+		attached = h.backupUC.AttachedName()
+	}
+	ctx := r.Context()
+	if dataSource == "backup" {
+		if attached == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{
+				"error": "backup not attached; connect a backup in System → Резервное копирование",
+			})
+			return
+		}
+		ctx = query.WithTables(ctx, query.BackupTables())
 	}
 
 	result, err := h.eventsUC.GetMap(ctx, usecaseevents.GetMapInput{
@@ -206,13 +199,13 @@ func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := map[string]any{
-		"group_by":         result.GroupBy,
-		"filter":           result.Filter,
-		"period":           result.Period,
-		"data_source":      dataSource,
-		"backup_attached":  attached,
-		"lines":            result.Lines,
-		"points":           result.Points,
+		"group_by":        result.GroupBy,
+		"filter":          result.Filter,
+		"period":          result.Period,
+		"data_source":     dataSource,
+		"backup_attached": attached,
+		"lines":           result.Lines,
+		"points":          result.Points,
 		"stats": map[string]any{
 			"raw_pairs":      result.RawPairs,
 			"edges":          len(result.Lines),
@@ -248,10 +241,19 @@ func (h *EventsHandler) GetEventsSeries(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	dataSource := normalizeDataSource(q.Get("source"))
-	ctx, _, errMsg, code := h.eventsQueryContext(r, dataSource)
-	if errMsg != "" {
-		writeJSON(w, code, map[string]any{"error": errMsg})
-		return
+	attached := ""
+	if h.backupUC != nil {
+		attached = h.backupUC.AttachedName()
+	}
+	ctx := r.Context()
+	if dataSource == "backup" {
+		if attached == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{
+				"error": "backup not attached; connect a backup in System → Резервное копирование",
+			})
+			return
+		}
+		ctx = query.WithTables(ctx, query.BackupTables())
 	}
 	result, err := h.eventsUC.GetSeries(ctx, usecaseevents.GetSeriesInput{
 		TimeRange: model.TimeRange{Mode: tr.Mode, Amount: tr.Amount, From: tr.From, To: tr.To},

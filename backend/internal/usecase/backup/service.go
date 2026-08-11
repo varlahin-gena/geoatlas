@@ -316,11 +316,14 @@ func (s *Service) runAttach(ctx context.Context, name string) {
 	}
 	if err := s.runner.RestoreTablesAs(ctx, name, pairs); err != nil {
 		_ = s.store.SetAttached("")
-		_ = s.runner.DropTables(context.Background(), []string{
+		// ctx мог быть уже отменён — cleanup без cancel, но с тем же деревом значений.
+		dropCtx, dropCancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
+		_ = s.runner.DropTables(dropCtx, []string{
 			"nm_bak_traffic_logs",
 			"nm_bak_traffic_edges_city_daily",
 			"nm_bak_traffic_edges_country_daily",
 		})
+		dropCancel()
 		if ctx.Err() != nil {
 			s.job.SetError(name, "canceled")
 			return

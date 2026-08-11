@@ -203,7 +203,7 @@ func (d *DirStore) SetAttached(name string) error {
 	if !nameRe.MatchString(name) {
 		return fmt.Errorf("invalid backup name")
 	}
-	return os.WriteFile(path, []byte(name+"\n"), 0o644)
+	return os.WriteFile(path, []byte(name+"\n"), 0o600)
 }
 
 // Delete удаляет каталог бэкапа и парный *.auth.tgz (маркер attached не трогает).
