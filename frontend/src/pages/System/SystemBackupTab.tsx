@@ -511,9 +511,11 @@ export function SystemBackupTab() {
       <section className="card card-compact">
         <h3 className="card-title">Список бэкапов</h3>
         <p className="hint">
-          Колонка <strong>Источник</strong> — вручную из UI или по расписанию. Колонка{' '}
-          <strong>Auth</strong> — есть ли рядом снимок <code>/app/data</code> (users, retention,
-          feeds) как <code>*.auth.tgz</code>. Это не трафик.
+          Колонка <strong>Создан</strong> — в поясе расписания (
+          <code>{savedSched.timezone || sched.timezone || 'UTC'}</code>
+          ), имя файла остаётся в UTC (<code>…Z</code>). Колонка <strong>Источник</strong> — вручную
+          или по расписанию. <strong>Auth</strong> — снимок <code>/app/data</code> как{' '}
+          <code>*.auth.tgz</code> (не трафик).
         </p>
         {backups.length === 0 ? (
           <p className="hint">Пока нет бэкапов.</p>
@@ -523,7 +525,12 @@ export function SystemBackupTab() {
               <thead>
                 <tr>
                   <th scope="col">Имя</th>
-                  <th scope="col">Создан</th>
+                  <th
+                    scope="col"
+                    title={`Время в поясе расписания ${savedSched.timezone || sched.timezone || 'UTC'}`}
+                  >
+                    Создан
+                  </th>
                   <th scope="col">Источник</th>
                   <th scope="col">Размер</th>
                   <th scope="col" title="Снимок /app/data (*.auth.tgz), не ClickHouse-таблицы">
@@ -547,7 +554,11 @@ export function SystemBackupTab() {
                       <td>
                         <code>{b.name}</code>
                       </td>
-                      <td>{b.created_at ? fmtDate(b.created_at) : '—'}</td>
+                      <td>
+                        {b.created_at
+                          ? fmtDate(b.created_at, savedSched.timezone || sched.timezone)
+                          : '—'}
+                      </td>
                       <td>{sourceLabel}</td>
                       <td>{fmtBytes(b.size_bytes || 0)}</td>
                       <td>{b.has_auth ? 'да' : 'нет'}</td>
