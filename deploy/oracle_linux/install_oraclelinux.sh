@@ -42,8 +42,8 @@ ${src_line}
   3. Источник (релиз / main)
   4. Клонирование репозитория
   5. Выбор модулей
-  6. Порт веб-интерфейса
-  7. HTTPS
+  6. HTTPS
+  7. Порт веб-интерфейса
   8. Профиль производительности
   9. Firewall
   10. Запуск стека
@@ -467,6 +467,13 @@ configure_modules() {
 }
 
 configure_http_port() {
+    # Обычно уже вызван из confirm_https (цепочка). Повторно не спрашиваем.
+    if [[ "${NM_HTTP_PORT_CONFIRMED:-0}" == "1" ]]; then
+        if declare -F apply_http_port >/dev/null 2>&1; then
+            apply_http_port "$PROJECT_DIR"
+            return 0
+        fi
+    fi
     local helper="${PROJECT_DIR}/deploy/common/select_http_port.sh"
     if [[ ! -f "$helper" ]]; then
         helper="${SCRIPT_DIR}/../common/select_http_port.sh"
@@ -480,17 +487,11 @@ configure_http_port() {
     fi
     HTTP_PORT="${HTTP_PORT:-80}"
     export HTTP_PORT
+    export NM_HTTP_PORT_CONFIRMED=1
     log "select_http_port.sh not found — HTTP_PORT=${HTTP_PORT}."
 }
 
 configure_https() {
-    # Обычно уже вызван из confirm_http_port (цепочка). Повторно не спрашиваем.
-    if [[ "${NM_HTTPS_CONFIRMED:-0}" == "1" ]]; then
-        if declare -F apply_https >/dev/null 2>&1; then
-            apply_https "$PROJECT_DIR"
-        fi
-        return 0
-    fi
     local helper="${PROJECT_DIR}/deploy/common/select_https.sh"
     if [[ ! -f "$helper" ]]; then
         helper="${SCRIPT_DIR}/../common/select_https.sh"
@@ -526,6 +527,10 @@ prepare_project() {
     log "Setting executable permissions..."
     for f in start.sh stop.sh \
              scripts/tune-resources.sh \
+             scripts/backup-clickhouse.sh \
+             scripts/restore-clickhouse.sh \
+             clickhouse/backfill_edges_agg.sh \
+             clickhouse/reset_data.sh \
              deploy/uninstall.sh \
              deploy/common/detect_resources.sh \
              deploy/common/select_modules.sh \
@@ -545,11 +550,11 @@ prepare_project() {
     log "Selecting modules..."
     configure_modules
 
-    log "Selecting HTTP port for web UI..."
-    configure_http_port
-
     log "Selecting HTTPS for web UI..."
     configure_https
+
+    log "Selecting HTTP port for web UI..."
+    configure_http_port
 
     log "Detecting server resources and generating performance profile..."
     configure_resources
@@ -558,11 +563,11 @@ prepare_project() {
         apply_module_selection "$PROJECT_DIR"
         print_modules_summary
     fi
-    if declare -F apply_http_port >/dev/null 2>&1; then
-        apply_http_port "$PROJECT_DIR"
-    fi
     if declare -F apply_https >/dev/null 2>&1; then
         apply_https "$PROJECT_DIR"
+    fi
+    if declare -F apply_http_port >/dev/null 2>&1; then
+        apply_http_port "$PROJECT_DIR"
     fi
 }
 

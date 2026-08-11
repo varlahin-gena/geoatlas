@@ -9,7 +9,7 @@
 #
 # Включение: NM_FULL_AUTO=1 или argv --full-auto
 # Даёт: релиз, все модули, HTTP 8080, автопрофиль, старт стека, firewall OFF.
-# HTTPS не выключается: при TTY select_https спросит интерактивно.
+# HTTPS не выключается: при TTY сначала select_https, затем HTTP-порт.
 
 _nm_fa_log() { echo "[$(date +'%F %T')] [full-auto] $*" >&2; }
 
@@ -55,9 +55,9 @@ nm_apply_full_auto_preset() {
     export ENABLE_FIREWALL=0
     export NM_FIREWALL_FROM_ENV=1
 
-    # HTTPS: не трогаем HTTPS_ENABLED — select_https спросит при TTY.
+    # HTTPS: не трогаем HTTPS_ENABLED — select_https спросит первым (при TTY), затем HTTP-порт.
     _nm_fa_log "режим «Сделай мне хорошо»: release=${NM_INSTALL_SOURCE}, HTTP_PORT=${HTTP_PORT}, auto profile, all modules, firewall OFF, start stack"
-    _nm_fa_log "HTTPS будет спрошен интерактивно (select_https), если есть TTY и HTTPS_ENABLED / NM_HTTPS_ENABLED ещё не заданы"
+    _nm_fa_log "Сначала HTTPS (select_https), затем HTTP-порт — если есть TTY и HTTPS_ENABLED / NM_HTTPS_ENABLED ещё не заданы"
 }
 
 _nm_fa_http_port() {

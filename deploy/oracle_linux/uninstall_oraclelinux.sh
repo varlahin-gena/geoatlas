@@ -6,7 +6,7 @@ _COMMON="${_SCRIPT_DIR}/../common/uninstall.sh"
 
 nm_audit_firewall() {
     if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld 2>/dev/null; then
-        echo "  Firewall         : firewalld active, порты 80/514/8080 будут проверены при удалении"
+        echo "  Firewall         : firewalld active, порты HTTP/HTTPS/514/8080 будут проверены при удалении"
     elif command -v firewall-cmd >/dev/null 2>&1; then
         echo "  Firewall         : firewalld установлен, но не active"
     else
@@ -21,7 +21,8 @@ nm_remove_firewall_rules() {
 
     local http_port="80"
     local https_port=""
-    local project_dir="${PROJECT_DIR:-/opt/network-monitor}"
+    # NM_PROJECT_DIR — канон common/uninstall.sh; PROJECT_DIR — legacy alias.
+    local project_dir="${NM_PROJECT_DIR:-${PROJECT_DIR:-/opt/network-monitor}}"
     if [[ -f "${project_dir}/.env" ]]; then
         local v
         v="$(grep -E '^[[:space:]]*HTTP_PORT=' "${project_dir}/.env" 2>/dev/null | tail -n1 | cut -d= -f2- || true)"

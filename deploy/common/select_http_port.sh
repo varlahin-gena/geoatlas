@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Выбор порта веб-интерфейса (frontend / nginx).
+# Выбор HTTP-порта веб-интерфейса (frontend / nginx).
+# Вызывается ПОСЛЕ confirm_https (см. select_https.sh → цепочка).
 # Использование:
 #   source deploy/common/select_http_port.sh
 #   confirm_http_port
@@ -11,42 +12,18 @@
 #   NM_FULL_AUTO=1              — порт 8080 (даже если HTTP_PORT ещё не выставлен)
 #   NM_AUTO_MODULES=1           — порт 80 по умолчанию (не full-auto)
 #
-# После confirm_http_port: HTTP_PORT (1–65535)
-# Также запускает шаг HTTPS (select_https.sh), чтобы вопрос не терялся
-# при старом install_*.sh (curl) или когда stdin после whiptail уже не TTY.
+# После confirm_http_port: HTTP_PORT (1–65535), NM_HTTP_PORT_CONFIRMED=1
+# Если HTTPS уже включён — спрашиваем порт для HTTP (редирект / параллельный доступ).
 
 set -Eeuo pipefail
 
 _nm_port_log() { echo "[$(date +'%F %T')] [http-port] $*"; }
 
-# Цепочка HTTPS сразу после выбора HTTP-порта (идемпотентно).
-_nm_port_chain_https_confirm() {
-    [[ "${NM_HTTPS_CONFIRMED:-0}" == "1" ]] && return 0
-    local project_dir="${1:-${PROJECT_DIR:-${NM_PROJECT_DIR:-.}}}"
-    local helper
-    helper="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)/select_https.sh"
-    if [[ ! -f "$helper" ]]; then
-        _nm_port_log "select_https.sh не найден — шаг HTTPS пропущен."
-        return 0
-    fi
-    # shellcheck source=deploy/common/select_https.sh
-    source "$helper"
-    confirm_https "$project_dir"
-    export NM_HTTPS_CONFIRMED=1
-}
-
-_nm_port_chain_https_apply() {
-    local project_dir="${1:-.}"
-    local helper
-    helper="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)/select_https.sh"
-    [[ -f "$helper" ]] || return 0
-    if ! declare -F apply_https >/dev/null 2>&1; then
-        # shellcheck source=deploy/common/select_https.sh
-        source "$helper"
-    fi
-    if declare -F apply_https >/dev/null 2>&1; then
-        apply_https "$project_dir"
-    fi
+_nm_port_https_on() {
+    case "${HTTPS_ENABLED:-}" in
+        1|true|TRUE|yes|YES|on|ON|auto) return 0 ;;
+    esac
+    return 1
 }
 
 _nm_port_ensure_ui() {
@@ -78,13 +55,13 @@ _nm_port_ask_custom() {
     local answer=""
     while true; do
         if declare -F nm_ui_inputbox >/dev/null 2>&1; then
-            answer="$(nm_ui_inputbox "Порт веб-интерфейса" "Введите TCP-порт (1–65535):" "$def")" || answer=""
+            answer="$(nm_ui_inputbox "HTTP-порт" "Введите TCP-порт (1–65535):" "$def")" || answer=""
         else
             if [[ -r /dev/tty && -w /dev/tty ]]; then
-                printf 'Порт веб-интерфейса [%s]: ' "$def" >/dev/tty
+                printf 'HTTP-порт [%s]: ' "$def" >/dev/tty
                 read -r answer </dev/tty || answer=""
             else
-                printf 'Порт веб-интерфейса [%s]: ' "$def" >&2
+                printf 'HTTP-порт [%s]: ' "$def" >&2
                 read -r answer || answer=""
             fi
         fi
@@ -95,7 +72,7 @@ _nm_port_ask_custom() {
             return 0
         fi
         if declare -F nm_ui_msgbox >/dev/null 2>&1; then
-            nm_ui_msgbox "Порт веб-интерфейса" \
+            nm_ui_msgbox "HTTP-порт" \
                 "Некорректный порт «${answer}». Нужно число от 1 до 65535." || true
         else
             echo "  Некорректный порт «${answer}». Нужно число от 1 до 65535." >&2
@@ -104,17 +81,24 @@ _nm_port_ask_custom() {
     done
 }
 
+_nm_port_set_confirmed() {
+    export HTTP_PORT="$1"
+    export NM_HTTP_PORT_CONFIRMED=1
+}
+
 confirm_http_port() {
-    local project_dir="${PROJECT_DIR:-${NM_PROJECT_DIR:-.}}"
+    if [[ "${NM_HTTP_PORT_CONFIRMED:-0}" == "1" ]] && [[ -n "${HTTP_PORT:-}" ]]; then
+        _nm_port_log "HTTP_PORT уже выбран (${HTTP_PORT}) — пропуск."
+        return 0
+    fi
 
     if [[ -n "${HTTP_PORT:-}" ]]; then
         if ! _nm_port_valid "$HTTP_PORT"; then
             _nm_port_log "WARNING: HTTP_PORT=${HTTP_PORT} некорректен — используем 80."
             HTTP_PORT=80
         fi
-        export HTTP_PORT
+        _nm_port_set_confirmed "$HTTP_PORT"
         _nm_port_log "Порт задан через HTTP_PORT=${HTTP_PORT}."
-        _nm_port_chain_https_confirm "$project_dir"
         return 0
     fi
     if [[ -n "${NM_HTTP_PORT:-}" ]]; then
@@ -123,41 +107,41 @@ confirm_http_port() {
             _nm_port_log "WARNING: NM_HTTP_PORT=${NM_HTTP_PORT} некорректен — используем 80."
             HTTP_PORT=80
         fi
-        export HTTP_PORT
+        _nm_port_set_confirmed "$HTTP_PORT"
         _nm_port_log "Порт задан через NM_HTTP_PORT=${HTTP_PORT}."
-        _nm_port_chain_https_confirm "$project_dir"
         return 0
     fi
 
     # «Сделай мне хорошо» — всегда 8080 (не путать с NM_AUTO_MODULES → 80).
     if [[ "${NM_FULL_AUTO:-0}" == "1" ]]; then
-        HTTP_PORT=8080
-        export HTTP_PORT
+        _nm_port_set_confirmed 8080
         _nm_port_log "NM_FULL_AUTO=1 — HTTP_PORT=8080."
-        _nm_port_chain_https_confirm "$project_dir"
         return 0
     fi
 
     if [[ "${NM_AUTO_MODULES:-0}" == "1" ]] || { [[ ! -t 0 ]] && [[ ! -r /dev/tty ]]; }; then
-        HTTP_PORT=80
-        export HTTP_PORT
+        _nm_port_set_confirmed 80
         _nm_port_log "Нет TTY / NM_AUTO_MODULES — HTTP_PORT=80."
-        _nm_port_chain_https_confirm "$project_dir"
         return 0
     fi
 
     _nm_port_ensure_ui || true
-    local choice=""
+    local choice="" title prompt
+    if _nm_port_https_on; then
+        title="HTTP-порт"
+        prompt="Порт HTTP (редирект на HTTPS или параллельный доступ).
+TLS уже: ${HTTPS_PORT:-443}"
+    else
+        title="Порт веб-интерфейса"
+        prompt="На каком порту открыть UI (только HTTP)?"
+    fi
 
     if declare -F nm_ui_radiolist >/dev/null 2>&1; then
         if ! choice="$(nm_ui_radiolist \
-            "Порт веб-интерфейса" \
-            "На каком порту открыть UI (nginx)?
-(HTTPS настраивается следующим шагом)" \
+            "$title" \
+            "$prompt" \
             80 "HTTP :80" ON \
             8080 "HTTP :8080" OFF \
-            443 "HTTP :443 (не TLS)" OFF \
-            8443 "HTTP :8443 (не TLS)" OFF \
             custom "Указать вручную" OFF)"; then
             _nm_port_log "Установка отменена пользователем."
             exit 0
@@ -180,14 +164,16 @@ confirm_http_port() {
             fi
             ;;
     esac
-    export HTTP_PORT
-    _nm_port_log "Выбран порт веб-интерфейса: ${HTTP_PORT}"
+    _nm_port_set_confirmed "$HTTP_PORT"
+    _nm_port_log "Выбран HTTP_PORT=${HTTP_PORT}"
     if declare -F nm_ui_msgbox >/dev/null 2>&1 && [[ "${NM_UI_BACKEND:-text}" != "text" ]]; then
-        nm_ui_msgbox "Порт веб-интерфейса" \
-            "Веб-интерфейс будет слушать порт ${HTTP_PORT}.
-Далее — вопрос про HTTPS." || true
+        local summary="HTTP: порт ${HTTP_PORT}."
+        if _nm_port_https_on; then
+            summary="${summary}
+HTTPS: порт ${HTTPS_PORT:-443} (TLS)."
+        fi
+        nm_ui_msgbox "$title" "$summary" || true
     fi
-    _nm_port_chain_https_confirm "$project_dir"
 }
 
 # Записать HTTP_PORT в .env (не затирая остальные ключи).
@@ -219,5 +205,4 @@ EOF
     mv "$tmp" "$env_file"
     export HTTP_PORT="$port"
     _nm_port_log "Записан HTTP_PORT=${port} → ${env_file}"
-    _nm_port_chain_https_apply "$project_dir"
 }

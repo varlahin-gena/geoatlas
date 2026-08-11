@@ -10,17 +10,22 @@
 #   NM_UNINSTALL_PRESET     — stop | clean | purge (без интерактива)
 #   NM_DRY_RUN=1            — только план, без изменений
 #   NM_FORCE / FORCE=1      — без подтверждения (CI/Ansible)
-#   REMOVE_DOCKER_VOLUMES   — 1 = удалить тома ClickHouse/syslog-ng
+#   REMOVE_DOCKER_VOLUMES   — 1 = удалить тома ClickHouse / backups / auth-users / syslog-ng
 #   REMOVE_PROJECT_FILES    — 1 = удалить каталог проекта
 #   REMOVE_IMAGES           — 1 = docker compose down --rmi local
-#   REMOVE_FIREWALL_RULES   — 1 = вызвать nm_remove_firewall_rules
+#   REMOVE_FIREWALL_RULES   — 1 = вызвать nm_remove_firewall_rules (HTTP/HTTPS/514)
 #
 # CLI: --help --dry-run -y|--yes --preset --purge|--clean|--stop
 #      --volumes --images --keep-files --no-firewall
 
 set -Eeuo pipefail
 
+# NM_PROJECT_DIR — канон; PROJECT_DIR принимаем как legacy alias.
+if [[ -z "${NM_PROJECT_DIR:-}" && -n "${PROJECT_DIR:-}" ]]; then
+    NM_PROJECT_DIR="$PROJECT_DIR"
+fi
 NM_PROJECT_DIR="${NM_PROJECT_DIR:-/opt/network-monitor}"
+PROJECT_DIR="${PROJECT_DIR:-$NM_PROJECT_DIR}"
 NM_DRY_RUN="${NM_DRY_RUN:-0}"
 NM_FORCE="${NM_FORCE:-${FORCE:-0}}"
 NM_PRESET="${NM_UNINSTALL_PRESET:-${NM_PRESET:-}}"
@@ -121,15 +126,15 @@ _nm_show_help() {
   --stop              только остановить стек (preset stop)
   --clean             безопасное удаление (preset clean, по умолчанию)
   --purge             полное удаление включая данные (preset purge)
-  --volumes           удалить Docker volumes (ClickHouse данные)
+  --volumes           удалить Docker volumes (ClickHouse, бэкапы, auth-users)
   --images            удалить локально собранные образы
   --keep-files        сохранить каталог проекта
-  --no-firewall       не трогать правила firewall
+  --no-firewall       не трогать правила firewall (HTTP/HTTPS/514)
 
 Presets:
   stop   — остановить docker compose, всё остальное сохранить
-  clean  — stop + удалить файлы проекта + firewall (данные сохраняются)
-  purge  — clean + volumes + локальные образы
+  clean  — stop + удалить файлы проекта + firewall (volumes сохраняются)
+  purge  — clean + volumes (CH/бэкапы/учётки) + локальные образы
 
 Переменные окружения (для Ansible/CI):
   FORCE=1  NM_DRY_RUN=1  NM_UNINSTALL_PRESET=purge
@@ -233,8 +238,8 @@ _nm_apply_preset() {
 _nm_preset_label() {
     case "$1" in
         stop)  echo "только остановить стек" ;;
-        clean) echo "безопасное удаление (данные сохраняются)" ;;
-        purge) echo "полное удаление (включая ClickHouse данные)" ;;
+        clean) echo "безопасное удаление (volumes сохраняются)" ;;
+        purge) echo "полное удаление (ClickHouse, бэкапы, auth-users)" ;;
         *)     echo "$1" ;;
     esac
 }
@@ -247,8 +252,8 @@ _nm_interactive_wizard() {
         if ! choice="$(nm_ui_radiolist \
             "Удаление ГеоАтлас" \
             "Выберите режим удаления:" \
-            clean "Безопасное удаление — стек, каталог и firewall (данные ClickHouse сохраняются)" ON \
-            purge "Полное удаление — включая volumes и локальные образы" OFF \
+            clean "Безопасное удаление — стек, каталог и firewall (volumes сохраняются)" ON \
+            purge "Полное удаление — volumes (CH/бэкапы/учётки) и локальные образы" OFF \
             stop "Только остановить стек (для обновления/отладки)" OFF \
             custom "Настроить вручную" OFF \
             cancel "Отмена" OFF)"; then
@@ -295,8 +300,8 @@ _nm_interactive_wizard() {
     echo "══════════════════════════════════════════════════════════"
     echo ""
     echo "  [1] Безопасное удаление — остановить стек, удалить каталог проекта и firewall"
-    echo "      (данные ClickHouse в Docker volumes сохраняются)"
-    echo "  [2] Полное удаление (purge) — всё включая ClickHouse и образы"
+    echo "      (Docker volumes: ClickHouse, бэкапы, auth-users — сохраняются)"
+    echo "  [2] Полное удаление (purge) — всё включая volumes и образы"
     echo "  [3] Только остановить стек (для обновления/отладки)"
     echo "  [4] Настроить вручную"
     echo "  [q] Отмена"
@@ -349,9 +354,9 @@ _nm_interactive_custom() {
         if selected="$(nm_ui_checklist \
             "Параметры удаления" \
             "Отметьте, что удалить:" \
-            volumes "Docker volumes (данные ClickHouse) — НЕОБРАТИМО" OFF \
+            volumes "Docker volumes (ClickHouse, бэкапы, auth-users) — НЕОБРАТИМО" OFF \
             files "Каталог проекта ${NM_PROJECT_DIR}" ON \
-            firewall "Правила firewall (80/514)" ON \
+            firewall "Правила firewall (HTTP/HTTPS/514)" ON \
             images "Локально собранные Docker-образы стека" OFF)"; then
             REMOVE_DOCKER_VOLUMES=0
             REMOVE_PROJECT_FILES=0
@@ -371,7 +376,7 @@ _nm_interactive_custom() {
 
     echo ""
 
-    if _nm_yesno "Удалить Docker volumes (данные ClickHouse)? НЕОБРАТИМО"; then
+    if _nm_yesno "Удалить Docker volumes (ClickHouse, бэкапы, auth-users)? НЕОБРАТИМО"; then
         REMOVE_DOCKER_VOLUMES=1
     else
         REMOVE_DOCKER_VOLUMES=0
@@ -383,7 +388,7 @@ _nm_interactive_custom() {
         REMOVE_PROJECT_FILES=0
     fi
 
-    if _nm_yesno_default_yes "Удалить правила firewall (80/514)?"; then
+    if _nm_yesno_default_yes "Удалить правила firewall (HTTP/HTTPS/514)?"; then
         REMOVE_FIREWALL_RULES=1
     else
         REMOVE_FIREWALL_RULES=0
@@ -442,7 +447,7 @@ _nm_audit_volumes() {
     for vol in "${volumes[@]}"; do
         [[ -z "$vol" ]] && continue
         case "$vol" in
-            *network-monitor*|*network_monitor*|*clickhouse*|*syslog-ng*) ;;
+            *network-monitor*|*network_monitor*|*clickhouse*|*syslog-ng*|*auth-users*) ;;
             *) continue ;;
         esac
         found=1
@@ -511,9 +516,9 @@ _nm_print_plan() {
     _nm_log "Каталог проекта       : ${NM_PROJECT_DIR}"
     _nm_log "Остановить стек (down): да"
     if [[ "$REMOVE_DOCKER_VOLUMES" == "1" ]]; then
-        _nm_log "ClickHouse данные     : БУДУТ УДАЛЕНЫ (docker volume -v)  <-- НЕОБРАТИМО"
+        _nm_log "Docker volumes        : БУДУТ УДАЛЕНЫ (CH data, бэкапы, auth-users)  <-- НЕОБРАТИМО"
     else
-        _nm_log "ClickHouse данные     : сохраняются"
+        _nm_log "Docker volumes        : сохраняются (ClickHouse, бэкапы, auth-users)"
     fi
     if [[ "$REMOVE_IMAGES" == "1" ]]; then
         _nm_log "Локальные образы      : будут удалены (--rmi local)"
@@ -529,7 +534,7 @@ _nm_print_plan() {
         if [[ "$REMOVE_DOCKER_VOLUMES" == "1" ]]; then
             _nm_log "Каталог проекта       : БУДЕТ УДАЛЁН (rm -rf ${NM_PROJECT_DIR})"
         else
-            _nm_log "Каталог проекта       : будет удалён (данные ClickHouse в volumes сохранятся)"
+            _nm_log "Каталог проекта       : будет удалён (volumes ClickHouse/бэкапы/auth сохранятся)"
         fi
     else
         _nm_log "Каталог проекта       : сохраняется"
@@ -559,7 +564,7 @@ _nm_confirm() {
     # Выбор в wizard/custom — уже подтверждение; лишние вопросы не задаём.
     if [[ "${NM_WIZARD_USED}" == "1" ]]; then
         if [[ "$REMOVE_DOCKER_VOLUMES" == "1" ]]; then
-            if ! _nm_yesno "Будут удалены данные ClickHouse. Это необратимо. Продолжить?"; then
+            if ! _nm_yesno "Будут удалены volumes: ClickHouse, бэкапы и auth-users. Это необратимо. Продолжить?"; then
                 _nm_log "Отменено пользователем."
                 exit 0
             fi
@@ -574,7 +579,7 @@ _nm_confirm() {
     fi
 
     if [[ "$REMOVE_DOCKER_VOLUMES" == "1" ]]; then
-        if ! _nm_yesno "Будут удалены данные ClickHouse. Это необратимо. Продолжить?"; then
+        if ! _nm_yesno "Будут удалены volumes: ClickHouse, бэкапы и auth-users. Это необратимо. Продолжить?"; then
             _nm_log "Отменено пользователем."
             exit 0
         fi
@@ -592,7 +597,7 @@ _nm_stop_stack() {
 
         local down_args=(down --remove-orphans)
         if [[ "$REMOVE_DOCKER_VOLUMES" == "1" ]]; then
-            _nm_log "WARNING: REMOVE_DOCKER_VOLUMES=1 — ClickHouse data will be DELETED!"
+            _nm_log "WARNING: REMOVE_DOCKER_VOLUMES=1 — ClickHouse data, backups and auth-users will be DELETED!"
             down_args+=(-v)
         else
             _nm_log "Docker volumes preserved (use --volumes or preset purge to delete)."
@@ -671,14 +676,14 @@ _nm_print_summary() {
         _nm_log "Note: locally built images kept (use --images or preset purge to remove)."
     fi
     if [[ "$REMOVE_DOCKER_VOLUMES" != "1" && "$REMOVE_PROJECT_FILES" == "1" ]]; then
-        _nm_log "Note: Docker volumes preserved — данные ClickHouse можно восстановить при повторной установке,"
+        _nm_log "Note: Docker volumes preserved — ClickHouse, бэкапы и auth-users можно восстановить при повторной установке,"
         _nm_log "      если тома не были удалены вручную."
     fi
     _nm_ensure_ui || true
     if declare -F nm_ui_msgbox >/dev/null 2>&1; then
         local note=""
         if [[ "$REMOVE_DOCKER_VOLUMES" != "1" && "$REMOVE_PROJECT_FILES" == "1" ]]; then
-            note=$'\n\nДанные ClickHouse в Docker volumes сохранены.'
+            note=$'\n\nDocker volumes (ClickHouse, бэкапы, auth-users) сохранены.'
         fi
         nm_ui_msgbox "Удаление завершено" \
 "ГеоАтлас удалён согласно выбранному режиму.

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Выбор HTTPS для веб-интерфейса (nginx TLS, свои PEM).
+# Первый шаг сетевой настройки UI: HTTPS да/нет → затем порты (HTTP через цепочку).
 # Использование:
 #   source deploy/common/select_https.sh
 #   confirm_https /opt/network-monitor
@@ -18,6 +19,7 @@
 #
 # Важно: шаг задаётся и в пошаговой установке, и при NM_FULL_AUTO=1
 # (если есть TTY и HTTPS_ENABLED / NM_HTTPS_ENABLED ещё не заданы).
+# После выбора HTTPS вызывается confirm_http_port (если ещё не подтверждён).
 
 set -Eeuo pipefail
 
@@ -192,6 +194,24 @@ _nm_https_ask_cert_paths() {
     _nm_https_install_certs "$project_dir" "$cert_src" "$key_src"
 }
 
+# Цепочка: после HTTPS спросить HTTP-порт (идемпотентно).
+_nm_https_chain_http_port() {
+    [[ "${NM_HTTP_PORT_CONFIRMED:-0}" == "1" ]] && return 0
+    local helper
+    helper="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)/select_http_port.sh"
+    if [[ ! -f "$helper" ]]; then
+        _nm_https_log "select_http_port.sh не найден — шаг HTTP-порта пропущен."
+        return 0
+    fi
+    if ! declare -F confirm_http_port >/dev/null 2>&1; then
+        # shellcheck source=deploy/common/select_http_port.sh
+        source "$helper"
+    fi
+    if declare -F confirm_http_port >/dev/null 2>&1; then
+        confirm_http_port
+    fi
+}
+
 _nm_https_prompt_certs_when_enabled() {
     local project_dir="$1"
     local choice=""
@@ -290,6 +310,7 @@ confirm_https() {
     if [[ -n "$enabled" ]]; then
         HTTPS_ENABLED="$enabled"
         export HTTPS_ENABLED
+        export NM_HTTPS_CONFIRMED=1
         HTTPS_PORT="${HTTPS_PORT:-${NM_HTTPS_PORT:-443}}"
         HTTP_REDIRECT="${HTTP_REDIRECT:-${NM_HTTP_REDIRECT:-1}}"
         if ! _nm_https_port_valid "${HTTPS_PORT}"; then
@@ -300,6 +321,7 @@ confirm_https() {
         if _nm_https_truthy "$HTTPS_ENABLED" || [[ "$HTTPS_ENABLED" == "auto" ]]; then
             _nm_https_prompt_certs_when_enabled "$project_dir"
         fi
+        _nm_https_chain_http_port
         return 0
     fi
 
@@ -314,10 +336,12 @@ confirm_https() {
         HTTPS_PORT="${HTTPS_PORT:-${NM_HTTPS_PORT:-443}}"
         HTTP_REDIRECT="${HTTP_REDIRECT:-${NM_HTTP_REDIRECT:-1}}"
         export HTTPS_ENABLED HTTPS_PORT HTTP_REDIRECT
+        export NM_HTTPS_CONFIRMED=1
         _nm_https_log "Нет интерактива (/dev/tty) — HTTPS_ENABLED=${HTTPS_ENABLED}"
         if _nm_https_truthy "$HTTPS_ENABLED" || [[ "$HTTPS_ENABLED" == "auto" ]]; then
             _nm_https_prompt_certs_when_enabled "$project_dir"
         fi
+        _nm_https_chain_http_port
         return 0
     fi
 
@@ -333,9 +357,10 @@ confirm_https() {
     if declare -F nm_ui_radiolist >/dev/null 2>&1; then
         if ! choice="$(nm_ui_radiolist \
             "HTTPS" \
-            "Включить HTTPS для веб-интерфейса (свои PEM-сертификаты)?" \
+            "Сначала режим доступа к UI.
+Порты спросим следующим шагом." \
             off "Только HTTP" "$default_off" \
-            on "HTTPS (TLS на nginx)" "$default_on" \
+            on "HTTPS (TLS, свои PEM)" "$default_on" \
             auto "Авто: HTTPS если PEM уже в certs/" OFF)"; then
             _nm_https_log "Установка отменена пользователем."
             exit 0
@@ -361,6 +386,7 @@ confirm_https() {
             ;;
     esac
     export HTTPS_ENABLED
+    export NM_HTTPS_CONFIRMED=1
 
     HTTPS_PORT="${HTTPS_PORT:-${NM_HTTPS_PORT:-443}}"
     HTTP_REDIRECT="${HTTP_REDIRECT:-${NM_HTTP_REDIRECT:-1}}"
@@ -396,15 +422,18 @@ confirm_https() {
     if declare -F nm_ui_msgbox >/dev/null 2>&1 && [[ "${NM_UI_BACKEND:-text}" != "text" ]]; then
         local summary
         if _nm_https_falsy "$HTTPS_ENABLED"; then
-            summary="HTTPS выключен. UI по HTTP (порт ${HTTP_PORT:-80})."
+            summary="HTTPS выключен. Далее — выбор HTTP-порта."
         else
             summary="HTTPS: ${HTTPS_ENABLED}
 Порт TLS: ${HTTPS_PORT}
 Редирект HTTP→HTTPS: ${HTTP_REDIRECT}
-Сертификаты: ${project_dir}/certs/"
+Сертификаты: ${project_dir}/certs/
+Далее — выбор HTTP-порта."
         fi
         nm_ui_msgbox "HTTPS" "$summary" || true
     fi
+
+    _nm_https_chain_http_port
 }
 
 # Записать HTTPS_* в .env (не затирая остальные ключи).
