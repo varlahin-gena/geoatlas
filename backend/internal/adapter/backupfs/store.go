@@ -113,18 +113,25 @@ func (d *DirStore) WriteAuthTarball(name, dataDir string) error {
 	tw := tar.NewWriter(gz)
 	defer tw.Close()
 
-	return filepath.WalkDir(dataDir, func(path string, de fs.DirEntry, err error) error {
+	// os.Root: Open/Walk только внутри dataDir — без symlink TOCTOU за пределы корня (gosec G122).
+	root, err := os.OpenRoot(dataDir)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+
+	return fs.WalkDir(root.FS(), ".", func(path string, de fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		rel, err := filepath.Rel(dataDir, path)
-		if err != nil {
-			return err
-		}
-		if rel == "." {
+		if path == "." {
 			return nil
 		}
-		rel = filepath.ToSlash(rel)
+		// Не следуем symlink'ам: иначе в tar могли бы попасть пути вне dataDir.
+		if de.Type()&fs.ModeSymlink != 0 {
+			return nil
+		}
+		rel := filepath.ToSlash(path)
 		info, err := de.Info()
 		if err != nil {
 			return err
@@ -144,7 +151,7 @@ func (d *DirStore) WriteAuthTarball(name, dataDir string) error {
 		if err := tw.WriteHeader(hdr); err != nil {
 			return err
 		}
-		rf, err := os.Open(path)
+		rf, err := root.Open(path)
 		if err != nil {
 			return err
 		}
