@@ -513,9 +513,10 @@ export function SystemBackupTab() {
         <p className="hint">
           Колонка <strong>Создан</strong> — в поясе расписания (
           <code>{savedSched.timezone || sched.timezone || 'UTC'}</code>
-          ), имя файла остаётся в UTC (<code>…Z</code>). Колонка <strong>Источник</strong> — вручную
-          или по расписанию. <strong>Auth</strong> — снимок <code>/app/data</code> как{' '}
-          <code>*.auth.tgz</code> (не трафик).
+          ). Имя файла — то же локальное время с оффсетом (<code>…+0300</code>); старые{' '}
+          <code>…Z</code> — UTC. <strong>Источник</strong> — вручную или по расписанию.{' '}
+          <strong>Auth</strong> — снимок <code>/app/data</code> как <code>*.auth.tgz</code> (не
+          трафик).
         </p>
         {backups.length === 0 ? (
           <p className="hint">Пока нет бэкапов.</p>

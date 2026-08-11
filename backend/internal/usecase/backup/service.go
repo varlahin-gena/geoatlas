@@ -460,6 +460,9 @@ func (s *Service) runCreate(ctx context.Context, source string) {
 	}()
 
 	name := "nm-" + time.Now().UTC().Format("20060102T150405Z")
+	if sch, err := s.GetSchedule(); err == nil {
+		name = FormatBackupName(time.Now(), sch.Timezone)
+	}
 	s.job.SetRunning(name, "backup started")
 
 	keep, includeEdges, includeAuth := s.effectivePolicy()

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestWriteAuthTarballSkipsSymlinkEscape(t *testing.T) {
@@ -63,6 +64,23 @@ func TestWriteAuthTarballSkipsSymlinkEscape(t *testing.T) {
 		if string(body) == "secret" {
 			t.Fatal("outside file content present in tar")
 		}
+	}
+}
+
+func TestParseBackupNameTimeOffset(t *testing.T) {
+	tUTC, ok := parseBackupNameTime("nm-20260811T072119Z")
+	if !ok || !tUTC.Equal(time.Date(2026, 8, 11, 7, 21, 19, 0, time.UTC)) {
+		t.Fatalf("utc: ok=%v t=%v", ok, tUTC)
+	}
+	tOff, ok := parseBackupNameTime("nm-20260811T102119+0300")
+	if !ok || !tOff.Equal(time.Date(2026, 8, 11, 7, 21, 19, 0, time.UTC)) {
+		t.Fatalf("offset: ok=%v t=%v", ok, tOff)
+	}
+	if !nameRe.MatchString("nm-20260811T102119+0300") {
+		t.Fatal("regex should accept offset name")
+	}
+	if !nameRe.MatchString("nm-20260811T072119Z") {
+		t.Fatal("regex should accept legacy Z name")
 	}
 }
 

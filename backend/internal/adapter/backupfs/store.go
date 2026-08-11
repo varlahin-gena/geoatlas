@@ -16,7 +16,7 @@ import (
 	"network_monitor/internal/usecase/backup"
 )
 
-var nameRe = regexp.MustCompile(`^nm-\d{8}T\d{6}Z$`)
+var nameRe = regexp.MustCompile(`^nm-\d{8}T\d{6}(Z|[+-]\d{4})$`)
 
 const attachedFile = ".nm-attached"
 
@@ -87,15 +87,18 @@ func (d *DirStore) List() ([]backup.Entry, error) {
 }
 
 func parseBackupNameTime(name string) (time.Time, bool) {
-	// nm-20060102T150405Z
+	// nm-20060102T150405Z  или  nm-20060102T150405+0300
 	if !strings.HasPrefix(name, "nm-") {
 		return time.Time{}, false
 	}
-	t, err := time.Parse("20060102T150405Z", strings.TrimPrefix(name, "nm-"))
-	if err != nil {
-		return time.Time{}, false
+	suffix := strings.TrimPrefix(name, "nm-")
+	if t, err := time.Parse("20060102T150405Z", suffix); err == nil {
+		return t.UTC(), true
 	}
-	return t.UTC(), true
+	if t, err := time.Parse("20060102T150405Z0700", suffix); err == nil {
+		return t.UTC(), true
+	}
+	return time.Time{}, false
 }
 
 // WriteSource сохраняет маркер manual|schedule рядом с каталогом бэкапа.

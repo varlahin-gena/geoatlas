@@ -18,6 +18,20 @@ func TestValidateScheduleOK(t *testing.T) {
 	}
 }
 
+func TestFormatBackupNameMoscow(t *testing.T) {
+	loc, err := time.LoadLocation("Europe/Moscow")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 07:21 UTC = 10:21 MSK
+	now := time.Date(2026, 8, 11, 7, 21, 19, 0, time.UTC)
+	got := FormatBackupName(now, "Europe/Moscow")
+	want := "nm-20260811T102119+0300"
+	if got != want {
+		t.Fatalf("got %q want %q (local %s)", got, want, now.In(loc))
+	}
+}
+
 func TestValidateScheduleRejects(t *testing.T) {
 	cases := []Schedule{
 		{Hour: 24, Minute: 0, Timezone: "UTC", Keep: 7},
