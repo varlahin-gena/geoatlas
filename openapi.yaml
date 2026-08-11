@@ -1068,6 +1068,41 @@ paths:
         "400":
           description: Невалидные дни (нужно 1…730)
 
+  /api/system/backups:
+    get:
+      tags: [system]
+      summary: Список бэкапов ClickHouse
+      description: |
+        Только administrator или Bearer.
+        Каталог на томе `clickhouse-backups` + статус фоновой задачи.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Каталог бэкапов
+    post:
+      tags: [system]
+      summary: Запустить создание бэкапа
+      description: |
+        Только administrator или Bearer (+ CSRF для cookie-сессии).
+        Асинхронно: native `BACKUP TABLE … TO Disk('backups', …)`.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: X-CSRF-Token
+          in: header
+          required: false
+          schema: { type: string }
+      responses:
+        "202":
+          description: Задача поставлена в очередь
+        "409":
+          description: Уже выполняется другой бэкап
+        "503":
+          description: Сервис/каталог недоступен
+
   /api/parse-errors:
     get:
       tags: [parse]

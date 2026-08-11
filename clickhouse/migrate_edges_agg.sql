@@ -3,12 +3,15 @@
 -- (model.BlockedInClause). Этот файл — ручной fallback для существующих установок.
 -- Ручной запуск:
 --   docker compose exec -T clickhouse clickhouse-client --multiquery < clickhouse/migrate_edges_agg.sql
+--
+-- src_ip/dst_ip: IPv4 (как Ensure* schemaVersionEdgesAgg >= 2). На старом томе с String
+-- лучше дать backend Ensure* (EXCHANGE), а не этот IF NOT EXISTS.
 
 CREATE TABLE IF NOT EXISTS traffic_edges_daily
 (
     day           Date,
-    src_ip        String,
-    dst_ip        String,
+    src_ip        IPv4,
+    dst_ip        IPv4,
     cnt           SimpleAggregateFunction(sum, UInt64),
     blocked_cnt   SimpleAggregateFunction(sum, UInt64),
     allowed_cnt   SimpleAggregateFunction(sum, UInt64),
@@ -28,9 +31,10 @@ CREATE TABLE IF NOT EXISTS traffic_edges_daily
     dst_country   AggregateFunction(any, String)
 )
 ENGINE = AggregatingMergeTree()
-PARTITION BY toYYYYMM(day)
+PARTITION BY day
 ORDER BY (day, src_ip, dst_ip)
-TTL day + INTERVAL 30 DAY DELETE;
+TTL day + INTERVAL 30 DAY DELETE
+SETTINGS ttl_only_drop_parts = 1;
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS traffic_edges_daily_mv
 TO traffic_edges_daily AS

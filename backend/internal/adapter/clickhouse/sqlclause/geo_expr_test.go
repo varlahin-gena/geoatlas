@@ -40,6 +40,9 @@ func TestGeoKeyExprsContainValidUTF8Unknown(t *testing.T) {
 	if !strings.Contains(ck, "src_ip") {
 		t.Fatalf("CityKeyExpr should fall back to src_ip: %s", ck)
 	}
+	if !strings.Contains(ck, "toString(") {
+		t.Fatalf("CityKeyExpr IP fallback must toString IPv4: %s", ck)
+	}
 	for _, bad := range []string{"unknown", "Reserved", "reserved"} {
 		if !strings.Contains(ck, bad) {
 			t.Fatalf("CityKeyExpr should treat %q as bad country: %s", bad, ck)
@@ -49,12 +52,15 @@ func TestGeoKeyExprsContainValidUTF8Unknown(t *testing.T) {
 
 func TestGeoGroupExprsIPAndSubnet(t *testing.T) {
 	sk, dk, sl, dl := GeoGroupExprs("ip")
-	if sk != "src_ip" || dk != "dst_ip" || sl != "src_ip" || dl != "dst_ip" {
+	if sk != "toString(src_ip)" || dk != "toString(dst_ip)" || sl != "toString(src_ip)" || dl != "toString(dst_ip)" {
 		t.Fatalf("ip exprs: %s %s %s %s", sk, dk, sl, dl)
 	}
 	sk, dk, _, _ = GeoGroupExprs("subnet")
-	if !strings.Contains(sk, "isIPv4String(src_ip)") || !strings.Contains(dk, "isIPv4String(dst_ip)") {
+	if !strings.Contains(sk, "toUInt32(src_ip)") || !strings.Contains(dk, "toUInt32(dst_ip)") {
 		t.Fatalf("subnet exprs: %s / %s", sk, dk)
+	}
+	if strings.Contains(sk, "isIPv4String") || strings.Contains(sk, "IPv4StringToNum") {
+		t.Fatalf("subnet must not use String IP helpers: %s", sk)
 	}
 	if !strings.Contains(sk, "/24") {
 		t.Fatalf("subnet missing /24: %s", sk)

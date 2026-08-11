@@ -1,7 +1,10 @@
 package main
 
 import (
+	"path/filepath"
+
 	chadapter "network_monitor/internal/adapter/clickhouse"
+	"network_monitor/internal/adapter/backupfs"
 	"network_monitor/internal/adapter/geoipcodec"
 	httpapi "network_monitor/internal/adapter/httpapi"
 	"network_monitor/internal/adapter/parseradapter"
@@ -9,6 +12,7 @@ import (
 	"network_monitor/internal/config"
 	"network_monitor/internal/parser"
 	usecaseauth "network_monitor/internal/usecase/auth"
+	usecasebackup "network_monitor/internal/usecase/backup"
 	usecaseevents "network_monitor/internal/usecase/events"
 	usecasegeo "network_monitor/internal/usecase/geo"
 	"network_monitor/internal/usecase/parseerrors"
@@ -41,8 +45,20 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 		Maintenance:        a.geoJobs,
 	})
 	authUC := usecaseauth.New(auth.users, auth.sessions)
+	dataDir := filepath.Dir(cfg.AuthUsersFile)
+	if dataDir == "." || dataDir == "" {
+		dataDir = "/app/data"
+	}
+	backupUC := usecasebackup.New(usecasebackup.Options{
+		Enabled:      cfg.BackupEnabled,
+		Dir:          cfg.BackupDir,
+		DataDir:      dataDir,
+		Keep:         cfg.BackupKeep,
+		IncludeEdges: cfg.BackupIncludeEdges,
+		IncludeAuth:  cfg.BackupIncludeAuth,
+	}, chadapter.NewBackupRunner(a.pools.Background), backupfs.New(cfg.BackupDir))
 	return httpapi.NewServer(
 		cfg, a.ingestSvc, eventsUC, geoUC, bg.repUC, parseErrorsUC, systemUC, systemRepo,
-		parseTestUC, bg.retentionUC, authUC, auth.users, auth.sessions, auth.apiTokens,
+		parseTestUC, bg.retentionUC, backupUC, authUC, auth.users, auth.sessions, auth.apiTokens,
 	)
 }

@@ -5,18 +5,19 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
+	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 
+	"network_monitor/internal/adapter/clickhouse/sqlclause"
 	"network_monitor/internal/model"
 )
 
 const geoBackfillIPLimit = 200_000
-const geoBackfillBatchSize = 400
+const geoEnrichInsertBatch = 25_000
 const geoStrMaxRunes = 256
 
 // DefaultGeoBackfillLookbackDays — окно авто-backfill (startup / upload).
@@ -35,18 +36,12 @@ type geoEnrichRow struct {
 	lat, lon                  float64
 }
 
-// countryNeedsSQL — SQL-условие «страна нужна из GeoIP» (зеркало model.NeedsCountry).
-func countryNeedsSQL(col string) string {
-	return fmt.Sprintf(`(%[1]s = '' OR lower(%[1]s) IN ('unknown', 'reserved') OR %[1]s = 'Неизвестно' OR lengthUTF8(trimBoth(%[1]s)) = 2)`, col)
-}
-
-// EnrichLogsMissingGeo дописывает lat/lon/city/region/country в traffic_logs
-// для IP без координат или без пригодной страны — после загрузки GeoIP,
-// без перезаливки логов.
-// lookbackDays > 0 ограничивает скан свежими строками (меньше mutations / CPU);
+// EnrichLogsMissingGeo готовит lookup-таблицу nm_geo_enrich_ip для IP без
+// координат или без пригодной страны в traffic_logs (lookback).
+// Не пишет ALTER UPDATE в traffic_logs: исторические дыры закрывает
+// RebuildGeoEdgesLookback через JOIN к этой таблице.
+// lookbackDays > 0 ограничивает скан свежими строками;
 // lookbackDays <= 0 — весь объём (только осознанно).
-// Mutations синхронизируются через mutations_sync=1, чтобы последующий
-// rebuild geo-edges видел уже обновлённые country/coords.
 func EnrichLogsMissingGeo(ctx context.Context, ch clickhouse.Conn, geo GeoResolver, lookbackDays int) (ips int, err error) {
 	if ch == nil || geo == nil || geo.RangeCount() == 0 {
 		return 0, nil
@@ -55,19 +50,26 @@ func EnrichLogsMissingGeo(ctx context.Context, ch clickhouse.Conn, geo GeoResolv
 	qctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
+	if err := ensureGeoEnrichIPTable(qctx, ch); err != nil {
+		return 0, err
+	}
+	if err := ch.Exec(qctx, "TRUNCATE TABLE IF EXISTS "+sqlclause.GeoEnrichIPTable); err != nil {
+		return 0, fmt.Errorf("truncate %s: %w", sqlclause.GeoEnrichIPTable, err)
+	}
+
 	timeFilter := ""
 	if lookbackDays > 0 {
 		timeFilter = fmt.Sprintf(" AND timestamp >= now64(3) - INTERVAL %d DAY", lookbackDays)
 	}
 
-	srcNeed := fmt.Sprintf(`(src_lat = 0 AND src_lon = 0) OR %s`, countryNeedsSQL("src_country"))
-	dstNeed := fmt.Sprintf(`(dst_lat = 0 AND dst_lon = 0) OR %s`, countryNeedsSQL("dst_country"))
+	srcNeed := fmt.Sprintf(`(src_lat = 0 AND src_lon = 0) OR %s`, sqlclause.CountryNeedsSQL("src_country"))
+	dstNeed := fmt.Sprintf(`(dst_lat = 0 AND dst_lon = 0) OR %s`, sqlclause.CountryNeedsSQL("dst_country"))
 
 	rows, err := ch.Query(qctx, fmt.Sprintf(`
 		SELECT ip FROM (
-			SELECT src_ip AS ip FROM traffic_logs WHERE (%s)%s
+			SELECT toString(src_ip) AS ip FROM traffic_logs WHERE (%s)%s
 			UNION DISTINCT
-			SELECT dst_ip AS ip FROM traffic_logs WHERE (%s)%s
+			SELECT toString(dst_ip) AS ip FROM traffic_logs WHERE (%s)%s
 		)
 		LIMIT %d
 	`, srcNeed, timeFilter, dstNeed, timeFilter, geoBackfillIPLimit))
@@ -108,132 +110,106 @@ func EnrichLogsMissingGeo(ctx context.Context, ch clickhouse.Conn, geo GeoResolv
 		return 0, nil
 	}
 
-	for i := 0; i < len(found); i += geoBackfillBatchSize {
-		end := i + geoBackfillBatchSize
-		if end > len(found) {
-			end = len(found)
-		}
-		batch := found[i:end]
-		if err := mutateGeoSide(qctx, ch, "src", batch); err != nil {
-			return ips, fmt.Errorf("src enrich batch: %w", err)
-		}
-		if err := mutateGeoSide(qctx, ch, "dst", batch); err != nil {
-			return ips, fmt.Errorf("dst enrich batch: %w", err)
-		}
-		ips += len(batch)
+	n, err := insertGeoEnrichIPRows(qctx, ch, found)
+	if err != nil {
+		return 0, err
 	}
-	slog.Info("geo backfill: mutations submitted",
-		"ips", ips,
-		"batches", (len(found)+geoBackfillBatchSize-1)/geoBackfillBatchSize,
+	slog.Info("geo backfill: lookup table ready",
+		"ips", n,
 		"lookback_days", lookbackDays,
+		"table", sqlclause.GeoEnrichIPTable,
 	)
-	return ips, nil
+	return n, nil
 }
 
-func mutateGeoSide(ctx context.Context, ch clickhouse.Conn, side string, batch []geoEnrichRow) error {
-	if len(batch) == 0 {
+func ensureGeoEnrichIPTable(ctx context.Context, ch clickhouse.Conn) error {
+	// CREATE IF NOT EXISTS не меняет String→IPv4; при несовпадении — DROP + CREATE.
+	var typ string
+	err := ch.QueryRow(ctx, `
+		SELECT type FROM system.columns
+		WHERE database = currentDatabase() AND table = ? AND name = 'ip'
+		LIMIT 1
+	`, sqlclause.GeoEnrichIPTable).Scan(&typ)
+	if err == nil && (typ == "IPv4" || strings.HasPrefix(typ, "IPv4(")) {
 		return nil
 	}
-	if side != "src" && side != "dst" {
-		return fmt.Errorf("geo enrich: invalid side %q", side)
+	if err == nil {
+		_ = ch.Exec(ctx, "DROP TABLE IF EXISTS "+sqlclause.GeoEnrichIPTable)
+	}
+	q := fmt.Sprintf(`
+		CREATE TABLE IF NOT EXISTS %s
+		(
+			ip       IPv4,
+			country  String,
+			region   String,
+			city     String,
+			lat      Float64,
+			lon      Float64
+		)
+		ENGINE = MergeTree()
+		ORDER BY ip
+	`, sqlclause.GeoEnrichIPTable)
+	if err := ch.Exec(ctx, q); err != nil {
+		return fmt.Errorf("create %s: %w", sqlclause.GeoEnrichIPTable, err)
+	}
+	return nil
+}
+
+func insertGeoEnrichIPRows(ctx context.Context, ch clickhouse.Conn, rows []geoEnrichRow) (int, error) {
+	var (
+		batch driver.Batch
+		count int
+	)
+	flush := func() error {
+		if batch == nil {
+			return nil
+		}
+		if err := batch.Send(); err != nil {
+			return err
+		}
+		batch = nil
+		return nil
+	}
+	insertSQL := fmt.Sprintf(`
+		INSERT INTO %s (ip, country, region, city, lat, lon)
+	`, sqlclause.GeoEnrichIPTable)
+	newBatch := func() error {
+		var err error
+		batch, err = ch.PrepareBatch(ctx, insertSQL)
+		return err
 	}
 
-	ips := make([]string, 0, len(batch))
-	lats := make([]string, 0, len(batch))
-	lons := make([]string, 0, len(batch))
-	cities := make([]string, 0, len(batch))
-	regions := make([]string, 0, len(batch))
-	countries := make([]string, 0, len(batch))
-
-	for _, e := range batch {
+	for _, e := range rows {
 		ip := strings.TrimSpace(e.ip)
 		if net.ParseIP(ip) == nil {
 			continue
 		}
-		ips = append(ips, quoteCHString(ip))
-		lats = append(lats, formatCHFloat(e.lat))
-		lons = append(lons, formatCHFloat(e.lon))
-		cities = append(cities, quoteCHString(clipGeoStr(e.city)))
-		regions = append(regions, quoteCHString(clipGeoStr(e.region)))
-		countries = append(countries, quoteCHString(clipGeoStr(e.country)))
-	}
-	if len(ips) == 0 {
-		return nil
-	}
-
-	ipCol := side + "_ip"
-	latCol := side + "_lat"
-	lonCol := side + "_lon"
-	cityCol := side + "_city"
-	regionCol := side + "_region"
-	countryCol := side + "_country"
-
-	ipArr := "[" + strings.Join(ips, ",") + "]"
-	latArr := "[" + strings.Join(lats, ",") + "]"
-	lonArr := "[" + strings.Join(lons, ",") + "]"
-	cityArr := "[" + strings.Join(cities, ",") + "]"
-	regionArr := "[" + strings.Join(regions, ",") + "]"
-	countryArr := "[" + strings.Join(countries, ",") + "]"
-	inClause := strings.Join(ips, ",")
-	countryNeed := countryNeedsSQL(countryCol)
-
-	// 1) Строки без координат: пишем lat/lon целиком (как раньше) + city/region/country.
-	coordsQ := fmt.Sprintf(`
-		ALTER TABLE traffic_logs UPDATE
-			%[2]s = transform(%[1]s, %[7]s, %[8]s, %[2]s),
-			%[3]s = transform(%[1]s, %[7]s, %[9]s, %[3]s),
-			%[4]s = if(%[4]s = '' OR lower(%[4]s) IN ('unknown', 'неизвестно'),
-				transform(%[1]s, %[7]s, %[10]s, %[4]s), %[4]s),
-			%[5]s = if(%[5]s = '', transform(%[1]s, %[7]s, %[11]s, %[5]s), %[5]s),
-			%[6]s = if(%[14]s AND transform(%[1]s, %[7]s, %[12]s, '') != '',
-				transform(%[1]s, %[7]s, %[12]s, %[6]s), %[6]s)
-		WHERE %[1]s IN (%[13]s) AND %[2]s = 0 AND %[3]s = 0
-		SETTINGS mutations_sync = 1
-	`, ipCol, latCol, lonCol, cityCol, regionCol, countryCol,
-		ipArr, latArr, lonArr, cityArr, regionArr, countryArr, inClause, countryNeed)
-	if err := ch.Exec(ctx, coordsQ); err != nil {
-		return err
-	}
-
-	// 2) Строки с координатами, но без страны: только city/region/country (lat/lon не трогаем).
-	countryQ := fmt.Sprintf(`
-		ALTER TABLE traffic_logs UPDATE
-			%[4]s = if(%[4]s = '' OR lower(%[4]s) IN ('unknown', 'неизвестно'),
-				transform(%[1]s, %[7]s, %[8]s, %[4]s), %[4]s),
-			%[5]s = if(%[5]s = '', transform(%[1]s, %[7]s, %[9]s, %[5]s), %[5]s),
-			%[6]s = if(%[12]s AND transform(%[1]s, %[7]s, %[10]s, '') != '',
-				transform(%[1]s, %[7]s, %[10]s, %[6]s), %[6]s)
-		WHERE %[1]s IN (%[11]s) AND NOT (%[2]s = 0 AND %[3]s = 0) AND %[12]s
-		SETTINGS mutations_sync = 1
-	`, ipCol, latCol, lonCol, cityCol, regionCol, countryCol,
-		ipArr, cityArr, regionArr, countryArr, inClause, countryNeed)
-	return ch.Exec(ctx, countryQ)
-}
-
-// quoteCHString экранирует литерал ClickHouse String: \ и ' .
-func quoteCHString(s string) string {
-	var b strings.Builder
-	b.Grow(len(s) + 2)
-	b.WriteByte('\'')
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		switch c {
-		case '\\', '\'':
-			b.WriteByte('\\')
-			b.WriteByte(c)
-		case 0:
-			// NUL в mutation-литерале недопустим.
-			continue
-		default:
-			b.WriteByte(c)
+		if batch == nil {
+			if err := newBatch(); err != nil {
+				return count, err
+			}
+		}
+		if err := batch.Append(
+			ip,
+			clipGeoStr(e.country),
+			clipGeoStr(e.region),
+			clipGeoStr(e.city),
+			e.lat,
+			e.lon,
+		); err != nil {
+			return count, err
+		}
+		count++
+		if count%geoEnrichInsertBatch == 0 {
+			if err := flush(); err != nil {
+				return count, err
+			}
 		}
 	}
-	b.WriteByte('\'')
-	return b.String()
-}
-
-func formatCHFloat(v float64) string {
-	return strconv.FormatFloat(v, 'g', -1, 64)
+	if err := flush(); err != nil {
+		return count, err
+	}
+	return count, nil
 }
 
 func clipGeoStr(s string) string {

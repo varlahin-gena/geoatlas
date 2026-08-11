@@ -15,11 +15,13 @@ import (
 // Схема версий: при изменении DDL MV/колонок бампим константу —
 // Ensure* пересоздаст объекты, если stored < desired.
 const (
-	schemaComponentEdgesAgg = "edges_agg"
-	schemaComponentGeoEdges = "geo_edges_agg"
+	schemaComponentEdgesAgg      = "edges_agg"
+	schemaComponentGeoEdges      = "geo_edges_agg"
+	schemaComponentTrafficLogsIP = "traffic_logs_ip"
 
-	schemaVersionEdgesAgg uint32 = 1
-	schemaVersionGeoEdges uint32 = 2
+	schemaVersionEdgesAgg      uint32 = 3 // PARTITION BY day + ttl_only_drop_parts
+	schemaVersionGeoEdges      uint32 = 4 // PARTITION BY day + ttl_only_drop_parts
+	schemaVersionTrafficLogsIP uint32 = 1 // traffic_logs.src_ip/dst_ip IPv4
 )
 
 func ensureSchemaVersionTable(ctx context.Context, ch clickhouse.Conn) error {

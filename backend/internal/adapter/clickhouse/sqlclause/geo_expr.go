@@ -2,6 +2,15 @@ package sqlclause
 
 import "fmt"
 
+// GeoEnrichIPTable — ephemeral IP→geo lookup для rebuild geo-edges без ALTER UPDATE
+// на traffic_logs. Заполняется EnrichLogsMissingGeo, читается INSERT SELECT.
+const GeoEnrichIPTable = "nm_geo_enrich_ip"
+
+// CountryNeedsSQL — условие «страна нужна из GeoIP» (зеркало model.NeedsCountry).
+func CountryNeedsSQL(col string) string {
+	return fmt.Sprintf(`(%[1]s = '' OR lower(%[1]s) IN ('unknown', 'reserved') OR %[1]s = 'Неизвестно' OR lengthUTF8(trimBoth(%[1]s)) = 2)`, col)
+}
+
 // GeoEdgesTable возвращает имя daily-агрегата по city|country.
 // Неизвестный groupBy → "" (не интерполируем произвольные строки в SQL).
 func GeoEdgesTable(groupBy string) string {
@@ -39,7 +48,7 @@ func CityKeyExpr(side string) string {
 func cityKeyExpr(side, table string) string {
 	city := colRef(table, side+"_city")
 	country := colRef(table, side+"_country")
-	ip := colRef(table, side+"_ip")
+	ip := fmt.Sprintf("toString(%s)", colRef(table, side+"_ip"))
 	// Без города/страны ключ = IP (не city:unknown): иначе разные адреса
 	// схлопываются в один узел и дуга на карте становится self-loop.
 	badCountry := fmt.Sprintf(`%[1]s IN ('', 'Неизвестно', 'Unknown', 'unknown', 'Reserved', 'reserved')`, country)
@@ -61,7 +70,7 @@ func CityLabelExpr(side string) string {
 func cityLabelExpr(side, table string) string {
 	city := colRef(table, side+"_city")
 	country := colRef(table, side+"_country")
-	ip := colRef(table, side+"_ip")
+	ip := fmt.Sprintf("toString(%s)", colRef(table, side+"_ip"))
 	badCountry := fmt.Sprintf(`%[1]s IN ('', 'Неизвестно', 'Unknown', 'unknown', 'Reserved', 'reserved')`, country)
 	return fmt.Sprintf(`multiIf(
 		trimBoth(%[1]s) != '', %[1]s,
@@ -79,17 +88,25 @@ func countryKeyExpr(side, table string) string {
 	return fmt.Sprintf(`if(trimBoth(%[1]s) = '' OR %[1]s IN ('Неизвестно', 'Unknown', 'unknown', 'Reserved', 'reserved'), 'Неизвестно', %[1]s)`, country)
 }
 
-// IPKeyExpr — ключ/лейбл узла при группировке по IP (колонка String).
+// IPKeyExpr — ключ/лейбл узла при группировке по IP (dotted-quad String).
 func IPKeyExpr(side string) string {
-	return side + "_ip"
+	return ipKeyExpr(side, "")
 }
 
-// SubnetKeyExpr — IPv4 /24; не-IPv4 → unknown (как service.IPGroupMeta).
+func ipKeyExpr(side, table string) string {
+	return fmt.Sprintf("toString(%s)", colRef(table, side+"_ip"))
+}
+
+// SubnetKeyExpr — IPv4 /24 (колонка типа IPv4).
 func SubnetKeyExpr(side string) string {
-	ip := side + "_ip"
+	return subnetKeyExpr(side, "")
+}
+
+func subnetKeyExpr(side, table string) string {
+	ip := colRef(table, side+"_ip")
 	// 4294967040 = 0xFFFFFF00
 	return fmt.Sprintf(
-		`if(isIPv4String(%[1]s), concat(IPv4NumToString(bitAnd(IPv4StringToNum(%[1]s), toUInt32(4294967040))), '/24'), 'unknown')`,
+		`concat(IPv4NumToString(bitAnd(toUInt32(%[1]s), toUInt32(4294967040))), '/24')`,
 		ip,
 	)
 }
@@ -112,23 +129,12 @@ func geoGroupExprs(groupBy, table string) (srcKey, dstKey, srcLabel, dstLabel st
 		return cityKeyExpr("src", table), cityKeyExpr("dst", table),
 			cityLabelExpr("src", table), cityLabelExpr("dst", table)
 	case "ip":
-		k := colRef(table, IPKeyExpr("src"))
-		d := colRef(table, IPKeyExpr("dst"))
+		k := ipKeyExpr("src", table)
+		d := ipKeyExpr("dst", table)
 		return k, d, k, d
 	case "subnet":
-		if table == "" {
-			k := SubnetKeyExpr("src")
-			d := SubnetKeyExpr("dst")
-			return k, d, k, d
-		}
-		k := fmt.Sprintf(
-			`if(isIPv4String(%[1]s), concat(IPv4NumToString(bitAnd(IPv4StringToNum(%[1]s), toUInt32(4294967040))), '/24'), 'unknown')`,
-			colRef(table, "src_ip"),
-		)
-		d := fmt.Sprintf(
-			`if(isIPv4String(%[1]s), concat(IPv4NumToString(bitAnd(IPv4StringToNum(%[1]s), toUInt32(4294967040))), '/24'), 'unknown')`,
-			colRef(table, "dst_ip"),
-		)
+		k := subnetKeyExpr("src", table)
+		d := subnetKeyExpr("dst", table)
 		return k, d, k, d
 	default:
 		return countryKeyExpr("src", table), countryKeyExpr("dst", table),

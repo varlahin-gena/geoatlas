@@ -27,6 +27,7 @@ import {
   type SystemStats,
   type Tab,
 } from './systemTypes';
+import { SystemBackupTab } from './SystemBackupTab';
 import { SystemChartsTab } from './SystemChartsTab';
 import { SystemOverviewTab } from './SystemOverviewTab';
 import { SystemPipelineTab } from './SystemPipelineTab';
@@ -398,6 +399,7 @@ export default function SystemPage() {
                 [
                   ['overview', 'Обзор'],
                   ['pipeline', 'Pipeline'],
+                  ['backup', 'Резервное копирование'],
                   ['security', 'Безопасность'],
                   ['charts', 'Графики'],
                 ] as const
@@ -463,6 +465,8 @@ export default function SystemPage() {
                 saveRetention={saveRetention}
               />
             ) : null}
+
+            {tab === 'backup' ? <SystemBackupTab /> : null}
 
             {tab === 'security' ? <SystemSecurityTab failed={failed} /> : null}
 

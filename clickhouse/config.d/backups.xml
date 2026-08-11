@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<clickhouse>
+    <!--
+      Disk для native BACKUP/RESTORE (scripts/backup-clickhouse.sh).
+      Том compose: clickhouse-backups → /var/lib/clickhouse-backups
+      Не хранить бэкапы внутри clickhouse-data: при wipe data-тома бэкапы должны уцелеть.
+    -->
+    <storage_configuration>
+        <disks>
+            <backups>
+                <type>local</type>
+                <path>/var/lib/clickhouse-backups/</path>
+            </backups>
+        </disks>
+    </storage_configuration>
+    <backups>
+        <allowed_disk>backups</allowed_disk>
+        <allowed_path>/var/lib/clickhouse-backups/</allowed_path>
+    </backups>
+</clickhouse>

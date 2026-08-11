@@ -40,7 +40,7 @@ func TestReputationEnabledOnMe(t *testing.T) {
 		QueryTimeout:           time.Minute,
 		ReputationFetchEnabled: true,
 	}
-	srv := httpapi.NewServer(cfg, nil, nil, nil, nil, nil, systemUC, stubPinger{}, nil, nil, authUC, users, sessions, nil)
+	srv := httpapi.NewServer(cfg, nil, nil, nil, nil, nil, systemUC, stubPinger{}, nil, nil, nil, authUC, users, sessions, nil)
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(ts.Close)
 

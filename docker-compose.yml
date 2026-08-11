@@ -13,6 +13,8 @@ services:
       - ./clickhouse/config.d:/etc/clickhouse-server/config.d:ro
       - ./clickhouse/users.d:/etc/clickhouse-server/users.d:ro
       - clickhouse-data:/var/lib/clickhouse
+      # Отдельный том: native BACKUP/RESTORE (см. scripts/backup-clickhouse.sh)
+      - clickhouse-backups:/var/lib/clickhouse-backups
     ulimits:
       nofile:
         soft: 262144
@@ -112,6 +114,11 @@ services:
       AUTH_USERS_FILE: /app/data/users.json
       RETENTION_FILE: /app/data/retention.json
       REPUTATION_FEEDS_FILE: /app/data/reputation_feeds.json
+      BACKUP_DIR: /var/lib/clickhouse-backups
+      BACKUP_ENABLED: ${BACKUP_ENABLED:-true}
+      BACKUP_KEEP: ${BACKUP_KEEP:-7}
+      BACKUP_INCLUDE_EDGES: ${BACKUP_INCLUDE_EDGES:-true}
+      BACKUP_INCLUDE_AUTH: ${BACKUP_INCLUDE_AUTH:-true}
       # Только local/dev: плейсхолдеры секретов и/или AUTH_DISABLED / API_AUTH_DISABLED
       NM_ALLOW_INSECURE: ${NM_ALLOW_INSECURE:-0}
       TZ: Europe/Moscow
@@ -119,6 +126,7 @@ services:
       - ./install-profile.json:/app/install-profile.json:ro
       - ./install-meta.json:/app/install-meta.json:ro
       - auth-users:/app/data
+      - clickhouse-backups:/var/lib/clickhouse-backups
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -222,6 +230,7 @@ services:
 
 volumes:
   clickhouse-data:
+  clickhouse-backups:
   syslog-ng-buffer:
   auth-users:
 

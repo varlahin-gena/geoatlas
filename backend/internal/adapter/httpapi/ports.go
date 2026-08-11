@@ -14,6 +14,7 @@ import (
 	usecasegeo "network_monitor/internal/usecase/geo"
 	"network_monitor/internal/usecase/parseerrors"
 	"network_monitor/internal/usecase/parsetest"
+	usecasebackup "network_monitor/internal/usecase/backup"
 	usecasereputation "network_monitor/internal/usecase/reputation"
 	usecaseretention "network_monitor/internal/usecase/retention"
 	usecasesystem "network_monitor/internal/usecase/system"
@@ -80,6 +81,12 @@ type SystemAPI interface {
 type RetentionAPI interface {
 	Get() (usecaseretention.Settings, error)
 	Update(context.Context, usecaseretention.Settings) (usecaseretention.Settings, error)
+}
+
+type BackupAPI interface {
+	Catalog() (usecasebackup.Catalog, error)
+	Status() usecasebackup.Status
+	ScheduleCreate(context.Context) error
 }
 
 type AuthAPI interface {

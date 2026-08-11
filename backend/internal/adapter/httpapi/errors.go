@@ -7,6 +7,7 @@ import (
 
 	"network_monitor/internal/apperr"
 	"network_monitor/internal/usecase/parseerrors"
+	usecasebackup "network_monitor/internal/usecase/backup"
 	usecaseretention "network_monitor/internal/usecase/retention"
 )
 
@@ -31,6 +32,11 @@ func writeDomainError(w http.ResponseWriter, logMsg string, err error) {
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": err.Error()})
 	case errors.Is(err, apperr.ErrConflict):
 		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error()})
+	case errors.Is(err, usecasebackup.ErrBusy):
+		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error()})
+	case errors.Is(err, usecasebackup.ErrDisabled),
+		errors.Is(err, usecasebackup.ErrUnavailable):
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": err.Error()})
 	case apperr.IsClient(err),
 		errors.Is(err, parseerrors.ErrNoIDs),
 		errors.Is(err, usecaseretention.ErrInvalidDays):

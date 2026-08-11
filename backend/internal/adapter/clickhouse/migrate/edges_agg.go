@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
@@ -85,13 +86,15 @@ func RefreshEdgesAggReady(ctx context.Context, ch clickhouse.Conn) error {
 }
 
 func applyEdgesAggSchema(ctx context.Context, ch clickhouse.Conn) error {
-	// Таблицу создаём IF NOT EXISTS; MV — через create→EXCHANGE, без окна DROP.
-	if err := execDDL(ctx, ch, `
-		CREATE TABLE IF NOT EXISTS traffic_edges_daily
+	// Ключ сортировки / партиции — через recreate + EXCHANGE, не MODIFY.
+	const next = "traffic_edges_daily__next"
+	createTable := func(name string) string {
+		return fmt.Sprintf(`
+		CREATE TABLE %s
 		(
 			day           Date,
-			src_ip        String,
-			dst_ip        String,
+			src_ip        IPv4,
+			dst_ip        IPv4,
 			cnt           SimpleAggregateFunction(sum, UInt64),
 			blocked_cnt   SimpleAggregateFunction(sum, UInt64),
 			allowed_cnt   SimpleAggregateFunction(sum, UInt64),
@@ -111,11 +114,40 @@ func applyEdgesAggSchema(ctx context.Context, ch clickhouse.Conn) error {
 			dst_country   AggregateFunction(any, String)
 		)
 		ENGINE = AggregatingMergeTree()
-		PARTITION BY toYYYYMM(day)
+		PARTITION BY day
 		ORDER BY (day, src_ip, dst_ip)
 		TTL day + INTERVAL 30 DAY DELETE
-	`); err != nil {
-		return fmt.Errorf("create traffic_edges_daily: %w", err)
+		SETTINGS ttl_only_drop_parts = 1
+	`, name)
+	}
+
+	exists, err := tableExists(ctx, ch, "traffic_edges_daily")
+	if err != nil {
+		return err
+	}
+	if !exists {
+		if err := execDDL(ctx, ch, createTable("traffic_edges_daily")); err != nil {
+			return fmt.Errorf("create traffic_edges_daily: %w", err)
+		}
+	} else {
+		needRebuild, reason, err := edgesDailyNeedsRebuild(ctx, ch, "traffic_edges_daily")
+		if err != nil {
+			return err
+		}
+		if needRebuild {
+			_ = execDDL(ctx, ch, "DROP TABLE IF EXISTS "+next)
+			if err := execDDL(ctx, ch, createTable(next)); err != nil {
+				return fmt.Errorf("create %s: %w", next, err)
+			}
+			if err := execDDL(ctx, ch, fmt.Sprintf("EXCHANGE TABLES traffic_edges_daily AND %s", next)); err != nil {
+				_ = execDDL(ctx, ch, "DROP TABLE IF EXISTS "+next)
+				return fmt.Errorf("exchange traffic_edges_daily: %w", err)
+			}
+			_ = execDDL(ctx, ch, "DROP TABLE IF EXISTS "+next)
+			slog.Info("edges agg: traffic_edges_daily rebuilt", "reason", reason, "note", "backfill required")
+		} else if err := ensureTTLOnlyDropPartsSetting(ctx, ch, "traffic_edges_daily"); err != nil {
+			return err
+		}
 	}
 
 	createMV := func(viewName string) string {
@@ -149,6 +181,54 @@ func applyEdgesAggSchema(ctx context.Context, ch clickhouse.Conn) error {
 	}
 	if err := replaceMaterializedView(ctx, ch, "traffic_edges_daily_mv", createMV); err != nil {
 		return err
+	}
+	return nil
+}
+
+// edgesDailyNeedsRebuild — true, если тип IP или зерно партиции не совпадают с SoT.
+func edgesDailyNeedsRebuild(ctx context.Context, ch clickhouse.Conn, table string) (bool, string, error) {
+	typ, err := columnType(ctx, ch, table, "src_ip")
+	if err != nil {
+		return false, "", err
+	}
+	if !isIPv4Type(typ) {
+		return true, "src_ip type " + typ, nil
+	}
+	pk, err := tablePartitionKey(ctx, ch, table)
+	if err != nil {
+		return false, "", err
+	}
+	if !isDayPartitionKey(pk) {
+		return true, "partition_key " + pk, nil
+	}
+	return false, "", nil
+}
+
+func tablePartitionKey(ctx context.Context, ch clickhouse.Conn, table string) (string, error) {
+	qctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	var pk string
+	err := ch.QueryRow(qctx, `
+		SELECT partition_key
+		FROM system.tables
+		WHERE database = currentDatabase() AND name = {table:String}
+		LIMIT 1
+	`, clickhouse.Named("table", table)).Scan(&pk)
+	if err != nil {
+		return "", fmt.Errorf("partition_key %s: %w", table, err)
+	}
+	return pk, nil
+}
+
+func isDayPartitionKey(pk string) bool {
+	p := strings.TrimSpace(pk)
+	return p == "day" || p == "`day`"
+}
+
+func ensureTTLOnlyDropPartsSetting(ctx context.Context, ch clickhouse.Conn, table string) error {
+	ddl := fmt.Sprintf(`ALTER TABLE %s MODIFY SETTING ttl_only_drop_parts = 1`, table)
+	if err := execDDL(ctx, ch, ddl); err != nil {
+		return fmt.Errorf("ttl_only_drop_parts %s: %w", table, err)
 	}
 	return nil
 }

@@ -54,6 +54,7 @@ func TestOpenAPIPathsMatchMux(t *testing.T) {
 		nil, // systemPinger
 		nil, // parseTestUC
 		nil, // retentionUC
+		nil, // backupUC
 		nil, // authUC
 		nil, nil, nil, // users, sessions, apiTokens
 	)

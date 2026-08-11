@@ -11,7 +11,7 @@ import (
 
 const (
 	schemaComponentTTLDropParts        = "ttl_only_drop_parts"
-	schemaVersionTTLDropParts   uint32 = 1
+	schemaVersionTTLDropParts   uint32 = 2 // + traffic_edges_* daily partitions
 )
 
 // EnsureTTLOnlyDropParts включает ttl_only_drop_parts на таблицах с дневными
@@ -25,7 +25,14 @@ func EnsureTTLOnlyDropParts(ctx context.Context, ch clickhouse.Conn) error {
 		return nil
 	}
 
-	tables := []string{"traffic_logs", "parse_errors", "system_metrics"}
+	tables := []string{
+		"traffic_logs",
+		"parse_errors",
+		"system_metrics",
+		"traffic_edges_daily",
+		"traffic_edges_city_daily",
+		"traffic_edges_country_daily",
+	}
 	for _, table := range tables {
 		ok, err := ttlTableExists(ctx, ch, table)
 		if err != nil {
@@ -35,6 +42,8 @@ func EnsureTTLOnlyDropParts(ctx context.Context, ch clickhouse.Conn) error {
 			slog.Info("ttl: skip missing table", "table", table)
 			continue
 		}
+		// Edges могли ещё быть на monthly partition — MODIFY SETTING безопасен,
+		// но дешёвый drop сработает только после Ensure* с PARTITION BY day.
 		ddl := fmt.Sprintf(`ALTER TABLE %s MODIFY SETTING ttl_only_drop_parts = 1`, table)
 		if err := execDDL(ctx, ch, ddl); err != nil {
 			return fmt.Errorf("ttl_only_drop_parts %s: %w", table, err)

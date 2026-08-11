@@ -183,11 +183,18 @@ type Config struct {
 	// GeoEnrichOnIngest заполняет пустые/unknown/Reserved/ISO country из GeoIP при записи.
 	// false — аварийный opt-out (city/coords всё равно обогащаются).
 	GeoEnrichOnIngest bool
-	// GeoBackfillLookbackDays — окно mutations для EnrichLogsMissingGeo (0 = весь объём).
+	// GeoBackfillLookbackDays — окно для EnrichLogsMissingGeo + rebuild geo-edges (0 = весь объём).
 	GeoBackfillLookbackDays int
 	// SkipStartupBackfill — на старте только schema Ensure*; тяжёлый backfill
 	// через POST /api/system/maintenance/backfill (или оставьте false — поведение как раньше).
 	SkipStartupBackfill bool
+
+	// Backup: UI + native BACKUP TO Disk('backups').
+	BackupEnabled      bool
+	BackupDir          string // смонтированный том clickhouse-backups
+	BackupKeep         int
+	BackupIncludeEdges bool
+	BackupIncludeAuth  bool
 
 	// Reputation: офлайн-списки (FireHOL и др.).
 	MaxReputationUploadSize int64
@@ -262,6 +269,11 @@ func FromEnv() Config {
 		GeoEnrichOnIngest:       parser.bool("GEO_ENRICH_ON_INGEST", true),
 		GeoBackfillLookbackDays: parser.int("GEO_BACKFILL_LOOKBACK_DAYS", 7),
 		SkipStartupBackfill:     parser.bool("SKIP_STARTUP_BACKFILL", false),
+		BackupEnabled:           parser.bool("BACKUP_ENABLED", true),
+		BackupDir:               envOr("BACKUP_DIR", "/var/lib/clickhouse-backups"),
+		BackupKeep:              parser.int("BACKUP_KEEP", 7),
+		BackupIncludeEdges:      parser.bool("BACKUP_INCLUDE_EDGES", true),
+		BackupIncludeAuth:       parser.bool("BACKUP_INCLUDE_AUTH", true),
 		MaxReputationUploadSize: parser.int64("MAX_REPUTATION_UPLOAD_SIZE", 1<<30),
 		ReputationFetchEnabled:  parser.bool("REPUTATION_FETCH_ENABLED", true),
 		ReputationFetchInterval: parser.durationFlexible("REPUTATION_FETCH_INTERVAL", 6*time.Hour),

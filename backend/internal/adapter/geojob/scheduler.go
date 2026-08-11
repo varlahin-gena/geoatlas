@@ -18,8 +18,8 @@ const (
 // DefaultLookbackDays — окно auto-backfill, если lookback не задан.
 const DefaultLookbackDays = 7
 
-// Scheduler сериализует reload GeoIP, agg backfill и enrich в traffic_logs.
-// Параллельные Schedule* не запускают несколько ALTER/INSERT сразу:
+// Scheduler сериализует reload GeoIP, agg backfill и geo enrich lookup.
+// Параллельные Schedule* не запускают несколько INSERT/DELETE сразу:
 // предыдущая работа отменяется по context, следующая ждёт workMu.
 type Scheduler struct {
 	geo          GeoIndex
@@ -181,7 +181,7 @@ func (s *Scheduler) runEnrich(ctx context.Context) {
 		return
 	}
 	if n > 0 {
-		slog.Info("geo job: backfill done", "ips", n, "lookback_days", s.lookbackDays)
+		slog.Info("geo job: enrich lookup ready", "ips", n, "lookback_days", s.lookbackDays)
 		if err := s.store.RebuildGeoEdgesLookback(ctx, s.lookbackDays); err != nil {
 			if ctx.Err() != nil {
 				slog.Info("geo job: geo-edges rebuild canceled")

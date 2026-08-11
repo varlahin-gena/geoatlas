@@ -64,7 +64,7 @@ func ensureSchema(t *testing.T, conn ch.Conn) {
 			parsed_at DateTime64(3) DEFAULT now64(3),
 			vendor LowCardinality(String) DEFAULT '',
 			device String,
-			src_ip String, dst_ip String,
+			src_ip IPv4, dst_ip IPv4,
 			src_port UInt32, dst_port UInt32,
 			action LowCardinality(String),
 			rule String, proto LowCardinality(String),

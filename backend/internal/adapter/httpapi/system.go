@@ -158,6 +158,34 @@ func (h *SystemHandler) PutRetention(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "retention": out})
 }
 
+func (h *SystemHandler) GetBackups(w http.ResponseWriter, r *http.Request) {
+	if h.backupUC == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "backup service unavailable"})
+		return
+	}
+	cat, err := h.backupUC.Catalog()
+	if err != nil {
+		writeInternalError(w, "backup catalog failed", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, cat)
+}
+
+func (h *SystemHandler) PostBackup(w http.ResponseWriter, r *http.Request) {
+	if h.backupUC == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "backup service unavailable"})
+		return
+	}
+	err := h.backupUC.ScheduleCreate(r.Context())
+	if err != nil {
+		writeDomainError(w, "backup schedule failed", err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{
+		"ok": true, "scheduled": true, "status": h.backupUC.Status(),
+	})
+}
+
 func failedLoginsSnapshot() []FailedLoginEvent {
 	out := defaultLoginLimiter.snapshotFailures()
 	if out == nil {

@@ -37,6 +37,10 @@ func EnsureGeoEdgesAggSchema(ctx context.Context, ch clickhouse.Conn) error {
 			return fmt.Errorf("set geo_edges schema version: %w", err)
 		}
 	}
+	// Lookup для rebuild без ALTER UPDATE traffic_logs (нужна и на старых томах).
+	if err := ensureGeoEnrichIPTable(ctx, ch); err != nil {
+		return err
+	}
 
 	slog.Info("geo edges agg: schema ready")
 	return nil
@@ -129,12 +133,105 @@ func ensureTrafficLogGeoColumns(ctx context.Context, ch clickhouse.Conn) error {
 	return nil
 }
 
+func ensureGeoEnrichIPTable(ctx context.Context, ch clickhouse.Conn) error {
+	exists, err := tableExists(ctx, ch, sqlclause.GeoEnrichIPTable)
+	if err != nil {
+		return err
+	}
+	if exists {
+		typ, err := columnType(ctx, ch, sqlclause.GeoEnrichIPTable, "ip")
+		if err != nil {
+			return err
+		}
+		if !isIPv4Type(typ) {
+			if err := execDDL(ctx, ch, "DROP TABLE IF EXISTS "+sqlclause.GeoEnrichIPTable); err != nil {
+				return fmt.Errorf("drop old %s: %w", sqlclause.GeoEnrichIPTable, err)
+			}
+			exists = false
+		}
+	}
+	if exists {
+		return nil
+	}
+	q := fmt.Sprintf(`
+		CREATE TABLE %s
+		(
+			ip       IPv4,
+			country  String,
+			region   String,
+			city     String,
+			lat      Float64,
+			lon      Float64
+		)
+		ENGINE = MergeTree()
+		ORDER BY ip
+	`, sqlclause.GeoEnrichIPTable)
+	if err := execDDL(ctx, ch, q); err != nil {
+		return fmt.Errorf("create %s: %w", sqlclause.GeoEnrichIPTable, err)
+	}
+	return nil
+}
+
+// geoEdgesEnrichedFromSQL — FROM-подзапрос: traffic_logs + LEFT JOIN nm_geo_enrich_ip.
+// Исторические дыры закрываются на чтении при INSERT SELECT, без ALTER UPDATE.
+// Пустая lookup-таблица → поведение как FROM traffic_logs.
+// dayFilterPlaceholder — "?" для параметра дня (toDate(timestamp) = ?).
+func geoEdgesEnrichedFromSQL(dayFilterPlaceholder string) string {
+	sgCountryNeed := sqlclause.CountryNeedsSQL("traffic_logs.src_country")
+	dgCountryNeed := sqlclause.CountryNeedsSQL("traffic_logs.dst_country")
+	return fmt.Sprintf(`
+		FROM (
+			SELECT
+				traffic_logs.timestamp AS timestamp,
+				traffic_logs.action AS action,
+				traffic_logs.rule AS rule,
+				traffic_logs.proto AS proto,
+				traffic_logs.src_port AS src_port,
+				traffic_logs.dst_port AS dst_port,
+				traffic_logs.device AS device,
+				traffic_logs.src_zone AS src_zone,
+				traffic_logs.dst_zone AS dst_zone,
+				traffic_logs.bytes_sent AS bytes_sent,
+				traffic_logs.bytes_recv AS bytes_recv,
+				traffic_logs.packets_sent AS packets_sent,
+				traffic_logs.packets_recv AS packets_recv,
+				traffic_logs.src_ip AS src_ip,
+				traffic_logs.dst_ip AS dst_ip,
+				if(traffic_logs.src_lat = 0 AND traffic_logs.src_lon = 0 AND (sg.lat != 0 OR sg.lon != 0),
+					sg.lat, traffic_logs.src_lat) AS src_lat,
+				if(traffic_logs.src_lat = 0 AND traffic_logs.src_lon = 0 AND (sg.lat != 0 OR sg.lon != 0),
+					sg.lon, traffic_logs.src_lon) AS src_lon,
+				if(traffic_logs.dst_lat = 0 AND traffic_logs.dst_lon = 0 AND (dg.lat != 0 OR dg.lon != 0),
+					dg.lat, traffic_logs.dst_lat) AS dst_lat,
+				if(traffic_logs.dst_lat = 0 AND traffic_logs.dst_lon = 0 AND (dg.lat != 0 OR dg.lon != 0),
+					dg.lon, traffic_logs.dst_lon) AS dst_lon,
+				if((traffic_logs.src_city = '' OR lower(traffic_logs.src_city) IN ('unknown', 'неизвестно')) AND sg.city != '',
+					sg.city, traffic_logs.src_city) AS src_city,
+				if((traffic_logs.dst_city = '' OR lower(traffic_logs.dst_city) IN ('unknown', 'неизвестно')) AND dg.city != '',
+					dg.city, traffic_logs.dst_city) AS dst_city,
+				if(traffic_logs.src_region = '' AND sg.region != '', sg.region, traffic_logs.src_region) AS src_region,
+				if(traffic_logs.dst_region = '' AND dg.region != '', dg.region, traffic_logs.dst_region) AS dst_region,
+				if(%[2]s AND sg.country != '', sg.country, traffic_logs.src_country) AS src_country,
+				if(%[3]s AND dg.country != '', dg.country, traffic_logs.dst_country) AS dst_country
+			FROM traffic_logs
+			LEFT JOIN %[1]s AS sg ON traffic_logs.src_ip = sg.ip
+			LEFT JOIN %[1]s AS dg ON traffic_logs.dst_ip = dg.ip
+			WHERE toDate(traffic_logs.timestamp) = %[4]s
+		) AS traffic_logs
+	`, sqlclause.GeoEnrichIPTable, sgCountryNeed, dgCountryNeed, dayFilterPlaceholder)
+}
+
 func ensureGeoEdgesTable(ctx context.Context, ch clickhouse.Conn, groupBy string) error {
 	table := sqlclause.GeoEdgesTable(groupBy)
 	mv := sqlclause.GeoEdgesMV(groupBy)
+	if table == "" || mv == "" {
+		return fmt.Errorf("geo edges: invalid groupBy %q", groupBy)
+	}
+	next := table + "__next"
 
-	if err := execDDL(ctx, ch, fmt.Sprintf(`
-		CREATE TABLE IF NOT EXISTS %s
+	createTable := func(name string) string {
+		return fmt.Sprintf(`
+		CREATE TABLE %s
 		(
 			day           Date,
 			src_key       String,
@@ -167,11 +264,40 @@ func ensureGeoEdgesTable(ctx context.Context, ch clickhouse.Conn, groupBy string
 			dst_city      AggregateFunction(any, String)
 		)
 		ENGINE = AggregatingMergeTree()
-		PARTITION BY toYYYYMM(day)
+		PARTITION BY day
 		ORDER BY (day, src_key, dst_key)
 		TTL day + INTERVAL 30 DAY DELETE
-	`, table)); err != nil {
-		return fmt.Errorf("create %s: %w", table, err)
+		SETTINGS ttl_only_drop_parts = 1
+	`, name)
+	}
+
+	exists, err := tableExists(ctx, ch, table)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		if err := execDDL(ctx, ch, createTable(table)); err != nil {
+			return fmt.Errorf("create %s: %w", table, err)
+		}
+	} else {
+		pk, err := tablePartitionKey(ctx, ch, table)
+		if err != nil {
+			return err
+		}
+		if !isDayPartitionKey(pk) {
+			_ = execDDL(ctx, ch, "DROP TABLE IF EXISTS "+next)
+			if err := execDDL(ctx, ch, createTable(next)); err != nil {
+				return fmt.Errorf("create %s: %w", next, err)
+			}
+			if err := execDDL(ctx, ch, fmt.Sprintf("EXCHANGE TABLES %s AND %s", table, next)); err != nil {
+				_ = execDDL(ctx, ch, "DROP TABLE IF EXISTS "+next)
+				return fmt.Errorf("exchange %s: %w", table, err)
+			}
+			_ = execDDL(ctx, ch, "DROP TABLE IF EXISTS "+next)
+			slog.Info("geo edges agg: table rebuilt", "table", table, "reason", "partition_key "+pk, "note", "backfill required")
+		} else if err := ensureTTLOnlyDropPartsSetting(ctx, ch, table); err != nil {
+			return err
+		}
 	}
 
 	srcKey, dstKey, srcLabel, dstLabel := sqlclause.GeoGroupExprsPrefixed("traffic_logs", groupBy)
@@ -316,15 +442,15 @@ func insertGeoEdgesDays(ctx context.Context, ch clickhouse.Conn, groupBy string,
 	table := sqlclause.GeoEdgesTable(groupBy)
 	srcKey, dstKey, srcLabel, dstLabel := sqlclause.GeoGroupExprsPrefixed("traffic_logs", groupBy)
 	selectBody := geoEdgesAggSelectBody(srcKey, dstKey, srcLabel, dstLabel, sqlclause.GeoCoordOK)
+	fromSQL := geoEdgesEnrichedFromSQL("?")
 
 	insertTpl := fmt.Sprintf(`
 		INSERT INTO %s
 		%s
-		FROM traffic_logs
-		WHERE toDate(timestamp) = ?
+		%s
 		GROUP BY day, src_key, dst_key
 		%s
-	`, table, selectBody, query.AggSettings())
+	`, table, selectBody, fromSQL, query.AggSettings())
 
 	for i, day := range days {
 		if err := ctx.Err(); err != nil {
@@ -342,8 +468,9 @@ func insertGeoEdgesDays(ctx context.Context, ch clickhouse.Conn, groupBy string,
 }
 
 // RebuildGeoEdgesLookback пересобирает traffic_edges_{city,country}_daily за окно
-// lookback после EnrichLogsMissingGeo: MV пишет только новые INSERT, UPDATE логов
-// сам агрегат не обновляет. lookbackDays <= 0 — все дни из traffic_logs.
+// lookback после EnrichLogsMissingGeo: MV пишет только на INSERT в traffic_logs,
+// а lookup nm_geo_enrich_ip подмешивается в INSERT SELECT (без UPDATE логов).
+// lookbackDays <= 0 — все дни из traffic_logs.
 func RebuildGeoEdgesLookback(ctx context.Context, ch clickhouse.Conn, lookbackDays int) error {
 	if ch == nil {
 		return nil

@@ -8,9 +8,12 @@
 //
 // Правила импорта: migrate и query могут импортировать aggstate и sqlclause;
 // migrate может импортировать query (AggSettings); migrate/query не импортируют parent clickhouse.
-// Parent не импортирует geoip — EnrichLogsMissingGeo принимает GeoResolver;
+// Parent не импортирует geoip — EnrichLogsMissingGeo принимает GeoResolver
+// и пишет nm_geo_enrich_ip (IPv4, без ALTER UPDATE traffic_logs);
 // ReplaceGeoRanges пишет готовые []model.GeoRange атомарно (staging + EXCHANGE).
 //
 // Источник правды по схеме агрегатов: Go Ensure* (не clickhouse/init.sql).
 // init.sql — только cold bootstrap базовых таблиц на пустом томе.
+// IP: traffic_logs / traffic_edges_daily / nm_geo_enrich_ip — IPv4;
+// geo_ranges / reputation_ranges — UInt32 (без изменений).
 package clickhouse

@@ -90,3 +90,33 @@ func TestEnsureTrafficLogsSuccessNoDDLWhenSchemaVersionErrors(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestEnsureTrafficLogsIPv4NoDDLWhenSchemaVersionErrors(t *testing.T) {
+	old := needsSchemaDDLFn
+	t.Cleanup(func() { needsSchemaDDLFn = old })
+
+	needsSchemaDDLFn = func(context.Context, clickhouse.Conn, string, uint32) (bool, error) {
+		return true, errors.New("ch down")
+	}
+	if err := EnsureTrafficLogsIPv4(context.Background(), nil); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestIsIPv4Type(t *testing.T) {
+	if !isIPv4Type("IPv4") {
+		t.Fatal("IPv4")
+	}
+	if isIPv4Type("String") || isIPv4Type("IPv6") {
+		t.Fatal("non-IPv4")
+	}
+}
+
+func TestIsDayPartitionKey(t *testing.T) {
+	if !isDayPartitionKey("day") || !isDayPartitionKey(" day ") || !isDayPartitionKey("`day`") {
+		t.Fatal("want day partition accepted")
+	}
+	if isDayPartitionKey("toYYYYMM(day)") || isDayPartitionKey("toYYYYMMDD(day)") {
+		t.Fatal("monthly/daily-func partition must not count as day")
+	}
+}

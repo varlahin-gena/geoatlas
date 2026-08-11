@@ -29,6 +29,9 @@ func RunStartup(ctx context.Context, deps Dependencies, opts Options, warn WarnF
 		if err := deps.Schema.EnsureTTLOnlyDropParts(bctx); err != nil {
 			warn("ttl_only_drop_parts ensure failed", err)
 		}
+		if err := deps.Schema.EnsureTrafficLogsIPv4(bctx); err != nil {
+			warn("traffic_logs ipv4 ensure failed", err)
+		}
 		if err := deps.Schema.EnsureTrafficLogsSuccess(bctx); err != nil {
 			warn("traffic_logs success column ensure failed", err)
 		}

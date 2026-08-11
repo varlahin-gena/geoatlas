@@ -1,4 +1,4 @@
-export type Tab = 'overview' | 'pipeline' | 'security' | 'charts';
+export type Tab = 'overview' | 'pipeline' | 'backup' | 'security' | 'charts';
 
 export const CONTAINERS = ['backend', 'clickhouse', 'syslog-ng', 'frontend'] as const;
 export const PERIODS = [
@@ -66,6 +66,33 @@ export interface Retention {
   parse_errors_days?: number;
   system_metrics_days?: number;
   updated_at?: string;
+}
+
+export interface BackupStatus {
+  state?: string;
+  message?: string;
+  name?: string;
+  started_at?: string;
+  updated_at?: string;
+}
+
+export interface BackupEntry {
+  name: string;
+  created_at?: string;
+  size_bytes?: number;
+  has_auth?: boolean;
+}
+
+export interface BackupCatalog {
+  ok?: boolean;
+  enabled?: boolean;
+  dir_ready?: boolean;
+  keep?: number;
+  include_edges?: boolean;
+  include_auth?: boolean;
+  backups?: BackupEntry[];
+  status?: BackupStatus;
+  hint?: string;
 }
 
 export interface HistoryPoint {

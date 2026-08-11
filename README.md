@@ -26,6 +26,7 @@
 - [Обслуживание](#обслуживание)
   - [Профили производительности](#профили-производительности)
   - [Срок хранения (TTL / retention)](#срок-хранения-ttl--retention)
+  - [Резервное копирование ClickHouse](#резервное-копирование-clickhouse)
   - [Очистка данных ClickHouse](#очистка-данных-clickhouse)
   - [Мониторинг ingest](#мониторинг-ingest)
   - [Логи и диагностика](#логи-и-диагностика)
@@ -134,7 +135,7 @@
 | `geo_ranges`                        | без TTL           | `init.sql` (не настраивается)                |
 | `nm_schema_version`                 | без TTL           | `Ensure*` (метаданные схемы)                 |
 
-Допустимый диапазон настраиваемых дней: **1…730**. На `traffic_logs` / `parse_errors` / `system_metrics` включён `ttl_only_drop_parts`: истечение удаляет дневную партицию целиком (без дорогих row-level TTL merges). Уменьшение TTL удалит старые партиции при следующем TTL merge/drop в ClickHouse.
+Допустимый диапазон настраиваемых дней: **1…730**. На `traffic_logs` / `parse_errors` / `system_metrics` / `traffic_edges_*` включён `ttl_only_drop_parts` при **дневных** партициях: истечение удаляет дневную партицию целиком (без дорогих row-level TTL merges). Уменьшение TTL удалит старые партиции при следующем TTL merge/drop в ClickHouse.
 
 Системные логи ClickHouse (`trace_log`, `text_log`, `metric_log`, …) по умолчанию **отключены** (`clickhouse/config.d/z_system_logs.xml`): на малых объёмах данных они иначе раздуваются сильнее `traffic_logs` и держат высокий idle CPU. `query_log` остаётся включённым. Образ ClickHouse в compose: **`clickhouse/clickhouse-server:25.8.28.1`**.
 
@@ -530,6 +531,58 @@ TTL таблиц ClickHouse настраивается без правки `init
 
 ---
 
+### Резервное копирование ClickHouse
+
+Native `BACKUP` / `RESTORE` на отдельный Docker-том `clickhouse-backups` (disk `backups` → `/var/lib/clickhouse-backups`). Это **не** замена HA: single-node appliance, бэкап защищает от потери `clickhouse-data` / ошибок оператора.
+
+| Что | Детали |
+|-----|--------|
+| Конфиг disk | `clickhouse/config.d/backups.xml` |
+| Том | `clickhouse-backups` (отдельно от `clickhouse-data`) |
+| Скрипты | `scripts/backup-clickhouse.sh`, `scripts/restore-clickhouse.sh` |
+| По умолчанию в бэкап | `traffic_logs`, `geo_ranges`, `reputation_ranges`, `parse_errors`, `system_metrics`, `traffic_edges_*` |
+| Рядом | `*.auth.tgz` — снимок `/app/data` (users, retention, reputation feeds) |
+
+После добавления тома на уже установленном стенде:
+
+```bash
+cd /opt/network-monitor
+docker compose up -d clickhouse   # подхватить mount + backups.xml
+chmod +x scripts/backup-clickhouse.sh scripts/restore-clickhouse.sh
+./scripts/backup-clickhouse.sh
+```
+
+**Env (backup):**
+
+| Переменная | Дефолт | Смысл |
+|------------|--------|--------|
+| `BACKUP_ENABLED` | `1` | `0` — no-op (удобно для cron) |
+| `BACKUP_KEEP` | `7` | сколько полных `nm-*` каталогов оставить |
+| `BACKUP_INCLUDE_EDGES` | `1` | `0` — без `traffic_edges_*` (потом backfill) |
+| `BACKUP_INCLUDE_AUTH` | `1` | писать `<name>.auth.tgz` |
+
+**Cron (пример):**
+
+```bash
+30 2 * * * cd /opt/network-monitor && ./scripts/backup-clickhouse.sh >>/var/log/nm-backup.log 2>&1
+```
+
+**Restore:**
+
+```bash
+docker compose exec clickhouse ls -1 /var/lib/clickhouse-backups
+# при непустых таблицах:
+RESTORE_ALLOW_NONEMPTY=1 ./scripts/restore-clickhouse.sh nm-20260411T023000Z
+```
+
+Скрипт по умолчанию останавливает `backend` / `syslog-ng` на время restore и поднимает их обратно. Если edges не было в бэкапе — `POST /api/system/maintenance/backfill` (admin).
+
+Планируйте место на диске: том бэкапов ≈ N × размер hot-данных. `down -v` / uninstall `--volumes` удалит и `clickhouse-backups`.
+
+**UI:** `/system` → вкладка **Резервное копирование** (administrator): список, статус, кнопка «Создать бэкап». Restore из UI нет — только CLI.
+
+---
+
 ### Очистка данных ClickHouse
 
 Удаляет все события, GeoIP, ошибки парсинга и метрики. **Схема таблиц сохраняется.**
@@ -826,11 +879,15 @@ network_monitor/
 │   └── chconn/                       # общий ClickHouse connect
 ├── clickhouse/
 │   ├── config.d/override.xml
+│   ├── config.d/backups.xml          # disk `backups` для BACKUP/RESTORE
 │   ├── users.d/query_limits.xml
 │   ├── init.sql                      # cold bootstrap базовых таблиц
 │   ├── migrate_*.sql                 # ops-fallback (не SoT; списки action — из model via go generate)
 │   ├── backfill_edges_agg.sh         # то же для BLOCKED=…
 │   └── reset_data.sql / reset_data.sh
+├── scripts/
+│   ├── backup-clickhouse.sh          # native BACKUP → том clickhouse-backups
+│   └── restore-clickhouse.sh         # RESTORE + optional auth tarball
 ├── certs/                            # PEM (fullchain/privkey); README + .gitkeep; ключи в .gitignore
 ├── deploy/
 │   ├── uninstall.sh

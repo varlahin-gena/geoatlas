@@ -61,6 +61,8 @@ func expectedAuthMatrix() map[string]authTier {
 		"GET /api/system/install-profile":           tierAdmin,
 		"GET /api/system/retention":                 tierAdmin,
 		"PUT /api/system/retention":                 tierAdmin,
+		"GET /api/system/backups":                   tierAdmin,
+		"POST /api/system/backups":                  tierAdmin,
 		"GET /api/parse-errors":                     tierAdmin,
 		"GET /api/parse-samples":                    tierAdmin,
 		"POST /api/parse-test":                      tierAdmin,
@@ -101,6 +103,7 @@ func TestAuthMatrixCoversServerRoutes(t *testing.T) {
 		nil,           // systemPinger
 		nil,           // parseTestUC
 		nil,           // retentionUC
+		nil,           // backupUC
 		nil,           // authUC
 		nil, nil, nil, // users, sessions, apiTokens
 	)

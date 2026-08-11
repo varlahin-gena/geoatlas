@@ -38,3 +38,26 @@ func TestGeoEdgesAggSelectBodyNoAliasShadowing(t *testing.T) {
 		}
 	}
 }
+
+func TestGeoEdgesEnrichedFromSQLJoinsLookup(t *testing.T) {
+	from := geoEdgesEnrichedFromSQL("?")
+	for _, want := range []string{
+		sqlclause.GeoEnrichIPTable,
+		"LEFT JOIN",
+		"AS sg ON",
+		"AS dg ON",
+		"AS traffic_logs",
+		"toDate(traffic_logs.timestamp) = ?",
+		"ALTER TABLE", // must NOT mutate logs
+	} {
+		if want == "ALTER TABLE" {
+			if strings.Contains(from, want) {
+				t.Fatalf("enriched FROM must not contain %q:\n%s", want, from)
+			}
+			continue
+		}
+		if !strings.Contains(from, want) {
+			t.Fatalf("enriched FROM missing %q:\n%s", want, from)
+		}
+	}
+}

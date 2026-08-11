@@ -40,6 +40,10 @@ func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backg
 	}()
 
 	// Schema для /api/events до HTTP: иначе city/days бьётся о missing columns/tables.
+	// IP-тип логов — до geo MV/enrich JOIN (IPv4 = IPv4).
+	if err := migrate.EnsureTrafficLogsIPv4(ctx, a.pools.Background); err != nil {
+		slog.Warn("traffic_logs ipv4 ensure (early) failed", "err", err)
+	}
 	if err := migrate.EnsureGeoEdgesAggSchema(ctx, a.pools.Background); err != nil {
 		slog.Warn("geo edges agg schema ensure (early) failed", "err", err)
 	}

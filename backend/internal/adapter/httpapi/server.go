@@ -36,12 +36,13 @@ func NewServer(
 	systemPinger usecasesystem.ClickHousePinger,
 	parseTestUC ParseTestAPI,
 	retentionUC RetentionAPI,
+	backupUC BackupAPI,
 	authUC AuthAPI,
 	users UserDirectory,
 	sessions SessionParser,
 	apiTokens APITokenStore,
 ) *Server {
-	deps := NewDeps(cfg, ingestSvc, eventsUC, geoUC, reputationUC, parseErrorsUC, systemUC, systemPinger, parseTestUC, retentionUC).
+	deps := NewDeps(cfg, ingestSvc, eventsUC, geoUC, reputationUC, parseErrorsUC, systemUC, systemPinger, parseTestUC, retentionUC, backupUC).
 		WithAuth(authUC, users, sessions, apiTokens).
 		WithSearchTemplates(searchtemplatesfile.New(cfg.SearchTemplatesFile))
 	health := &HealthHandler{deps}
@@ -224,6 +225,12 @@ func NewServer(
 	r.Handle("/api/system/retention",
 		chain(http.HandlerFunc(system.PutRetention), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
 	).Methods("PUT")
+	r.Handle("/api/system/backups",
+		withTimeout(chain(http.HandlerFunc(system.GetBackups), adminMW), healthTimeout),
+	).Methods("GET")
+	r.Handle("/api/system/backups",
+		chain(http.HandlerFunc(system.PostBackup), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
+	).Methods("POST")
 	r.Handle("/api/parse-errors",
 		withTimeout(chain(http.HandlerFunc(parse.ListParseErrors), adminMW), readTimeout),
 	).Methods("GET")

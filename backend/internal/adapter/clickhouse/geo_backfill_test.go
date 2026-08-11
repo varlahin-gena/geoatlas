@@ -1,28 +1,11 @@
 package clickhouse
 
 import (
-	"context"
 	"strings"
 	"testing"
-)
 
-func TestQuoteCHString(t *testing.T) {
-	cases := []struct {
-		in, want string
-	}{
-		{"", "''"},
-		{"Moscow", "'Moscow'"},
-		{"O'Brien", "'O\\'Brien'"},
-		{`a\b`, `'a\\b'`},
-		{"a\\'b", "'a\\\\\\'b'"}, // a \ ' b → a \\ \' b
-		{"x\x00y", "'xy'"},
-	}
-	for _, tc := range cases {
-		if got := quoteCHString(tc.in); got != tc.want {
-			t.Fatalf("quoteCHString(%q)=%q want %q", tc.in, got, tc.want)
-		}
-	}
-}
+	"network_monitor/internal/adapter/clickhouse/sqlclause"
+)
 
 func TestClipGeoStr(t *testing.T) {
 	if got := clipGeoStr("ok"); got != "ok" {
@@ -43,18 +26,11 @@ func stringsRepeat(s string, n int) string {
 	return string(b)
 }
 
-func TestMutateGeoSideRejectsBadSide(t *testing.T) {
-	err := mutateGeoSide(context.TODO(), nil, "evil", []geoEnrichRow{{ip: "1.1.1.1", lat: 1}})
-	if err == nil {
-		t.Fatal("expected error for invalid side")
-	}
-}
-
 func TestCountryNeedsSQL(t *testing.T) {
-	s := countryNeedsSQL("src_country")
+	s := sqlclause.CountryNeedsSQL("src_country")
 	for _, want := range []string{"src_country", "unknown", "reserved", "Неизвестно", "lengthUTF8"} {
 		if !strings.Contains(s, want) {
-			t.Fatalf("countryNeedsSQL missing %q: %s", want, s)
+			t.Fatalf("CountryNeedsSQL missing %q: %s", want, s)
 		}
 	}
 }

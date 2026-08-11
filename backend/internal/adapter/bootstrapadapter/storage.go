@@ -24,6 +24,10 @@ func (s *Storage) EnsureTTLOnlyDropParts(ctx context.Context) error {
 	return migrate.EnsureTTLOnlyDropParts(ctx, s.CH)
 }
 
+func (s *Storage) EnsureTrafficLogsIPv4(ctx context.Context) error {
+	return migrate.EnsureTrafficLogsIPv4(ctx, s.CH)
+}
+
 func (s *Storage) EnsureTrafficLogsSuccess(ctx context.Context) error {
 	return migrate.EnsureTrafficLogsSuccess(ctx, s.CH)
 }

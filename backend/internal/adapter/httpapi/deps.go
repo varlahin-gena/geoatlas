@@ -21,6 +21,7 @@ type Deps struct {
 	systemUC        SystemAPI
 	systemPinger    usecasesystem.ClickHousePinger
 	retentionUC     RetentionAPI
+	backupUC        BackupAPI
 	authUC          AuthAPI
 	users           UserDirectory // middleware / LiveSession
 	sessions        SessionParser
@@ -39,6 +40,7 @@ func NewDeps(
 	systemPinger usecasesystem.ClickHousePinger,
 	parseTestUC ParseTestAPI,
 	retentionUC RetentionAPI,
+	backupUC BackupAPI,
 ) *Deps {
 	d := &Deps{
 		cfg:           cfg,
@@ -50,6 +52,7 @@ func NewDeps(
 		systemUC:      systemUC,
 		systemPinger:  systemPinger,
 		retentionUC:   retentionUC,
+		backupUC:      backupUC,
 	}
 	if ingestSvc != nil {
 		d.ingest = ingestSvc
