@@ -64,32 +64,6 @@ func (r *BackupRunner) BackupTables(ctx context.Context, name string, tables []s
 	return nil
 }
 
-// TruncateTables очищает указанные таблицы (legacy; attach больше не использует).
-func (r *BackupRunner) TruncateTables(ctx context.Context, tables []string) error {
-	if r == nil || r.ch == nil {
-		return fmt.Errorf("clickhouse not configured")
-	}
-	qctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
-	defer cancel()
-	for _, t := range tables {
-		t = strings.TrimSpace(t)
-		if t == "" || !isSafeIdent(t) {
-			return fmt.Errorf("invalid table name %q", t)
-		}
-		ok, err := r.TableExists(qctx, t)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			continue
-		}
-		if err := r.ch.Exec(qctx, "TRUNCATE TABLE IF EXISTS "+t); err != nil {
-			return fmt.Errorf("truncate %s: %w", t, err)
-		}
-	}
-	return nil
-}
-
 // DropTables удаляет shadow-таблицы бэкапа.
 func (r *BackupRunner) DropTables(ctx context.Context, tables []string) error {
 	if r == nil || r.ch == nil {
@@ -105,38 +79,6 @@ func (r *BackupRunner) DropTables(ctx context.Context, tables []string) error {
 		if err := r.ch.Exec(qctx, "DROP TABLE IF EXISTS "+t); err != nil {
 			return fmt.Errorf("drop %s: %w", t, err)
 		}
-	}
-	return nil
-}
-
-// RestoreTables копирует таблицы из Disk('backups', name) в живые таблицы (CLI-совместимо).
-func (r *BackupRunner) RestoreTables(ctx context.Context, name string, tables []string) error {
-	if r == nil || r.ch == nil {
-		return fmt.Errorf("clickhouse not configured")
-	}
-	name = strings.TrimSpace(name)
-	if name == "" || strings.ContainsAny(name, "'\\\"/;") {
-		return fmt.Errorf("invalid backup name")
-	}
-	qctx, cancel := context.WithTimeout(ctx, 2*time.Hour)
-	defer cancel()
-	restored := 0
-	for _, t := range tables {
-		t = strings.TrimSpace(t)
-		if t == "" || !isSafeIdent(t) {
-			return fmt.Errorf("invalid table name %q", t)
-		}
-		sql := restoreTableSQL(t, name)
-		if err := r.ch.Exec(qctx, sql); err != nil {
-			if isMissingBackupObject(err) {
-				continue
-			}
-			return fmt.Errorf("restore %s: %w", t, err)
-		}
-		restored++
-	}
-	if restored == 0 {
-		return fmt.Errorf("restore: nothing restored from %s", name)
 	}
 	return nil
 }
@@ -185,13 +127,6 @@ func backupTablesSQL(tables []string, name string) string {
 		parts = append(parts, "TABLE "+t)
 	}
 	return fmt.Sprintf("BACKUP %s TO Disk('backups', '%s')", strings.Join(parts, ", "), name)
-}
-
-func restoreTableSQL(table, name string) string {
-	return fmt.Sprintf(
-		"RESTORE TABLE %s FROM Disk('backups', '%s') SETTINGS allow_non_empty_tables = true",
-		table, name,
-	)
 }
 
 func restoreTableAsSQL(src, dest, name string) string {

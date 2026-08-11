@@ -320,10 +320,6 @@ func (s *Service) Reload(ctx context.Context) error {
 	return nil
 }
 
-func IsClientError(err error) bool {
-	return apperr.IsClient(err)
-}
-
 func IsConflict(err error) bool {
 	return errors.Is(err, apperr.ErrConflict)
 }

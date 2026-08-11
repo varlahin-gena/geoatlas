@@ -74,10 +74,8 @@ type Catalog struct {
 // Runner — native BACKUP / RESTORE / DROP в ClickHouse.
 type Runner interface {
 	BackupTables(ctx context.Context, name string, tables []string) error
-	RestoreTables(ctx context.Context, name string, tables []string) error
 	RestoreTablesAs(ctx context.Context, name string, pairs [][2]string) error
 	DropTables(ctx context.Context, tables []string) error
-	TruncateTables(ctx context.Context, tables []string) error
 	TableExists(ctx context.Context, name string) (bool, error)
 }
 

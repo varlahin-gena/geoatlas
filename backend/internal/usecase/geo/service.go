@@ -137,11 +137,6 @@ func (s *Service) checkUploadLimits(n int, dryRun bool) error {
 	return nil
 }
 
-// IsClientCSVError — совместимость: CSV-ошибки помечены ErrInvalidCSV.
-func IsClientCSVError(err error) bool {
-	return errors.Is(err, apperr.ErrInvalidCSV)
-}
-
 // --- Ranges ---
 
 type ListRangesInput struct {
@@ -507,18 +502,4 @@ func summarizeGeoMissingItems(items []MissingItem) map[string]any {
 		"by_kind":      byKind,
 		"public_focus": byKind["public_unknown"],
 	}
-}
-
-// --- typed errors for HTTP mapping (compat wrappers over apperr) ---
-
-func IsClientError(err error) bool {
-	return apperr.IsClient(err)
-}
-
-func IsNotFound(err error) bool {
-	return errors.Is(err, apperr.ErrNotFound)
-}
-
-func IsConflict(err error) bool {
-	return errors.Is(err, apperr.ErrConflict)
 }
