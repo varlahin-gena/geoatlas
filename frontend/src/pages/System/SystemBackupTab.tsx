@@ -27,17 +27,20 @@ export function SystemBackupTab() {
     include_edges: true,
     include_auth: true,
   });
+  const [tzCustom, setTzCustom] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const data = await apiFetch<BackupCatalog>('/api/system/backups');
       setCat(data);
       if (data.schedule) {
+        const tz = data.schedule.timezone || 'Europe/Moscow';
+        setTzCustom(!TZ_PRESETS.includes(tz));
         setSched({
           enabled: !!data.schedule.enabled,
           hour: data.schedule.hour ?? 2,
           minute: data.schedule.minute ?? 30,
-          timezone: data.schedule.timezone || 'Europe/Moscow',
+          timezone: tz,
           keep: data.schedule.keep ?? 7,
           include_edges: data.schedule.include_edges !== false,
           include_auth: data.schedule.include_auth !== false,
@@ -281,30 +284,50 @@ export function SystemBackupTab() {
             </span>
           </div>
           <div className="kv-row">
-            <span className="k">Timezone</span>
-            <span className="v" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <select
-                value={TZ_PRESETS.includes(sched.timezone || '') ? sched.timezone : '__custom__'}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (v === '__custom__') return;
-                  setSched((s) => ({ ...s, timezone: v }));
-                }}
-              >
-                {TZ_PRESETS.map((tz) => (
-                  <option key={tz} value={tz}>
-                    {tz}
-                  </option>
-                ))}
-                <option value="__custom__">другое…</option>
-              </select>
-              <input
-                type="text"
-                style={{ minWidth: 160 }}
-                value={sched.timezone || ''}
-                onChange={(e) => setSched((s) => ({ ...s, timezone: e.target.value }))}
-                placeholder="IANA, напр. Asia/Tomsk"
-              />
+            <span className="k">Часовой пояс</span>
+            <span className="v">
+              {tzCustom ? (
+                <span style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <input
+                    type="text"
+                    style={{ minWidth: 200 }}
+                    value={sched.timezone || ''}
+                    onChange={(e) => setSched((s) => ({ ...s, timezone: e.target.value }))}
+                    placeholder="IANA, напр. Asia/Tomsk"
+                    aria-label="Часовой пояс IANA"
+                  />
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => {
+                      setTzCustom(false);
+                      setSched((s) => ({ ...s, timezone: 'Europe/Moscow' }));
+                    }}
+                  >
+                    Из списка
+                  </button>
+                </span>
+              ) : (
+                <select
+                  value={sched.timezone || 'Europe/Moscow'}
+                  aria-label="Часовой пояс"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === '__custom__') {
+                      setTzCustom(true);
+                      return;
+                    }
+                    setSched((s) => ({ ...s, timezone: v }));
+                  }}
+                >
+                  {TZ_PRESETS.map((tz) => (
+                    <option key={tz} value={tz}>
+                      {tz}
+                    </option>
+                  ))}
+                  <option value="__custom__">Другой (IANA)…</option>
+                </select>
+              )}
             </span>
           </div>
           <div className="kv-row">
