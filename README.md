@@ -46,12 +46,14 @@
 - Парсинг **UserGate, FortiGate, Cisco ASA, Cisco FTD (FirePower), Cowrie (honeypot)** и универсальный фолбэк (Generic KV)
 - **Осознанный пропуск** событий: распознанные, но несетевые строки (например, часть `cowrie.*`) не попадают в `parse_errors`
 - **Авторизация по умолчанию**: роли `administrator` / `operator`, cookie-сессии, CSRF, Bearer `API_AUTH_TOKEN` (+ `API_AUTH_PREVIOUS_TOKEN`); именованные API-токены со scopes `read`/`ops`/`admin` (UI `/api-tokens`); управление УЗ в UI
+- Веб-интерфейс — **React SPA** (Vite + TypeScript); clean paths, legacy `*.html` редиректятся
 - Опциональный **HTTPS** на nginx со своими PEM-сертификатами (редирект HTTP→HTTPS)
-- Загрузка и правка **GeoIP-базы** (CSV SIEM KUMA, страница `/geo-ranges`, IP без координат на `/geo-missing`); большие CSV — с сервера через `curl` (см. [GeoIP](#geoip))
+- Загрузка и правка **GeoIP-базы** (CSV SIEM KUMA, `/geo-ranges`, IP без координат на `/geo-missing`); лимиты upload по профилю, очистка базы, большие CSV — с сервера через `curl` (см. [GeoIP](#geoip))
 - Установка **«Сделай мне хорошо»** (`NM_FULL_AUTO` / `--full-auto`): релиз, все модули, порт 8080, автопрофиль, firewall off
 - Toast-уведомления без автоскрытия (крестик), сохраняются при смене страниц до ручного закрытия
 - **Репутация IP** (модуль опционален при установке): offline-списки и URL-фиды (`/reputation`), каталог публичных источников, фильтр и подсветка дуг на карте; приватные IP не помечаются
 - Хранение и аналитика в **ClickHouse**; дневные geo-агрегаты для пресетов `1d+` (city/country)
+- **Резервное копирование ClickHouse**: расписание из UI, CLI backup/restore, неразрушающее «Подключить» (shadow `nm_bak_*`) для просмотра на карте
 - **Настраиваемый TTL (retention)** таблиц из UI `/system`
 - Построение связей на карте (2D MapLibre) и глобусе (3D MapLibre Globe); на карту попадают только узлы/рёбра с координатами
 - Полный mesh дуг + viewport-fit zoom; heatmap стран (на глобусе отключён) + sparkline по клику на страну; экспорт PNG; светлая/тёмная тема
@@ -60,9 +62,10 @@
 - Группировка узлов: по IP / по подсети `/24` / **по городу (по умолчанию)** / по стране; при отсутствии города — фолбэк на центр страны
 - **Тест парсеров** в браузере: статусы parsed / skipped / error, гео-обогащение, пресеты по вендорам
 - **Журнал ошибок парсинга**: поиск, выборочное и полное удаление, передача строк в «Тест парсеров»
-- Страница системного мониторинга (вкладки Обзор / Pipeline / Безопасность / Графики): метрики контейнеров, пайплайна (в т.ч. **UDP/TCP EPS**, drops, circuit breaker), **форма TTL**, неуспешные логины, хранилище, профиль установки, **индикатор ёмкости**, алёрты; ручной maintenance backfill агрегатов
-- Индикатор здоровья системы на главной странице (ссылка на `/system`)
-- Контракт HTTP API: [`openapi.yaml`](openapi.yaml) (OpenAPI **1.3.0**)
+- Страница системного мониторинга (Обзор / Pipeline / Безопасность / Графики / **Резервное копирование**): метрики контейнеров, пайплайна (в т.ч. **UDP/TCP EPS**, drops, circuit breaker), **форма TTL**, неуспешные логины, хранилище, профиль установки, **индикатор ёмкости**, алёрты; ручной maintenance backfill агрегатов
+- Индикатор здоровья системы на главной странице (ссылка на `/system`); **версия установки** (`main` / тег) в меню пользователя
+- Docker: fail-closed секреты в compose, hardened контейнеры (`cap_drop: ALL`); запуск через `./start.sh`
+- Контракт HTTP API: [`openapi.yaml`](openapi.yaml) (OpenAPI **1.4.0**)
 
 ---
 
@@ -732,7 +735,7 @@ cd /opt/network-monitor
 ./stop.sh
 git fetch origin --tags
 
-# последний релиз по semver, либо явно: TAG=v1.1.4
+# последний релиз по semver, либо явно: TAG=v1.2.0
 TAG=$(git tag -l 'v*' --sort=-v:refname | head -1)
 echo "Откат на $TAG"
 git checkout --force "$TAG"
@@ -851,7 +854,7 @@ docker compose logs backend --since=10m 2>&1 | grep -iE 'geo index loaded|geo cs
 | `/geo-missing`    | IP без GeoIP          | Адреса без координат; добавление в GeoIP; выгрузка CSV; мгновенная перефильтрация списка                                                             |
 | `/geo-ranges`     | База GeoIP            | Просмотр/правка диапазонов, выгрузка CSV                                                                                                             |
 | `/parser-test`    | Тест парсеров         | До 200 строк за запрос, пресеты по вендорам, статусы parsed/skipped/error                                                                            |
-| `/system`         | Системный мониторинг  | Обзор / Pipeline (EPS/drops/queue bytes) / Безопасность / Графики; алёрты, ёмкость, профиль установки                                                        |
+| `/system`         | Системный мониторинг  | Обзор / Pipeline (EPS/drops/queue bytes) / Безопасность / Графики / Резервное копирование; алёрты, ёмкость, профиль установки                              |
 | `/users`          | Учётные записи        | Список/создание УЗ (скрыто, если UI-auth выключен)                                                                                                   |
 | `/api-tokens`     | API-токены            | Именованные Bearer со scope read/ops/admin; секрет показывается один раз                                                                             |
 | `/change-password`| Смена пароля          | Смена своего пароля                                                                                                                                  |
@@ -862,7 +865,7 @@ Unit-тесты карты (репутация / heatmap focus / coords helpers)
 
 ### HTTP API
 
-Контракт REST API (в т.ч. auth, events, geo, reputation, retention, tokens, search-templates): [`openapi.yaml`](openapi.yaml), версия документа **1.3.0**. Проверка живости: `GET /api/health` (публичный). Остальные эндпоинты — cookie-сессия и/или Bearer (`API_AUTH_TOKEN` / именованный токен со scope).
+Контракт REST API (в т.ч. auth, events, geo, reputation, retention, tokens, search-templates, backups): [`openapi.yaml`](openapi.yaml), версия документа **1.4.0**. Проверка живости: `GET /api/health` (публичный). Остальные эндпоинты — cookie-сессия и/или Bearer (`API_AUTH_TOKEN` / именованный токен со scope).
 
 ## Структура репозитория
 
@@ -931,7 +934,7 @@ network_monitor/
 │   └── internal/
 │       ├── config/
 │       └── collector/
-├── openapi.yaml                      # контракт HTTP API (OpenAPI 1.3.0)
+├── openapi.yaml                      # контракт HTTP API (OpenAPI 1.4.0)
 ├── VERSION / CHANGELOG.md / RELEASING.md
 ├── .github/workflows/ci.yml
 ├── start.sh / stop.sh

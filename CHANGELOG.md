@@ -5,21 +5,40 @@
 
 ## [Unreleased]
 
-### Changed
-- Docker hardening: root `.dockerignore`, hermetic backend build (no `go mod tidy` fallback), non-root `stats-collector`, `cap_drop: ALL` on app services, frontend healthcheck + tmpfs
-- Compose fail-closed secrets: `API_AUTH_TOKEN` / `SESSION_SECRET` / seed passwords require `.env` (`:?`); prefer `./start.sh`
-- Fix: frontend `cap_add: NET_BIND_SERVICE` — иначе nginx не биндит `:80`/`:443` после `cap_drop: ALL`
-- Fix: frontend также нужен `CHOWN`/`SETUID`/`SETGID` — nginx chown cache dirs под worker uid 101
+## [1.2.0] — 2026-08-11
+
+Минорный релиз: React SPA, HTTPS, резервное копирование ClickHouse, лимиты GeoIP upload и hardening Docker.
 
 ### Added
-- HTTPS на nginx со своими PEM: `certs/fullchain.pem` + `certs/privkey.pem`, `HTTPS_ENABLED` / `HTTPS_PORT` / `HTTP_REDIRECT`, `docker-compose.https.yml`
-- Entrypoint frontend генерирует `default.conf` (HTTP или HTTPS + редирект); общий `nginx-app.inc`
-- `deploy/common/compose.sh` (`nm_compose`) — start/stop/tune подключают HTTPS-override при наличии сертификатов
-- Firewall (UFW/firewalld) открывает HTTPS-порт при включённом TLS
-- Установщик (Ubuntu / Oracle Linux): интерактивный шаг HTTPS (`select_https.sh`) в пошаговом режиме и в «Сделай мне хорошо»; env-overrides `NM_HTTPS_*` / `NM_SSL_*` / `NM_CERTS_DIR`
-- Fix: вопрос HTTPS не пропускается после whiptail (`/dev/tty` + цепочка из `select_http_port.sh`)
-- UI: версия в меню пользователя (`main` / тег релиза) — `install-meta.json`, `GET /api/system/version`
-- Fix: установщик не пишет `.env` до `git clone` (непустой `/opt/network-monitor` ломал клон → «docker-compose.yml not found»)
+- **Frontend SPA**: React + TypeScript + Vite; clean routes (`/`, `/system`, …); legacy `*.html` редиректятся; unit-тесты карты (vitest) и `scripts/frontend-smoke.sh`
+- Опциональный **HTTPS** на nginx: свои PEM (`certs/`), `HTTPS_ENABLED` / `HTTPS_PORT` / `HTTP_REDIRECT`, `docker-compose.https.yml`, entrypoint генерирует `default.conf`; `deploy/common/compose.sh` подключает override
+- Установщик (Ubuntu / Oracle Linux): интерактивный шаг HTTPS (`select_https.sh`) в пошаговом и full-auto; env `NM_HTTPS_*` / `NM_SSL_*` / `NM_CERTS_DIR`
+- **Резервное копирование ClickHouse**: native `BACKUP`/`RESTORE` на том `clickhouse-backups`; CLI `scripts/backup-clickhouse.sh` / `restore-clickhouse.sh`; UI `/system` → «Резервное копирование» (список, создать, расписание, keep, edges/auth)
+- Неразрушающее **Подключить** бэкапа через shadow-таблицы `nm_bak_*` (карта Live / Бэкап); Отключить / Удалить; маркер источника `вручную` / `по расписанию`
+- Расписание бэкапов: ежедневно `hour:minute` + IANA timezone, имена с локальным временем и UTC-offset; timestamps в UI в timezone расписания
+- **GeoIP**: лимиты размера/числа ranges из install-profile (`GEOIP_UPLOAD_MAX_*`); early **409** при опасном full-replace поверх крупного индекса; **Очистить базу** на `/geo-ranges` + загрузка CSV там же
+- `GET /api/system/version` + строка версии (`main` / тег) в меню пользователя (`install-meta.json`)
+- Ingest drops / queue bytes / circuit breaker явнее на `/system` (Pipeline); в README — product limits (IPv4-only, single-host control plane)
+- Action vocabulary ClickHouse: SoT в `model` → `go generate` в ops SQL
+
+### Changed
+- Docker hardening: root `.dockerignore`, hermetic backend build, non-root `stats-collector`, `cap_drop: ALL`, frontend healthcheck + tmpfs; frontend `cap_add: NET_BIND_SERVICE` + `CHOWN`/`SETUID`/`SETGID` для nginx
+- Compose **fail-closed** на секретах: `API_AUTH_TOKEN` / `SESSION_SECRET` / seed-пароли требуют `.env` (`:?`); предпочтителен `./start.sh`
+- Усиление хранения ClickHouse (IPv4 migrate, TTL/agg правки); MapPage / SystemPage разбиты на hooks и вкладки
+- Firewall (UFW/firewalld) открывает HTTPS-порт при TLS
+
+### Fixed
+- Вопрос HTTPS после whiptail не пропускается; установщик не пишет `.env` до `git clone` (непустой `/opt/network-monitor`)
+- Scheduled backup: пропуск дня после failed/queued-only run; timezone UI; permission denied на `*.auth.tgz` (общий uid 101 / `volume-perms`)
+- Multi-table `BACKUP` SQL под ClickHouse 25; gosec/contextcheck в backup и action-vocab путях
+- Карта: race wipe basemap, globe GeoJSON fills, defaults/sidebar/globe visibility после SPA-миграции
+- Подписи байт на графиках `/system` (storage / buffer)
+
+### Notes
+- OpenAPI API doc version: **1.4.0** (backups, backup-schedule, geo-ranges/clear, system/version)
+- Продуктовая версия: **1.2.0**
+- После обновления: `git fetch && git checkout v1.2.0` (или `main`), `./start.sh` (или `docker compose up -d --build`); при HTTPS — PEM в `certs/` и `docker-compose.https.yml` через `./start.sh`
+- 59 коммитов с `v1.1.4`
 
 ## [1.1.4] — 2026-08-06
 
@@ -161,6 +180,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[1.2.0]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.2.0
 [1.1.4]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.1.4
 [1.1.3]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.1.3
 [1.1.2]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.1.2
