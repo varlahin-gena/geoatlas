@@ -332,9 +332,12 @@ export function renderSparklineSVG(points: { allowed?: number; blocked?: number;
 export async function fetchCountrySeries(
   country: string,
   periodQuery: string,
+  dataSource: 'live' | 'backup' = 'live',
   signal?: AbortSignal,
 ): Promise<SeriesPayload> {
-  const url = `/api/events/series?country=${encodeURIComponent(country)}${periodQuery}`;
+  const url =
+    `/api/events/series?country=${encodeURIComponent(country)}` +
+    `${periodQuery}&source=${encodeURIComponent(dataSource)}`;
   return apiFetch<SeriesPayload>(url, { signal, cache: 'no-store' });
 }
 

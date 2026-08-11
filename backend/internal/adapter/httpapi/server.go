@@ -231,6 +231,15 @@ func NewServer(
 	r.Handle("/api/system/backups",
 		chain(http.HandlerFunc(system.PostBackup), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
 	).Methods("POST")
+	r.Handle("/api/system/backups/{name}/attach",
+		chain(http.HandlerFunc(system.PostBackupAttach), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
+	).Methods("POST")
+	r.Handle("/api/system/backups/{name}/detach",
+		chain(http.HandlerFunc(system.PostBackupDetach), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
+	).Methods("POST")
+	r.Handle("/api/system/backups/{name}",
+		chain(http.HandlerFunc(system.DeleteBackup), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
+	).Methods("DELETE")
 	r.Handle("/api/parse-errors",
 		withTimeout(chain(http.HandlerFunc(parse.ListParseErrors), adminMW), readTimeout),
 	).Methods("GET")

@@ -32,7 +32,7 @@ func ScanGeoEdgesForTimeRange(
 		return nil, false, nil
 	}
 
-	tr = promoteHoursToGeoDays(tr, groupBy)
+	tr = promoteHoursToGeoDays(tr, groupBy, TablesOf(ctx).IsBackup() || aggstate.PreferGeoEdgesAgg())
 
 	switch tr.Mode {
 	case "days":
@@ -47,13 +47,16 @@ func ScanGeoEdgesForTimeRange(
 		}
 		// city|country: pre-agg если готов — даже пустой ответ (нет данных за период).
 		// Не падаем обратно на traffic_logs: иначе каждый «пустой» день = cold GROUP BY на миллионы строк.
-		if aggstate.PreferGeoEdgesAgg() {
-			table := sqlclause.GeoEdgesTable(groupBy)
+		// Для shadow бэкапа pre-agg всегда пробуем (независимо от live MV readiness).
+		tables := TablesOf(ctx)
+		tryEdges := tables.IsBackup() || aggstate.PreferGeoEdgesAgg()
+		if tryEdges {
+			table := tables.GeoEdges(groupBy)
 			if table != "" {
 				rows, err := scanGeoEdgesDays(ctx, ch, table, tr.Amount, limit, filter, timeout)
 				if err != nil {
 					slog.Warn("geo edges daily scan failed, falling back to traffic_logs",
-						"group_by", groupBy, "err", err)
+						"group_by", groupBy, "table", table, "err", err)
 				} else {
 					return rows, true, nil
 				}
@@ -86,20 +89,20 @@ func ScanGeoEdgesForTimeRange(
 
 // promoteHoursToGeoDays: city/country + hours кратные суткам → days, если pre-agg готов.
 // Иначе UI «1 день» как hours=24 всегда cold-сканит traffic_logs.
-func promoteHoursToGeoDays(tr model.TimeRange, groupBy string) model.TimeRange {
+func promoteHoursToGeoDays(tr model.TimeRange, groupBy string, preferEdges bool) model.TimeRange {
 	if groupBy != "city" && groupBy != "country" {
 		return tr
 	}
 	if tr.Mode != "hours" || tr.Amount < 24 || tr.Amount%24 != 0 {
 		return tr
 	}
-	if !aggstate.PreferGeoEdgesAgg() {
+	if !preferEdges {
 		return tr
 	}
 	return model.TimeRange{Mode: "days", Amount: tr.Amount / 24}
 }
 
-func scanGeoFromLogsSelect(srcKey, dstKey, srcLabel, dstLabel, whereExtra string) string {
+func scanGeoFromLogsSelect(logsTable, srcKey, dstKey, srcLabel, dstLabel, whereExtra string) string {
 	// Не использовать any(src_city) AS src_city: ClickHouse подставит алиас
 	// внутрь any(cityLabelExpr), получится вложенный aggregate (code 184).
 	return fmt.Sprintf(`
@@ -132,7 +135,7 @@ func scanGeoFromLogsSelect(srcKey, dstKey, srcLabel, dstLabel, whereExtra string
 			any(dst_country) AS out_dst_country,
 			any(src_city) AS out_src_city,
 			any(dst_city) AS out_dst_city
-		FROM traffic_logs
+		FROM %s
 		WHERE %s
 		GROUP BY src_key, dst_key
 		ORDER BY coord_weight DESC, cnt DESC
@@ -140,7 +143,7 @@ func scanGeoFromLogsSelect(srcKey, dstKey, srcLabel, dstLabel, whereExtra string
 		sqlclause.CountIfBlockedSQL(), sqlclause.CountIfAllowedSQL(),
 		sqlclause.GeoCoordOK, sqlclause.GeoCoordOK, sqlclause.GeoCoordOK, sqlclause.GeoCoordOK,
 		sqlclause.CoordWeightSQL(),
-		whereExtra)
+		logsTable, whereExtra)
 }
 
 func scanGeoFromLogsRelative(
@@ -165,7 +168,7 @@ func scanGeoFromLogsRelative(
 	srcKey, dstKey, srcLabel, dstLabel := sqlclause.GeoGroupExprs(groupBy)
 	where := fmt.Sprintf("timestamp >= now() - INTERVAL ? %s%s", unit, sqlclause.ActionWhereSQL(filter))
 	// ClickHouse: ORDER BY → LIMIT → SETTINGS (SETTINGS must be last).
-	q := scanGeoFromLogsSelect(srcKey, dstKey, srcLabel, dstLabel, where) +
+	q := scanGeoFromLogsSelect(TablesOf(ctx).Logs, srcKey, dstKey, srcLabel, dstLabel, where) +
 		"\n\t\t" + limitClause(limit) + AggSettings()
 
 	qctx, cancel := context.WithTimeout(ctx, timeout)
@@ -189,7 +192,7 @@ func scanGeoFromLogsAbsolute(
 ) ([]model.GeoEdgeAgg, error) {
 	srcKey, dstKey, srcLabel, dstLabel := sqlclause.GeoGroupExprs(groupBy)
 	where := fmt.Sprintf("timestamp >= ? AND timestamp < ?%s", sqlclause.ActionWhereSQL(filter))
-	q := scanGeoFromLogsSelect(srcKey, dstKey, srcLabel, dstLabel, where) +
+	q := scanGeoFromLogsSelect(TablesOf(ctx).Logs, srcKey, dstKey, srcLabel, dstLabel, where) +
 		"\n\t\t" + limitClause(limit) + AggSettings()
 
 	qctx, cancel := context.WithTimeout(ctx, timeout)

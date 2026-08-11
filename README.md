@@ -586,7 +586,15 @@ RESTORE_ALLOW_NONEMPTY=1 ./scripts/restore-clickhouse.sh nm-20260411T023000Z
 
 Планируйте место на диске: том бэкапов ≈ N × размер hot-данных. `down -v` / uninstall `--volumes` удалит и `clickhouse-backups`.
 
-**UI:** `/system` → вкладка **Резервное копирование** (administrator): список, статус, кнопка «Создать бэкап». Restore из UI нет — только CLI.
+**UI:** `/system` → вкладка **Резервное копирование** (administrator): список, статус, «Создать бэкап», **Подключить / Отключить / Удалить**.
+
+- **Подключить** — `RESTORE … AS nm_bak_*` (shadow для карты). Live и ingest не трогаются.
+- **Отключить** — `DROP nm_bak_*`; бэкап на диске и live сохраняются.
+- **Удалить** — стереть бэкап с тома (нельзя, пока подключён).
+- На карте: переключатель **Live / Бэкап** (после Подключить).
+- Колонка **Auth** — есть ли `*.auth.tgz` (снимок `/app/data`), не трафик.
+
+Полный CLI restore (включая auth): `./scripts/restore-clickhouse.sh <name>`.
 
 ---
 

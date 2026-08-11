@@ -64,6 +64,119 @@ func (r *BackupRunner) BackupTables(ctx context.Context, name string, tables []s
 	return nil
 }
 
+// TruncateTables очищает указанные таблицы (legacy; attach больше не использует).
+func (r *BackupRunner) TruncateTables(ctx context.Context, tables []string) error {
+	if r == nil || r.ch == nil {
+		return fmt.Errorf("clickhouse not configured")
+	}
+	qctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
+	defer cancel()
+	for _, t := range tables {
+		t = strings.TrimSpace(t)
+		if t == "" || !isSafeIdent(t) {
+			return fmt.Errorf("invalid table name %q", t)
+		}
+		ok, err := r.TableExists(qctx, t)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			continue
+		}
+		if err := r.ch.Exec(qctx, "TRUNCATE TABLE IF EXISTS "+t); err != nil {
+			return fmt.Errorf("truncate %s: %w", t, err)
+		}
+	}
+	return nil
+}
+
+// DropTables удаляет shadow-таблицы бэкапа.
+func (r *BackupRunner) DropTables(ctx context.Context, tables []string) error {
+	if r == nil || r.ch == nil {
+		return fmt.Errorf("clickhouse not configured")
+	}
+	qctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
+	defer cancel()
+	for _, t := range tables {
+		t = strings.TrimSpace(t)
+		if t == "" || !isSafeIdent(t) {
+			return fmt.Errorf("invalid table name %q", t)
+		}
+		if err := r.ch.Exec(qctx, "DROP TABLE IF EXISTS "+t); err != nil {
+			return fmt.Errorf("drop %s: %w", t, err)
+		}
+	}
+	return nil
+}
+
+// RestoreTables копирует таблицы из Disk('backups', name) в живые таблицы (CLI-совместимо).
+func (r *BackupRunner) RestoreTables(ctx context.Context, name string, tables []string) error {
+	if r == nil || r.ch == nil {
+		return fmt.Errorf("clickhouse not configured")
+	}
+	name = strings.TrimSpace(name)
+	if name == "" || strings.ContainsAny(name, "'\\\"/;") {
+		return fmt.Errorf("invalid backup name")
+	}
+	qctx, cancel := context.WithTimeout(ctx, 2*time.Hour)
+	defer cancel()
+	restored := 0
+	for _, t := range tables {
+		t = strings.TrimSpace(t)
+		if t == "" || !isSafeIdent(t) {
+			return fmt.Errorf("invalid table name %q", t)
+		}
+		sql := restoreTableSQL(t, name)
+		if err := r.ch.Exec(qctx, sql); err != nil {
+			if isMissingBackupObject(err) {
+				continue
+			}
+			return fmt.Errorf("restore %s: %w", t, err)
+		}
+		restored++
+	}
+	if restored == 0 {
+		return fmt.Errorf("restore: nothing restored from %s", name)
+	}
+	return nil
+}
+
+// RestoreTablesAs восстанавливает src из бэкапа в dest (shadow). Dest предварительно DROP.
+// pairs: [srcLive, destShadow].
+func (r *BackupRunner) RestoreTablesAs(ctx context.Context, name string, pairs [][2]string) error {
+	if r == nil || r.ch == nil {
+		return fmt.Errorf("clickhouse not configured")
+	}
+	name = strings.TrimSpace(name)
+	if name == "" || strings.ContainsAny(name, "'\\\"/;") {
+		return fmt.Errorf("invalid backup name")
+	}
+	qctx, cancel := context.WithTimeout(ctx, 2*time.Hour)
+	defer cancel()
+	restored := 0
+	for _, p := range pairs {
+		src, dest := strings.TrimSpace(p[0]), strings.TrimSpace(p[1])
+		if src == "" || dest == "" || !isSafeIdent(src) || !isSafeIdent(dest) {
+			return fmt.Errorf("invalid table pair %q → %q", src, dest)
+		}
+		if err := r.ch.Exec(qctx, "DROP TABLE IF EXISTS "+dest); err != nil {
+			return fmt.Errorf("drop %s: %w", dest, err)
+		}
+		sql := restoreTableAsSQL(src, dest, name)
+		if err := r.ch.Exec(qctx, sql); err != nil {
+			if isMissingBackupObject(err) {
+				continue
+			}
+			return fmt.Errorf("restore %s as %s: %w", src, dest, err)
+		}
+		restored++
+	}
+	if restored == 0 {
+		return fmt.Errorf("restore: nothing restored from %s", name)
+	}
+	return nil
+}
+
 // backupTablesSQL — CH 25: перед каждым объектом нужен keyword TABLE
 // (`BACKUP TABLE a, TABLE b TO …`), не `BACKUP TABLE a, b`.
 func backupTablesSQL(tables []string, name string) string {
@@ -72,6 +185,42 @@ func backupTablesSQL(tables []string, name string) string {
 		parts = append(parts, "TABLE "+t)
 	}
 	return fmt.Sprintf("BACKUP %s TO Disk('backups', '%s')", strings.Join(parts, ", "), name)
+}
+
+func restoreTableSQL(table, name string) string {
+	return fmt.Sprintf(
+		"RESTORE TABLE %s FROM Disk('backups', '%s') SETTINGS allow_non_empty_tables = true",
+		table, name,
+	)
+}
+
+func restoreTableAsSQL(src, dest, name string) string {
+	return fmt.Sprintf(
+		"RESTORE TABLE %s AS %s FROM Disk('backups', '%s')",
+		src, dest, name,
+	)
+}
+
+func isMissingBackupObject(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	for _, needle := range []string{
+		"not found",
+		"doesn't exist",
+		"does not exist",
+		"unknown_table",
+		"no_such",
+		"cannot find",
+		"backup doesn't",
+		"backup does not",
+	} {
+		if strings.Contains(msg, needle) {
+			return true
+		}
+	}
+	return false
 }
 
 func isSafeIdent(s string) bool {

@@ -65,3 +65,35 @@ func TestWriteAuthTarballSkipsSymlinkEscape(t *testing.T) {
 		}
 	}
 }
+
+func TestAttachedMarkerAndDelete(t *testing.T) {
+	root := t.TempDir()
+	store := New(root)
+	name := "nm-20260101T000000Z"
+	if err := os.MkdirAll(filepath.Join(root, name), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if !store.Exists(name) {
+		t.Fatal("expected exists")
+	}
+	if err := store.SetAttached(name); err != nil {
+		t.Fatal(err)
+	}
+	got, err := store.Attached()
+	if err != nil || got != name {
+		t.Fatalf("attached=%q err=%v", got, err)
+	}
+	if err := store.SetAttached(""); err != nil {
+		t.Fatal(err)
+	}
+	got, err = store.Attached()
+	if err != nil || got != "" {
+		t.Fatalf("cleared attached=%q err=%v", got, err)
+	}
+	if err := store.Delete(name); err != nil {
+		t.Fatal(err)
+	}
+	if store.Exists(name) {
+		t.Fatal("expected deleted")
+	}
+}

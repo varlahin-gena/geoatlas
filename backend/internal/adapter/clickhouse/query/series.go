@@ -97,12 +97,12 @@ func ScanCountrySeries(
 			%s AS blocked_cnt,
 			%s AS allowed_cnt,
 			count() AS total
-		FROM traffic_logs
+		FROM %s
 		WHERE %s
 		GROUP BY bucket
 		ORDER BY bucket
 		%s
-	`, bucketSec, sqlclause.CountIfBlockedSQL(), sqlclause.CountIfAllowedSQL(), where, AggSettings())
+	`, bucketSec, sqlclause.CountIfBlockedSQL(), sqlclause.CountIfAllowedSQL(), TablesOf(ctx).Logs, where, AggSettings())
 
 	qctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()

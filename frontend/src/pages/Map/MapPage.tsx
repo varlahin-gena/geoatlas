@@ -62,6 +62,9 @@ export default function MapPage() {
     fetchError,
     autoRefresh,
     setAutoRefresh,
+    dataSource,
+    selectDataSource,
+    backupAttached,
     periodQuery,
     fetchData,
   } = useMapEvents(toast);
@@ -140,6 +143,7 @@ export default function MapPage() {
     visibleLines,
     countriesGeoJSON,
     periodQuery,
+    dataSource,
     toast,
     applySearchFilter,
     clearFocusedCountry,
@@ -634,6 +638,9 @@ export default function MapPage() {
         setMonoArcs={setMonoArcs}
         autoRefresh={autoRefresh}
         setAutoRefresh={setAutoRefresh}
+        dataSource={dataSource}
+        selectDataSource={selectDataSource}
+        backupAttached={backupAttached}
         autoRotate={autoRotate}
         setAutoRotate={setAutoRotate}
         toggleSidebar={toggleSidebar}

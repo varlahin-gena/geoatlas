@@ -86,7 +86,11 @@ type RetentionAPI interface {
 type BackupAPI interface {
 	Catalog() (usecasebackup.Catalog, error)
 	Status() usecasebackup.Status
+	AttachedName() string
 	ScheduleCreate(context.Context) error
+	ScheduleAttach(context.Context, string) error
+	ScheduleDetach(context.Context, string) error
+	DeleteBackup(string) error
 }
 
 type AuthAPI interface {

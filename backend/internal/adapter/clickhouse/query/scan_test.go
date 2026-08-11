@@ -8,7 +8,7 @@ import (
 )
 
 func TestScanGeoFromLogsSelectClauseOrder(t *testing.T) {
-	q := scanGeoFromLogsSelect("src_k", "dst_k", "src_l", "dst_l", "timestamp >= now()") +
+	q := scanGeoFromLogsSelect("traffic_logs", "src_k", "dst_k", "src_l", "dst_l", "timestamp >= now()") +
 		"\n\t\t" + limitClause(20000) + AggSettings()
 
 	orderIdx := strings.Index(q, "ORDER BY coord_weight DESC, cnt DESC")
@@ -25,6 +25,7 @@ func TestScanGeoFromLogsSelectClauseOrder(t *testing.T) {
 
 func TestScanGeoFromLogsSelectNoAliasShadowing(t *testing.T) {
 	q := scanGeoFromLogsSelect(
+		"traffic_logs",
 		sqlclause.CityKeyExpr("src"), sqlclause.CityKeyExpr("dst"),
 		sqlclause.CityLabelExpr("src"), sqlclause.CityLabelExpr("dst"),
 		"timestamp >= now()",
@@ -53,7 +54,7 @@ func TestScanGeoFromLogsSelectNoAliasShadowing(t *testing.T) {
 }
 
 func TestRawAggSelectSQLNoAliasShadowing(t *testing.T) {
-	q := rawAggSelectSQL("timestamp >= now()", "all", 100)
+	q := rawAggSelectSQL("traffic_logs", "timestamp >= now()", "all", 100)
 	// CH 25: anyIf(src_lon, … src_lat …) AS src_lat + AS src_lon → code 184 nested aggregate.
 	for _, bad := range []string{
 		"AS src_lat,",
@@ -82,7 +83,7 @@ func TestRawAggSelectSQLNoAliasShadowing(t *testing.T) {
 }
 
 func TestRawAggSelectSQLHasLimitBeforeSettings(t *testing.T) {
-	q := rawAggSelectSQL("timestamp >= now()", "all", 20000)
+	q := rawAggSelectSQL("traffic_logs", "timestamp >= now()", "all", 20000)
 	orderIdx := strings.Index(q, "ORDER BY")
 	limitIdx := strings.Index(q, "LIMIT 20000")
 	settingsIdx := strings.Index(q, "SETTINGS")

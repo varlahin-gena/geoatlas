@@ -34,6 +34,7 @@ export function useMapDetail(opts: {
   visibleLines: MapLine[];
   countriesGeoJSON: GeoFeatureCollection | null;
   periodQuery: string;
+  dataSource?: 'live' | 'backup';
   toast: (msg: string, kind?: ToastKind) => void;
   applySearchFilter: (value: string) => void;
   clearFocusedCountry: () => void;
@@ -46,6 +47,7 @@ export function useMapDetail(opts: {
     visibleLines,
     countriesGeoJSON,
     periodQuery,
+    dataSource = 'live',
     toast,
     applySearchFilter,
     clearFocusedCountry,
@@ -158,7 +160,7 @@ export function useMapDetail(opts: {
       seriesAbortRef.current = controller;
       void (async () => {
         try {
-          const data = await fetchCountrySeries(countryKey, periodQuery, controller.signal);
+          const data = await fetchCountrySeries(countryKey, periodQuery, dataSource, controller.signal);
           setDetail((prev) => {
             if (!prev || prev.countryKey !== countryKey) return prev;
             return {
@@ -186,6 +188,7 @@ export function useMapDetail(opts: {
       countriesGeoJSON,
       visibleLines,
       periodQuery,
+      dataSource,
       clearFocusedCountry,
       closeDetail,
       applySearchFilter,

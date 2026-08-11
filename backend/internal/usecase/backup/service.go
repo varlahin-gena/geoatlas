@@ -8,9 +8,12 @@ import (
 )
 
 var (
-	ErrUnavailable = errors.New("backup service unavailable")
-	ErrBusy        = errors.New("backup already running")
-	ErrDisabled    = errors.New("backups disabled")
+	ErrUnavailable  = errors.New("backup service unavailable")
+	ErrBusy         = errors.New("backup already running")
+	ErrDisabled     = errors.New("backups disabled")
+	ErrNotFound     = errors.New("backup not found")
+	ErrNotAttached  = errors.New("backup is not attached")
+	ErrDeleteActive = errors.New("cannot delete attached backup; detach first")
 )
 
 // Entry — один полный бэкап на disk backups.
@@ -19,6 +22,7 @@ type Entry struct {
 	CreatedAt time.Time `json:"created_at"`
 	SizeBytes int64     `json:"size_bytes"`
 	HasAuth   bool      `json:"has_auth"`
+	Attached  bool      `json:"attached"`
 }
 
 // Status — состояние фоновой задачи.
@@ -32,29 +36,38 @@ type Status struct {
 
 // Catalog — список + настройки для UI.
 type Catalog struct {
-	OK           bool   `json:"ok"`
-	Enabled      bool   `json:"enabled"`
-	DirReady     bool   `json:"dir_ready"`
-	Keep         int    `json:"keep"`
-	IncludeEdges bool   `json:"include_edges"`
-	IncludeAuth  bool   `json:"include_auth"`
+	OK           bool    `json:"ok"`
+	Enabled      bool    `json:"enabled"`
+	DirReady     bool    `json:"dir_ready"`
+	Keep         int     `json:"keep"`
+	IncludeEdges bool    `json:"include_edges"`
+	IncludeAuth  bool    `json:"include_auth"`
+	Attached     string  `json:"attached,omitempty"`
 	Backups      []Entry `json:"backups"`
-	Status       Status `json:"status"`
-	Hint         string `json:"hint,omitempty"`
+	Status       Status  `json:"status"`
+	Hint         string  `json:"hint,omitempty"`
 }
 
-// Runner выполняет native BACKUP в ClickHouse.
+// Runner — native BACKUP / RESTORE / DROP в ClickHouse.
 type Runner interface {
 	BackupTables(ctx context.Context, name string, tables []string) error
+	RestoreTables(ctx context.Context, name string, tables []string) error
+	RestoreTablesAs(ctx context.Context, name string, pairs [][2]string) error
+	DropTables(ctx context.Context, tables []string) error
+	TruncateTables(ctx context.Context, tables []string) error
 	TableExists(ctx context.Context, name string) (bool, error)
 }
 
-// Store — каталог бэкапов на томе (list / auth tarball / prune).
+// Store — каталог бэкапов на томе.
 type Store interface {
 	DirReady() bool
 	List() ([]Entry, error)
+	Exists(name string) bool
 	WriteAuthTarball(name, dataDir string) error
 	Prune(keep int) error
+	Delete(name string) error
+	Attached() (string, error)
+	SetAttached(name string) error
 }
 
 // Options — из config.
@@ -67,7 +80,7 @@ type Options struct {
 	IncludeAuth  bool
 }
 
-// Service — list + async create.
+// Service — list + async create / attach / detach.
 type Service struct {
 	opts   Options
 	runner Runner
@@ -105,6 +118,11 @@ func (s *Service) Catalog() (Catalog, error) {
 		cat.Hint = "Том clickhouse-backups не смонтирован в backend (BACKUP_DIR). Перезапустите compose."
 		return cat, nil
 	}
+	attached, err := s.store.Attached()
+	if err != nil {
+		return cat, err
+	}
+	cat.Attached = attached
 	if !cat.Enabled {
 		cat.Hint = "Создание бэкапов отключено (BACKUP_ENABLED=0)."
 	}
@@ -112,8 +130,15 @@ func (s *Service) Catalog() (Catalog, error) {
 	if err != nil {
 		return cat, err
 	}
+	for i := range entries {
+		entries[i].Attached = entries[i].Name == attached
+	}
 	cat.Backups = entries
-	cat.Hint = "Restore: ./scripts/restore-clickhouse.sh <name> на хосте appliance."
+	if attached != "" {
+		cat.Hint = "Подключён " + attached + ": данные в shadow-таблицах nm_bak_*. Live и ingest не трогаются. На карте переключите источник на «Бэкап»."
+	} else {
+		cat.Hint = "«Подключить» копирует данные бэкапа в nm_bak_* (live не меняется). На карте можно смотреть Live или Бэкап. Auth — снимок /app/data (*.auth.tgz), не трафик."
+	}
 	return cat, nil
 }
 
@@ -124,16 +149,25 @@ func (s *Service) Status() Status {
 	return s.job.Status()
 }
 
+// AttachedName — имя подключённого бэкапа (пусто если нет).
+func (s *Service) AttachedName() string {
+	if s == nil || s.store == nil {
+		return ""
+	}
+	name, err := s.store.Attached()
+	if err != nil {
+		return ""
+	}
+	return name
+}
+
 // ScheduleCreate ставит полный бэкап в очередь (не блокирует HTTP).
 func (s *Service) ScheduleCreate(parent context.Context) error {
-	if s == nil || s.runner == nil || s.store == nil {
-		return ErrUnavailable
+	if err := s.readyForJob(); err != nil {
+		return err
 	}
 	if !s.opts.Enabled {
 		return ErrDisabled
-	}
-	if !s.store.DirReady() {
-		return fmt.Errorf("%w: backup dir not ready", ErrUnavailable)
 	}
 	if !s.job.TryStart() {
 		return ErrBusy
@@ -143,6 +177,85 @@ func (s *Service) ScheduleCreate(parent context.Context) error {
 		defer cancel()
 		s.runCreate(ctx)
 	}()
+	return nil
+}
+
+// ScheduleAttach: RESTORE map-таблиц в nm_bak_* (live не трогаем).
+func (s *Service) ScheduleAttach(parent context.Context, name string) error {
+	if err := s.readyForJob(); err != nil {
+		return err
+	}
+	if !s.store.Exists(name) {
+		return ErrNotFound
+	}
+	if !s.job.TryStart() {
+		return ErrBusy
+	}
+	ctx, cancel := detachContext(parent, 2*time.Hour)
+	go func() {
+		defer cancel()
+		s.runAttach(ctx, name)
+	}()
+	return nil
+}
+
+// ScheduleDetach: DROP nm_bak_*; бэкап на диске и live остаются.
+func (s *Service) ScheduleDetach(parent context.Context, name string) error {
+	if err := s.readyForJob(); err != nil {
+		return err
+	}
+	attached, err := s.store.Attached()
+	if err != nil {
+		return err
+	}
+	if attached == "" || attached != name {
+		return ErrNotAttached
+	}
+	if !s.job.TryStart() {
+		return ErrBusy
+	}
+	ctx, cancel := detachContext(parent, 30*time.Minute)
+	go func() {
+		defer cancel()
+		s.runDetach(ctx, name)
+	}()
+	return nil
+}
+
+// DeleteBackup удаляет файлы бэкапа с тома (нельзя, если он подключён).
+func (s *Service) DeleteBackup(name string) error {
+	if s == nil || s.store == nil {
+		return ErrUnavailable
+	}
+	if !s.store.DirReady() {
+		return fmt.Errorf("%w: backup dir not ready", ErrUnavailable)
+	}
+	if s.job != nil {
+		st := s.job.Status()
+		if st.State == "running" {
+			return ErrBusy
+		}
+	}
+	attached, err := s.store.Attached()
+	if err != nil {
+		return err
+	}
+	if attached != "" && attached == name {
+		return ErrDeleteActive
+	}
+	if !s.store.Exists(name) {
+		return ErrNotFound
+	}
+	return s.store.Delete(name)
+}
+
+func (s *Service) readyForJob() error {
+	if s == nil || s.runner == nil || s.store == nil {
+		return ErrUnavailable
+	}
+	if !s.store.DirReady() {
+		return fmt.Errorf("%w: backup dir not ready", ErrUnavailable)
+	}
 	return nil
 }
 
@@ -156,7 +269,7 @@ func (s *Service) runCreate(ctx context.Context) {
 	name := "nm-" + time.Now().UTC().Format("20060102T150405Z")
 	s.job.SetRunning(name, "backup started")
 
-	tables, err := s.resolveTables(ctx)
+	tables, err := s.resolveTables(ctx, s.opts.IncludeEdges)
 	if err != nil {
 		s.job.SetError(name, err.Error())
 		return
@@ -191,7 +304,59 @@ func (s *Service) runCreate(ctx context.Context) {
 	s.job.SetOK(name, "done")
 }
 
-func (s *Service) resolveTables(ctx context.Context) ([]string, error) {
+func (s *Service) runAttach(ctx context.Context, name string) {
+	defer s.job.Finish()
+	s.job.SetRunning(name, "RESTORE в nm_bak_*…")
+
+	// Импорт здесь нельзя (цикл) — пары задаём явно, зеркало query.MapShadowPairs.
+	pairs := [][2]string{
+		{"traffic_logs", "nm_bak_traffic_logs"},
+		{"traffic_edges_city_daily", "nm_bak_traffic_edges_city_daily"},
+		{"traffic_edges_country_daily", "nm_bak_traffic_edges_country_daily"},
+	}
+	if err := s.runner.RestoreTablesAs(ctx, name, pairs); err != nil {
+		_ = s.store.SetAttached("")
+		_ = s.runner.DropTables(context.Background(), []string{
+			"nm_bak_traffic_logs",
+			"nm_bak_traffic_edges_city_daily",
+			"nm_bak_traffic_edges_country_daily",
+		})
+		if ctx.Err() != nil {
+			s.job.SetError(name, "canceled")
+			return
+		}
+		s.job.SetError(name, err.Error())
+		return
+	}
+
+	if err := s.store.SetAttached(name); err != nil {
+		s.job.SetError(name, "marker: "+err.Error())
+		return
+	}
+	s.job.SetOK(name, "подключён — смотрите на карте источник «Бэкап»; live не изменён")
+}
+
+func (s *Service) runDetach(ctx context.Context, name string) {
+	defer s.job.Finish()
+	s.job.SetRunning(name, "DROP nm_bak_*…")
+
+	shadows := []string{
+		"nm_bak_traffic_logs",
+		"nm_bak_traffic_edges_city_daily",
+		"nm_bak_traffic_edges_country_daily",
+	}
+	if err := s.runner.DropTables(ctx, shadows); err != nil {
+		s.job.SetError(name, "drop: "+err.Error())
+		return
+	}
+	if err := s.store.SetAttached(""); err != nil {
+		s.job.SetError(name, "marker: "+err.Error())
+		return
+	}
+	s.job.SetOK(name, "отключён — shadow удалены, live и бэкап на диске на месте")
+}
+
+func (s *Service) resolveTables(ctx context.Context, includeEdges bool) ([]string, error) {
 	base := []string{
 		"traffic_logs",
 		"geo_ranges",
@@ -199,7 +364,7 @@ func (s *Service) resolveTables(ctx context.Context) ([]string, error) {
 		"parse_errors",
 		"system_metrics",
 	}
-	if s.opts.IncludeEdges {
+	if includeEdges {
 		base = append(base,
 			"traffic_edges_daily",
 			"traffic_edges_city_daily",

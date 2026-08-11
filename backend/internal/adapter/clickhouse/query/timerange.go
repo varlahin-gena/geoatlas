@@ -39,7 +39,7 @@ func ScanRawAggsForTimeRange(
 	}
 }
 
-func rawAggSelectSQL(whereExtra, filter string, limit int) string {
+func rawAggSelectSQL(logsTable, whereExtra, filter string, limit int) string {
 	return fmt.Sprintf(`
 		SELECT
 			toString(src_ip) AS src_ip,
@@ -68,13 +68,13 @@ func rawAggSelectSQL(whereExtra, filter string, limit int) string {
 			sum(bytes_recv) AS bytes_recv,
 			sum(packets_sent) AS packets_sent,
 			sum(packets_recv) AS packets_recv
-		FROM traffic_logs
+		FROM %s
 		WHERE %s
 		GROUP BY src_ip, dst_ip
 		%s
 		%s
 		%s
-	`, sqlclause.CountIfBlockedSQL(), sqlclause.CountIfAllowedSQL(), whereExtra,
+	`, sqlclause.CountIfBlockedSQL(), sqlclause.CountIfAllowedSQL(), logsTable, whereExtra,
 		sqlclause.OrderByMapAggFilterSQL(filter), limitClause(limit), AggSettings())
 }
 
@@ -100,7 +100,7 @@ func scanRawLogsRelative(
 	}
 
 	where := fmt.Sprintf("timestamp >= now() - INTERVAL ? %s%s", unit, sqlclause.ActionWhereSQL(filter))
-	q := rawAggSelectSQL(where, filter, limit)
+	q := rawAggSelectSQL(TablesOf(ctx).Logs, where, filter, limit)
 
 	qctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -126,7 +126,7 @@ func scanRawLogsAbsolute(
 	timeout time.Duration,
 ) ([]model.RawAgg, error) {
 	where := fmt.Sprintf("timestamp >= ? AND timestamp < ?%s", sqlclause.ActionWhereSQL(filter))
-	q := rawAggSelectSQL(where, filter, limit)
+	q := rawAggSelectSQL(TablesOf(ctx).Logs, where, filter, limit)
 
 	qctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()

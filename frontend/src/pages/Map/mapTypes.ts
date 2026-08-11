@@ -57,6 +57,8 @@ export interface EventsPayload {
   lines?: MapLine[];
   period?: string;
   source?: string;
+  data_source?: string;
+  backup_attached?: string;
   stats?: Record<string, unknown>;
 }
 

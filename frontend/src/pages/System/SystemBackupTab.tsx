@@ -10,6 +10,7 @@ export function SystemBackupTab() {
   const [cat, setCat] = useState<BackupCatalog | null>(null);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [busyName, setBusyName] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -45,8 +46,78 @@ export function SystemBackupTab() {
     }
   };
 
+  const attach = async (b: BackupEntry) => {
+    if (
+      !confirm(
+        `Подключить «${b.name}» для просмотра на карте?\n\n` +
+          `Данные попадут в shadow-таблицы nm_bak_* (live и ingest не трогаются). ` +
+          `На карте переключите источник на «Бэкап».`,
+      )
+    ) {
+      return;
+    }
+    setBusyName(b.name);
+    try {
+      await apiFetch(`/api/system/backups/${encodeURIComponent(b.name)}/attach`, {
+        method: 'POST',
+        body: '{}',
+      });
+      toast('Подключение запущено', 'success');
+      await load();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Не удалось подключить', 'error');
+    } finally {
+      setBusyName(null);
+    }
+  };
+
+  const detach = async (b: BackupEntry) => {
+    if (
+      !confirm(
+        `Отключить «${b.name}»?\n\nShadow-таблицы nm_bak_* будут удалены. Live-данные и файлы бэкапа на диске останутся.`,
+      )
+    ) {
+      return;
+    }
+    setBusyName(b.name);
+    try {
+      await apiFetch(`/api/system/backups/${encodeURIComponent(b.name)}/detach`, {
+        method: 'POST',
+        body: '{}',
+      });
+      toast('Отключение запущено', 'success');
+      await load();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Не удалось отключить', 'error');
+    } finally {
+      setBusyName(null);
+    }
+  };
+
+  const remove = async (b: BackupEntry) => {
+    if (b.attached) {
+      toast('Сначала отключите бэкап', 'error');
+      return;
+    }
+    if (!confirm(`Удалить бэкап «${b.name}» с диска? Это необратимо.`)) {
+      return;
+    }
+    setBusyName(b.name);
+    try {
+      await apiFetch(`/api/system/backups/${encodeURIComponent(b.name)}`, {
+        method: 'DELETE',
+      });
+      toast('Бэкап удалён', 'success');
+      await load();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Не удалось удалить', 'error');
+    } finally {
+      setBusyName(null);
+    }
+  };
+
   const status = cat?.status;
-  const running = status?.state === 'running' || creating;
+  const running = status?.state === 'running' || creating || busyName !== null;
   const backups: BackupEntry[] = cat?.backups || [];
 
   return (
@@ -70,11 +141,13 @@ export function SystemBackupTab() {
             disabled={running || cat?.enabled === false || cat?.dir_ready === false}
             onClick={() => void create()}
           >
-            {running ? 'Выполняется…' : 'Создать бэкап'}
+            {status?.state === 'running' || creating ? 'Выполняется…' : 'Создать бэкап'}
           </button>
         </div>
         <p className="hint">
-          Native ClickHouse BACKUP на том clickhouse-backups. Restore — CLI на хосте:{' '}
+          Native ClickHouse BACKUP на том clickhouse-backups. «Подключить» копирует данные в
+          shadow-таблицы <code>nm_bak_*</code> — live и ingest не меняются. На карте переключатель
+          Live / Бэкап. «Отключить» удаляет только shadow. Полный appliance restore (включая auth):{' '}
           <code>./scripts/restore-clickhouse.sh &lt;name&gt;</code>
         </p>
         {loading && !cat ? <p className="hint">Загрузка…</p> : null}
@@ -102,6 +175,10 @@ export function SystemBackupTab() {
                 {cat.include_auth ? 'да' : 'нет'}
               </span>
             </div>
+            <div className="kv-row">
+              <span className="k">Подключён</span>
+              <span className="v">{cat.attached ? <code>{cat.attached}</code> : 'нет'}</span>
+            </div>
           </div>
         ) : null}
         {cat?.hint ? <p className="hint">{cat.hint}</p> : null}
@@ -109,6 +186,12 @@ export function SystemBackupTab() {
 
       <section className="card card-compact">
         <h3 className="card-title">Список бэкапов</h3>
+        <p className="hint">
+          Колонка <strong>Auth</strong> — есть ли рядом снимок <code>/app/data</code> (users,
+          retention, feeds) как <code>*.auth.tgz</code>. Это не трафик: «нет» значит tarball не
+          записался (часто из‑за ошибки прав на ранних попытках) или бэкап оборвался после
+          ClickHouse BACKUP. На «Подключить / Отключить» auth не влияет.
+        </p>
         {backups.length === 0 ? (
           <p className="hint">Пока нет бэкапов.</p>
         ) : (
@@ -119,20 +202,60 @@ export function SystemBackupTab() {
                   <th scope="col">Имя</th>
                   <th scope="col">Создан</th>
                   <th scope="col">Размер</th>
-                  <th scope="col">Auth</th>
+                  <th scope="col" title="Снимок /app/data (*.auth.tgz), не ClickHouse-таблицы">
+                    Auth
+                  </th>
+                  <th scope="col">Состояние</th>
+                  <th scope="col">Действия</th>
                 </tr>
               </thead>
               <tbody>
-                {backups.map((b) => (
-                  <tr key={b.name}>
-                    <td>
-                      <code>{b.name}</code>
-                    </td>
-                    <td>{b.created_at ? fmtDate(b.created_at) : '—'}</td>
-                    <td>{fmtBytes(b.size_bytes || 0)}</td>
-                    <td>{b.has_auth ? 'да' : 'нет'}</td>
-                  </tr>
-                ))}
+                {backups.map((b) => {
+                  const rowBusy = running;
+                  return (
+                    <tr key={b.name}>
+                      <td>
+                        <code>{b.name}</code>
+                      </td>
+                      <td>{b.created_at ? fmtDate(b.created_at) : '—'}</td>
+                      <td>{fmtBytes(b.size_bytes || 0)}</td>
+                      <td>{b.has_auth ? 'да' : 'нет'}</td>
+                      <td>{b.attached ? 'подключён' : '—'}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          {b.attached ? (
+                            <button
+                              type="button"
+                              className="btn"
+                              disabled={rowBusy}
+                              onClick={() => void detach(b)}
+                            >
+                              Отключить
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="btn primary"
+                              disabled={rowBusy}
+                              onClick={() => void attach(b)}
+                            >
+                              Подключить
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="btn danger"
+                            disabled={rowBusy || !!b.attached}
+                            onClick={() => void remove(b)}
+                            title={b.attached ? 'Сначала отключите' : undefined}
+                          >
+                            Удалить
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

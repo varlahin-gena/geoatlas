@@ -81,6 +81,7 @@ export interface BackupEntry {
   created_at?: string;
   size_bytes?: number;
   has_auth?: boolean;
+  attached?: boolean;
 }
 
 export interface BackupCatalog {
@@ -90,6 +91,7 @@ export interface BackupCatalog {
   keep?: number;
   include_edges?: boolean;
   include_auth?: boolean;
+  attached?: string;
   backups?: BackupEntry[];
   status?: BackupStatus;
   hint?: string;

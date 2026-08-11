@@ -33,6 +33,9 @@ export function MapSidebar({
   setMonoArcs,
   autoRefresh,
   setAutoRefresh,
+  dataSource,
+  selectDataSource,
+  backupAttached,
   autoRotate,
   setAutoRotate,
   toggleSidebar,
@@ -64,6 +67,9 @@ export function MapSidebar({
   setMonoArcs: (v: boolean) => void;
   autoRefresh: boolean;
   setAutoRefresh: (v: boolean) => void;
+  dataSource: 'live' | 'backup';
+  selectDataSource: (v: 'live' | 'backup') => void;
+  backupAttached: string;
   autoRotate: boolean;
   setAutoRotate: (v: boolean) => void;
   toggleSidebar: () => void;
@@ -291,10 +297,40 @@ export function MapSidebar({
           <input
             type="checkbox"
             checked={autoRefresh}
+            disabled={dataSource === 'backup'}
             onChange={(e) => setAutoRefresh(e.target.checked)}
           />
           <span>Авто-обновление</span>
         </label>
+        <div className="sidebar-section-title" style={{ marginTop: 10 }}>
+          Данные
+        </div>
+        <div className="mode-switch" title={backupAttached ? `Бэкап: ${backupAttached}` : 'Сначала Подключить бэкап в Системе'}>
+          <button
+            type="button"
+            className={dataSource === 'live' ? 'active' : ''}
+            onClick={() => selectDataSource('live')}
+          >
+            Live
+          </button>
+          <button
+            type="button"
+            className={dataSource === 'backup' ? 'active' : ''}
+            disabled={!backupAttached && dataSource !== 'backup'}
+            onClick={() => selectDataSource('backup')}
+          >
+            Бэкап
+          </button>
+        </div>
+        {backupAttached ? (
+          <p className="hint" style={{ marginTop: 6, fontSize: 12 }}>
+            Подключён <code>{backupAttached}</code>
+          </p>
+        ) : (
+          <p className="hint" style={{ marginTop: 6, fontSize: 12 }}>
+            Нет подключённого бэкапа
+          </p>
+        )}
         <label
           className="side-toggle"
           id="autoRotateWrap"

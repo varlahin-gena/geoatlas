@@ -18,6 +18,8 @@ import (
 
 var nameRe = regexp.MustCompile(`^nm-\d{8}T\d{6}Z$`)
 
+const attachedFile = ".nm-attached"
+
 // DirStore — каталог бэкапов на смонтированном томе clickhouse-backups.
 type DirStore struct {
 	Root string
@@ -161,6 +163,67 @@ func (d *DirStore) WriteAuthTarball(name, dataDir string) error {
 	})
 }
 
+func (d *DirStore) Exists(name string) bool {
+	if !d.DirReady() || !nameRe.MatchString(name) {
+		return false
+	}
+	st, err := os.Stat(filepath.Join(d.Root, name))
+	return err == nil && st.IsDir()
+}
+
+// Attached — имя бэкапа, чьи данные сейчас в живых таблицах (пусто = никто).
+func (d *DirStore) Attached() (string, error) {
+	if !d.DirReady() {
+		return "", nil
+	}
+	b, err := os.ReadFile(filepath.Join(d.Root, attachedFile))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	name := strings.TrimSpace(string(b))
+	if !nameRe.MatchString(name) {
+		return "", nil
+	}
+	return name, nil
+}
+
+func (d *DirStore) SetAttached(name string) error {
+	if !d.DirReady() {
+		return fmt.Errorf("backup dir not ready")
+	}
+	path := filepath.Join(d.Root, attachedFile)
+	name = strings.TrimSpace(name)
+	if name == "" {
+		_ = os.Remove(path)
+		return nil
+	}
+	if !nameRe.MatchString(name) {
+		return fmt.Errorf("invalid backup name")
+	}
+	return os.WriteFile(path, []byte(name+"\n"), 0o644)
+}
+
+// Delete удаляет каталог бэкапа и парный *.auth.tgz (маркер attached не трогает).
+func (d *DirStore) Delete(name string) error {
+	if !d.DirReady() {
+		return fmt.Errorf("backup dir not ready")
+	}
+	if !nameRe.MatchString(name) {
+		return fmt.Errorf("invalid backup name")
+	}
+	if !d.Exists(name) {
+		return fmt.Errorf("backup not found")
+	}
+	if err := os.RemoveAll(filepath.Join(d.Root, name)); err != nil {
+		return err
+	}
+	_ = os.Remove(filepath.Join(d.Root, name+".auth.tgz"))
+	return nil
+}
+
 func (d *DirStore) Prune(keep int) error {
 	if !d.DirReady() {
 		return nil
@@ -168,12 +231,18 @@ func (d *DirStore) Prune(keep int) error {
 	if keep < 1 {
 		keep = 1
 	}
+	attached, _ := d.Attached()
 	list, err := d.List()
 	if err != nil {
 		return err
 	}
-	for i, e := range list {
-		if i < keep {
+	kept := 0
+	for _, e := range list {
+		if e.Name == attached {
+			continue // подключённый бэкап не выкидываем политикой keep
+		}
+		kept++
+		if kept <= keep {
 			continue
 		}
 		_ = os.RemoveAll(filepath.Join(d.Root, e.Name))

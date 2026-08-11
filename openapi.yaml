@@ -1103,6 +1103,86 @@ paths:
         "503":
           description: Сервис/каталог недоступен
 
+  /api/system/backups/{name}/attach:
+    post:
+      tags: [system]
+      summary: Подключить бэкап (данные → живые таблицы)
+      description: |
+        Только administrator. Асинхронно: RESTORE map-таблиц в shadow `nm_bak_*`
+        (live и ingest не трогаются). На карте переключатель Live / Бэкап.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+        - name: X-CSRF-Token
+          in: header
+          required: false
+          schema: { type: string }
+      responses:
+        "202":
+          description: Задача поставлена
+        "404":
+          description: Бэкап не найден
+        "409":
+          description: Уже выполняется другая операция
+
+  /api/system/backups/{name}/detach:
+    post:
+      tags: [system]
+      summary: Отключить подключённый бэкап (очистить таблицы)
+      description: |
+        Только administrator. DROP shadow `nm_bak_*`; файлы бэкапа и live остаются.
+        Доступно только для текущего attached бэкапа.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+        - name: X-CSRF-Token
+          in: header
+          required: false
+          schema: { type: string }
+      responses:
+        "202":
+          description: Задача поставлена
+        "400":
+          description: Бэкап не подключён
+        "409":
+          description: Уже выполняется другая операция
+
+  /api/system/backups/{name}:
+    delete:
+      tags: [system]
+      summary: Удалить бэкап с тома
+      description: |
+        Только administrator. Нельзя удалить подключённый бэкап — сначала detach.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+        - name: X-CSRF-Token
+          in: header
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: Удалён
+        "404":
+          description: Не найден
+        "409":
+          description: Подключён или занят job
+
   /api/parse-errors:
     get:
       tags: [parse]

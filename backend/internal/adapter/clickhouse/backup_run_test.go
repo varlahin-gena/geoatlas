@@ -15,3 +15,11 @@ func TestBackupTablesSQLPrefixesEachTable(t *testing.T) {
 		t.Fatal("must not omit TABLE before subsequent names")
 	}
 }
+
+func TestRestoreTableAsSQL(t *testing.T) {
+	got := restoreTableAsSQL("traffic_logs", "nm_bak_traffic_logs", "nm-20260101T000000Z")
+	want := "RESTORE TABLE traffic_logs AS nm_bak_traffic_logs FROM Disk('backups', 'nm-20260101T000000Z')"
+	if got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+}
