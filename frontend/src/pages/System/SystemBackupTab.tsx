@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '@/api/client';
 import { useToast } from '@/components/Toast';
 import { fmtDate, fmtNumber } from '@/lib/format';
@@ -11,6 +11,37 @@ function pad2(n: number) {
   return String(n).padStart(2, '0');
 }
 
+function normalizeSched(s: BackupSchedule | undefined | null): BackupSchedule {
+  return {
+    enabled: !!s?.enabled,
+    hour: s?.hour ?? 2,
+    minute: s?.minute ?? 30,
+    timezone: (s?.timezone || 'Europe/Moscow').trim(),
+    keep: s?.keep ?? 7,
+    include_edges: s?.include_edges !== false,
+    include_auth: s?.include_auth !== false,
+    updated_at: s?.updated_at,
+    last_run_at: s?.last_run_at,
+    last_run_date: s?.last_run_date,
+  };
+}
+
+function scheduleSignature(s: BackupSchedule): string {
+  return [
+    s.enabled ? '1' : '0',
+    String(s.hour ?? 0),
+    String(s.minute ?? 0),
+    (s.timezone || '').trim(),
+    String(s.keep ?? 7),
+    s.include_edges ? '1' : '0',
+    s.include_auth ? '1' : '0',
+  ].join('|');
+}
+
+function formatLocalTime(s: BackupSchedule): string {
+  return `${pad2(s.hour ?? 0)}:${pad2(s.minute ?? 0)} ${s.timezone || 'UTC'}`;
+}
+
 export function SystemBackupTab() {
   const { toast } = useToast();
   const [cat, setCat] = useState<BackupCatalog | null>(null);
@@ -18,36 +49,18 @@ export function SystemBackupTab() {
   const [creating, setCreating] = useState(false);
   const [busyName, setBusyName] = useState<string | null>(null);
   const [savingSchedule, setSavingSchedule] = useState(false);
-  const [sched, setSched] = useState<BackupSchedule>({
-    enabled: false,
-    hour: 2,
-    minute: 30,
-    timezone: 'Europe/Moscow',
-    keep: 7,
-    include_edges: true,
-    include_auth: true,
-  });
+  const [savedSched, setSavedSched] = useState<BackupSchedule>(normalizeSched(null));
+  const [sched, setSched] = useState<BackupSchedule>(normalizeSched(null));
   const [tzCustom, setTzCustom] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const data = await apiFetch<BackupCatalog>('/api/system/backups');
       setCat(data);
-      if (data.schedule) {
-        const tz = data.schedule.timezone || 'Europe/Moscow';
-        setTzCustom(!TZ_PRESETS.includes(tz));
-        setSched({
-          enabled: !!data.schedule.enabled,
-          hour: data.schedule.hour ?? 2,
-          minute: data.schedule.minute ?? 30,
-          timezone: tz,
-          keep: data.schedule.keep ?? 7,
-          include_edges: data.schedule.include_edges !== false,
-          include_auth: data.schedule.include_auth !== false,
-          last_run_at: data.schedule.last_run_at,
-          last_run_date: data.schedule.last_run_date,
-        });
-      }
+      const next = normalizeSched(data.schedule);
+      setSavedSched(next);
+      setSched(next);
+      setTzCustom(!TZ_PRESETS.includes(next.timezone || ''));
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Ошибка списка бэкапов', 'error');
     } finally {
@@ -65,6 +78,15 @@ export function SystemBackupTab() {
     return () => window.clearInterval(id);
   }, [cat?.status?.state, load]);
 
+  const dirty = useMemo(
+    () => scheduleSignature(sched) !== scheduleSignature(savedSched),
+    [sched, savedSched],
+  );
+
+  const scheduleActive =
+    !!cat?.enabled && !!cat?.dir_ready && !!savedSched.enabled && !dirty;
+  const schedulePausedByEnv = !!savedSched.enabled && cat?.enabled === false;
+
   const create = async () => {
     setCreating(true);
     try {
@@ -81,19 +103,31 @@ export function SystemBackupTab() {
   const saveSchedule = async () => {
     setSavingSchedule(true);
     try {
-      await apiFetch<{ ok?: boolean; schedule?: BackupSchedule }>('/api/system/backup-schedule', {
-        method: 'PUT',
-        body: JSON.stringify({
-          enabled: !!sched.enabled,
-          hour: Number(sched.hour) || 0,
-          minute: Number(sched.minute) || 0,
-          timezone: (sched.timezone || 'UTC').trim(),
-          keep: Number(sched.keep) || 7,
-          include_edges: !!sched.include_edges,
-          include_auth: !!sched.include_auth,
-        }),
-      });
-      toast('Расписание сохранено', 'success');
+      const res = await apiFetch<{ ok?: boolean; schedule?: BackupSchedule }>(
+        '/api/system/backup-schedule',
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            enabled: !!sched.enabled,
+            hour: Number(sched.hour) || 0,
+            minute: Number(sched.minute) || 0,
+            timezone: (sched.timezone || 'UTC').trim(),
+            keep: Number(sched.keep) || 7,
+            include_edges: !!sched.include_edges,
+            include_auth: !!sched.include_auth,
+          }),
+        },
+      );
+      const applied = normalizeSched(res.schedule || sched);
+      setSavedSched(applied);
+      setSched(applied);
+      setTzCustom(!TZ_PRESETS.includes(applied.timezone || ''));
+      toast(
+        applied.enabled
+          ? `Расписание применено: ежедневно в ${formatLocalTime(applied)}`
+          : 'Расписание применено: автобэкап выключен',
+        'success',
+      );
       await load();
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Не удалось сохранить расписание', 'error');
@@ -237,8 +271,26 @@ export function SystemBackupTab() {
               <span className="v">{cat.attached ? <code>{cat.attached}</code> : 'нет'}</span>
             </div>
             <div className="kv-row">
+              <span className="k">Расписание</span>
+              <span className="v">
+                {schedulePausedByEnv ? (
+                  <>в файле вкл, но <code>BACKUP_ENABLED=0</code></>
+                ) : dirty ? (
+                  <>есть несохранённые изменения</>
+                ) : savedSched.enabled ? (
+                  <>
+                    <strong>включено</strong> · ежедневно {formatLocalTime(savedSched)}
+                  </>
+                ) : (
+                  <strong>выключено</strong>
+                )}
+              </span>
+            </div>
+            <div className="kv-row">
               <span className="k">След. авто</span>
-              <span className="v">{cat.next_run_at ? fmtDate(cat.next_run_at) : '—'}</span>
+              <span className="v">
+                {scheduleActive && cat.next_run_at ? fmtDate(cat.next_run_at) : '—'}
+              </span>
             </div>
           </div>
         ) : null}
@@ -246,11 +298,59 @@ export function SystemBackupTab() {
       </section>
 
       <section className="card card-compact">
-        <h3 className="card-title">Расписание и политика</h3>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            flexWrap: 'wrap',
+          }}
+        >
+          <h3 className="card-title" style={{ margin: 0 }}>
+            Расписание и политика
+          </h3>
+          <span
+            className="profile-badge"
+            title={
+              dirty
+                ? 'Изменения ещё не сохранены'
+                : schedulePausedByEnv
+                  ? 'BACKUP_ENABLED=0 блокирует создание'
+                  : savedSched.enabled
+                    ? 'Автобэкап активен'
+                    : 'Автобэкап выключен'
+            }
+          >
+            {dirty
+              ? 'не сохранено'
+              : schedulePausedByEnv
+                ? 'пауза (env)'
+                : savedSched.enabled
+                  ? 'расписание вкл'
+                  : 'расписание выкл'}
+          </span>
+        </div>
         <p className="hint">
           Ежедневный автобэкап в указанное локальное время. При включённом расписании внешний cron{' '}
           <code>scripts/backup-clickhouse.sh</code> не обязателен. Kill-switch:{' '}
           <code>BACKUP_ENABLED=0</code>.
+        </p>
+        <p className="hint" style={{ marginTop: 8 }}>
+          {dirty ? (
+            <>
+              Черновик отличается от сохранённого. Нажмите «Сохранить расписание», чтобы применить.
+            </>
+          ) : savedSched.updated_at ? (
+            <>
+              Применено: {fmtDate(savedSched.updated_at)}
+              {savedSched.enabled
+                ? ` · активно · ${formatLocalTime(savedSched)} · keep ${fmtNumber(savedSched.keep)}`
+                : ' · автобэкап выключен'}
+            </>
+          ) : (
+            <>Сохранённых правок из UI пока нет (действуют дефолты env).</>
+          )}
         </p>
         <div className="kv-grid cols-2" style={{ marginTop: 12 }}>
           <div className="kv-row">
@@ -378,15 +478,28 @@ export function SystemBackupTab() {
             </span>
           </div>
         </div>
-        <div style={{ marginTop: 12 }}>
+        <div style={{ marginTop: 12, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <button
             type="button"
             className="btn primary"
-            disabled={savingSchedule || cat?.enabled === false}
+            disabled={savingSchedule || cat?.enabled === false || !dirty}
             onClick={() => void saveSchedule()}
           >
-            {savingSchedule ? 'Сохранение…' : 'Сохранить расписание'}
+            {savingSchedule ? 'Сохранение…' : dirty ? 'Сохранить и применить' : 'Нет изменений'}
           </button>
+          {dirty ? (
+            <button
+              type="button"
+              className="btn"
+              disabled={savingSchedule}
+              onClick={() => {
+                setSched(savedSched);
+                setTzCustom(!TZ_PRESETS.includes(savedSched.timezone || ''));
+              }}
+            >
+              Отменить правки
+            </button>
+          ) : null}
         </div>
       </section>
 
