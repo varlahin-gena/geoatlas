@@ -44,10 +44,21 @@ func TestShouldFire(t *testing.T) {
 	if !fire || dateKey != "2026-08-11" {
 		t.Fatalf("fire=%v date=%q", fire, dateKey)
 	}
-	sch.LastRunDate = "2026-08-11"
-	fire, _ = ShouldFire(sch, now)
+	// Догон: после слота всё ещё можно, пока нет успешного last_run_date.
+	later := time.Date(2026, 8, 11, 10, 0, 0, 0, loc)
+	fire, _ = ShouldFire(sch, later)
+	if !fire {
+		t.Fatal("should catch up after slot")
+	}
+	before := time.Date(2026, 8, 11, 2, 29, 0, 0, loc)
+	fire, _ = ShouldFire(sch, before)
 	if fire {
-		t.Fatal("should not fire twice same day")
+		t.Fatal("must not fire before slot")
+	}
+	sch.LastRunDate = "2026-08-11"
+	fire, _ = ShouldFire(sch, later)
+	if fire {
+		t.Fatal("should not fire twice same day after success")
 	}
 	sch.LastRunDate = ""
 	sch.Enabled = false
@@ -71,8 +82,13 @@ func TestNextRunAt(t *testing.T) {
 	}
 	after := time.Date(2026, 8, 11, 3, 1, 0, 0, loc)
 	next = NextRunAt(sch, after)
+	if !next.Equal(after.UTC()) {
+		t.Fatalf("overdue got %s want %s", next, after.UTC())
+	}
+	sch.LastRunDate = "2026-08-11"
+	next = NextRunAt(sch, after)
 	want = time.Date(2026, 8, 12, 3, 0, 0, 0, loc).UTC()
 	if !next.Equal(want) {
-		t.Fatalf("after slot got %s want %s", next, want)
+		t.Fatalf("after success got %s want %s", next, want)
 	}
 }

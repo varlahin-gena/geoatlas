@@ -84,7 +84,8 @@ func ValidateSchedule(in Schedule) (Schedule, error) {
 	}, nil
 }
 
-// NextRunAt — ближайший запуск (сегодня HH:MM если ещё не прошло и не last_run_date, иначе завтра).
+// NextRunAt — ближайший запуск: сегодняшняя HH:MM, либо «сейчас» если слот уже прошёл
+// и сегодня ещё не было успешного автобэкапа (догон), иначе завтра.
 func NextRunAt(sch Schedule, now time.Time) time.Time {
 	loc, err := time.LoadLocation(sch.Timezone)
 	if err != nil {
@@ -93,13 +94,18 @@ func NextRunAt(sch Schedule, now time.Time) time.Time {
 	local := now.In(loc)
 	candidate := time.Date(local.Year(), local.Month(), local.Day(), sch.Hour, sch.Minute, 0, 0, loc)
 	dateKey := local.Format("2006-01-02")
-	if !local.Before(candidate) || sch.LastRunDate == dateKey {
-		candidate = candidate.Add(24 * time.Hour)
+	if sch.LastRunDate == dateKey {
+		return candidate.Add(24 * time.Hour).UTC()
 	}
-	return candidate.UTC()
+	if local.Before(candidate) {
+		return candidate.UTC()
+	}
+	// Слот сегодня уже прошёл, успешного прогона ещё нет — тикер догонит.
+	return now.UTC()
 }
 
-// ShouldFire — true, если сейчас локальная минута расписания и сегодня ещё не запускали.
+// ShouldFire — true, если сегодня ещё не было успешного автобэкапа и локальное время
+// уже достигло (или прошло) слот HH:MM (догон после простоя / ErrBusy / сбоя job).
 func ShouldFire(sch Schedule, now time.Time) (fire bool, dateKey string) {
 	if !sch.Enabled {
 		return false, ""
@@ -110,10 +116,11 @@ func ShouldFire(sch Schedule, now time.Time) (fire bool, dateKey string) {
 	}
 	local := now.In(loc)
 	dateKey = local.Format("2006-01-02")
-	if local.Hour() != sch.Hour || local.Minute() != sch.Minute {
+	if sch.LastRunDate == dateKey {
 		return false, dateKey
 	}
-	if sch.LastRunDate == dateKey {
+	candidate := time.Date(local.Year(), local.Month(), local.Day(), sch.Hour, sch.Minute, 0, 0, loc)
+	if local.Before(candidate) {
 		return false, dateKey
 	}
 	return true, dateKey

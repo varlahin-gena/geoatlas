@@ -213,10 +213,12 @@ func (s *Service) GetSchedule() (Schedule, error) {
 		seed := DefaultsSchedule(s.opts)
 		seed.LastRunAt = out.LastRunAt
 		seed.LastRunDate = out.LastRunDate
+		s.dropStaleScheduleLastRun(&seed)
 		return seed, nil
 	}
 	normalized.LastRunAt = out.LastRunAt
 	normalized.LastRunDate = out.LastRunDate
+	s.dropStaleScheduleLastRun(&normalized)
 	return normalized, nil
 }
 
@@ -231,6 +233,11 @@ func (s *Service) UpdateSchedule(in Schedule) (Schedule, error) {
 	prev, _ := s.GetSchedule()
 	out.LastRunAt = prev.LastRunAt
 	out.LastRunDate = prev.LastRunDate
+	// Смена слота — разрешить новый прогон сегодня (иначе «Последний авто» блокирует догон).
+	if prev.Hour != out.Hour || prev.Minute != out.Minute || prev.Timezone != out.Timezone {
+		out.LastRunDate = ""
+		s.clearLastFireDate()
+	}
 	out.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 	if err := s.schedule.Save(out); err != nil {
 		return Schedule{}, err
@@ -260,18 +267,66 @@ func (s *Service) TickAutoCreate(parent context.Context, now time.Time) {
 	s.mu.Unlock()
 
 	if err := s.ScheduleCreate(parent, SourceSchedule); err != nil {
-		if errors.Is(err, ErrBusy) {
-			return
-		}
-		s.mu.Lock()
-		if s.lastFireDate == dateKey {
-			s.lastFireDate = ""
-		}
-		s.mu.Unlock()
+		// ErrBusy / недоступность — снимем dedupe, чтобы тикер догнал позже сегодня.
+		s.clearLastFireDate()
 		return
 	}
+	// last_run_* пишем только после успешного runCreate (см. persistScheduleRun).
+}
+
+func (s *Service) clearLastFireDate() {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	s.lastFireDate = ""
+	s.mu.Unlock()
+}
+
+// dropStaleScheduleLastRun — last_run без бэкапа source=schedule в этот день (старый баг:
+// last_run писали при постановке в очередь). Сбрасываем, чтобы догон сработал.
+func (s *Service) dropStaleScheduleLastRun(sch *Schedule) {
+	if s == nil || s.store == nil || sch == nil || sch.LastRunDate == "" {
+		return
+	}
+	list, err := s.store.List()
+	if err != nil {
+		return
+	}
+	loc, err := time.LoadLocation(sch.Timezone)
+	if err != nil {
+		loc = time.UTC
+	}
+	for _, e := range list {
+		if e.Source != SourceSchedule {
+			continue
+		}
+		if e.CreatedAt.In(loc).Format("2006-01-02") == sch.LastRunDate {
+			return
+		}
+	}
+	sch.LastRunDate = ""
+	sch.LastRunAt = ""
+	if s.schedule != nil {
+		_ = s.schedule.Save(*sch)
+	}
+	s.clearLastFireDate()
+}
+
+func (s *Service) persistScheduleRun(now time.Time) {
+	if s == nil || s.schedule == nil {
+		return
+	}
+	sch, err := s.GetSchedule()
+	if err != nil {
+		return
+	}
+	loc, err := time.LoadLocation(sch.Timezone)
+	if err != nil {
+		loc = time.UTC
+	}
 	sch.LastRunAt = now.UTC().Format(time.RFC3339)
-	sch.LastRunDate = dateKey
+	sch.LastRunDate = now.In(loc).Format("2006-01-02")
 	_ = s.schedule.Save(sch)
 }
 
@@ -392,6 +447,17 @@ func (s *Service) effectivePolicy() (keep int, includeEdges, includeAuth bool) {
 
 func (s *Service) runCreate(ctx context.Context, source string) {
 	defer s.job.Finish()
+	succeeded := false
+	defer func() {
+		if source != SourceSchedule {
+			return
+		}
+		if succeeded {
+			s.persistScheduleRun(time.Now().UTC())
+			return
+		}
+		s.clearLastFireDate()
+	}()
 
 	name := "nm-" + time.Now().UTC().Format("20060102T150405Z")
 	s.job.SetRunning(name, "backup started")
@@ -427,6 +493,8 @@ func (s *Service) runCreate(ctx context.Context, source string) {
 	}
 
 	_ = s.store.WriteSource(name, source)
+	// Бэкап на диске есть — день расписания считаем закрытым (даже если prune ниже упадёт).
+	succeeded = true
 
 	if err := s.store.Prune(keep); err != nil {
 		s.job.SetError(name, "prune: "+err.Error())
