@@ -66,6 +66,31 @@ func TestWriteAuthTarballSkipsSymlinkEscape(t *testing.T) {
 	}
 }
 
+func TestWriteSourceAndList(t *testing.T) {
+	root := t.TempDir()
+	store := New(root)
+	name := "nm-20260101T120000Z"
+	if err := os.MkdirAll(filepath.Join(root, name), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.WriteSource(name, "manual"); err != nil {
+		t.Fatal(err)
+	}
+	list, err := store.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 || list[0].Source != "manual" {
+		t.Fatalf("got %+v", list)
+	}
+	if err := store.Delete(name); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, name+".source")); !os.IsNotExist(err) {
+		t.Fatalf("source marker should be removed: %v", err)
+	}
+}
+
 func TestAttachedMarkerAndDelete(t *testing.T) {
 	root := t.TempDir()
 	store := New(root)

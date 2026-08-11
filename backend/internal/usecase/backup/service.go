@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 )
@@ -24,6 +25,25 @@ type Entry struct {
 	SizeBytes int64     `json:"size_bytes"`
 	HasAuth   bool      `json:"has_auth"`
 	Attached  bool      `json:"attached"`
+	// Source: manual | schedule | "" (старые бэкапы без маркера).
+	Source string `json:"source,omitempty"`
+}
+
+const (
+	SourceManual   = "manual"
+	SourceSchedule = "schedule"
+)
+
+// NormalizeSource — только известные значения.
+func NormalizeSource(s string) string {
+	switch strings.TrimSpace(strings.ToLower(s)) {
+	case SourceManual:
+		return SourceManual
+	case SourceSchedule:
+		return SourceSchedule
+	default:
+		return ""
+	}
 }
 
 // Status — состояние фоновой задачи.
@@ -67,6 +87,7 @@ type Store interface {
 	List() ([]Entry, error)
 	Exists(name string) bool
 	WriteAuthTarball(name, dataDir string) error
+	WriteSource(name, source string) error
 	Prune(keep int) error
 	Delete(name string) error
 	Attached() (string, error)
@@ -238,7 +259,7 @@ func (s *Service) TickAutoCreate(parent context.Context, now time.Time) {
 	s.lastFireDate = dateKey
 	s.mu.Unlock()
 
-	if err := s.ScheduleCreate(parent); err != nil {
+	if err := s.ScheduleCreate(parent, SourceSchedule); err != nil {
 		if errors.Is(err, ErrBusy) {
 			return
 		}
@@ -255,7 +276,8 @@ func (s *Service) TickAutoCreate(parent context.Context, now time.Time) {
 }
 
 // ScheduleCreate ставит полный бэкап в очередь (не блокирует HTTP).
-func (s *Service) ScheduleCreate(parent context.Context) error {
+// source: manual | schedule.
+func (s *Service) ScheduleCreate(parent context.Context, source string) error {
 	if err := s.readyForJob(); err != nil {
 		return err
 	}
@@ -265,10 +287,14 @@ func (s *Service) ScheduleCreate(parent context.Context) error {
 	if !s.job.TryStart() {
 		return ErrBusy
 	}
+	src := NormalizeSource(source)
+	if src == "" {
+		src = SourceManual
+	}
 	ctx, cancel := detachContext(parent, 2*time.Hour)
 	go func() {
 		defer cancel()
-		s.runCreate(ctx)
+		s.runCreate(ctx, src)
 	}()
 	return nil
 }
@@ -364,7 +390,7 @@ func (s *Service) effectivePolicy() (keep int, includeEdges, includeAuth bool) {
 	return sch.Keep, sch.IncludeEdges, sch.IncludeAuth
 }
 
-func (s *Service) runCreate(ctx context.Context) {
+func (s *Service) runCreate(ctx context.Context, source string) {
 	defer s.job.Finish()
 
 	name := "nm-" + time.Now().UTC().Format("20060102T150405Z")
@@ -399,6 +425,8 @@ func (s *Service) runCreate(ctx context.Context) {
 			return
 		}
 	}
+
+	_ = s.store.WriteSource(name, source)
 
 	if err := s.store.Prune(keep); err != nil {
 		s.job.SetError(name, "prune: "+err.Error())

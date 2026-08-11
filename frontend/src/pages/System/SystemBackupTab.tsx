@@ -506,8 +506,9 @@ export function SystemBackupTab() {
       <section className="card card-compact">
         <h3 className="card-title">Список бэкапов</h3>
         <p className="hint">
-          Колонка <strong>Auth</strong> — есть ли рядом снимок <code>/app/data</code> (users,
-          retention, feeds) как <code>*.auth.tgz</code>. Это не трафик.
+          Колонка <strong>Источник</strong> — вручную из UI или по расписанию. Колонка{' '}
+          <strong>Auth</strong> — есть ли рядом снимок <code>/app/data</code> (users, retention,
+          feeds) как <code>*.auth.tgz</code>. Это не трафик.
         </p>
         {backups.length === 0 ? (
           <p className="hint">Пока нет бэкапов.</p>
@@ -518,6 +519,7 @@ export function SystemBackupTab() {
                 <tr>
                   <th scope="col">Имя</th>
                   <th scope="col">Создан</th>
+                  <th scope="col">Источник</th>
                   <th scope="col">Размер</th>
                   <th scope="col" title="Снимок /app/data (*.auth.tgz), не ClickHouse-таблицы">
                     Auth
@@ -529,12 +531,19 @@ export function SystemBackupTab() {
               <tbody>
                 {backups.map((b) => {
                   const rowBusy = running;
+                  const sourceLabel =
+                    b.source === 'manual'
+                      ? 'вручную'
+                      : b.source === 'schedule'
+                        ? 'по расписанию'
+                        : '—';
                   return (
                     <tr key={b.name}>
                       <td>
                         <code>{b.name}</code>
                       </td>
                       <td>{b.created_at ? fmtDate(b.created_at) : '—'}</td>
+                      <td>{sourceLabel}</td>
                       <td>{fmtBytes(b.size_bytes || 0)}</td>
                       <td>{b.has_auth ? 'да' : 'нет'}</td>
                       <td>{b.attached ? 'подключён' : '—'}</td>

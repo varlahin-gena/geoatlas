@@ -9,6 +9,7 @@ import (
 
 	"github.com/gorilla/mux"
 
+	usecasebackup "network_monitor/internal/usecase/backup"
 	usecaseretention "network_monitor/internal/usecase/retention"
 	"network_monitor/internal/usecase/system"
 )
@@ -179,7 +180,7 @@ func (h *SystemHandler) PostBackup(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "backup service unavailable"})
 		return
 	}
-	err := h.backupUC.ScheduleCreate(r.Context())
+	err := h.backupUC.ScheduleCreate(r.Context(), usecasebackup.SourceManual)
 	if err != nil {
 		writeDomainError(w, "backup schedule failed", err)
 		return

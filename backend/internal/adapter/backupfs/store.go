@@ -68,11 +68,16 @@ func (d *DirStore) List() ([]backup.Entry, error) {
 		if t, ok := parseBackupNameTime(name); ok {
 			created = t
 		}
+		src := ""
+		if b, err := os.ReadFile(filepath.Join(d.Root, name+".source")); err == nil {
+			src = backup.NormalizeSource(string(b))
+		}
 		out = append(out, backup.Entry{
 			Name:      name,
 			CreatedAt: created,
 			SizeBytes: size,
 			HasAuth:   auth,
+			Source:    src,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -91,6 +96,21 @@ func parseBackupNameTime(name string) (time.Time, bool) {
 		return time.Time{}, false
 	}
 	return t.UTC(), true
+}
+
+// WriteSource сохраняет маркер manual|schedule рядом с каталогом бэкапа.
+func (d *DirStore) WriteSource(name, source string) error {
+	if !d.DirReady() {
+		return fmt.Errorf("backup dir not ready")
+	}
+	if !nameRe.MatchString(name) {
+		return fmt.Errorf("invalid backup name")
+	}
+	src := backup.NormalizeSource(source)
+	if src == "" {
+		return fmt.Errorf("invalid backup source")
+	}
+	return os.WriteFile(filepath.Join(d.Root, name+".source"), []byte(src+"\n"), 0o600)
 }
 
 func (d *DirStore) WriteAuthTarball(name, dataDir string) error {
@@ -221,6 +241,7 @@ func (d *DirStore) Delete(name string) error {
 		return err
 	}
 	_ = os.Remove(filepath.Join(d.Root, name+".auth.tgz"))
+	_ = os.Remove(filepath.Join(d.Root, name+".source"))
 	return nil
 }
 
@@ -247,6 +268,7 @@ func (d *DirStore) Prune(keep int) error {
 		}
 		_ = os.RemoveAll(filepath.Join(d.Root, e.Name))
 		_ = os.Remove(filepath.Join(d.Root, e.Name+".auth.tgz"))
+		_ = os.Remove(filepath.Join(d.Root, e.Name+".source"))
 	}
 	return nil
 }

@@ -82,6 +82,8 @@ export interface BackupEntry {
   size_bytes?: number;
   has_auth?: boolean;
   attached?: boolean;
+  /** manual | schedule | отсутствует у старых бэкапов */
+  source?: 'manual' | 'schedule' | string;
 }
 
 export interface BackupSchedule {

@@ -1075,6 +1075,7 @@ paths:
       description: |
         Только administrator или Bearer.
         Каталог на томе `clickhouse-backups` + статус фоновой задачи.
+        У каждой записи `source`: `manual` | `schedule` (пусто у старых бэкапов без маркера).
       security:
         - bearerAuth: []
         - cookieAuth: []
