@@ -166,7 +166,12 @@
   pointer-events: auto;
 }
 
-.geo-wizard-banner.with-viz-hint {
+/* Leave room for the traffic legend in the top-right corner. */
+.viz-area.has-geo-empty-banner.has-map-legend .geo-wizard-banner {
+  right: 232px;
+}
+
+.viz-area.has-geo-empty-banner.has-viz-hint .viz-hint {
   top: 56px;
 }
 
@@ -187,7 +192,16 @@
     flex-direction: column;
     align-items: stretch;
   }
-  .geo-wizard-banner.with-viz-hint {
+  .viz-area.has-geo-empty-banner.has-map-legend .geo-wizard-banner {
+    right: 12px;
+  }
+  .viz-area.has-geo-empty-banner.has-map-legend .legend {
+    top: 76px;
+  }
+  .viz-area.has-geo-empty-banner.has-viz-hint .viz-hint {
     top: 72px;
+  }
+  .viz-area.has-geo-empty-banner.has-map-legend.has-viz-hint .legend {
+    top: 116px;
   }
 }

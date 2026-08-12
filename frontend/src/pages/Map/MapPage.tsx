@@ -253,6 +253,28 @@ export default function MapPage() {
       ? `Показано ${fmtNumber(arcCountInfo.shown)} из ${fmtNumber(arcCountInfo.total)} связей — увеличьте лимит дуг или сузьте период`
       : '';
 
+  const showGeoEmptyBanner =
+    isAdmin && !geoWizard.visible && geoWizard.geo != null && geoWizard.geo.count === 0;
+
+  const displayEmptyOverlay =
+    showGeoEmptyBanner && emptyOverlay?.title === 'Нет координат для карты'
+      ? null
+      : emptyOverlay;
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    const refreshGeo = () => void geoWizard.reloadStatus();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refreshGeo();
+    };
+    window.addEventListener('focus', refreshGeo);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('focus', refreshGeo);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [isAdmin, geoWizard.reloadStatus]);
+
   return (
     <div className={`app${sidebarCollapsed ? ' sidebar-collapsed' : ''}`} id="app">
       <a className="skip-link" href="#map-main">
@@ -325,14 +347,13 @@ export default function MapPage() {
           }}
         />
 
-        <div className={`viz-area${loading ? ' is-loading' : ''}`}>
+        <div
+          className={`viz-area${loading ? ' is-loading' : ''}${showGeoEmptyBanner ? ' has-geo-empty-banner' : ''}${truncHint ? ' has-viz-hint' : ''}${showLegend ? ' has-map-legend' : ''}`}
+        >
           <div ref={mapContainer} id="map-host" className="viz-host" />
 
-          {isAdmin &&
-          !geoWizard.visible &&
-          geoWizard.geo != null &&
-          geoWizard.geo.count === 0 ? (
-            <div className={`geo-wizard-banner${truncHint ? ' with-viz-hint' : ''}`} role="status">
+          {showGeoEmptyBanner ? (
+            <div className="geo-wizard-banner" role="status">
               <p>База GeoIP пуста — карта не покажет дуги без координат.</p>
               <button type="button" className="btn primary" onClick={geoWizard.open}>
                 Мастер GeoIP
@@ -342,7 +363,7 @@ export default function MapPage() {
 
           <MapVizOverlays
             truncHint={truncHint}
-            emptyOverlay={emptyOverlay}
+            emptyOverlay={displayEmptyOverlay}
             loading={loading}
             showLegend={showLegend}
             monoArcs={monoArcs}
