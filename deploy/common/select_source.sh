@@ -137,7 +137,7 @@ confirm_install_source() {
                 BRANCH="main"
                 NM_INSTALL_IS_TAG=0
                 NM_INSTALL_SOURCE="main"
-                _nm_src_log "WARNING: теги релизов не найдены — устанавливаем main."
+                _nm_src_log "ВНИМАНИЕ: теги релизов не найдены — устанавливаем main."
             fi
             ;;
         main|latest|dev|*)

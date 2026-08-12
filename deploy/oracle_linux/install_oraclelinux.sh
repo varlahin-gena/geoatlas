@@ -22,14 +22,14 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 
 log() { echo "[$(date +'%F %T')] $*"; }
 
-trap 'log "ERROR at line ${LINENO} (exit code $?). Check logs above / docker compose logs."' ERR
+trap 'log "ОШИБКА на строке ${LINENO} (код выхода $?). Смотрите лог выше / docker compose logs."' ERR
 
 _nm_banner_text() {
     local src_line
     if [[ -n "${NM_INSTALL_SOURCE:-}" ]]; then
         src_line="Источник: ${NM_INSTALL_SOURCE} → ${BRANCH}"
     else
-        src_line="Ref: ${BRANCH} (выбор источника — после Docker)"
+        src_line="Ссылка: ${BRANCH} (выбор источника — после Docker)"
     fi
     cat <<EOF
 Каталог: ${PROJECT_DIR}
@@ -45,7 +45,7 @@ ${src_line}
   6. HTTPS
   7. Порт веб-интерфейса
   8. Профиль производительности
-  9. Firewall
+  9. Файрвол
   10. Запуск стека
 EOF
 }
@@ -221,7 +221,7 @@ ${PROJECT_DIR}" \
 
 require_root() {
     if [[ $EUID -ne 0 ]]; then
-        echo "Please run as root."
+        echo "Запустите от имени root."
         exit 1
     fi
 }
@@ -229,25 +229,25 @@ require_root() {
 detect_os() {
     if [[ -f /etc/os-release ]]; then
         . /etc/os-release
-        log "Detected OS: ${PRETTY_NAME:-unknown}"
+        log "Обнаружена ОС: ${PRETTY_NAME:-unknown}"
 
         case "${ID:-}" in
             ol|rhel|rocky|almalinux|centos) ;;
-            *) log "Warning: this script is intended for Oracle Linux / RHEL-based systems (detected: ${ID:-unknown}).";;
+            *) log "Внимание: скрипт рассчитан на Oracle Linux / системы на базе RHEL (обнаружено: ${ID:-unknown}).";;
         esac
 
         OS_MAJOR="${VERSION_ID%%.*}"
-        log "Major version: ${OS_MAJOR}"
+        log "Мажорная версия: ${OS_MAJOR}"
     fi
 }
 
 remove_conflicting_packages() {
-    log "Removing podman / buildah / runc if present (to avoid conflicts with Docker)..."
+    log "Удаление podman / buildah / runc при наличии (чтобы избежать конфликтов с Docker)..."
     dnf remove -y podman buildah runc containerd container-tools 2>/dev/null || true
 }
 
 install_packages() {
-    log "Installing prerequisites..."
+    log "Установка зависимостей..."
     dnf install -y \
         ca-certificates \
         curl \
@@ -265,15 +265,15 @@ install_packages() {
 
 install_docker() {
     if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
-        log "Docker and compose plugin already installed."
+        log "Docker и плагин Compose уже установлены."
         systemctl enable --now docker || true
         return
     fi
 
-    log "Adding Docker CE repository..."
+    log "Добавление репозитория Docker CE..."
     dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
 
-    log "Installing Docker Engine and Compose plugin..."
+    log "Установка Docker Engine и плагина Compose..."
     dnf install -y \
         docker-ce \
         docker-ce-cli \
@@ -281,36 +281,36 @@ install_docker() {
         docker-buildx-plugin \
         docker-compose-plugin
 
-    log "Enabling Docker service..."
+    log "Включение службы Docker..."
     systemctl enable --now docker
 }
 
 configure_selinux() {
     if ! command -v getenforce >/dev/null 2>&1; then
-        log "SELinux tools not present, skipping."
+        log "Утилиты SELinux отсутствуют — пропуск."
         return
     fi
 
     local mode
     mode="$(getenforce 2>/dev/null || echo Disabled)"
-    log "SELinux mode: ${mode}"
+    log "Режим SELinux: ${mode}"
 
     if [[ "$DISABLE_SELINUX" == "1" ]]; then
-        log "Setting SELinux to permissive (DISABLE_SELINUX=1)..."
+        log "Перевод SELinux в permissive (DISABLE_SELINUX=1)..."
         setenforce 0 || true
         sed -i 's/^SELINUX=enforcing/SELINUX=permissive/' /etc/selinux/config || true
         return
     fi
 
     if [[ "$mode" == "Enforcing" ]]; then
-        log "SELinux is Enforcing. Setting bool 'container_manage_cgroup' to allow Docker..."
+        log "SELinux в режиме Enforcing. Включаем bool 'container_manage_cgroup' для Docker..."
         setsebool -P container_manage_cgroup on 2>/dev/null || true
     fi
 }
 
 configure_firewall() {
     if [[ "$ENABLE_FIREWALL" != "1" ]]; then
-        log "Firewalld configuration skipped."
+        log "Настройка firewalld пропущена."
         return
     fi
 
@@ -331,7 +331,7 @@ configure_firewall() {
         [[ -f "${PROJECT_DIR}/certs/fullchain.pem" && -f "${PROJECT_DIR}/certs/privkey.pem" ]] && https_enabled=1
     fi
 
-    log "Configuring firewalld (HTTP ${http_port}/tcp)..."
+    log "Настройка firewalld (HTTP ${http_port}/tcp)..."
     systemctl enable --now firewalld || true
 
     firewall-cmd --permanent --add-port="${http_port}/tcp" || true
@@ -346,7 +346,7 @@ configure_firewall() {
         firewall-cmd --permanent --add-port=514/tcp  || true
         firewall-cmd --permanent --add-port=514/udp  || true
     else
-        log "Port 514 skipped (syslog module disabled)."
+        log "Порт 514 пропущен (модуль syslog отключён)."
     fi
 
     firewall-cmd --reload || true
@@ -360,11 +360,11 @@ clone_or_update_repo() {
     mkdir -p /opt
 
     if [[ -d "$PROJECT_DIR/.git" ]]; then
-        log "Project already exists, updating..."
+        log "Проект уже существует, обновляем..."
         cd "$PROJECT_DIR"
 
         if ! git diff --quiet || ! git diff --cached --quiet; then
-            log "Local changes detected — stashing before update."
+            log "Обнаружены локальные изменения — делаем stash перед обновлением."
             git stash push -u -m "install-$(date +%s)" || true
         fi
 
@@ -377,7 +377,7 @@ clone_or_update_repo() {
             git pull --ff-only origin "$BRANCH"
         fi
     else
-        log "Cloning repository..."
+        log "Клонирование репозитория..."
         git clone -b "$BRANCH" "$REPO_URL" "$PROJECT_DIR"
         cd "$PROJECT_DIR"
     fi
@@ -446,7 +446,7 @@ find_module_helper() {
 source_module_helper() {
     local helper
     if ! helper="$(find_module_helper)"; then
-        log "Module selector not found — all modules enabled."
+        log "Селектор модулей не найден — включены все модули."
         NM_MODULE_AUTH=1
         NM_MODULE_API_AUTH=1
         NM_MODULE_SYSLOG=1
@@ -488,7 +488,7 @@ configure_http_port() {
     HTTP_PORT="${HTTP_PORT:-80}"
     export HTTP_PORT
     export NM_HTTP_PORT_CONFIRMED=1
-    log "select_http_port.sh not found — HTTP_PORT=${HTTP_PORT}."
+    log "select_http_port.sh не найден — HTTP_PORT=${HTTP_PORT}."
 }
 
 configure_https() {
@@ -504,13 +504,13 @@ configure_https() {
         apply_https "$PROJECT_DIR"
         return 0
     fi
-    log "select_https.sh not found — HTTPS step skipped."
+    log "select_https.sh не найден — шаг HTTPS пропущен."
 }
 
 configure_resources() {
     local detector="${PROJECT_DIR}/deploy/common/detect_resources.sh"
     if [[ ! -f "$detector" ]]; then
-        log "Resource detector not found ($detector), using default compose limits."
+        log "Детектор ресурсов не найден ($detector), используются лимиты compose по умолчанию."
         return
     fi
 
@@ -522,9 +522,9 @@ configure_resources() {
 prepare_project() {
     cd "$PROJECT_DIR"
 
-    [[ -f docker-compose.yml ]] || { log "docker-compose.yml not found after clone."; exit 1; }
+    [[ -f docker-compose.yml ]] || { log "docker-compose.yml не найден после клонирования."; exit 1; }
 
-    log "Setting executable permissions..."
+    log "Выставление прав на исполнение..."
     for f in start.sh stop.sh \
              scripts/tune-resources.sh \
              scripts/backup-clickhouse.sh \
@@ -547,16 +547,16 @@ prepare_project() {
         fi
     done
 
-    log "Selecting modules..."
+    log "Выбор модулей..."
     configure_modules
 
-    log "Selecting HTTPS for web UI..."
+    log "Выбор HTTPS для веб-интерфейса..."
     configure_https
 
-    log "Selecting HTTP port for web UI..."
+    log "Выбор HTTP-порта для веб-интерфейса..."
     configure_http_port
 
-    log "Detecting server resources and generating performance profile..."
+    log "Анализ ресурсов сервера и формирование профиля производительности..."
     configure_resources
 
     if source_module_helper; then
@@ -593,7 +593,7 @@ ask_firewall() {
         if [[ "$https_on" == "1" ]]; then
             ports="${ports}, ${HTTPS_PORT:-443}"
         fi
-        if nm_ui_yesno "Firewall" \
+        if nm_ui_yesno "Файрвол" \
             "Настроить правила firewalld (порты ${ports}, 514)?" 1; then
             ENABLE_FIREWALL=1
         else
@@ -608,11 +608,11 @@ start_stack() {
     cd "$PROJECT_DIR"
 
     if source_module_helper && ! confirm_start_stack "$PROJECT_DIR"; then
-        log "Stack start skipped by user."
+        log "Запуск стека пропущен пользователем."
         return 0
     fi
 
-    log "Delegating startup to ./start.sh ..."
+    log "Запуск через ./start.sh ..."
     ./start.sh
 }
 
@@ -663,7 +663,7 @@ main() {
     else
         ask_firewall
         if [[ "${ENABLE_FIREWALL}" == "1" ]]; then
-            _nm_run_gauge_fn "Firewall" "Настройка правил firewalld…" configure_firewall
+            _nm_run_gauge_fn "Файрвол" "Настройка правил firewalld…" configure_firewall
         else
             configure_firewall
         fi

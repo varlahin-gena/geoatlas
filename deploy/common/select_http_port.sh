@@ -94,7 +94,7 @@ confirm_http_port() {
 
     if [[ -n "${HTTP_PORT:-}" ]]; then
         if ! _nm_port_valid "$HTTP_PORT"; then
-            _nm_port_log "WARNING: HTTP_PORT=${HTTP_PORT} некорректен — используем 80."
+            _nm_port_log "ВНИМАНИЕ: HTTP_PORT=${HTTP_PORT} некорректен — используем 80."
             HTTP_PORT=80
         fi
         _nm_port_set_confirmed "$HTTP_PORT"
@@ -104,7 +104,7 @@ confirm_http_port() {
     if [[ -n "${NM_HTTP_PORT:-}" ]]; then
         HTTP_PORT="$NM_HTTP_PORT"
         if ! _nm_port_valid "$HTTP_PORT"; then
-            _nm_port_log "WARNING: NM_HTTP_PORT=${NM_HTTP_PORT} некорректен — используем 80."
+            _nm_port_log "ВНИМАНИЕ: NM_HTTP_PORT=${NM_HTTP_PORT} некорректен — используем 80."
             HTTP_PORT=80
         fi
         _nm_port_set_confirmed "$HTTP_PORT"
@@ -159,7 +159,7 @@ TLS уже: ${HTTPS_PORT:-443}"
             if _nm_port_valid "$choice"; then
                 HTTP_PORT="$choice"
             else
-                _nm_port_log "WARNING: неизвестный выбор «${choice}» — HTTP_PORT=80."
+                _nm_port_log "ВНИМАНИЕ: неизвестный выбор «${choice}» — HTTP_PORT=80."
                 HTTP_PORT=80
             fi
             ;;

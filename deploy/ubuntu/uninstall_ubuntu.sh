@@ -7,12 +7,12 @@ _COMMON="${_SCRIPT_DIR}/../common/uninstall.sh"
 nm_audit_firewall() {
     if command -v ufw >/dev/null 2>&1; then
         if ufw status 2>/dev/null | grep -qi "Status: active"; then
-            echo "  Firewall (UFW)   : active, правила HTTP/HTTPS/514/8080 будут проверены при удалении"
+            echo "  Файрвол (UFW)    : активен, правила HTTP/HTTPS/514/8080 будут проверены при удалении"
         else
-            echo "  Firewall (UFW)   : установлен, но не active"
+            echo "  Файрвол (UFW)    : установлен, но не активен"
         fi
     else
-        echo "  Firewall (UFW)   : не установлен"
+        echo "  Файрвол (UFW)    : не установлен"
     fi
 }
 
@@ -35,7 +35,7 @@ nm_remove_firewall_rules() {
     [[ -z "$https_port" ]] && https_port="443"
 
     if command -v ufw >/dev/null 2>&1; then
-        echo "[$(date +'%F %T')] Removing UFW rules..."
+        echo "[$(date +'%F %T')] Удаление правил UFW..."
         ufw delete allow "${http_port}/tcp" || true
         ufw delete allow "${https_port}/tcp" || true
         ufw delete allow 80/tcp   || true

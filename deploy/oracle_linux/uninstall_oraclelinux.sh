@@ -6,11 +6,11 @@ _COMMON="${_SCRIPT_DIR}/../common/uninstall.sh"
 
 nm_audit_firewall() {
     if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld 2>/dev/null; then
-        echo "  Firewall         : firewalld active, порты HTTP/HTTPS/514/8080 будут проверены при удалении"
+        echo "  Файрвол          : firewalld активен, порты HTTP/HTTPS/514/8080 будут проверены при удалении"
     elif command -v firewall-cmd >/dev/null 2>&1; then
-        echo "  Firewall         : firewalld установлен, но не active"
+        echo "  Файрвол          : firewalld установлен, но не активен"
     else
-        echo "  Firewall         : firewalld не найден"
+        echo "  Файрвол          : firewalld не найден"
     fi
 }
 
@@ -33,7 +33,7 @@ nm_remove_firewall_rules() {
     [[ -z "$https_port" ]] && https_port="443"
 
     if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld; then
-        echo "[$(date +'%F %T')] Removing firewalld rules..."
+        echo "[$(date +'%F %T')] Удаление правил firewalld..."
         firewall-cmd --permanent --remove-port="${http_port}/tcp" || true
         firewall-cmd --permanent --remove-port="${https_port}/tcp" || true
         firewall-cmd --permanent --remove-port=80/tcp   || true
@@ -44,7 +44,7 @@ nm_remove_firewall_rules() {
         firewall-cmd --permanent --remove-port=8080/tcp || true
         firewall-cmd --reload || true
     else
-        echo "[$(date +'%F %T')] firewalld not active or not installed — skipping rule removal."
+        echo "[$(date +'%F %T')] firewalld не активен или не установлен — пропуск удаления правил."
     fi
 }
 

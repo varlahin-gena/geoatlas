@@ -24,14 +24,14 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 
 log() { echo "[$(date +'%F %T')] $*"; }
 
-trap 'log "ERROR at line ${LINENO} (exit code $?). Check logs above / docker compose logs."' ERR
+trap 'log "ОШИБКА на строке ${LINENO} (код выхода $?). Смотрите лог выше / docker compose logs."' ERR
 
 _nm_banner_text() {
     local src_line
     if [[ -n "${NM_INSTALL_SOURCE:-}" ]]; then
         src_line="Источник: ${NM_INSTALL_SOURCE} → ${BRANCH}"
     else
-        src_line="Ref: ${BRANCH} (выбор источника — после Docker)"
+        src_line="Ссылка: ${BRANCH} (выбор источника — после Docker)"
     fi
     cat <<EOF
 Каталог: ${PROJECT_DIR}
@@ -46,7 +46,7 @@ ${src_line}
   5. HTTPS
   6. Порт веб-интерфейса
   7. Профиль производительности
-  8. Firewall
+  8. Файрвол
   9. Запуск стека
 EOF
 }
@@ -223,7 +223,7 @@ ${PROJECT_DIR}" \
 
 require_root() {
     if [[ $EUID -ne 0 ]]; then
-        echo "Please run as root."
+        echo "Запустите от имени root."
         exit 1
     fi
 }
@@ -232,17 +232,17 @@ detect_ubuntu() {
     if [[ -f /etc/os-release ]]; then
         . /etc/os-release
         if [[ "${ID:-}" != "ubuntu" ]]; then
-            log "Warning: this script is intended for Ubuntu (detected: ${ID:-unknown})."
+            log "Внимание: скрипт рассчитан на Ubuntu (обнаружено: ${ID:-unknown})."
         fi
-        log "Detected OS: ${PRETTY_NAME:-unknown}"
+        log "Обнаружена ОС: ${PRETTY_NAME:-unknown}"
     fi
 }
 
 install_packages() {
-    log "Updating package lists..."
+    log "Обновление списков пакетов..."
     apt-get update
 
-    log "Installing prerequisites..."
+    log "Установка зависимостей..."
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
         ca-certificates \
         curl \
@@ -258,18 +258,18 @@ install_packages() {
 
 install_docker() {
     if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
-        log "Docker and compose plugin already installed."
+        log "Docker и плагин Compose уже установлены."
         systemctl enable --now docker || true
         return
     fi
 
-    log "Adding Docker GPG key and repository..."
+    log "Добавление GPG-ключа и репозитория Docker..."
     install -m 0755 -d /etc/apt/keyrings
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
     chmod a+r /etc/apt/keyrings/docker.gpg
 
     if [[ ! -s /etc/apt/keyrings/docker.gpg ]]; then
-        log "Failed to download Docker GPG key."
+        log "Не удалось скачать GPG-ключ Docker."
         exit 1
     fi
 
@@ -285,7 +285,7 @@ install_docker() {
 
     apt-get update
 
-    log "Installing Docker Engine and Compose plugin..."
+    log "Установка Docker Engine и плагина Compose..."
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
         docker-ce \
         docker-ce-cli \
@@ -293,13 +293,13 @@ install_docker() {
         docker-buildx-plugin \
         docker-compose-plugin
 
-    log "Enabling Docker service..."
+    log "Включение службы Docker..."
     systemctl enable --now docker
 }
 
 configure_firewall() {
     if [[ "$ENABLE_UFW" != "1" ]]; then
-        log "UFW configuration skipped."
+        log "Настройка UFW пропущена."
         return
     fi
 
@@ -320,7 +320,7 @@ configure_firewall() {
         [[ -f "${PROJECT_DIR}/certs/fullchain.pem" && -f "${PROJECT_DIR}/certs/privkey.pem" ]] && https_enabled=1
     fi
 
-    log "Configuring UFW rules (HTTP ${http_port}/tcp)..."
+    log "Настройка правил UFW (HTTP ${http_port}/tcp)..."
     ufw allow "${http_port}/tcp" || true
     case "${https_enabled}" in
         1|true|TRUE|yes|YES|on|ON)
@@ -333,15 +333,15 @@ configure_firewall() {
         ufw allow 514/tcp || true
         ufw allow 514/udp || true
     else
-        log "Port 514 skipped (syslog module disabled)."
+        log "Порт 514 пропущен (модуль syslog отключён)."
     fi
 
     if ufw status | grep -qi "Status: inactive"; then
         if [[ "$UFW_AUTO_ENABLE" == "1" ]]; then
-            log "UFW is inactive — enabling non-interactively..."
-            ufw --force enable || log "Could not enable UFW automatically."
+            log "UFW неактивен — включаем без подтверждения..."
+            ufw --force enable || log "Не удалось включить UFW автоматически."
         else
-            log "UFW is inactive. Rules added but firewall NOT enabled (set UFW_AUTO_ENABLE=1 to enable)."
+            log "UFW неактивен. Правила добавлены, но файрвол НЕ включён (для включения задайте UFW_AUTO_ENABLE=1)."
         fi
     else
         ufw reload || true
@@ -356,11 +356,11 @@ clone_or_update_repo() {
     mkdir -p /opt
 
     if [[ -d "$PROJECT_DIR/.git" ]]; then
-        log "Project already exists, updating..."
+        log "Проект уже существует, обновляем..."
         cd "$PROJECT_DIR"
 
         if ! git diff --quiet || ! git diff --cached --quiet; then
-            log "Local changes detected — stashing before update."
+            log "Обнаружены локальные изменения — делаем stash перед обновлением."
             git stash push -u -m "install-$(date +%s)" || true
         fi
 
@@ -373,7 +373,7 @@ clone_or_update_repo() {
             git pull --ff-only origin "$BRANCH"
         fi
     else
-        log "Cloning repository..."
+        log "Клонирование репозитория..."
         git clone -b "$BRANCH" "$REPO_URL" "$PROJECT_DIR"
         cd "$PROJECT_DIR"
     fi
@@ -443,7 +443,7 @@ find_module_helper() {
 source_module_helper() {
     local helper
     if ! helper="$(find_module_helper)"; then
-        log "Module selector not found — all modules enabled."
+        log "Селектор модулей не найден — включены все модули."
         NM_MODULE_AUTH=1
         NM_MODULE_API_AUTH=1
         NM_MODULE_SYSLOG=1
@@ -485,7 +485,7 @@ configure_http_port() {
     HTTP_PORT="${HTTP_PORT:-80}"
     export HTTP_PORT
     export NM_HTTP_PORT_CONFIRMED=1
-    log "select_http_port.sh not found — HTTP_PORT=${HTTP_PORT}."
+    log "select_http_port.sh не найден — HTTP_PORT=${HTTP_PORT}."
 }
 
 configure_https() {
@@ -501,13 +501,13 @@ configure_https() {
         apply_https "$PROJECT_DIR"
         return 0
     fi
-    log "select_https.sh not found — HTTPS step skipped."
+    log "select_https.sh не найден — шаг HTTPS пропущен."
 }
 
 configure_resources() {
     local detector="${PROJECT_DIR}/deploy/common/detect_resources.sh"
     if [[ ! -f "$detector" ]]; then
-        log "Resource detector not found ($detector), using default compose limits."
+        log "Детектор ресурсов не найден ($detector), используются лимиты compose по умолчанию."
         return
     fi
 
@@ -519,9 +519,9 @@ configure_resources() {
 prepare_project() {
     cd "$PROJECT_DIR"
 
-    [[ -f docker-compose.yml ]] || { log "docker-compose.yml not found after clone."; exit 1; }
+    [[ -f docker-compose.yml ]] || { log "docker-compose.yml не найден после клонирования."; exit 1; }
 
-    log "Setting executable permissions..."
+    log "Выставление прав на исполнение..."
     for f in start.sh stop.sh \
              scripts/tune-resources.sh \
              scripts/backup-clickhouse.sh \
@@ -544,16 +544,16 @@ prepare_project() {
         fi
     done
 
-    log "Selecting modules..."
+    log "Выбор модулей..."
     configure_modules
 
-    log "Selecting HTTPS for web UI..."
+    log "Выбор HTTPS для веб-интерфейса..."
     configure_https
 
-    log "Selecting HTTP port for web UI..."
+    log "Выбор HTTP-порта для веб-интерфейса..."
     configure_http_port
 
-    log "Detecting server resources and generating performance profile..."
+    log "Анализ ресурсов сервера и формирование профиля производительности..."
     configure_resources
 
     # Синхронизируем модули в .env (и на случай NM_SKIP_PROFILE).
@@ -591,7 +591,7 @@ ask_firewall() {
         if [[ "$https_on" == "1" ]]; then
             ports="${ports}, ${HTTPS_PORT:-443}"
         fi
-        if nm_ui_yesno "Firewall" \
+        if nm_ui_yesno "Файрвол" \
             "Настроить правила UFW (порты ${ports}, 514)?" 1; then
             ENABLE_UFW=1
         else
@@ -606,11 +606,11 @@ start_stack() {
     cd "$PROJECT_DIR"
 
     if source_module_helper && ! confirm_start_stack "$PROJECT_DIR"; then
-        log "Stack start skipped by user."
+        log "Запуск стека пропущен пользователем."
         return 0
     fi
 
-    log "Delegating startup to ./start.sh ..."
+    log "Запуск через ./start.sh ..."
     ./start.sh
 }
 
@@ -659,7 +659,7 @@ main() {
     else
         ask_firewall
         if [[ "${ENABLE_UFW}" == "1" ]]; then
-            _nm_run_gauge_fn "Firewall" "Настройка правил UFW…" configure_firewall
+            _nm_run_gauge_fn "Файрвол" "Настройка правил UFW…" configure_firewall
         else
             configure_firewall
         fi

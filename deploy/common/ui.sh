@@ -53,14 +53,14 @@ _nm_ui_pick_backend() {
                 echo "whiptail"
                 return
             fi
-            _nm_ui_log "NM_UI=whiptail недоступен — fallback."
+            _nm_ui_log "NM_UI=whiptail недоступен — запасной вариант."
             ;;
         dialog)
             if command -v dialog >/dev/null 2>&1; then
                 echo "dialog"
                 return
             fi
-            _nm_ui_log "NM_UI=dialog недоступен — fallback."
+            _nm_ui_log "NM_UI=dialog недоступен — запасной вариант."
             ;;
         text)
             echo "text"
@@ -72,7 +72,7 @@ _nm_ui_pick_backend() {
         "")
             ;;
         *)
-            _nm_ui_log "WARNING: неизвестный NM_UI=${NM_UI} — автовыбор."
+            _nm_ui_log "ВНИМАНИЕ: неизвестный NM_UI=${NM_UI} — автовыбор."
             ;;
     esac
 
@@ -481,7 +481,7 @@ nm_ui_run_with_gauge() {
         rc=$?
         set -e
         if (( rc != 0 )); then
-            _nm_ui_log "ERROR: ${title} (exit ${rc})"
+            _nm_ui_log "ОШИБКА: ${title} (код выхода ${rc})"
             tail -n 40 "$logf" >&2 || true
             if declare -F nm_ui_msgbox >/dev/null 2>&1; then
                 nm_ui_msgbox "Ошибка: ${title}" \
@@ -534,7 +534,7 @@ $(tail -n 25 "$logf" 2>/dev/null || true)" || true
             "Команда завершилась с кодом ${rc}.
 
 ${tail_txt}" || true
-        _nm_ui_log "ERROR: ${title} (exit ${rc}) — см. лог ${logf}"
+        _nm_ui_log "ОШИБКА: ${title} (код выхода ${rc}) — см. лог ${logf}"
         # оставляем лог для отладки при ошибке
         return "$rc"
     fi

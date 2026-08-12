@@ -11,34 +11,34 @@ REMOVE_DOCKER_VOLUMES="${REMOVE_DOCKER_VOLUMES:-0}"
 
 log() { echo "[$(date +'%F %T')] $*"; }
 
-trap 'log "ERROR at line ${LINENO} (exit code $?)."' ERR
+trap 'log "ОШИБКА на строке ${LINENO} (код выхода $?)."' ERR
 
 require_docker() {
     if ! command -v docker >/dev/null 2>&1; then
-        echo "Docker not found."
+        echo "Docker не найден."
         exit 1
     fi
     if ! docker compose version >/dev/null 2>&1; then
-        echo "docker compose plugin not found."
+        echo "Плагин docker compose не найден."
         exit 1
     fi
 }
 
 stop_stack() {
-    log "Stopping Docker Compose stack..."
+    log "Остановка стека Docker Compose..."
     if [[ "$REMOVE_DOCKER_VOLUMES" == "1" ]]; then
-        log "WARNING: REMOVE_DOCKER_VOLUMES=1 — ClickHouse data will be DELETED!"
+        log "ВНИМАНИЕ: REMOVE_DOCKER_VOLUMES=1 — данные ClickHouse будут УДАЛЕНЫ!"
         nm_compose "$SCRIPT_DIR" down -v --remove-orphans
     else
         nm_compose "$SCRIPT_DIR" down --remove-orphans
-        log "Docker volumes preserved (set REMOVE_DOCKER_VOLUMES=1 to delete)."
+        log "Docker volumes сохранены (удалить: REMOVE_DOCKER_VOLUMES=1)."
     fi
 }
 
 main() {
     require_docker
     stop_stack
-    log "Stack stopped."
+    log "Стек остановлен."
 }
 
 main "$@"

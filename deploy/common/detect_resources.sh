@@ -125,7 +125,7 @@ profile_params() {
             SYSLOG_MEM_MB=4096; SYSLOG_CPUS=4
             ;;
         *)
-            _nm_log "Unknown profile: $profile"
+            _nm_log "Неизвестный профиль: $profile"
             return 1
             ;;
     esac
@@ -244,7 +244,7 @@ confirm_profile() {
 
     if [[ -n "${NM_FORCE_PROFILE:-}" ]]; then
         if ! is_valid_profile "${NM_FORCE_PROFILE}"; then
-            _nm_log "ERROR: NM_FORCE_PROFILE='${NM_FORCE_PROFILE}' — неизвестный профиль."
+            _nm_log "ОШИБКА: NM_FORCE_PROFILE='${NM_FORCE_PROFILE}' — неизвестный профиль."
             return 1
         fi
         NM_SELECTED_PROFILE="${NM_FORCE_PROFILE}"
@@ -594,15 +594,15 @@ warn_if_constraints() {
     local ram_mb="$1" disk_gb="$2" cgroup="$3"
 
     if (( disk_gb > 0 && disk_gb < 20 )); then
-        _nm_log "WARNING: мало свободного места на диске (${disk_gb} GiB). Рекомендуется ≥20 GiB для ClickHouse и буферов syslog-ng."
+        _nm_log "ВНИМАНИЕ: мало свободного места на диске (${disk_gb} GiB). Рекомендуется ≥20 GiB для ClickHouse и буферов syslog-ng."
     fi
 
     if (( ram_mb > 0 && ram_mb < 3072 )); then
-        _nm_log "WARNING: мало RAM (${ram_mb} MiB). Система будет работать, но при высокой нагрузке возможны OOM и отставание ingest."
+        _nm_log "ВНИМАНИЕ: мало RAM (${ram_mb} MiB). Система будет работать, но при высокой нагрузке возможны OOM и отставание ingest."
     fi
 
     if [[ "$cgroup" == "unknown" ]]; then
-        _nm_log "WARNING: не удалось определить версию cgroup — stats-collector может не видеть метрики контейнеров."
+        _nm_log "ВНИМАНИЕ: не удалось определить версию cgroup — stats-collector может не видеть метрики контейнеров."
     fi
 }
 
@@ -638,7 +638,7 @@ apply_resource_profile() {
     fi
 
     if ! profile_params "$profile"; then
-        _nm_log "ERROR: некорректный профиль '$profile', откат на $recommended"
+        _nm_log "ОШИБКА: некорректный профиль '$profile', откат на $recommended"
         profile="$recommended"
         profile_params "$profile"
     fi

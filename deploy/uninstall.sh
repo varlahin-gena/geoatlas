@@ -23,8 +23,8 @@ case "$OS_ID" in
         exec "${_SCRIPT_DIR}/oracle_linux/uninstall_oraclelinux.sh" "$@"
         ;;
     *)
-        echo "[$(date +'%F %T')] ERROR: unsupported OS: ${OS_ID}"
-        echo "Use explicitly:"
+        echo "[$(date +'%F %T')] ОШИБКА: неподдерживаемая ОС: ${OS_ID}"
+        echo "Запустите явно:"
         echo "  sudo bash ${_SCRIPT_DIR}/ubuntu/uninstall_ubuntu.sh"
         echo "  sudo bash ${_SCRIPT_DIR}/oracle_linux/uninstall_oraclelinux.sh"
         exit 1

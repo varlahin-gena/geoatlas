@@ -56,15 +56,15 @@ fi
 
 log() { echo "[$(date +'%F %T')] $*"; }
 
-trap 'log "ERROR at line ${LINENO} (exit code $?)."' ERR
+trap 'log "ОШИБКА на строке ${LINENO} (код выхода $?)."' ERR
 
 require_docker() {
     if ! command -v docker >/dev/null 2>&1; then
-        echo "Docker not found. Please install Docker first."
+        echo "Docker не найден. Сначала установите Docker."
         exit 1
     fi
     if ! docker compose version >/dev/null 2>&1; then
-        echo "docker compose plugin not found. Install docker-compose-plugin."
+        echo "Плагин docker compose не найден. Установите docker-compose-plugin."
         exit 1
     fi
 }
@@ -91,15 +91,15 @@ ensure_compose_profiles() {
         # docker compose подхватит значение из .env автоматически
         local profiles
         profiles="$(grep -E '^[[:space:]]*COMPOSE_PROFILES=' "$env_file" | tail -n1 | cut -d= -f2- || true)"
-        log "Compose profiles: ${profiles:-"(none — core only)"}"
+        log "Compose-профили: ${profiles:-"(нет — только ядро)"}"
         return 0
     fi
     if [[ -n "${COMPOSE_PROFILES:-}" ]]; then
-        log "Compose profiles (env): ${COMPOSE_PROFILES}"
+        log "Compose-профили (env): ${COMPOSE_PROFILES}"
         return 0
     fi
     export COMPOSE_PROFILES="${COMPOSE_PROFILES:-syslog,stats}"
-    log "Compose profiles (default): ${COMPOSE_PROFILES}"
+    log "Compose-профили (по умолчанию): ${COMPOSE_PROFILES}"
 }
 
 # Генерирует API_AUTH_TOKEN, SESSION_SECRET и seed-пароли в .env, если ещё нет.
@@ -150,7 +150,7 @@ ensure_api_auth_token() {
             echo "AUTH_OPERATOR_PASSWORD=operator"
         fi
     } >>"$env_file"
-    log "Generated auth secrets in .env (API_AUTH_TOKEN / SESSION_SECRET / default users if missing)"
+    log "Сгенерированы секреты авторизации в .env (API_AUTH_TOKEN / SESSION_SECRET / пользователи по умолчанию, если отсутствовали)"
 }
 
 # Не даём поднять стек без секретов / с legacy-плейсхолдерами.
@@ -182,26 +182,26 @@ check_auth_secrets() {
     [[ -n "${AUTH_OPERATOR_PASSWORD:-}" ]] && operator_pass="$AUTH_OPERATOR_PASSWORD"
 
     if [[ "$allow" == "1" || "$allow" == "true" || "$allow" == "yes" ]]; then
-        log "WARNING: NM_ALLOW_INSECURE=$allow — insecure placeholders allowed (dev only)"
+        log "ВНИМАНИЕ: NM_ALLOW_INSECURE=$allow — небезопасные плейсхолдеры разрешены (только для разработки)"
         return 0
     fi
 
     if [[ -z "$token" || -z "$secret" ]]; then
-        log "ERROR: API_AUTH_TOKEN and SESSION_SECRET are required in .env."
-        log "  Run via ./start.sh (generates secrets) or set them manually."
-        log "  For local only: NM_ALLOW_INSECURE=1 ./start.sh"
+        log "ОШИБКА: в .env обязательны API_AUTH_TOKEN и SESSION_SECRET."
+        log "  Запустите через ./start.sh (сгенерирует секреты) или задайте вручную."
+        log "  Только для локальной разработки: NM_ALLOW_INSECURE=1 ./start.sh"
         exit 1
     fi
 
     if [[ "$token" == "dev-insecure-change-me" || "$secret" == "dev-session-secret-change-me" ]]; then
-        log "ERROR: .env still has legacy insecure placeholder secrets."
-        log "  Run via ./start.sh (generates token/secret) or set unique API_AUTH_TOKEN / SESSION_SECRET."
-        log "  For local only: NM_ALLOW_INSECURE=1 ./start.sh"
+        log "ОШИБКА: в .env всё ещё стоят небезопасные плейсхолдеры секретов."
+        log "  Запустите через ./start.sh (сгенерирует token/secret) или задайте уникальные API_AUTH_TOKEN / SESSION_SECRET."
+        log "  Только для локальной разработки: NM_ALLOW_INSECURE=1 ./start.sh"
         exit 1
     fi
 
     if [[ "$admin_pass" == "admin" || "$operator_pass" == "operator" ]]; then
-        log "WARNING: default seed passwords in .env (admin/operator) — change after first login"
+        log "ВНИМАНИЕ: в .env пароли по умолчанию (admin/operator) — смените после первого входа"
     fi
 }
 
@@ -215,7 +215,7 @@ wait_for_health() {
         curl_opts+=(-k)
     fi
 
-    log "Waiting for health endpoint: $url (timeout ${timeout}s)..."
+    log "Ожидание health endpoint: $url (таймаут ${timeout}с)..."
     while (( elapsed < timeout )); do
         if curl "${curl_opts[@]}" "$url" >/dev/null 2>&1; then
             log "Health OK."
@@ -225,14 +225,14 @@ wait_for_health() {
         elapsed=$((elapsed + 2))
     done
 
-    log "Health check timed out after ${timeout}s."
+    log "Проверка health не успела за ${timeout}с."
     return 1
 }
 
 main() {
     require_docker
 
-    [[ -f docker-compose.yml ]] || { log "docker-compose.yml not found in $SCRIPT_DIR"; exit 1; }
+    [[ -f docker-compose.yml ]] || { log "docker-compose.yml не найден в $SCRIPT_DIR"; exit 1; }
 
     prepare_mounts
     ensure_api_auth_token
@@ -240,12 +240,12 @@ main() {
     ensure_compose_profiles
 
     if (( HTTPS_ON == 1 )); then
-        log "HTTPS: enabled (certs present; host port ${HTTPS_PORT})"
+        log "HTTPS: включён (сертификаты на месте; порт хоста ${HTTPS_PORT})"
     else
-        log "HTTPS: off (put PEM in ./certs — see certs/README.md)"
+        log "HTTPS: выкл. (положите PEM в ./certs — см. certs/README.md)"
     fi
 
-    log "Starting Docker Compose stack..."
+    log "Запуск стека Docker Compose..."
     if [[ "$DO_BUILD" == "1" ]]; then
         nm_compose "$SCRIPT_DIR" up -d --build
     else
@@ -253,9 +253,9 @@ main() {
     fi
 
     if ! wait_for_health "$HEALTH_URL" "$HEALTH_TIMEOUT"; then
-        log "Backend did not become healthy in time."
+        log "Backend не стал healthy вовремя."
         nm_compose "$SCRIPT_DIR" ps || true
-        log "----- backend logs (tail) -----"
+        log "----- лог backend (хвост) -----"
         nm_compose "$SCRIPT_DIR" logs --tail=50 backend || true
         exit 1
     fi
@@ -273,31 +273,31 @@ main() {
                 | sed -E 's/.*"([^"]+)"[[:space:]]*$/\1/' || true)"
         fi
         if [[ -n "$profile" ]]; then
-            log "Install profile: ${profile} (see install-profile.json)"
+            log "Профиль установки: ${profile} (см. install-profile.json)"
         fi
     fi
 
-    log "Stack is up."
+    log "Стек запущен."
     if (( HTTPS_ON == 1 )); then
         if [[ "${HTTPS_PORT}" == "443" ]]; then
-            log "Web interface: https://${IP_ADDR}"
-            log "Login page   : https://${IP_ADDR}/login.html"
-            log "Health check : https://${IP_ADDR}/api/health"
+            log "Веб-интерфейс: https://${IP_ADDR}"
+            log "Страница входа: https://${IP_ADDR}/login.html"
+            log "Health check  : https://${IP_ADDR}/api/health"
         else
-            log "Web interface: https://${IP_ADDR}:${HTTPS_PORT}"
-            log "Login page   : https://${IP_ADDR}:${HTTPS_PORT}/login.html"
-            log "Health check : https://${IP_ADDR}:${HTTPS_PORT}/api/health"
+            log "Веб-интерфейс: https://${IP_ADDR}:${HTTPS_PORT}"
+            log "Страница входа: https://${IP_ADDR}:${HTTPS_PORT}/login.html"
+            log "Health check  : https://${IP_ADDR}:${HTTPS_PORT}/api/health"
         fi
     elif [[ "${HTTP_PORT}" == "80" ]]; then
-        log "Web interface: http://${IP_ADDR}"
-        log "Login page   : http://${IP_ADDR}/login.html"
-        log "Health check : http://${IP_ADDR}/api/health"
+        log "Веб-интерфейс: http://${IP_ADDR}"
+        log "Страница входа: http://${IP_ADDR}/login.html"
+        log "Health check  : http://${IP_ADDR}/api/health"
     else
-        log "Web interface: http://${IP_ADDR}:${HTTP_PORT}"
-        log "Login page   : http://${IP_ADDR}:${HTTP_PORT}/login.html"
-        log "Health check : http://${IP_ADDR}:${HTTP_PORT}/api/health"
+        log "Веб-интерфейс: http://${IP_ADDR}:${HTTP_PORT}"
+        log "Страница входа: http://${IP_ADDR}:${HTTP_PORT}/login.html"
+        log "Health check  : http://${IP_ADDR}:${HTTP_PORT}/api/health"
     fi
-    log "Default login: admin / admin (смена пароля при первом входе)"
+    log "Логин по умолчанию: admin / admin (смена пароля при первом входе)"
 }
 
 main "$@"

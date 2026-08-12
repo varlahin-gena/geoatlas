@@ -65,14 +65,14 @@ _nm_run_gauge_fn() {
 }
 
 _nm_trap_err() {
-    _nm_log "ERROR at ${BASH_SOURCE[1]:-?}:${BASH_LINENO[0]:-${LINENO}} (exit code $?)."
+    _nm_log "ОШИБКА в ${BASH_SOURCE[1]:-?}:${BASH_LINENO[0]:-${LINENO}} (код выхода $?)."
 }
 
 trap '_nm_trap_err' ERR
 
 _nm_require_root() {
     if [[ $EUID -ne 0 ]]; then
-        echo "Please run as root."
+        echo "Запустите от имени root."
         exit 1
     fi
 }
@@ -131,7 +131,7 @@ _nm_show_help() {
   --keep-files        сохранить каталог проекта
   --no-firewall       не трогать правила firewall (HTTP/HTTPS/514)
 
-Presets:
+Пресеты:
   stop   — остановить docker compose, всё остальное сохранить
   clean  — stop + удалить файлы проекта + firewall (volumes сохраняются)
   purge  — clean + volumes (CH/бэкапы/учётки) + локальные образы
@@ -228,7 +228,7 @@ _nm_apply_preset() {
             REMOVE_FIREWALL_RULES=1
             ;;
         *)
-            _nm_log "ERROR: неизвестный preset «${preset}». Допустимо: stop, clean, purge."
+            _nm_log "ОШИБКА: неизвестный preset «${preset}». Допустимо: stop, clean, purge."
             exit 1
             ;;
     esac
@@ -339,7 +339,7 @@ _nm_interactive_wizard() {
                 exit 0
                 ;;
             *)
-                echo "  Не понял «${choice}». Enter = [1], или 2/3/4/q." >&2
+                echo "  Не понял «${choice}». Enter = [1], либо 2/3/4/q." >&2
                 ;;
         esac
     done
@@ -426,7 +426,7 @@ _nm_audit_compose() {
     if [[ -n "$ps_out" ]]; then
         running="$(echo "$ps_out" | tail -n +2 | grep -ci 'up' 2>/dev/null || true)"
         total="$(echo "$ps_out" | tail -n +2 | grep -c . 2>/dev/null || true)"
-        echo "  Контейнеры       : ${running}/${total} running"
+        echo "  Контейнеры       : ${running}/${total} запущено"
         # sed вместо while read — иначе EOF от read (exit 1) ломает set -e
         echo "$ps_out" | tail -n +2 | sed '/./s/^/                     /'
     else
@@ -454,9 +454,9 @@ _nm_audit_volumes() {
         mount="$(docker volume inspect "$vol" --format '{{.Mountpoint}}' 2>/dev/null || true)"
         if [[ -n "$mount" && -d "$mount" ]]; then
             du_size="$(du -sb "$mount" 2>/dev/null | cut -f1 || echo 0)"
-            echo "  Volume           : ${vol} ($(_nm_format_bytes "${du_size:-0}"))"
+            echo "  Том              : ${vol} ($(_nm_format_bytes "${du_size:-0}"))"
         else
-            echo "  Volume           : ${vol}"
+            echo "  Том              : ${vol}"
         fi
     done
 
@@ -593,18 +593,18 @@ _nm_step() {
 _nm_stop_stack() {
     if [[ -d "$NM_PROJECT_DIR" ]] && command -v docker >/dev/null 2>&1 && [[ -f "${NM_PROJECT_DIR}/docker-compose.yml" ]]; then
         cd "$NM_PROJECT_DIR"
-        _nm_log "Stopping Docker Compose stack..."
+        _nm_log "Остановка стека Docker Compose..."
 
         local down_args=(down --remove-orphans)
         if [[ "$REMOVE_DOCKER_VOLUMES" == "1" ]]; then
-            _nm_log "WARNING: REMOVE_DOCKER_VOLUMES=1 — ClickHouse data, backups and auth-users will be DELETED!"
+            _nm_log "ВНИМАНИЕ: REMOVE_DOCKER_VOLUMES=1 — данные ClickHouse, бэкапы и auth-users будут УДАЛЕНЫ!"
             down_args+=(-v)
         else
-            _nm_log "Docker volumes preserved (use --volumes or preset purge to delete)."
+            _nm_log "Docker volumes сохранены (удалить: --volumes или preset purge)."
         fi
 
         if [[ "$REMOVE_IMAGES" == "1" ]]; then
-            _nm_log "Locally built images will be removed (--rmi local)."
+            _nm_log "Локально собранные образы будут удалены (--rmi local)."
             down_args+=(--rmi local)
         fi
 
@@ -622,13 +622,13 @@ _nm_stop_stack() {
         fi
         cd /
     else
-        _nm_log "Project directory, compose file or docker not found — skipping compose down."
+        _nm_log "Каталог проекта, compose-файл или docker не найдены — пропуск compose down."
     fi
 }
 
 _nm_remove_project_files() {
     if [[ "$REMOVE_PROJECT_FILES" != "1" ]]; then
-        _nm_log "Project directory preserved (REMOVE_PROJECT_FILES=0 / --keep-files)."
+        _nm_log "Каталог проекта сохранён (REMOVE_PROJECT_FILES=0 / --keep-files)."
         return
     fi
 
@@ -643,17 +643,17 @@ _nm_remove_project_files() {
         if [[ "$NM_DRY_RUN" == "1" ]]; then
             _nm_log "DRY-RUN: rm -rf ${NM_PROJECT_DIR}"
         else
-            _nm_log "Removing project directory: ${NM_PROJECT_DIR}"
+            _nm_log "Удаление каталога проекта: ${NM_PROJECT_DIR}"
             rm -rf "$NM_PROJECT_DIR"
         fi
     else
-        _nm_log "Project directory already removed."
+        _nm_log "Каталог проекта уже удалён."
     fi
 }
 
 _nm_remove_firewall() {
     if [[ "$REMOVE_FIREWALL_RULES" != "1" ]]; then
-        _nm_log "Firewall rule removal skipped."
+        _nm_log "Удаление правил файрвола пропущено."
         return
     fi
 
@@ -665,18 +665,18 @@ _nm_remove_firewall() {
     if declare -F nm_remove_firewall_rules >/dev/null; then
         nm_remove_firewall_rules
     else
-        _nm_log "WARNING: nm_remove_firewall_rules не определён — пропуск firewall."
+        _nm_log "ВНИМАНИЕ: nm_remove_firewall_rules не определён — пропуск файрвола."
     fi
 }
 
 _nm_print_summary() {
-    _nm_log "Uninstallation completed."
-    _nm_log "Docker itself was not removed."
+    _nm_log "Удаление завершено."
+    _nm_log "Docker Engine на хосте не удалялся."
     if [[ "$REMOVE_IMAGES" != "1" ]]; then
-        _nm_log "Note: locally built images kept (use --images or preset purge to remove)."
+        _nm_log "Примечание: локально собранные образы сохранены (удалить: --images или preset purge)."
     fi
     if [[ "$REMOVE_DOCKER_VOLUMES" != "1" && "$REMOVE_PROJECT_FILES" == "1" ]]; then
-        _nm_log "Note: Docker volumes preserved — ClickHouse, бэкапы и auth-users можно восстановить при повторной установке,"
+        _nm_log "Примечание: Docker volumes сохранены — ClickHouse, бэкапы и auth-users можно восстановить при повторной установке,"
         _nm_log "      если тома не были удалены вручную."
     fi
     _nm_ensure_ui || true
@@ -731,8 +731,8 @@ nm_run_uninstall() {
     _nm_step 1 "Остановка Docker Compose стека"
     _nm_run_gauge_fn "Остановка стека" "docker compose down…" _nm_stop_stack
 
-    _nm_step 2 "Удаление правил firewall"
-    _nm_run_gauge_fn "Firewall" "Удаление правил firewall…" _nm_remove_firewall
+    _nm_step 2 "Удаление правил файрвола"
+    _nm_run_gauge_fn "Файрвол" "Удаление правил файрвола…" _nm_remove_firewall
 
     _nm_step 3 "Удаление файлов проекта"
     _nm_run_gauge_fn "Файлы проекта" "Удаление ${NM_PROJECT_DIR}…" _nm_remove_project_files

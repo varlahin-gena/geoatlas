@@ -124,7 +124,7 @@ _nm_mod_parse_list() {
                 ;;
             core|none) ;;
             *)
-                _nm_mod_log "WARNING: неизвестный модуль «${part}» в NM_MODULES — пропущен."
+                _nm_mod_log "ВНИМАНИЕ: неизвестный модуль «${part}» в NM_MODULES — пропущен."
                 ;;
         esac
     done
@@ -184,7 +184,7 @@ print_modules_summary() {
     echo "  syslog-ng         : ${s}"
     echo "  stats-collector   : ${p}"
     echo "  Репутация IP      : ${r}"
-    echo "  Compose profiles  : ${profiles}"
+    echo "  Compose-профили   : ${profiles}"
     echo "══════════════════════════════════════════════════════════"
     echo ""
     _nm_mod_ensure_ui || true
@@ -196,7 +196,7 @@ API Bearer-токен: ${t}
 syslog-ng: ${s}
 stats-collector: ${p}
 Репутация IP: ${r}
-Compose profiles: ${profiles}" || true
+Compose-профили: ${profiles}" || true
     fi
 }
 

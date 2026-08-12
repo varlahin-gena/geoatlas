@@ -139,7 +139,7 @@ _nm_https_install_certs() {
         return 1
     fi
     if [[ ! -f "$cert_src" || ! -f "$key_src" ]]; then
-        _nm_https_log "WARNING: файлы сертификата не найдены: ${cert_src} / ${key_src}"
+        _nm_https_log "ВНИМАНИЕ: файлы сертификата не найдены: ${cert_src} / ${key_src}"
         return 1
     fi
 
@@ -230,7 +230,7 @@ _nm_https_prompt_certs_when_enabled() {
 
     if [[ ! -t 0 ]] && [[ "${NM_UI_BACKEND:-}" == "text" || -z "${NM_UI_BACKEND:-}" ]]; then
         # Нет TTY — оставляем без файлов; start.sh/nginx предупредит.
-        _nm_https_log "WARNING: HTTPS включён, но PEM нет. Положите certs/fullchain.pem и privkey.pem до старта."
+        _nm_https_log "ВНИМАНИЕ: HTTPS включён, но PEM нет. Положите certs/fullchain.pem и privkey.pem до старта."
         return 0
     fi
 
@@ -257,7 +257,7 @@ _nm_https_prompt_certs_when_enabled() {
                     nm_ui_msgbox "HTTPS" \
                         "Не удалось скопировать сертификаты. Положите PEM в ${project_dir}/certs/ до запуска стека." || true
                 fi
-                _nm_https_log "WARNING: копирование не удалось — ожидаются файлы в certs/"
+                _nm_https_log "ВНИМАНИЕ: копирование не удалось — ожидаются файлы в certs/"
             fi
             ;;
         dir)
@@ -274,7 +274,7 @@ _nm_https_prompt_certs_when_enabled() {
                 NM_CERTS_DIR="$d"
                 export NM_CERTS_DIR
                 if ! _nm_https_install_certs "$project_dir"; then
-                    _nm_https_log "WARNING: в каталоге нет ожидаемых PEM"
+                    _nm_https_log "ВНИМАНИЕ: в каталоге нет ожидаемых PEM"
                 fi
             fi
             ;;

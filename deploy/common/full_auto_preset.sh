@@ -56,7 +56,7 @@ nm_apply_full_auto_preset() {
     export NM_FIREWALL_FROM_ENV=1
 
     # HTTPS: не трогаем HTTPS_ENABLED — select_https спросит первым (при TTY), затем HTTP-порт.
-    _nm_fa_log "режим «Сделай мне хорошо»: release=${NM_INSTALL_SOURCE}, HTTP_PORT=${HTTP_PORT}, auto profile, all modules, firewall OFF, start stack"
+    _nm_fa_log "режим «Сделай мне хорошо»: release=${NM_INSTALL_SOURCE}, HTTP_PORT=${HTTP_PORT}, автопрофиль, все модули, файрвол ВЫКЛ, запуск стека"
     _nm_fa_log "Сначала HTTPS (select_https), затем HTTP-порт — если есть TTY и HTTPS_ENABLED / NM_HTTPS_ENABLED ещё не заданы"
 }
 
@@ -129,10 +129,10 @@ _nm_fa_open_ports_if_fw_active() {
     local https_port="${3:-}"
 
     if _nm_fa_ufw_active; then
-        _nm_fa_log "UFW всё ещё active — открываем ${port}/tcp (fallback)"
+        _nm_fa_log "UFW всё ещё активен — открываем ${port}/tcp (запасной вариант)"
         ufw allow "${port}/tcp" >/dev/null 2>&1 || true
         if [[ -n "$https_port" ]]; then
-            _nm_fa_log "UFW: HTTPS ${https_port}/tcp (fallback)"
+            _nm_fa_log "UFW: HTTPS ${https_port}/tcp (запасной вариант)"
             ufw allow "${https_port}/tcp" >/dev/null 2>&1 || true
         fi
         if [[ "$open_syslog" == "1" ]]; then
@@ -143,10 +143,10 @@ _nm_fa_open_ports_if_fw_active() {
     fi
 
     if _nm_fa_firewalld_active; then
-        _nm_fa_log "firewalld всё ещё active — открываем ${port}/tcp (fallback)"
+        _nm_fa_log "firewalld всё ещё активен — открываем ${port}/tcp (запасной вариант)"
         firewall-cmd --permanent --add-port="${port}/tcp" >/dev/null 2>&1 || true
         if [[ -n "$https_port" ]]; then
-            _nm_fa_log "firewalld: HTTPS ${https_port}/tcp (fallback)"
+            _nm_fa_log "firewalld: HTTPS ${https_port}/tcp (запасной вариант)"
             firewall-cmd --permanent --add-port="${https_port}/tcp" >/dev/null 2>&1 || true
         fi
         if [[ "$open_syslog" == "1" ]]; then
@@ -164,13 +164,13 @@ nm_disable_host_firewall() {
     local port https_port=""
     port="$(_nm_fa_http_port "$project_dir")"
 
-    _nm_fa_log "выключаем host firewall…"
+    _nm_fa_log "выключаем файрвол хоста…"
 
     if command -v ufw >/dev/null 2>&1; then
         if ufw --force disable >/dev/null 2>&1; then
-            _nm_fa_log "UFW: disabled"
+            _nm_fa_log "UFW: отключён"
         else
-            _nm_fa_log "UFW: disable не удался (продолжаем)"
+            _nm_fa_log "UFW: отключение не удалось (продолжаем)"
         fi
     fi
 
@@ -178,9 +178,9 @@ nm_disable_host_firewall() {
         if systemctl list-unit-files firewalld.service >/dev/null 2>&1 \
             || systemctl status firewalld >/dev/null 2>&1; then
             if systemctl disable --now firewalld >/dev/null 2>&1; then
-                _nm_fa_log "firewalld: disabled and stopped"
+                _nm_fa_log "firewalld: отключён и остановлен"
             else
-                _nm_fa_log "firewalld: disable/stop не удался (продолжаем)"
+                _nm_fa_log "firewalld: отключение/остановка не удались (продолжаем)"
             fi
         fi
     fi
@@ -260,7 +260,7 @@ nm_full_auto_finish() {
             login_url="${base}/login.html"
             _nm_fa_log "login.html OK на 127.0.0.1:${port} (внешний IP ${ip} может быть недоступен — SG/маршрут)"
         else
-            _nm_fa_log "WARNING: login.html недоступен на :${port} (${scheme})"
+            _nm_fa_log "ВНИМАНИЕ: login.html недоступен на :${port} (${scheme})"
             _nm_fa_log "  Проверьте: grep -E 'HTTP_PORT|HTTPS_' ${project_dir}/.env; docker compose -f ${project_dir}/docker-compose.yml ps"
             if [[ "$scheme" == "https" ]]; then
                 _nm_fa_log "  curl -k -I https://127.0.0.1:${port}/login.html"
