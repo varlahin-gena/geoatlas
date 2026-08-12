@@ -112,9 +112,11 @@ type Alert struct {
 }
 
 type BackendInfo struct {
-	GoVersion    string  `json:"go_version"`
-	NumGoroutine int     `json:"num_goroutine"`
-	HeapAllocMB  float64 `json:"heap_alloc_mb"`
+	GoVersion      string  `json:"go_version"`
+	NumGoroutine   int     `json:"num_goroutine"`
+	HeapAllocMB    float64 `json:"heap_alloc_mb"`
+	GeoIndexRanges int     `json:"geo_index_ranges,omitempty"`
+	GeoIndexMB     float64 `json:"geo_index_mb,omitempty"`
 }
 
 type HistoryResponse struct {

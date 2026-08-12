@@ -46,7 +46,13 @@ export interface SystemStats {
   health?: Record<string, Record<string, unknown>>;
   pipeline?: Record<string, Record<string, number>>;
   storage?: Record<string, Record<string, number>>;
-  backend_info?: { num_goroutine?: number; heap_alloc_mb?: number; go_version?: string };
+  backend_info?: {
+    num_goroutine?: number;
+    heap_alloc_mb?: number;
+    go_version?: string;
+    geo_index_ranges?: number;
+    geo_index_mb?: number;
+  };
   install_profile?: {
     profile?: string;
     profile_label?: string;

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"network_monitor/internal/apperr"
+	"network_monitor/internal/geoip"
 	"network_monitor/internal/mapagg"
 	"network_monitor/internal/model"
 )
@@ -54,6 +55,18 @@ type indexReadiness interface {
 	IndexReady() bool
 }
 
+type normalizedRangeReplacer interface {
+	ReplaceNormalizedRanges(ranges []model.GeoRange)
+}
+
+type indexSizer interface {
+	ApproxBytes() uint64
+}
+
+type snapshotCSVReader interface {
+	ReadCSVSnapshot(r io.Reader) ([]model.GeoRange, *geoip.BuiltSnapshot, error)
+}
+
 // IndexReady — готовность in-memory индекса после стартового Reload.
 // Если индекс не реализует readiness (тесты/простые stubs) — считаем ready.
 func (s *Service) IndexReady() bool {
@@ -79,7 +92,16 @@ func (s *Service) UploadCSV(ctx context.Context, r io.Reader, dryRun bool) (Uplo
 	}
 
 	started := time.Now()
-	ranges, err := s.codec.ReadCSV(r)
+	var (
+		ranges []model.GeoRange
+		built  *geoip.BuiltSnapshot
+		err    error
+	)
+	if codec, ok := s.codec.(snapshotCSVReader); ok {
+		ranges, built, err = codec.ReadCSVSnapshot(r)
+	} else {
+		ranges, err = s.codec.ReadCSV(r)
+	}
 	parseDur := time.Since(started)
 	if err != nil {
 		var maxBytes *http.MaxBytesError
@@ -105,7 +127,7 @@ func (s *Service) UploadCSV(ctx context.Context, r io.Reader, dryRun bool) (Uplo
 		}
 		return UploadResult{DryRun: true, Count: len(ranges), Sample: sample}, nil
 	}
-	count, err := s.persistRanges(ctx, ranges)
+	count, err := s.persistRangesWithSnapshot(ctx, ranges, built)
 	if err != nil {
 		return UploadResult{}, err
 	}
@@ -335,7 +357,11 @@ func (s *Service) ClearAll(ctx context.Context) (ClearResult, error) {
 	if s.index != nil {
 		s.index.ReplaceRanges(nil)
 	}
-	slog.Info("geo ranges cleared", "index_before", before, "index_after", s.IndexRangeCount())
+	slog.Info("geo ranges cleared",
+		"index_before", before,
+		"index_after", s.IndexRangeCount(),
+		"index_bytes_mb", float64(s.indexApproxBytes())/(1<<20),
+	)
 	return ClearResult{IndexBefore: before}, nil
 }
 
@@ -347,7 +373,14 @@ func (s *Service) FormatNetwork(start, end uint32) string {
 }
 
 func (s *Service) persistRanges(ctx context.Context, ranges []model.GeoRange) (int, error) {
-	clean, _ := s.codec.Normalize(ranges)
+	return s.persistRangesWithSnapshot(ctx, ranges, nil)
+}
+
+func (s *Service) persistRangesWithSnapshot(ctx context.Context, ranges []model.GeoRange, built *geoip.BuiltSnapshot) (int, error) {
+	clean := ranges
+	if built == nil {
+		clean, _ = s.codec.Normalize(ranges)
+	}
 	if len(clean) == 0 {
 		return 0, fmt.Errorf("no geo ranges to insert")
 	}
@@ -356,12 +389,38 @@ func (s *Service) persistRanges(ctx context.Context, ranges []model.GeoRange) (i
 		return 0, err
 	}
 	if s.index != nil {
-		s.index.ReplaceRanges(clean)
+		if built != nil {
+			if publish, ok := s.index.(interface{ ReplaceBuiltSnapshot(*geoip.BuiltSnapshot) }); ok {
+				publish.ReplaceBuiltSnapshot(built)
+			} else if fast, ok := s.index.(normalizedRangeReplacer); ok {
+				fast.ReplaceNormalizedRanges(clean)
+			} else {
+				s.index.ReplaceRanges(clean)
+			}
+		} else if fast, ok := s.index.(normalizedRangeReplacer); ok {
+			fast.ReplaceNormalizedRanges(clean)
+		} else {
+			s.index.ReplaceRanges(clean)
+		}
+		slog.Info("geo index updated from persisted ranges",
+			"ranges", len(clean),
+			"index_bytes_mb", float64(s.indexApproxBytes())/(1<<20),
+		)
 	}
 	if s.jobs != nil {
 		s.jobs.ScheduleReloadAndEnrich(ctx, 30*time.Minute)
 	}
 	return count, nil
+}
+
+func (s *Service) indexApproxBytes() uint64 {
+	if s == nil || s.index == nil {
+		return 0
+	}
+	if sized, ok := s.index.(indexSizer); ok {
+		return sized.ApproxBytes()
+	}
+	return 0
 }
 
 // --- Missing ---

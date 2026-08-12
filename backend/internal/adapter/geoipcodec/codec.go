@@ -16,6 +16,9 @@ func New() *Codec { return &Codec{} }
 var _ usecasegeo.RangeCodec = (*Codec)(nil)
 
 func (Codec) ReadCSV(r io.Reader) ([]model.GeoRange, error) { return geoip.ReadCSV(r) }
+func (Codec) ReadCSVSnapshot(r io.Reader) ([]model.GeoRange, *geoip.BuiltSnapshot, error) {
+	return geoip.ReadCSVSnapshot(r)
+}
 func (Codec) WriteCSV(w io.Writer, ranges []model.GeoRange) error {
 	return geoip.WriteCSV(w, ranges)
 }

@@ -184,6 +184,28 @@ func TestReadCSVAcceptsAdjacent(t *testing.T) {
 	}
 }
 
+func TestReadCSVSnapshotBuildsCompactIndex(t *testing.T) {
+	csv := `Network,Country,Region,City,Latitude,Longitude
+10.0.1.0-10.0.1.255,RU,X,B,55,37
+10.0.0.0-10.0.0.255,RU,X,A,55,37
+`
+	ranges, built, err := ReadCSVSnapshot(strings.NewReader(csv))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ranges) != 2 || built == nil || built.RangeCount() != 2 {
+		t.Fatalf("ranges=%d built=%v count=%d", len(ranges), built != nil, built.RangeCount())
+	}
+	if ranges[0].StartIP >= ranges[1].StartIP {
+		t.Fatalf("expected sorted ranges: %#v", ranges)
+	}
+	idx := New()
+	idx.ReplaceBuiltSnapshot(built)
+	if got := idx.Lookup("10.0.1.1"); !got.Found || got.City != "B" {
+		t.Fatalf("lookup=%+v", got)
+	}
+}
+
 func TestParseRangeEntryAndWriteCSVRoundTrip(t *testing.T) {
 	g, err := ParseRangeEntry("10.0.0.5", "Россия", "Org", "Москва", 55.75, 37.62)
 	if err != nil {
@@ -239,5 +261,48 @@ func TestCollectRangesAndLookupRange(t *testing.T) {
 	}
 	if _, ok := idx.LookupRange("8.8.8.8"); ok {
 		t.Fatal("expected miss")
+	}
+}
+
+func TestSnapshotRoundTripAndApproxBytes(t *testing.T) {
+	idx := New()
+	idx.ReplaceRanges([]model.GeoRange{
+		{StartIP: 1, EndIP: 10, Country: "RU", Region: "MOW", City: "Moscow", Lat: 55.75, Lon: 37.62},
+		{StartIP: 20, EndIP: 30, Country: "RU", Region: "SPE", City: "Saint Petersburg", Lat: 59.93, Lon: 30.31},
+		{StartIP: 40, EndIP: 50, Country: "KZ", Region: "ALA", City: "Almaty", Lat: 43.23, Lon: 76.89},
+	})
+
+	got := idx.Snapshot()
+	if len(got) != 3 {
+		t.Fatalf("snapshot len=%d", len(got))
+	}
+	if got[0].Country != "RU" || got[1].City != "Saint Petersburg" || got[2].Region != "ALA" {
+		t.Fatalf("snapshot mismatch: %#v", got)
+	}
+	if idx.ApproxBytes() == 0 {
+		t.Fatal("expected compact snapshot to report approximate bytes")
+	}
+}
+
+func TestReplaceNormalizedRangesKeepsLookupBehavior(t *testing.T) {
+	idx := New()
+	clean, skipped := NormalizeRanges([]model.GeoRange{
+		{StartIP: 100, EndIP: 200, Country: "A", City: "first"},
+		{StartIP: 150, EndIP: 250, Country: "B", City: "overlap"},
+		{StartIP: 300, EndIP: 400, Country: "C", City: "third"},
+	})
+	if skipped != 1 {
+		t.Fatalf("skipped=%d", skipped)
+	}
+
+	idx.ReplaceNormalizedRanges(clean)
+	if idx.RangeCount() != 2 {
+		t.Fatalf("count=%d", idx.RangeCount())
+	}
+	if got := idx.Lookup(Uint32ToIP(175)); !got.Found || got.City != "first" {
+		t.Fatalf("lookup=%+v", got)
+	}
+	if got := idx.Lookup(Uint32ToIP(350)); !got.Found || got.Country != "C" {
+		t.Fatalf("lookup=%+v", got)
 	}
 }

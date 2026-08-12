@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -175,20 +176,20 @@ func ParseRangeEntry(network, country, region, city string, lat, lon float64) (m
 	}, nil
 }
 
-// ReadCSV парсит GeoIP CSV в память: валидация колонок, отказ при overlapping ranges.
-// Запись в ClickHouse — clickhouse.ReplaceGeoRanges (geoip не зависит от CH для импорта).
-func ReadCSV(r io.Reader) ([]model.GeoRange, error) {
+// ReadCSVSnapshot парсит GeoIP CSV и за один проход подготовки возвращает
+// отсортированные ranges и готовый compact snapshot для Index.
+func ReadCSVSnapshot(r io.Reader) ([]model.GeoRange, *BuiltSnapshot, error) {
 	reader := csv.NewReader(r)
 	reader.TrimLeadingSpace = true
 	reader.FieldsPerRecord = -1
 
 	headers, err := reader.Read()
 	if err != nil {
-		return nil, fmt.Errorf("error reading header: %w", err)
+		return nil, nil, fmt.Errorf("error reading header: %w", err)
 	}
 	cols, err := parseCSVHeader(headers)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var ranges []model.GeoRange
@@ -205,11 +206,37 @@ func ReadCSV(r io.Reader) ([]model.GeoRange, error) {
 		}
 	}
 	if len(ranges) == 0 {
-		return nil, errors.New("no valid geo rows found")
+		return nil, nil, errors.New("no valid geo rows found")
 	}
-	if err := CheckNonOverlapping(ranges); err != nil {
-		return nil, err
+	sort.Slice(ranges, func(i, j int) bool {
+		if ranges[i].StartIP == ranges[j].StartIP {
+			return ranges[i].EndIP < ranges[j].EndIP
+		}
+		return ranges[i].StartIP < ranges[j].StartIP
+	})
+	for idx, g := range ranges {
+		if g.EndIP < g.StartIP {
+			return nil, nil, fmt.Errorf("invalid geo range: end < start (%d > %d)", g.StartIP, g.EndIP)
+		}
+		if idx == 0 {
+			continue
+		}
+		prev := ranges[idx-1]
+		if g.StartIP <= prev.EndIP {
+			return nil, nil, fmt.Errorf("overlapping geo ranges: [%d-%d] overlaps [%d-%d]",
+				prev.StartIP, prev.EndIP, g.StartIP, g.EndIP)
+		}
 	}
-	clean, _ := NormalizeRanges(ranges)
-	return clean, nil
+	builder := NewCompactBuilder(len(ranges))
+	for _, g := range ranges {
+		builder.AddRange(g)
+	}
+	return ranges, builder.Build(), nil
+}
+
+// ReadCSV парсит GeoIP CSV в память: валидация колонок, отказ при overlapping ranges.
+// Запись в ClickHouse — clickhouse.ReplaceGeoRanges (geoip не зависит от CH для импорта).
+func ReadCSV(r io.Reader) ([]model.GeoRange, error) {
+	ranges, _, err := ReadCSVSnapshot(r)
+	return ranges, err
 }

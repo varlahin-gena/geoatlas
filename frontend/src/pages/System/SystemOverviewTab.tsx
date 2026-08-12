@@ -29,6 +29,21 @@ export function SystemOverviewTab({
   edgesHint: string;
   updatedAt: Date | null;
 }) {
+  const backendMeta = [
+    `goroutines: ${fmtNumber(stats?.backend_info?.num_goroutine)}`,
+    stats?.backend_info?.heap_alloc_mb != null
+      ? `heap: ${Number(stats.backend_info.heap_alloc_mb).toFixed(1)} MB`
+      : 'heap: —',
+    stats?.backend_info?.geo_index_mb != null
+      ? `GeoIP index: ${Number(stats.backend_info.geo_index_mb).toFixed(1)} MB`
+      : null,
+    stats?.backend_info?.geo_index_ranges != null
+      ? `ranges: ${fmtNumber(stats.backend_info.geo_index_ranges)}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
     <div className="tab-panel active" id="tab-overview" role="tabpanel">
       {showInstallProfile ? (
@@ -72,11 +87,7 @@ export function SystemOverviewTab({
               {
                 name: 'Backend',
                 health: backendHealth,
-                meta: `goroutines: ${fmtNumber(stats?.backend_info?.num_goroutine)} · heap: ${
-                  stats?.backend_info?.heap_alloc_mb != null
-                    ? `${Number(stats.backend_info.heap_alloc_mb).toFixed(1)} MB`
-                    : '—'
-                }`,
+                meta: backendMeta,
               },
               {
                 name: 'Ingest',
@@ -195,9 +206,7 @@ export function SystemOverviewTab({
 
       <div className="footer-info" id="footerInfoOverview">
         обновлено: {updatedAt ? updatedAt.toLocaleString('ru-RU') : '—'}
-        {stats?.backend_info
-          ? ` · backend heap: ${Number(stats.backend_info.heap_alloc_mb || 0).toFixed(1)} MB · goroutines: ${fmtNumber(stats.backend_info.num_goroutine)}`
-          : ''}
+        {stats?.backend_info ? ` · ${backendMeta}` : ''}
       </div>
     </div>
   );

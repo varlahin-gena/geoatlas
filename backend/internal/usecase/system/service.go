@@ -17,6 +17,7 @@ type Dependencies struct {
 	Metrics            MetricsStore
 	Edges              EdgesAggReader
 	Ingest             IngestLive
+	GeoIndex           GeoIndexLive
 	Profiles           ProfileLoader
 	Maintenance        MaintenanceScheduler
 	InstallProfilePath string
@@ -28,6 +29,7 @@ type Service struct {
 	metrics            MetricsStore
 	edges              EdgesAggReader
 	ingest             IngestLive
+	geoIndex           GeoIndexLive
 	profiles           ProfileLoader
 	maintenance        MaintenanceScheduler
 	installProfilePath string
@@ -45,6 +47,7 @@ func New(deps Dependencies) *Service {
 		metrics:            deps.Metrics,
 		edges:              deps.Edges,
 		ingest:             deps.Ingest,
+		geoIndex:           deps.GeoIndex,
 		profiles:           deps.Profiles,
 		maintenance:        deps.Maintenance,
 		installProfilePath: deps.InstallProfilePath,
@@ -85,6 +88,10 @@ func (s *Service) CollectStats(ctx context.Context) (SystemStatsResponse, error)
 			NumGoroutine: runtime.NumGoroutine(),
 			HeapAllocMB:  float64(memHeapAlloc()) / 1024.0 / 1024.0,
 		},
+	}
+	if s.geoIndex != nil {
+		resp.Backend.GeoIndexRanges = s.geoIndex.RangeCount()
+		resp.Backend.GeoIndexMB = float64(s.geoIndex.ApproxBytes()) / (1 << 20)
 	}
 
 	for _, rec := range records {

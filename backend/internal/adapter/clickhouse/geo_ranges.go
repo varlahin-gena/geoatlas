@@ -13,6 +13,7 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 
+	"network_monitor/internal/geoip"
 	"network_monitor/internal/model"
 )
 
@@ -36,6 +37,23 @@ func LoadGeoRanges(ctx context.Context, ch clickhouse.Conn) ([]model.GeoRange, e
 	}
 	defer rows.Close()
 	return scanGeoRangeRows(rows)
+}
+
+// LoadGeoSnapshot читает geo_ranges и строит compact snapshot потоково.
+func LoadGeoSnapshot(ctx context.Context, ch clickhouse.Conn) (*geoip.BuiltSnapshot, error) {
+	if ch == nil {
+		return nil, fmt.Errorf("clickhouse conn is nil")
+	}
+	rows, err := ch.Query(ctx, `
+		SELECT start_ip, end_ip, country, region, city, lat, lon
+		FROM geo_ranges
+		ORDER BY start_ip, end_ip
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("query geo_ranges: %w", err)
+	}
+	defer rows.Close()
+	return buildGeoSnapshot(rows)
 }
 
 // CountGeoRanges — число строк в geo_ranges.
@@ -153,6 +171,21 @@ func scanGeoRangeRows(rows driver.Rows) ([]model.GeoRange, error) {
 		ranges = append(ranges, g)
 	}
 	return ranges, rows.Err()
+}
+
+func buildGeoSnapshot(rows driver.Rows) (*geoip.BuiltSnapshot, error) {
+	builder := geoip.NewCompactBuilder(0)
+	for rows.Next() {
+		var g model.GeoRange
+		if err := rows.Scan(&g.StartIP, &g.EndIP, &g.Country, &g.Region, &g.City, &g.Lat, &g.Lon); err != nil {
+			return nil, err
+		}
+		builder.AddRange(g)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return builder.Build(), nil
 }
 
 func isNoRows(err error) bool {

@@ -48,6 +48,12 @@ type IngestLive interface {
 	Snapshot() (IngestSnapshot, bool)
 }
 
+// GeoIndexLive exposes compact GeoIP index size for observability.
+type GeoIndexLive interface {
+	RangeCount() int
+	ApproxBytes() uint64
+}
+
 // ClickHousePinger checks ClickHouse liveness.
 type ClickHousePinger interface {
 	Ping(ctx context.Context) error

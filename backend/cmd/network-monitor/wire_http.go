@@ -42,6 +42,7 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 		Metrics:            systemRepo,
 		Edges:              systemRepo,
 		Ingest:             &systemlive.IngestAdapter{Src: a.ingestSvc},
+		GeoIndex:           bg.geo,
 		Profiles:           systemlive.ProfileAdapter{},
 		InstallProfilePath: cfg.InstallProfilePath,
 		InstallMetaPath:    cfg.InstallMetaPath,
