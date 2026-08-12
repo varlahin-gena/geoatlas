@@ -5,6 +5,23 @@
 
 ## [Unreleased]
 
+## [1.3.1] — 2026-08-12
+
+Патч-релиз: экономнее память GeoIP, лучше наблюдаемость индекса и чище empty-state карты.
+
+### Changed
+- **GeoIP index in RAM**: compact snapshot со словарями строк вместо хранения полного `[]GeoRange`; потоковая сборка snapshot из ClickHouse и CSV upload-path без лишней нормализации/копий
+- `/system`: backend health показывает размер GeoIP-индекса в памяти и число ranges; предупреждения в GeoIP upload flow смягчены с учётом нового memory profile
+
+### Fixed
+- Карта: баннер пустой GeoIP больше не дублирует центральный `no_geo` overlay, перечитывает статус GeoIP при возврате на страницу и не конфликтует с легендой/подсказками сверху
+
+### Notes
+- OpenAPI API doc version: **1.5.0** (без изменений)
+- Продуктовая версия: **1.3.1**
+- После обновления: `git fetch && git checkout v1.3.1` (или `main`), `./start.sh`
+- 4 коммита с `v1.3.0`
+
 ## [1.3.0] — 2026-08-12
 
 Минорный релиз: first-run мастер GeoIP, hardening SPA/auth и русскоязычные сообщения установщика.
