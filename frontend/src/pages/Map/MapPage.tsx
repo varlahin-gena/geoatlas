@@ -332,7 +332,7 @@ export default function MapPage() {
           !geoWizard.visible &&
           geoWizard.geo != null &&
           geoWizard.geo.count === 0 ? (
-            <div className="geo-wizard-banner" role="status">
+            <div className={`geo-wizard-banner${truncHint ? ' with-viz-hint' : ''}`} role="status">
               <p>База GeoIP пуста — карта не покажет дуги без координат.</p>
               <button type="button" className="btn primary" onClick={geoWizard.open}>
                 Мастер GeoIP

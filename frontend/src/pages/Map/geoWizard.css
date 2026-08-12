@@ -166,6 +166,10 @@
   pointer-events: auto;
 }
 
+.geo-wizard-banner.with-viz-hint {
+  top: 56px;
+}
+
 .geo-wizard-banner p {
   margin: 0;
   line-height: 1.4;
@@ -182,5 +186,8 @@
   .geo-wizard-banner {
     flex-direction: column;
     align-items: stretch;
+  }
+  .geo-wizard-banner.with-viz-hint {
+    top: 72px;
   }
 }
