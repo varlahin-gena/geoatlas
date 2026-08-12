@@ -5,6 +5,30 @@
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-08-12
+
+Минорный релиз: first-run мастер GeoIP, hardening SPA/auth и русскоязычные сообщения установщика.
+
+### Added
+- **First-run GeoIP wizard** на карте: шаги «почему пусто / загрузка / готово»; CSV с `dry_run` preview, curl-snippet для больших файлов, ссылка на `/geo-missing`; polling до появления диапазонов; dismiss в `users.json` (`POST /api/auth/geo-wizard-dismiss`) и баннер/кнопка в сайдбаре
+- `index_ready` в `GET /api/geo-ranges` (пока async Reload индекса при старте)
+- Empty overlay карты различает «нет событий» / «нет координат (GeoIP)» / «всё отфильтровано»
+
+### Changed
+- Карта/System: MapLibre вынесен в `useMapLibreController`, сайдбар/топбар на grouped props; System на `AdminLayout` + scoped CSS; общий `usePolling`
+- Роли UI: `deriveIsAdmin` / `roles.ts` вместо хрупкого сравнения строк
+- Установщик и uninstall (Ubuntu / Oracle Linux / common / `start.sh` / `stop.sh`): пользовательские сообщения на русском
+
+### Fixed
+- Sparkline XSS на карте; nginx `auth_request` / auth matrix для reputation; жёстче контракт OpenAPI MapLine
+- Smoke/контракты SPA расширены под wizard и auth edge
+
+### Notes
+- OpenAPI API doc version: **1.5.0** (`geo-wizard-dismiss`, `geo_wizard_dismissed`, `index_ready`)
+- Продуктовая версия: **1.3.0**
+- После обновления: `git fetch && git checkout v1.3.0` (или `main`), `./start.sh`
+- 3 коммита с `v1.2.1`
+
 ## [1.2.1] — 2026-08-11
 
 Патч после 1.2.0: порядок шагов установщика (HTTPS → HTTP-порт), uninstall под тома 1.2.0, удаление мёртвого кода.
