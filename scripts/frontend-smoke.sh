@@ -133,6 +133,66 @@ grep -q 'location = /system.html' frontend/nginx-app.inc || fail "nginx-app: leg
 if grep -q 'location = /index.html' frontend/nginx-app.inc; then
   fail "nginx-app: /index.html must not redirect (SPA try_files loop)"
 fi
+# Drift lock vs backend auth_matrix: reputation mutations = ops, lookup = login
+python3 - <<'PY' || fail "nginx-app: reputation auth matrix drift"
+from pathlib import Path
+text = Path("frontend/nginx-app.inc").read_text(encoding="utf-8")
+
+def auth_in_block(loc: str) -> str:
+    i = text.find(loc)
+    if i < 0:
+        raise SystemExit(f"missing {loc!r}")
+    j = text.find("\n    location ", i + len(loc))
+    block = text[i : j if j >= 0 else None]
+    for needle in (
+        "auth_request /auth-check-ops",
+        "auth_request /auth-check-admin",
+        "auth_request /auth-check",
+    ):
+        if needle in block:
+            return needle
+    raise SystemExit(f"no auth_request in block for {loc!r}")
+
+checks = {
+    "location = /api/reputation/refresh": "auth_request /auth-check-ops",
+    "location = /api/reputation/feeds": "auth_request /auth-check-ops",
+    "location = /api/reputation/lookup": "auth_request /auth-check",
+    "location ~ ^/api/reputation/(feeds|lists)/[^/]+$": "auth_request /auth-check-ops",
+}
+for loc, want in checks.items():
+    got = auth_in_block(loc)
+    # Exact match for ops/admin; for login allow /auth-check but not -ops/-admin
+    if want == "auth_request /auth-check":
+        if got != "auth_request /auth-check":
+            raise SystemExit(f"{loc}: want login auth-check, got {got}")
+    elif got != want:
+        raise SystemExit(f"{loc}: want {want}, got {got}")
+print("reputation auth matrix ok")
+PY
+# EventsResponse schema ↔ mapTypes field lock (OpenAPI MapLine / MapPoint)
+python3 - <<'PY' || fail "openapi EventsResponse ↔ mapTypes drift"
+from pathlib import Path
+import re
+oa = Path("openapi.yaml").read_text(encoding="utf-8")
+mt = Path("frontend/src/pages/Map/mapTypes.ts").read_text(encoding="utf-8")
+for name in ("MapLine:", "MapPoint:", "ReputationHit:"):
+    if name not in oa:
+        raise SystemExit(f"openapi missing schema {name}")
+# Core wire fields must appear in both OpenAPI MapLine and TS MapLine
+need = ["src", "dst", "src_lat", "dst_lon", "src_reputation", "blocked_count", "last_action"]
+for f in need:
+    if f"{f}:" not in oa and f"{f}:" not in oa.replace(" ", ""):
+        # openapi uses "src: { type:"
+        if f"{f}:" not in oa:
+            raise SystemExit(f"openapi MapLine missing {f}")
+    if f"{f}" not in mt and f"{f}?" not in mt:
+        # TS: src: string; or src_lat?: number;
+        if not re.search(rf"\b{re.escape(f)}\??:", mt):
+            raise SystemExit(f"mapTypes.ts missing {f}")
+if "Keep in sync with openapi.yaml" not in mt:
+    raise SystemExit("mapTypes.ts missing sync comment")
+print("events schema lock ok")
+PY
 grep -q 'include /etc/nginx/includes/app.inc' frontend/nginx.conf || fail "nginx.conf: app.inc include"
 grep -q 'HTTPS_ENABLED' frontend/docker-entrypoint.sh || fail "entrypoint: HTTPS_ENABLED"
 grep -q 'listen 443 ssl' frontend/docker-entrypoint.sh || fail "entrypoint: listen 443 ssl"

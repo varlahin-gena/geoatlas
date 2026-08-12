@@ -1,9 +1,10 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import uPlot from 'uplot';
 import { apiFetch } from '@/api/client';
-import { AdminSidebar, UserMenu } from '@/components/Shell';
+import { AdminLayout } from '@/components/AdminLayout';
 import { useToast } from '@/components/Toast';
 import { fmtNumber } from '@/lib/format';
+import { usePolling } from '@/lib/usePolling';
 import 'uplot/dist/uPlot.min.css';
 import '@/styles/system.css';
 import { alignSeries, makeChart, type ChartFormatOpts } from './systemCharts';
@@ -82,20 +83,23 @@ export default function SystemPage() {
 
   useEffect(() => {
     document.title = 'ГеоАтлас — Мониторинг';
-    document.body.classList.add('page-admin');
-    return () => document.body.classList.remove('page-admin');
   }, []);
 
   useEffect(() => {
-    void loadStats();
     void loadRetention();
-  }, [loadStats, loadRetention]);
+  }, [loadRetention]);
 
   useEffect(() => {
-    if (!autoRefresh) return;
-    const id = window.setInterval(() => void loadStats(), 5000);
-    return () => window.clearInterval(id);
+    if (!autoRefresh) void loadStats();
   }, [autoRefresh, loadStats]);
+
+  usePolling(
+    async () => {
+      await loadStats();
+    },
+    5000,
+    autoRefresh,
+  );
 
   useEffect(() => {
     try {
@@ -279,15 +283,14 @@ export default function SystemPage() {
   const ingestHealth = stats?.health?.ingest || {};
 
   return (
-    <div id="adminApp" className="app">
-      <AdminSidebar />
-      <div className="admin-main">
-        <header className="header">
-          <div className="title-block">
-            <h1>Мониторинг системы</h1>
-            <div className="subtitle">ГеоАтлас · pipeline / containers / storage</div>
-          </div>
-          <div className="spacer" />
+    <AdminLayout
+      className="nm-system"
+      title="Мониторинг системы"
+      subtitle="pipeline / containers / storage"
+      mainClassName="content"
+      showSystemHealth={false}
+      actions={
+        <>
           <div className="period-tabs" id="periodTabs" hidden={tab !== 'charts'}>
             {PERIODS.map(([v, label]) => (
               <button
@@ -313,12 +316,9 @@ export default function SystemPage() {
             <span className="dot" />
             <span id="healthText">{stats ? healthText : '— загрузка —'}</span>
           </div>
-          <div id="userBarHost">
-            <UserMenu />
-          </div>
-        </header>
-
-        <main className="content" id="system-main">
+        </>
+      }
+    >
           <div className="content-chrome">
             <section
               className={`chrome-section chrome-alerts${alerts.length ? '' : ' chrome-alerts--empty'}`}
@@ -481,8 +481,6 @@ export default function SystemPage() {
               />
             ) : null}
           </div>
-        </main>
-      </div>
-    </div>
+    </AdminLayout>
   );
 }

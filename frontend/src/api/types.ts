@@ -1,7 +1,7 @@
 export const ROLE_ADMIN = 'administrator';
 export const ROLE_OPERATOR = 'operator';
 
-export type UserRole = typeof ROLE_ADMIN | typeof ROLE_OPERATOR | string;
+export type UserRole = typeof ROLE_ADMIN | typeof ROLE_OPERATOR;
 
 export interface AuthUser {
   username: string;

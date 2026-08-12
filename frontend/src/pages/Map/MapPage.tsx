@@ -1,34 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import maplibregl from 'maplibre-gl';
-import { MapboxOverlay } from '@deck.gl/mapbox';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/auth/AuthContext';
 import { filterNav, PAGE_NAV } from '@/components/nav';
 import { useToast } from '@/components/Toast';
 import { fmtNumber } from '@/lib/format';
-import {
-  DEFAULT_GLOBE_VIEW,
-  DEFAULT_MAP_VIEW,
-  MAP_STYLE_DARK,
-  MAP_STYLE_LIGHT,
-  emptyStyleFallback,
-} from './mapConstants';
 import { loadCountriesGeoJSON, type GeoFeatureCollection } from './mapHeatmap';
 import { MapDetailPanel } from './mapDetail';
 import { buildDeckLayers } from './mapLayers';
 import { MapSidebar } from './MapSidebar';
 import { MapTopbar } from './MapTopbar';
 import { MapVizOverlays } from './MapVizOverlays';
-import {
-  applyGlobeFitZoom,
-  applyMapFitZoom,
-  applyMapProjection,
-  readViewStateFromMap,
-} from './mapViewport';
-import type { ViewState } from './mapTypes';
-import { useGlobeAutoRotate } from './useGlobeAutoRotate';
 import { useMapDetail } from './useMapDetail';
 import { useMapEvents } from './useMapEvents';
 import { useMapFilters } from './useMapFilters';
+import { useMapLibreController } from './useMapLibreController';
 import { useMapReputation } from './useMapReputation';
 import { useMapUploads } from './useMapUploads';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -37,15 +21,6 @@ import '@/styles/index.css';
 export default function MapPage() {
   const { isAdmin, reputationEnabled, uiAuthEnabled, theme } = useAuth();
   const { toast } = useToast();
-  const mapContainer = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<maplibregl.Map | null>(null);
-  const overlayRef = useRef<MapboxOverlay | null>(null);
-  const mapTilesFailedRef = useRef(true);
-  const basemapOkRef = useRef(false);
-  const lastThemeBasemapRef = useRef<string | null>(null);
-  const heavyLayersRef = useRef(false);
-  const basemapGenRef = useRef(0);
-  const layersRefreshBusy = useRef(false);
 
   const {
     period,
@@ -123,12 +98,26 @@ export default function MapPage() {
   const [monoArcs, setMonoArcs] = useState(false);
   const [autoRotate, setAutoRotate] = useState(true);
   const [countriesGeoJSON, setCountriesGeoJSON] = useState<GeoFeatureCollection | null>(null);
-  const [heavyCountryLayers, setHeavyCountryLayers] = useState(false);
-  const [mapTilesFailed, setMapTilesFailed] = useState(true);
-  const [globeView, setGlobeView] = useState<ViewState>({ ...DEFAULT_GLOBE_VIEW });
   const [arcCountInfo, setArcCountInfo] = useState({ shown: 0, total: 0 });
-  const [mapReady, setMapReady] = useState(false);
-  const [layersTick, setLayersTick] = useState(0);
+
+  const {
+    mapContainer,
+    overlayRef,
+    layersRefreshBusy,
+    heavyCountryLayers,
+    mapTilesFailed,
+    globeView,
+    mapReady,
+    layersTick,
+    resetView,
+    exportPng,
+  } = useMapLibreController({
+    theme,
+    viewMode,
+    setViewMode,
+    autoRotate,
+    toast,
+  });
 
   const { logFileRef, geoFileRef, uploadFile } = useMapUploads({
     isAdmin,
@@ -150,28 +139,6 @@ export default function MapPage() {
     setFocusedCountry,
   });
 
-  const bumpLayersTick = useCallback(() => {
-    setLayersTick((t) => t + 1);
-  }, []);
-
-  const {
-    startGlobeAutoRotate,
-    stopGlobeAutoRotate,
-    userInteractingRef,
-    lastGlobeCullKeyRef,
-    viewModeRef,
-    autoRotateRef,
-    globeViewRef,
-  } = useGlobeAutoRotate({
-    mapRef,
-    viewMode,
-    autoRotate,
-    mapReady,
-    globeView,
-    setGlobeView,
-    bumpLayersTick,
-  });
-
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
       return localStorage.getItem('nm.mapSidebarCollapsed') === '1';
@@ -179,9 +146,6 @@ export default function MapPage() {
       return false;
     }
   });
-
-  heavyLayersRef.current = heavyCountryLayers;
-  mapTilesFailedRef.current = mapTilesFailed;
 
   useEffect(() => {
     document.title = 'ГеоАтлас — SOC';
@@ -192,310 +156,6 @@ export default function MapPage() {
   useEffect(() => {
     void loadCountriesGeoJSON().then(setCountriesGeoJSON);
   }, []);
-
-  const beginRemoteBasemapUpgrade = useCallback(
-    (styleUrl: string) => {
-      const map = mapRef.current;
-      if (!map || !styleUrl) return;
-      const gen = ++basemapGenRef.current;
-      let settled = false;
-      const center = map.getCenter();
-      const zoom = map.getZoom();
-      const bearing = map.getBearing();
-      const pitch = map.getPitch();
-
-      const finishOk = () => {
-        if (settled || gen !== basemapGenRef.current || !mapRef.current) return;
-        settled = true;
-        basemapOkRef.current = true;
-        mapTilesFailedRef.current = false;
-        setMapTilesFailed(false);
-        try {
-          map.jumpTo({ center, zoom, bearing, pitch });
-          applyMapProjection(map, viewModeRef.current);
-          map.triggerRepaint();
-        } catch {
-          /* ignore */
-        }
-        setLayersTick((t) => t + 1);
-      };
-
-      map.once('style.load', finishOk);
-      try {
-        map.setStyle(styleUrl);
-      } catch (e) {
-        console.warn('Remote basemap upgrade failed to start:', e);
-        return;
-      }
-
-      window.setTimeout(() => {
-        if (settled || gen !== basemapGenRef.current || !mapRef.current) return;
-        // style.load never arrived — stay on whatever is current; only force
-        // empty fallback if we never had a successful remote style.
-        if (basemapOkRef.current) return;
-        settled = true;
-        mapTilesFailedRef.current = true;
-        setMapTilesFailed(true);
-        console.warn('Remote basemap slow/unavailable, keeping local style');
-        try {
-          map.setStyle(emptyStyleFallback(viewModeRef.current));
-          applyMapProjection(map, viewModeRef.current);
-        } catch {
-          /* ignore */
-        }
-        try {
-          map.jumpTo({ center, zoom, bearing, pitch });
-          applyMapProjection(map, viewModeRef.current);
-        } catch {
-          /* ignore */
-        }
-        setLayersTick((t) => t + 1);
-      }, 12000);
-    },
-    [],
-  );
-
-  // Init map once — start with remote basemap (CARTO). Empty style only as fallback.
-  useEffect(() => {
-    if (!mapContainer.current || mapRef.current) return;
-    const host = mapContainer.current;
-    host.innerHTML = '';
-
-    const initialStyleUrl = theme === 'light' ? MAP_STYLE_LIGHT : MAP_STYLE_DARK;
-    lastThemeBasemapRef.current = theme;
-    setMapTilesFailed(false);
-    mapTilesFailedRef.current = false;
-    basemapOkRef.current = false;
-
-    const vs = viewMode === 'globe' ? DEFAULT_GLOBE_VIEW : DEFAULT_MAP_VIEW;
-    let map: maplibregl.Map;
-    try {
-      map = new maplibregl.Map({
-        container: host,
-        style: initialStyleUrl,
-        center: [vs.longitude, vs.latitude],
-        zoom: vs.zoom,
-        bearing: vs.bearing,
-        pitch: vs.pitch,
-        attributionControl: {},
-        fadeDuration: 0,
-        // Needed for PNG export from canvas
-        ...({ preserveDrawingBuffer: true } as any),
-      });
-    } catch (e) {
-      console.error('MapLibre init failed:', e);
-      toast('Ошибка инициализации карты', 'error');
-      return;
-    }
-
-    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
-    mapRef.current = map;
-
-    const fallbackToEmpty = (why: string) => {
-      if (basemapOkRef.current || mapTilesFailedRef.current) return;
-      console.warn('Basemap fallback:', why);
-      mapTilesFailedRef.current = true;
-      setMapTilesFailed(true);
-      try {
-        map.setStyle(emptyStyleFallback(viewModeRef.current));
-        applyMapProjection(map, viewModeRef.current);
-      } catch {
-        /* ignore */
-      }
-      setLayersTick((t) => t + 1);
-    };
-
-    map.on('error', (e) => {
-      const msg = (e && e.error && e.error.message) || String(e.error || '');
-      if (!/Failed to fetch|NetworkError|AJAX|tile|style|load/i.test(msg) && !e.error) return;
-      if (basemapOkRef.current) {
-        console.warn('Basemap tile/style warning (keeping remote style)', e.error || e);
-        return;
-      }
-      fallbackToEmpty(msg || 'map error');
-    });
-
-    let readyOnce = false;
-    const onReady = () => {
-      if (readyOnce) return;
-      readyOnce = true;
-      if (!mapTilesFailedRef.current) {
-        basemapOkRef.current = true;
-        mapTilesFailedRef.current = false;
-        setMapTilesFailed(false);
-      }
-
-      if (viewModeRef.current === 'globe') {
-        if (!applyMapProjection(map, 'globe')) {
-          toast('Globe projection недоступен — остаёмся в 2D', 'error');
-          setViewMode('map');
-        } else {
-          const gvs = applyGlobeFitZoom(map, {
-            longitude: DEFAULT_GLOBE_VIEW.longitude,
-            latitude: DEFAULT_GLOBE_VIEW.latitude,
-            bearing: DEFAULT_GLOBE_VIEW.bearing,
-          });
-          setGlobeView(gvs);
-          globeViewRef.current = gvs;
-        }
-      } else {
-        applyMapProjection(map, 'map');
-        applyMapFitZoom(map, { ...DEFAULT_MAP_VIEW });
-      }
-
-      const overlay = new MapboxOverlay({
-        interleaved: false,
-        layers: [],
-      });
-      map.addControl(overlay as unknown as maplibregl.IControl);
-      overlayRef.current = overlay;
-      setMapReady(true);
-
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const enable = () => {
-            heavyLayersRef.current = true;
-            setHeavyCountryLayers(true);
-          };
-          if (typeof requestIdleCallback === 'function') {
-            requestIdleCallback(enable, { timeout: 120 });
-          } else {
-            enable();
-          }
-        });
-      });
-
-      if (viewModeRef.current === 'globe' && autoRotateRef.current) {
-        startGlobeAutoRotate();
-      }
-    };
-
-    if (map.isStyleLoaded()) onReady();
-    else map.once('load', onReady);
-    const t = window.setTimeout(() => {
-      if (!readyOnce) {
-        // Remote style never loaded — fall back so the UI still works.
-        fallbackToEmpty('initial style timeout');
-        onReady();
-      }
-    }, 12000);
-
-    map.on('move', () => {
-      const vsNow = readViewStateFromMap(map);
-      if (viewModeRef.current === 'globe') {
-        setGlobeView(vsNow);
-        globeViewRef.current = vsNow;
-        const lon = Math.round((vsNow.longitude || 0) * 4) / 4;
-        const lat = Math.round((vsNow.latitude || 0) * 4) / 4;
-        const key = `${lon}:${lat}`;
-        if (key !== lastGlobeCullKeyRef.current) {
-          lastGlobeCullKeyRef.current = key;
-          setLayersTick((t) => t + 1);
-        }
-      }
-    });
-    map.on('zoomend', () => {
-      if (layersRefreshBusy.current) return;
-      setLayersTick((t) => t + 1);
-    });
-
-    const onInteractStart = () => {
-      userInteractingRef.current = true;
-      stopGlobeAutoRotate();
-    };
-    const onInteractEnd = () => {
-      userInteractingRef.current = false;
-      if (viewModeRef.current === 'globe' && autoRotateRef.current) startGlobeAutoRotate();
-    };
-    map.on('mousedown', onInteractStart);
-    map.on('mouseup', onInteractEnd);
-    map.on('dragstart', onInteractStart);
-    map.on('dragend', onInteractEnd);
-    map.on('touchstart', onInteractStart);
-    map.on('touchend', onInteractEnd);
-
-    return () => {
-      window.clearTimeout(t);
-      stopGlobeAutoRotate();
-      overlayRef.current = null;
-      try {
-        map.remove();
-      } catch {
-        /* ignore */
-      }
-      mapRef.current = null;
-      setMapReady(false);
-      heavyLayersRef.current = false;
-      setHeavyCountryLayers(false);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Theme basemap — first load is handled in onReady; only react to later theme changes.
-  useEffect(() => {
-    if (!mapReady || !mapRef.current) return;
-    if (lastThemeBasemapRef.current === null) {
-      lastThemeBasemapRef.current = theme;
-      return;
-    }
-    if (lastThemeBasemapRef.current === theme) return;
-    lastThemeBasemapRef.current = theme;
-    basemapOkRef.current = false;
-    const styleUrl = theme === 'light' ? MAP_STYLE_LIGHT : MAP_STYLE_DARK;
-    beginRemoteBasemapUpgrade(styleUrl);
-  }, [theme, mapReady, beginRemoteBasemapUpgrade]);
-
-  // View mode switch — never setStyle(empty) here: that races the CARTO upgrade
-  // while mapTilesFailedRef is still true and wipes a loading/loaded basemap.
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!mapReady || !map) return;
-    stopGlobeAutoRotate();
-    lastGlobeCullKeyRef.current = '';
-    if (viewMode === 'globe') {
-      if (!applyMapProjection(map, 'globe')) {
-        toast('Globe projection недоступен', 'error');
-        setViewMode('map');
-        return;
-      }
-      const gvs = applyGlobeFitZoom(map, {
-        longitude: globeViewRef.current.longitude ?? DEFAULT_GLOBE_VIEW.longitude,
-        latitude: globeViewRef.current.latitude ?? DEFAULT_GLOBE_VIEW.latitude,
-        bearing: globeViewRef.current.bearing ?? DEFAULT_GLOBE_VIEW.bearing,
-      });
-      setGlobeView(gvs);
-      globeViewRef.current = gvs;
-      if (autoRotate) startGlobeAutoRotate();
-    } else {
-      applyMapProjection(map, 'map');
-      applyMapFitZoom(map, { ...DEFAULT_MAP_VIEW });
-    }
-    if (overlayRef.current) {
-      overlayRef.current.setProps({ views: undefined });
-    }
-    setLayersTick((t) => t + 1);
-    window.setTimeout(() => {
-      try {
-        map.resize();
-      } catch {
-        /* ignore */
-      }
-      applyMapProjection(map, viewModeRef.current);
-      if (viewModeRef.current === 'globe') {
-        const gvs = applyGlobeFitZoom(map);
-        setGlobeView(gvs);
-        globeViewRef.current = gvs;
-      } else {
-        applyMapFitZoom(map);
-      }
-      try {
-        map.triggerRepaint();
-      } catch {
-        /* ignore */
-      }
-      setLayersTick((t) => t + 1);
-    }, 100);
-  }, [viewMode, mapReady, autoRotate, startGlobeAutoRotate, stopGlobeAutoRotate, toast]);
 
   // Update deck layers
   useEffect(() => {
@@ -550,6 +210,8 @@ export default function MapPage() {
     openLineDetail,
     openPointDetail,
     openCountryDetail,
+    overlayRef,
+    layersRefreshBusy,
   ]);
 
   const adminLinks = filterNav(PAGE_NAV, {
@@ -571,35 +233,6 @@ export default function MapPage() {
     });
   }
 
-  function resetView() {
-    const map = mapRef.current;
-    if (!map) return;
-    if (viewMode === 'globe') {
-      const gvs = applyGlobeFitZoom(map, {
-        longitude: DEFAULT_GLOBE_VIEW.longitude,
-        latitude: DEFAULT_GLOBE_VIEW.latitude,
-        bearing: DEFAULT_GLOBE_VIEW.bearing,
-      });
-      setGlobeView(gvs);
-      globeViewRef.current = gvs;
-    } else {
-      applyMapFitZoom(map, { ...DEFAULT_MAP_VIEW });
-    }
-    setLayersTick((t) => t + 1);
-  }
-
-  async function exportPng() {
-    const canvas = mapContainer.current?.querySelector('canvas');
-    if (!canvas) {
-      toast('Карта ещё не готова', 'warn');
-      return;
-    }
-    const a = document.createElement('a');
-    a.href = (canvas as HTMLCanvasElement).toDataURL('image/png');
-    a.download = `geoatlas-${Date.now()}.png`;
-    a.click();
-  }
-
   const truncHint =
     arcCountInfo.total > arcCountInfo.shown
       ? `Показано ${fmtNumber(arcCountInfo.shown)} из ${fmtNumber(arcCountInfo.total)} связей — увеличьте лимит дуг или сузьте период`
@@ -611,72 +244,66 @@ export default function MapPage() {
         К содержимому
       </a>
       <MapSidebar
-        viewMode={viewMode}
-        setViewMode={setViewMode}
+        view={{ viewMode, setViewMode, autoRotate, setAutoRotate }}
         isAdmin={isAdmin}
-        logFileRef={logFileRef}
-        geoFileRef={geoFileRef}
-        uploadFile={uploadFile}
-        fetchData={fetchData}
-        resetView={resetView}
-        exportPng={exportPng}
+        uploads={{ logFileRef, geoFileRef, uploadFile }}
+        actions={{ fetchData, resetView, exportPng, toggleSidebar }}
         adminLinks={adminLinks}
-        minCount={minCount}
-        setMinCount={setMinCount}
-        arcCountInfo={arcCountInfo}
-        maxArcs={maxArcs}
-        setMaxArcs={setMaxArcs}
-        showLegend={showLegend}
-        setShowLegend={setShowLegend}
-        showStats={showStats}
-        setShowStats={setShowStats}
-        showHeatmap={showHeatmap}
-        setShowHeatmap={setShowHeatmap}
-        showCountryLabels={showCountryLabels}
-        setShowCountryLabels={setShowCountryLabels}
-        monoArcs={monoArcs}
-        setMonoArcs={setMonoArcs}
-        autoRefresh={autoRefresh}
-        setAutoRefresh={setAutoRefresh}
-        dataSource={dataSource}
-        selectDataSource={selectDataSource}
-        backupAttached={backupAttached}
-        autoRotate={autoRotate}
-        setAutoRotate={setAutoRotate}
-        toggleSidebar={toggleSidebar}
+        viz={{
+          minCount,
+          setMinCount,
+          arcCountInfo,
+          maxArcs,
+          setMaxArcs,
+          showLegend,
+          setShowLegend,
+          showStats,
+          setShowStats,
+          showHeatmap,
+          setShowHeatmap,
+          showCountryLabels,
+          setShowCountryLabels,
+          monoArcs,
+          setMonoArcs,
+        }}
+        data={{
+          autoRefresh,
+          setAutoRefresh,
+          dataSource,
+          selectDataSource,
+          backupAttached,
+        }}
       />
 
       <main className="main" id="map-main">
         <MapTopbar
-          search={search}
-          setSearch={setSearch}
-          builderOpen={builderOpen}
-          setBuilderOpen={setBuilderOpen}
-          groupBy={groupBy}
-          setGroupBy={setGroupBy}
-          filter={filter}
-          setFilter={setFilter}
-          reputationEnabled={reputationEnabled}
-          ipMode={ipMode}
-          repFilterCount={repFilterCount}
-          repMenuOpen={repMenuOpen}
-          setRepMenuOpen={setRepMenuOpen}
-          repCategories={repCategories}
-          setRepCategories={setRepCategories}
-          repLists={repLists}
-          setRepLists={setRepLists}
-          repSide={repSide}
-          setRepSide={setRepSide}
-          repColorArcs={repColorArcs}
-          setRepColorArcs={setRepColorArcs}
-          repTree={repTree}
-          period={period}
-          setPeriod={setPeriod}
-          periodFrom={periodFrom}
-          setPeriodFrom={setPeriodFrom}
-          periodTo={periodTo}
-          setPeriodTo={setPeriodTo}
-          fetchData={fetchData}
+          search={{ search, setSearch, builderOpen, setBuilderOpen }}
+          grouping={{ groupBy, setGroupBy, filter, setFilter }}
+          reputation={{
+            reputationEnabled,
+            ipMode,
+            repFilterCount,
+            repMenuOpen,
+            setRepMenuOpen,
+            repCategories,
+            setRepCategories,
+            repLists,
+            setRepLists,
+            repSide,
+            setRepSide,
+            repColorArcs,
+            setRepColorArcs,
+            repTree,
+          }}
+          period={{
+            period,
+            setPeriod,
+            periodFrom,
+            setPeriodFrom,
+            periodTo,
+            setPeriodTo,
+            fetchData,
+          }}
         />
 
         <div className={`viz-area${loading ? ' is-loading' : ''}`}>
@@ -693,10 +320,7 @@ export default function MapPage() {
             stats={stats}
           />
 
-          <MapDetailPanel
-            detail={detail}
-            onClose={closeDetail}
-          />
+          <MapDetailPanel detail={detail} onClose={closeDetail} />
         </div>
       </main>
     </div>

@@ -5,6 +5,7 @@ import { apiFetch, isAbortError } from '@/api/client';
 import type { SystemVersion } from '@/api/types';
 import { ROLE_ADMIN } from '@/api/types';
 import { themeLabel } from '@/auth/theme';
+import { usePolling } from '@/lib/usePolling';
 import { filterNav, isNavActive, PAGE_NAV } from './nav';
 
 const SIDEBAR_KEY = 'nm.adminSidebarCollapsed';
@@ -294,24 +295,14 @@ export function SystemHealthPill() {
   const [level, setLevel] = useState<'ok' | 'warn' | 'bad' | null>(null);
   const [title, setTitle] = useState('Состояние системы');
 
-  useEffect(() => {
-    let cancelled = false;
-    let inFlight: AbortController | null = null;
-    const tick = async () => {
-      inFlight?.abort();
-      const controller = new AbortController();
-      inFlight = controller;
+  usePolling(
+    async (signal) => {
       try {
-        const res = await fetch('/api/system/status', {
-          credentials: 'same-origin',
-          signal: controller.signal,
-        });
-        if (!res.ok) throw new Error(String(res.status));
-        const data = (await res.json()) as {
+        const data = await apiFetch<{
           level?: string;
           alerts?: Array<{ level?: string; target?: string; message?: string }>;
-        };
-        if (cancelled || controller.signal.aborted) return;
+        }>('/api/system/status', { signal, cache: 'no-store' });
+        if (signal.aborted) return;
         const alerts = data.alerts || [];
         const count = alerts.length;
         const lvl = (data.level || 'ok').toLowerCase();
@@ -332,20 +323,15 @@ export function SystemHealthPill() {
           setTitle(isAdmin ? 'Кликни, чтобы открыть мониторинг' : 'Состояние системы');
         }
       } catch (e) {
-        if (isAbortError(e) || cancelled) return;
+        if (isAbortError(e) || signal.aborted) return;
         setLevel('bad');
         setText('API недоступен');
         setTitle('Не удалось получить статус системы');
       }
-    };
-    void tick();
-    const id = window.setInterval(() => void tick(), 5000);
-    return () => {
-      cancelled = true;
-      inFlight?.abort();
-      window.clearInterval(id);
-    };
-  }, [isAdmin]);
+    },
+    5000,
+    true,
+  );
 
   const cls = `status-pill${level === 'bad' ? ' bad' : level === 'warn' ? ' warn' : level === 'ok' ? ' ok' : ''}`;
   const content = (

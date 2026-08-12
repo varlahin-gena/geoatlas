@@ -4,6 +4,7 @@ export interface ReputationHit {
   network?: string;
 }
 
+/** Keep in sync with openapi.yaml MapPoint / MapLine (+ backend model.Node / model.Line). */
 export interface MapPoint {
   lat: number;
   lon: number;

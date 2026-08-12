@@ -1,4 +1,8 @@
-/* Общие токены и меню пользователя ГеоАтлас. */
+/* Общие токены и меню пользователя ГеоАтлас.
+ *
+ * Page scoping (no CSS modules): body.page-map | body.page-admin | body.page-auth;
+ * system monitor extras live under #adminApp.nm-system (see system.css).
+ */
 
 :root {
   --bg: #0d1117;

@@ -5,75 +5,82 @@ import { isNavActive, type NavItem } from '@/components/nav';
 import { fmtNumber } from '@/lib/format';
 import { Icon } from './mapIcons';
 
-export function MapSidebar({
-  viewMode,
-  setViewMode,
-  isAdmin,
-  logFileRef,
-  geoFileRef,
-  uploadFile,
-  fetchData,
-  resetView,
-  exportPng,
-  adminLinks,
-  minCount,
-  setMinCount,
-  arcCountInfo,
-  maxArcs,
-  setMaxArcs,
-  showLegend,
-  setShowLegend,
-  showStats,
-  setShowStats,
-  showHeatmap,
-  setShowHeatmap,
-  showCountryLabels,
-  setShowCountryLabels,
-  monoArcs,
-  setMonoArcs,
-  autoRefresh,
-  setAutoRefresh,
-  dataSource,
-  selectDataSource,
-  backupAttached,
-  autoRotate,
-  setAutoRotate,
-  toggleSidebar,
-}: {
-  viewMode: 'map' | 'globe';
-  setViewMode: (mode: 'map' | 'globe') => void;
+export type MapSidebarProps = {
+  view: {
+    viewMode: 'map' | 'globe';
+    setViewMode: (mode: 'map' | 'globe') => void;
+    autoRotate: boolean;
+    setAutoRotate: (v: boolean) => void;
+  };
   isAdmin: boolean;
-  logFileRef: RefObject<HTMLInputElement | null>;
-  geoFileRef: RefObject<HTMLInputElement | null>;
-  uploadFile: (kind: 'logs' | 'geo', file: File) => void | Promise<void>;
-  fetchData: () => void | Promise<void>;
-  resetView: () => void;
-  exportPng: () => void | Promise<void>;
+  uploads: {
+    logFileRef: RefObject<HTMLInputElement | null>;
+    geoFileRef: RefObject<HTMLInputElement | null>;
+    uploadFile: (kind: 'logs' | 'geo', file: File) => void | Promise<void>;
+  };
+  actions: {
+    fetchData: () => void | Promise<void>;
+    resetView: () => void;
+    exportPng: () => void | Promise<void>;
+    toggleSidebar: () => void;
+  };
   adminLinks: NavItem[];
-  minCount: number;
-  setMinCount: (n: number) => void;
-  arcCountInfo: { shown: number; total: number };
-  maxArcs: number;
-  setMaxArcs: (n: number) => void;
-  showLegend: boolean;
-  setShowLegend: (v: boolean) => void;
-  showStats: boolean;
-  setShowStats: (v: boolean) => void;
-  showHeatmap: boolean;
-  setShowHeatmap: (v: boolean) => void;
-  showCountryLabels: boolean;
-  setShowCountryLabels: (v: boolean) => void;
-  monoArcs: boolean;
-  setMonoArcs: (v: boolean) => void;
-  autoRefresh: boolean;
-  setAutoRefresh: (v: boolean) => void;
-  dataSource: 'live' | 'backup';
-  selectDataSource: (v: 'live' | 'backup') => void;
-  backupAttached: string;
-  autoRotate: boolean;
-  setAutoRotate: (v: boolean) => void;
-  toggleSidebar: () => void;
-}) {
+  viz: {
+    minCount: number;
+    setMinCount: (n: number) => void;
+    arcCountInfo: { shown: number; total: number };
+    maxArcs: number;
+    setMaxArcs: (n: number) => void;
+    showLegend: boolean;
+    setShowLegend: (v: boolean) => void;
+    showStats: boolean;
+    setShowStats: (v: boolean) => void;
+    showHeatmap: boolean;
+    setShowHeatmap: (v: boolean) => void;
+    showCountryLabels: boolean;
+    setShowCountryLabels: (v: boolean) => void;
+    monoArcs: boolean;
+    setMonoArcs: (v: boolean) => void;
+  };
+  data: {
+    autoRefresh: boolean;
+    setAutoRefresh: (v: boolean) => void;
+    dataSource: 'live' | 'backup';
+    selectDataSource: (v: 'live' | 'backup') => void;
+    backupAttached: string;
+  };
+};
+
+export function MapSidebar({
+  view,
+  isAdmin,
+  uploads,
+  actions,
+  adminLinks,
+  viz,
+  data,
+}: MapSidebarProps) {
+  const { viewMode, setViewMode, autoRotate, setAutoRotate } = view;
+  const { logFileRef, geoFileRef, uploadFile } = uploads;
+  const { fetchData, resetView, exportPng, toggleSidebar } = actions;
+  const {
+    minCount,
+    setMinCount,
+    arcCountInfo,
+    maxArcs,
+    setMaxArcs,
+    showLegend,
+    setShowLegend,
+    showStats,
+    setShowStats,
+    showHeatmap,
+    setShowHeatmap,
+    showCountryLabels,
+    setShowCountryLabels,
+    monoArcs,
+    setMonoArcs,
+  } = viz;
+  const { autoRefresh, setAutoRefresh, dataSource, selectDataSource, backupAttached } = data;
   const location = useLocation();
 
   return (

@@ -1370,6 +1370,10 @@ components:
 
     EventsResponse:
       type: object
+      description: |
+        Payload карты (/api/events). Поля lines/points синхронизировать с
+        frontend/src/pages/Map/mapTypes.ts (MapLine / MapPoint) и
+        backend/internal/model Line / Node.
       properties:
         group_by: { type: string }
         filter: { type: string }
@@ -1379,12 +1383,16 @@ components:
         minutes: { type: integer }
         from: { type: string }
         to: { type: string }
+        data_source: { type: string, enum: [live, backup] }
+        backup_attached: { type: string }
         lines:
           type: array
-          items: { type: object }
+          items:
+            $ref: "#/components/schemas/MapLine"
         points:
           type: object
-          additionalProperties: { type: object }
+          additionalProperties:
+            $ref: "#/components/schemas/MapPoint"
         stats:
           type: object
           properties:
@@ -1396,3 +1404,64 @@ components:
               type: string
               description: "ip | geo_city | geo_country"
               example: geo_city
+
+    ReputationHit:
+      type: object
+      properties:
+        list: { type: string }
+        category: { type: string }
+        network: { type: string }
+
+    MapPoint:
+      type: object
+      required: [lat, lon]
+      properties:
+        lat: { type: number }
+        lon: { type: number }
+        country: { type: string }
+        city: { type: string }
+        region: { type: string }
+        label: { type: string }
+        count: { type: integer }
+        reputation:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReputationHit"
+
+    MapLine:
+      type: object
+      required: [src, dst]
+      properties:
+        src: { type: string }
+        dst: { type: string }
+        src_label: { type: string }
+        dst_label: { type: string }
+        src_lat: { type: number }
+        src_lon: { type: number }
+        dst_lat: { type: number }
+        dst_lon: { type: number }
+        status: { type: string }
+        blocked: { type: boolean }
+        count: { type: integer }
+        allowed_count: { type: integer }
+        blocked_count: { type: integer }
+        bytes_sent: { type: integer }
+        bytes_recv: { type: integer }
+        rule: { type: string }
+        proto: { type: string }
+        src_port: { type: integer }
+        dst_port: { type: integer }
+        src_zone: { type: string }
+        dst_zone: { type: string }
+        src_country: { type: string }
+        dst_country: { type: string }
+        device: { type: string }
+        last_action: { type: string }
+        src_reputation:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReputationHit"
+        dst_reputation:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReputationHit"

@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { apiFetch } from '@/api/client';
 import { fmtNumber } from '@/lib/format';
 import { mapRuCountry } from './mapConstants';
@@ -341,6 +340,46 @@ export async function fetchCountrySeries(
   return apiFetch<SeriesPayload>(url, { signal, cache: 'no-store' });
 }
 
+function DetailSparkline({ detail }: { detail: DetailState }) {
+  if (detail.kind !== 'country') return null;
+
+  if (detail.sparklineLoading) {
+    return (
+      <>
+        <div className="detail-section-title">Динамика</div>
+        <div className="detail-sparkline">
+          <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Загрузка ряда…</div>
+        </div>
+      </>
+    );
+  }
+
+  if (detail.sparklineError) {
+    return (
+      <>
+        <div className="detail-section-title">Динамика</div>
+        <div className="detail-sparkline">
+          <div style={{ color: 'var(--red)', fontSize: 11 }} role="alert">
+            Ряд недоступен: {detail.sparklineError}
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  if (!detail.sparklineHtml) return null;
+
+  return (
+    <>
+      {detail.bucketSec != null ? (
+        <div className="detail-section-title">Динамика (bucket {detail.bucketSec}s)</div>
+      ) : null}
+      {/* Trusted SVG from renderSparklineSVG (numeric coords only) */}
+      <div dangerouslySetInnerHTML={{ __html: detail.sparklineHtml }} />
+    </>
+  );
+}
+
 export function MapDetailPanel({
   detail,
   onClose,
@@ -348,23 +387,6 @@ export function MapDetailPanel({
   detail: DetailState | null;
   onClose: () => void;
 }) {
-  const [sparkHtml, setSparkHtml] = useState<string>('');
-
-  useEffect(() => {
-    if (detail?.sparklineHtml) setSparkHtml(detail.sparklineHtml);
-    else if (detail?.sparklineLoading) {
-      setSparkHtml(
-        '<div class="detail-sparkline"><div style="color:var(--text-muted);font-size:11px">Загрузка ряда…</div></div>',
-      );
-    } else if (detail?.sparklineError) {
-      setSparkHtml(
-        `<div class="detail-sparkline"><div style="color:var(--red);font-size:11px">Ряд недоступен: ${detail.sparklineError}</div></div>`,
-      );
-    } else {
-      setSparkHtml('');
-    }
-  }, [detail?.sparklineHtml, detail?.sparklineLoading, detail?.sparklineError]);
-
   const open = !!detail;
   return (
     <aside className={`detail-panel${open ? ' open' : ''}`} id="detailPanel">
@@ -397,18 +419,7 @@ export function MapDetailPanel({
         <div className="detail-actions" id="detailActions" style={{ display: 'none' }} />
       )}
       <div className="detail-body" id="detailBody">
-        {detail?.kind === 'country' && sparkHtml ? (
-          <>
-            {detail.bucketSec != null ? (
-              <div className="detail-section-title">
-                Динамика (bucket {detail.bucketSec}s)
-              </div>
-            ) : detail.sparklineLoading ? (
-              <div className="detail-section-title">Динамика</div>
-            ) : null}
-            <div dangerouslySetInnerHTML={{ __html: sparkHtml }} />
-          </>
-        ) : null}
+        {detail ? <DetailSparkline detail={detail} /> : null}
         {detail?.sections.map((sec, si) => (
           <div key={`${sec.title || 'sec'}-${si}`}>
             {sec.title ? <div className="detail-section-title">{sec.title}</div> : null}

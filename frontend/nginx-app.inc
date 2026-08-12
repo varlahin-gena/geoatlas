@@ -256,14 +256,56 @@
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    # Долгое обновление reputation-фидов (backend до 10 мин)
+    # Reputation mutations: ops на backend (auth_matrix). GET lists/feeds/catalog —
+    # admin; nginx пропускает ≥ops, backend режет GET для чистого ops Bearer.
+    # Долгое обновление фидов (backend до 10 мин).
     location = /api/reputation/refresh {
-        auth_request /auth-check-admin;
+        auth_request /auth-check-ops;
 
         proxy_pass http://backend:8080;
         proxy_http_version 1.1;
         proxy_read_timeout 1800s;
         proxy_send_timeout 1800s;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-Host $http_host;
+        proxy_set_header Cookie $http_cookie;
+        proxy_set_header Authorization $http_authorization;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location = /api/reputation/feeds {
+        auth_request /auth-check-ops;
+        proxy_pass http://backend:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-Host $http_host;
+        proxy_set_header Cookie $http_cookie;
+        proxy_set_header Authorization $http_authorization;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location ~ ^/api/reputation/(feeds|lists)/[^/]+$ {
+        auth_request /auth-check-ops;
+        proxy_pass http://backend:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-Host $http_host;
+        proxy_set_header Cookie $http_cookie;
+        proxy_set_header Authorization $http_authorization;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Lookup на карте: любой залогиненный (tierLogin в auth_matrix)
+    location = /api/reputation/lookup {
+        auth_request /auth-check;
+        proxy_pass http://backend:8080;
+        proxy_http_version 1.1;
         proxy_set_header Host $http_host;
         proxy_set_header X-Forwarded-Host $http_host;
         proxy_set_header Cookie $http_cookie;

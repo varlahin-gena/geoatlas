@@ -1,70 +1,71 @@
+import type { Dispatch, SetStateAction } from 'react';
 import { SystemHealthPill, UserMenu } from '@/components/Shell';
 import { SearchBuilder } from './SearchBuilder';
 import { PERIODS } from './mapPeriods';
 import { categoryLabel } from './mapReputation';
 import type { RepFilterSide } from './mapTypes';
 
-export function MapTopbar({
-  search,
-  setSearch,
-  builderOpen,
-  setBuilderOpen,
-  groupBy,
-  setGroupBy,
-  filter,
-  setFilter,
-  reputationEnabled,
-  ipMode,
-  repFilterCount,
-  repMenuOpen,
-  setRepMenuOpen,
-  repCategories,
-  setRepCategories,
-  repLists,
-  setRepLists,
-  repSide,
-  setRepSide,
-  repColorArcs,
-  setRepColorArcs,
-  repTree,
-  period,
-  setPeriod,
-  periodFrom,
-  setPeriodFrom,
-  periodTo,
-  setPeriodTo,
-  fetchData,
-}: {
-  search: string;
-  setSearch: (v: string) => void;
-  builderOpen: boolean;
-  setBuilderOpen: (v: boolean | ((prev: boolean) => boolean)) => void;
-  groupBy: string;
-  setGroupBy: (v: string) => void;
-  filter: 'all' | 'allowed' | 'blocked';
-  setFilter: (v: 'all' | 'allowed' | 'blocked') => void;
-  reputationEnabled: boolean;
-  ipMode: boolean;
-  repFilterCount: number;
-  repMenuOpen: boolean;
-  setRepMenuOpen: (v: boolean | ((prev: boolean) => boolean)) => void;
-  repCategories: Set<string>;
-  setRepCategories: (v: Set<string> | ((prev: Set<string>) => Set<string>)) => void;
-  repLists: Set<string>;
-  setRepLists: (v: Set<string> | ((prev: Set<string>) => Set<string>)) => void;
-  repSide: RepFilterSide;
-  setRepSide: (v: RepFilterSide) => void;
-  repColorArcs: boolean;
-  setRepColorArcs: (v: boolean) => void;
-  repTree: Record<string, Set<string>>;
-  period: string;
-  setPeriod: (v: string) => void;
-  periodFrom: string;
-  setPeriodFrom: (v: string) => void;
-  periodTo: string;
-  setPeriodTo: (v: string) => void;
-  fetchData: () => void | Promise<void>;
-}) {
+export type MapTopbarProps = {
+  search: {
+    search: string;
+    setSearch: (v: string) => void;
+    builderOpen: boolean;
+    setBuilderOpen: Dispatch<SetStateAction<boolean>>;
+  };
+  grouping: {
+    groupBy: string;
+    setGroupBy: (v: string) => void;
+    filter: 'all' | 'allowed' | 'blocked';
+    setFilter: (v: 'all' | 'allowed' | 'blocked') => void;
+  };
+  reputation: {
+    reputationEnabled: boolean;
+    ipMode: boolean;
+    repFilterCount: number;
+    repMenuOpen: boolean;
+    setRepMenuOpen: Dispatch<SetStateAction<boolean>>;
+    repCategories: Set<string>;
+    setRepCategories: Dispatch<SetStateAction<Set<string>>>;
+    repLists: Set<string>;
+    setRepLists: Dispatch<SetStateAction<Set<string>>>;
+    repSide: RepFilterSide;
+    setRepSide: (v: RepFilterSide) => void;
+    repColorArcs: boolean;
+    setRepColorArcs: (v: boolean) => void;
+    repTree: Record<string, Set<string>>;
+  };
+  period: {
+    period: string;
+    setPeriod: (v: string) => void;
+    periodFrom: string;
+    setPeriodFrom: (v: string) => void;
+    periodTo: string;
+    setPeriodTo: (v: string) => void;
+    fetchData: () => void | Promise<void>;
+  };
+};
+
+export function MapTopbar({ search: searchCtl, grouping, reputation, period: periodCtl }: MapTopbarProps) {
+  const { search, setSearch, builderOpen, setBuilderOpen } = searchCtl;
+  const { groupBy, setGroupBy, filter, setFilter } = grouping;
+  const {
+    reputationEnabled,
+    ipMode,
+    repFilterCount,
+    repMenuOpen,
+    setRepMenuOpen,
+    repCategories,
+    setRepCategories,
+    repLists,
+    setRepLists,
+    repSide,
+    setRepSide,
+    repColorArcs,
+    setRepColorArcs,
+    repTree,
+  } = reputation;
+  const { period, setPeriod, periodFrom, setPeriodFrom, periodTo, setPeriodTo, fetchData } = periodCtl;
+
   return (
     <header className="topbar">
       <div className="search-box">

@@ -10,8 +10,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import * as authApi from '@/api/auth';
 import type { AuthUser } from '@/api/types';
-import { ROLE_ADMIN } from '@/api/types';
 import { applyTheme, getTheme, toggleTheme, type Theme } from './theme';
+import { deriveIsAdmin, deriveReputationEnabled, deriveUiAuthEnabled } from './roles';
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -89,13 +89,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<AuthContextValue>(() => {
-    const isAdmin = !user || !!user.authDisabled || user.role === ROLE_ADMIN;
     return {
       user,
       loading,
-      isAdmin,
-      reputationEnabled: !user || user.reputationEnabled !== false,
-      uiAuthEnabled: !user || !user.authDisabled,
+      isAdmin: deriveIsAdmin(user),
+      reputationEnabled: deriveReputationEnabled(user),
+      uiAuthEnabled: deriveUiAuthEnabled(user),
       theme,
       refresh,
       login,
