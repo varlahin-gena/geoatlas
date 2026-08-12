@@ -22,12 +22,13 @@ type loginRequest struct {
 }
 
 type authUserResponse struct {
-	Username            string `json:"username"`
-	FullName            string `json:"full_name,omitempty"`
-	Role                string `json:"role"`
-	MustResetPassword   bool   `json:"must_reset_password,omitempty"`
-	AuthDisabled        bool   `json:"authDisabled,omitempty"`
-	ReputationEnabled   bool   `json:"reputationEnabled"`
+	Username           string `json:"username"`
+	FullName           string `json:"full_name,omitempty"`
+	Role               string `json:"role"`
+	MustResetPassword  bool   `json:"must_reset_password,omitempty"`
+	GeoWizardDismissed bool   `json:"geo_wizard_dismissed,omitempty"`
+	AuthDisabled       bool   `json:"authDisabled,omitempty"`
+	ReputationEnabled  bool   `json:"reputationEnabled"`
 }
 
 type changePasswordRequest struct {
@@ -56,21 +57,27 @@ type setFullNameRequest struct {
 	FullName string `json:"full_name"`
 }
 
+type geoWizardDismissRequest struct {
+	Dismissed *bool `json:"dismissed"`
+}
+
 func userResponse(u auth.User) authUserResponse {
 	return authUserResponse{
-		Username:          u.Username,
-		FullName:          u.FullName,
-		Role:              u.Role,
-		MustResetPassword: u.MustResetPassword,
+		Username:           u.Username,
+		FullName:           u.FullName,
+		Role:               u.Role,
+		MustResetPassword:  u.MustResetPassword,
+		GeoWizardDismissed: u.GeoWizardDismissed,
 	}
 }
 
 func userPublicResponse(u auth.UserPublic) authUserResponse {
 	return authUserResponse{
-		Username:          u.Username,
-		FullName:          u.FullName,
-		Role:              u.Role,
-		MustResetPassword: u.MustResetPassword,
+		Username:           u.Username,
+		FullName:           u.FullName,
+		Role:               u.Role,
+		MustResetPassword:  u.MustResetPassword,
+		GeoWizardDismissed: u.GeoWizardDismissed,
 	}
 }
 
@@ -210,6 +217,45 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, userPublicResponse(pub))
+}
+
+// DismissGeoWizard — POST /api/auth/geo-wizard-dismiss (свой флаг first-run GeoIP).
+func (h *AuthHandler) DismissGeoWizard(w http.ResponseWriter, r *http.Request) {
+	if h.authDisabled() {
+		writeJSON(w, http.StatusOK, h.withModuleFlags(authUserResponse{
+			Username:           "anonymous",
+			Role:               auth.RoleAdministrator,
+			AuthDisabled:       true,
+			GeoWizardDismissed: true,
+		}))
+		return
+	}
+	sess, err := SessionFromRequest(r, h.sessions)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
+		return
+	}
+	var req geoWizardDismissRequest
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+		return
+	}
+	if req.Dismissed == nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "dismissed required"})
+		return
+	}
+	if h.authUC == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "auth not configured"})
+		return
+	}
+	pub, err := h.authUC.SetGeoWizardDismissed(sess.Username, *req.Dismissed)
+	if err != nil {
+		writeUserStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, h.withModuleFlags(userPublicResponse(pub)))
 }
 
 // Check — GET /api/auth/check (nginx auth_request: любой залогиненный или Bearer≥read).

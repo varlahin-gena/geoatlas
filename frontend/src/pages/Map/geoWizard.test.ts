@@ -1,0 +1,98 @@
+import { describe, expect, it } from 'vitest';
+import {
+  buildGeoCurlSnippet,
+  classifyEmptyMap,
+  formatNetworkHint,
+  shouldShowGeoWizard,
+} from './geoWizard';
+
+describe('shouldShowGeoWizard', () => {
+  it('shows for admin with empty geo and not dismissed', () => {
+    expect(
+      shouldShowGeoWizard({ isAdmin: true, dismissed: false, geoCount: 0 }),
+    ).toBe(true);
+  });
+
+  it('hides for operator / dismissed / nonempty / unknown', () => {
+    expect(
+      shouldShowGeoWizard({ isAdmin: false, dismissed: false, geoCount: 0 }),
+    ).toBe(false);
+    expect(
+      shouldShowGeoWizard({ isAdmin: true, dismissed: true, geoCount: 0 }),
+    ).toBe(false);
+    expect(
+      shouldShowGeoWizard({ isAdmin: true, dismissed: false, geoCount: 10 }),
+    ).toBe(false);
+    expect(
+      shouldShowGeoWizard({ isAdmin: true, dismissed: false, geoCount: null }),
+    ).toBe(false);
+  });
+
+  it('forceOpen overrides dismiss and nonempty', () => {
+    expect(
+      shouldShowGeoWizard({
+        isAdmin: true,
+        dismissed: true,
+        geoCount: 5,
+        forceOpen: true,
+      }),
+    ).toBe(true);
+  });
+});
+
+describe('classifyEmptyMap', () => {
+  it('distinguishes no_geo from no_events', () => {
+    const noGeo = classifyEmptyMap({
+      loading: false,
+      fetchError: null,
+      linesCount: 0,
+      visibleCount: 0,
+      rawPairs: 12,
+      skippedNoGeo: 12,
+      filterActive: false,
+      searchError: '',
+    });
+    expect(noGeo?.reason).toBe('no_geo');
+
+    const noEvents = classifyEmptyMap({
+      loading: false,
+      fetchError: null,
+      linesCount: 0,
+      visibleCount: 0,
+      rawPairs: 0,
+      skippedNoGeo: 0,
+      filterActive: false,
+      searchError: '',
+    });
+    expect(noEvents?.reason).toBe('no_events');
+  });
+
+  it('reports filtered when lines exist but none visible', () => {
+    const filtered = classifyEmptyMap({
+      loading: false,
+      fetchError: null,
+      linesCount: 3,
+      visibleCount: 0,
+      rawPairs: 3,
+      skippedNoGeo: 0,
+      filterActive: true,
+      searchError: '',
+    });
+    expect(filtered?.reason).toBe('filtered');
+  });
+});
+
+describe('buildGeoCurlSnippet', () => {
+  it('includes origin upload-geo path', () => {
+    const snip = buildGeoCurlSnippet('http://10.0.0.5:8080');
+    expect(snip).toContain('http://10.0.0.5:8080/upload-geo');
+    expect(snip).toContain('Authorization: Bearer $API_AUTH_TOKEN');
+  });
+});
+
+describe('formatNetworkHint', () => {
+  it('formats single and range', () => {
+    expect(formatNetworkHint(0x0a000001, 0x0a000001)).toBe('10.0.0.1');
+    expect(formatNetworkHint(0x0a000000, 0x0a0000ff)).toBe('10.0.0.0-10.0.0.255');
+  });
+});

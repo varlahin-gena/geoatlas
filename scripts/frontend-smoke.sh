@@ -69,7 +69,19 @@ grep -q 'upload-geo' \
   frontend/src/pages/Map/MapPage.tsx \
   frontend/src/pages/Map/useMapUploads.ts \
   frontend/src/pages/Map/MapSidebar.tsx || fail "map upload-geo"
+grep -q 'geo-wizard\|GeoWizard\|useGeoWizard' \
+  frontend/src/pages/Map/MapPage.tsx \
+  frontend/src/pages/Map/GeoWizardModal.tsx \
+  frontend/src/pages/Map/useGeoWizard.ts || fail "geo wizard"
+grep -q 'geo_wizard_dismissed\|/api/auth/geo-wizard-dismiss' \
+  frontend/src/api/auth.ts \
+  frontend/src/api/types.ts || fail "geo wizard dismiss API"
+grep -q 'classifyEmptyMap\|skipped_no_geo\|skippedNoGeo' \
+  frontend/src/pages/Map/geoWizard.ts \
+  frontend/src/pages/Map/useMapFilters.ts \
+  frontend/src/pages/Map/useMapEvents.ts || fail "empty map no-geo classification"
 [[ -f frontend/src/pages/Map/useMapEvents.ts ]] || fail "missing useMapEvents"
+[[ -f frontend/src/pages/Map/geoWizard.test.ts ]] || fail "missing geoWizard.test.ts"
 [[ -f frontend/src/pages/Map/MapSidebar.tsx ]] || fail "missing MapSidebar"
 [[ -f frontend/src/pages/Map/MapTopbar.tsx ]] || fail "missing MapTopbar"
 [[ -f frontend/eslint.config.js ]] || fail "missing eslint.config.js"

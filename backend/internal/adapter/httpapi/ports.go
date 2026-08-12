@@ -36,6 +36,7 @@ type GeoAPI interface {
 	UploadCSV(context.Context, io.Reader, bool) (usecasegeo.UploadResult, error)
 	PrecheckUpload(dryRun bool) error
 	IndexRangeCount() int
+	IndexReady() bool
 	ListMissing(context.Context, usecasegeo.ListMissingInput) (usecasegeo.ListMissingResult, error)
 	FormatNetwork(uint32, uint32) string
 	ListRanges(context.Context, usecasegeo.ListRangesInput) (usecasegeo.ListRangesResult, error)
@@ -104,6 +105,7 @@ type AuthAPI interface {
 	CreateUser(usecaseauth.CreateUserInput) (auth.UserPublic, error)
 	SetRole(string, string) (auth.UserPublic, error)
 	SetFullName(string, string) (auth.UserPublic, error)
+	SetGeoWizardDismissed(string, bool) (auth.UserPublic, error)
 	ResetPassword(usecaseauth.ResetPasswordInput) (auth.UserPublic, error)
 	DeleteUser(string, string) error
 }

@@ -4,6 +4,7 @@ import { mapRuCountry } from './mapConstants';
 import { lineMatchesFocusedCountry } from './mapHeatmap';
 import { hasCoords } from './mapLayers';
 import { lineMatchesReputation } from './mapReputation';
+import { classifyEmptyMap } from './geoWizard';
 import type { MapLine, MapPoint, RepFilterSide } from './mapTypes';
 
 export function useMapFilters(opts: {
@@ -11,6 +12,8 @@ export function useMapFilters(opts: {
   points: Record<string, MapPoint>;
   loading: boolean;
   fetchError: string | null;
+  rawPairs?: number;
+  skippedNoGeo?: number;
   repActive: boolean;
   repCategories: Set<string>;
   repLists: Set<string>;
@@ -21,6 +24,8 @@ export function useMapFilters(opts: {
     points,
     loading,
     fetchError,
+    rawPairs = 0,
+    skippedNoGeo = 0,
     repActive,
     repCategories,
     repLists,
@@ -137,42 +142,43 @@ export function useMapFilters(opts: {
   }, [visibleLines, points]);
 
   const emptyOverlay = useMemo(() => {
-    if (loading) return null;
-    if (fetchError) {
-      return { title: 'Ошибка загрузки', text: fetchError };
-    }
-    if (!lines.length) {
+    const filterHints: string[] = [];
+    if (filter !== 'all') filterHints.push(`фильтр «${filter}»`);
+    if (search) filterHints.push(`поиск «${search}»`);
+    if (minCount > 1) filterHints.push(`порог ≥ ${minCount} соб.`);
+    if (repActive) filterHints.push('репутация');
+    if (focusedCountry) filterHints.push('фокус страны');
+
+    const classified = classifyEmptyMap({
+      loading,
+      fetchError,
+      linesCount: lines.length,
+      visibleCount: visibleLines.length,
+      rawPairs,
+      skippedNoGeo,
+      filterActive: filterHints.length > 0,
+      searchError: compiled.mode === 'error' ? compiled.error || 'Ошибка поискового запроса' : '',
+    });
+    if (!classified) return null;
+    if (classified.reason === 'filtered' && filterHints.length) {
       return {
-        title: 'Нет событий за период',
-        text: 'Попробуйте расширить период, уменьшить порог minCount или проверить ingest.',
+        title: classified.title,
+        text: `Активные фильтры скрыли все связи: ${filterHints.join(', ')}.`,
       };
     }
-    if (!visibleLines.length) {
-      const hints: string[] = [];
-      if (filter !== 'all') hints.push(`фильтр «${filter}»`);
-      if (search) hints.push(`поиск «${search}»`);
-      if (minCount > 1) hints.push(`порог ≥ ${minCount} соб.`);
-      if (repActive) hints.push('репутация');
-      return {
-        title: 'Ничего не отображается',
-        text: hints.length
-          ? `Активные фильтры скрыли все связи: ${hints.join(', ')}.`
-          : 'Все связи отфильтрованы текущими настройками.',
-      };
-    }
-    if (compiled.mode === 'error') {
-      return { title: 'Ошибка поиска', text: compiled.error || '' };
-    }
-    return null;
+    return { title: classified.title, text: classified.text };
   }, [
     loading,
     fetchError,
     lines.length,
     visibleLines.length,
+    rawPairs,
+    skippedNoGeo,
     filter,
     search,
     minCount,
     repActive,
+    focusedCountry,
     compiled,
   ]);
 

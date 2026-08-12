@@ -131,6 +131,37 @@ func TestUserCreateResetAndMustReset(t *testing.T) {
 	}
 }
 
+func TestSetGeoWizardDismissed(t *testing.T) {
+	hash, err := HashPassword("adminpass1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := NewUserStore(User{
+		Username: "admin", PasswordHash: string(hash), Role: RoleAdministrator,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pub, err := store.SetGeoWizardDismissed("admin", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !pub.GeoWizardDismissed {
+		t.Fatal("expected dismissed")
+	}
+	got, ok := store.Get("admin")
+	if !ok || !got.GeoWizardDismissed {
+		t.Fatalf("Get dismissed=%v ok=%v", got.GeoWizardDismissed, ok)
+	}
+	pub, err = store.SetGeoWizardDismissed("admin", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pub.GeoWizardDismissed {
+		t.Fatal("expected cleared")
+	}
+}
+
 func TestCookieRoundTrip(t *testing.T) {
 	mgr, err := NewSessionManager("cookie-secret", time.Hour)
 	if err != nil {

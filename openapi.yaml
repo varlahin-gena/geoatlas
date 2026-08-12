@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: ГеоАтлас API
-  version: "1.4.0"
+  version: "1.5.0"
   description: |
     Backend API для приёма syslog/логов МСЭ, GeoIP и карты трафика.
 
@@ -70,7 +70,7 @@ paths:
       summary: Текущий пользователь
       responses:
         "200":
-          description: OK (поля username, role, must_reset_password)
+          description: OK (поля username, role, must_reset_password, geo_wizard_dismissed)
         "401":
           description: Нет сессии
   /api/auth/change-password:
@@ -82,6 +82,32 @@ paths:
           description: OK
         "401":
           description: Неверный текущий пароль / нет сессии
+  /api/auth/geo-wizard-dismiss:
+    post:
+      tags: [auth]
+      summary: Скрыть или снова показать first-run GeoIP wizard
+      description: |
+        Любой залогиненный пользователь. Флаг хранится в `users.json` (`geo_wizard_dismissed`).
+        При `AUTH_DISABLED` отвечает ok без персистентности.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [dismissed]
+              properties:
+                dismissed: { type: boolean }
+      responses:
+        "200":
+          description: OK (обновлённый пользователь)
+        "400":
+          description: Неверный JSON
+        "401":
+          description: Нет сессии
   /api/auth/check:
     get:
       tags: [auth]
@@ -448,7 +474,9 @@ paths:
           schema: { type: integer, default: 2000, maximum: 10000 }
       responses:
         "200":
-          description: ranges list
+          description: |
+            ranges list; `count` — всего в базе/индексе; `index_ready` — in-memory индекс
+            после стартового Reload готов (false пока идёт асинхронная загрузка).
         "401":
           description: unauthorized
         "403":

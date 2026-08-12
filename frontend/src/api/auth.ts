@@ -29,3 +29,10 @@ export function changePassword(oldPassword: string, newPassword: string): Promis
     }),
   }).then(() => undefined);
 }
+
+export function setGeoWizardDismissed(dismissed: boolean): Promise<AuthUser> {
+  return apiFetch<AuthUser>('/api/auth/geo-wizard-dismiss', {
+    method: 'POST',
+    body: JSON.stringify({ dismissed }),
+  });
+}

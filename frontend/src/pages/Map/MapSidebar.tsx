@@ -18,6 +18,10 @@ export type MapSidebarProps = {
     geoFileRef: RefObject<HTMLInputElement | null>;
     uploadFile: (kind: 'logs' | 'geo', file: File) => void | Promise<void>;
   };
+  geoWizard?: {
+    open: () => void;
+    empty: boolean;
+  };
   actions: {
     fetchData: () => void | Promise<void>;
     resetView: () => void;
@@ -55,6 +59,7 @@ export function MapSidebar({
   view,
   isAdmin,
   uploads,
+  geoWizard,
   actions,
   adminLinks,
   viz,
@@ -184,6 +189,19 @@ export function MapSidebar({
             </svg>
             <span className="label">Обновить GeoIP</span>
           </button>
+          {geoWizard ? (
+            <button
+              type="button"
+              className="side-btn"
+              title="Мастер первой загрузки GeoIP"
+              onClick={geoWizard.open}
+            >
+              <Icon d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+              <span className="label">
+                {geoWizard.empty ? 'Мастер GeoIP' : 'Мастер GeoIP'}
+              </span>
+            </button>
+          ) : null}
         </div>
       ) : null}
 

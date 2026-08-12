@@ -110,6 +110,13 @@ func (s *Service) SetFullName(username, fullName string) (domain.UserPublic, err
 	return s.users.SetFullName(username, fullName)
 }
 
+func (s *Service) SetGeoWizardDismissed(username string, dismissed bool) (domain.UserPublic, error) {
+	if s == nil || s.users == nil {
+		return domain.UserPublic{}, ErrNotConfigured
+	}
+	return s.users.SetGeoWizardDismissed(username, dismissed)
+}
+
 type ResetPasswordInput struct {
 	Username          string
 	Password          string

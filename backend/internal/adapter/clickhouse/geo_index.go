@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"runtime"
+	"sync/atomic"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
@@ -13,17 +14,26 @@ import (
 // ReloadableGeoIndex — *geoip.Index + Reload из ClickHouse.
 type ReloadableGeoIndex struct {
 	*geoip.Index
-	ch clickhouse.Conn
+	ch    clickhouse.Conn
+	ready atomic.Bool
 }
 
 func NewReloadableGeoIndex(ch clickhouse.Conn) *ReloadableGeoIndex {
 	return &ReloadableGeoIndex{Index: geoip.New(), ch: ch}
 }
 
+// IndexReady — true после первой попытки Reload (успех или пустая база).
+// Пока false, in-memory индекс ещё поднимается асинхронно при старте.
+func (i *ReloadableGeoIndex) IndexReady() bool {
+	return i != nil && i.ready.Load()
+}
+
 func (i *ReloadableGeoIndex) Reload(ctx context.Context) error {
 	if i == nil || i.Index == nil {
 		return nil
 	}
+	defer i.ready.Store(true)
+
 	before := i.RangeCount()
 	var msBefore runtime.MemStats
 	runtime.ReadMemStats(&msBefore)

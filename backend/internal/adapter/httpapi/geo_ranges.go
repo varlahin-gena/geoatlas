@@ -103,7 +103,8 @@ func (h *GeoHandler) ListGeoRanges(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"ok": true, "count": result.Total, "filtered": result.Filtered,
 			"shown": len(items), "ip": result.IP, "ip_hit": result.IPHit, "ranges": items,
-			"limits": limits,
+			"index_ready": h.geoUC.IndexReady(),
+			"limits":      limits,
 		})
 		return
 	}
@@ -111,7 +112,8 @@ func (h *GeoHandler) ListGeoRanges(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok": true, "count": result.Total, "filtered": result.Filtered,
 		"shown": len(items), "truncated": result.Truncated, "ranges": items,
-		"limits": limits,
+		"index_ready": h.geoUC.IndexReady(),
+		"limits":      limits,
 	})
 }
 

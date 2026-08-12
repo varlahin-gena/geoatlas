@@ -8,6 +8,7 @@ export interface AuthUser {
   full_name?: string;
   role: UserRole;
   must_reset_password?: boolean;
+  geo_wizard_dismissed?: boolean;
   authDisabled?: boolean;
   reputationEnabled?: boolean;
 }

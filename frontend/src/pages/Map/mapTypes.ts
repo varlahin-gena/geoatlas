@@ -60,7 +60,14 @@ export interface EventsPayload {
   source?: string;
   data_source?: string;
   backup_attached?: string;
-  stats?: Record<string, unknown>;
+  stats?: {
+    raw_pairs?: number;
+    edges?: number;
+    nodes?: number;
+    skipped_no_geo?: number;
+    source?: string;
+    [key: string]: unknown;
+  };
 }
 
 export interface SeriesPoint {

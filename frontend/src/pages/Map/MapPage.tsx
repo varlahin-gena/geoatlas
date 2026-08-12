@@ -9,6 +9,8 @@ import { buildDeckLayers } from './mapLayers';
 import { MapSidebar } from './MapSidebar';
 import { MapTopbar } from './MapTopbar';
 import { MapVizOverlays } from './MapVizOverlays';
+import { GeoWizardModal } from './GeoWizardModal';
+import { useGeoWizard } from './useGeoWizard';
 import { useMapDetail } from './useMapDetail';
 import { useMapEvents } from './useMapEvents';
 import { useMapFilters } from './useMapFilters';
@@ -17,9 +19,10 @@ import { useMapReputation } from './useMapReputation';
 import { useMapUploads } from './useMapUploads';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import '@/styles/index.css';
+import './geoWizard.css';
 
 export default function MapPage() {
-  const { isAdmin, reputationEnabled, uiAuthEnabled, theme } = useAuth();
+  const { isAdmin, reputationEnabled, uiAuthEnabled, theme, user, refresh } = useAuth();
   const { toast } = useToast();
 
   const {
@@ -35,6 +38,7 @@ export default function MapPage() {
     lines,
     loading,
     fetchError,
+    eventStats,
     autoRefresh,
     setAutoRefresh,
     dataSource,
@@ -84,10 +88,21 @@ export default function MapPage() {
     points,
     loading,
     fetchError,
+    rawPairs: eventStats.rawPairs,
+    skippedNoGeo: eventStats.skippedNoGeo,
     repActive,
     repCategories,
     repLists,
     repSide,
+  });
+
+  const geoWizard = useGeoWizard({
+    isAdmin,
+    user,
+    uiAuthEnabled,
+    toast,
+    refreshUser: refresh,
+    onGeoReady: fetchData,
   });
 
   const [viewMode, setViewMode] = useState<'map' | 'globe'>('map');
@@ -249,6 +264,10 @@ export default function MapPage() {
         uploads={{ logFileRef, geoFileRef, uploadFile }}
         actions={{ fetchData, resetView, exportPng, toggleSidebar }}
         adminLinks={adminLinks}
+        geoWizard={{
+          open: geoWizard.open,
+          empty: geoWizard.geo != null && geoWizard.geo.count === 0,
+        }}
         viz={{
           minCount,
           setMinCount,
@@ -309,6 +328,18 @@ export default function MapPage() {
         <div className={`viz-area${loading ? ' is-loading' : ''}`}>
           <div ref={mapContainer} id="map-host" className="viz-host" />
 
+          {isAdmin &&
+          !geoWizard.visible &&
+          geoWizard.geo != null &&
+          geoWizard.geo.count === 0 ? (
+            <div className="geo-wizard-banner" role="status">
+              <p>База GeoIP пуста — карта не покажет дуги без координат.</p>
+              <button type="button" className="btn primary" onClick={geoWizard.open}>
+                Мастер GeoIP
+              </button>
+            </div>
+          ) : null}
+
           <MapVizOverlays
             truncHint={truncHint}
             emptyOverlay={emptyOverlay}
@@ -323,6 +354,25 @@ export default function MapPage() {
           <MapDetailPanel detail={detail} onClose={closeDetail} />
         </div>
       </main>
+
+      {geoWizard.visible ? (
+        <GeoWizardModal
+          step={geoWizard.step}
+          setStep={geoWizard.setStep}
+          busy={geoWizard.busy}
+          geo={geoWizard.geo}
+          preview={geoWizard.preview}
+          pendingFile={geoWizard.pendingFile}
+          pollNote={geoWizard.pollNote}
+          curlSnippet={geoWizard.curlSnippet}
+          fileRef={geoWizard.fileRef}
+          onDismiss={() => void geoWizard.dismiss()}
+          onCloseSuccess={() => void geoWizard.closeAfterSuccess()}
+          onDryRun={(file) => void geoWizard.runDryRun(file)}
+          onCommit={() => void geoWizard.commitUpload()}
+          onWaitForCurl={() => void geoWizard.waitForGeo()}
+        />
+      ) : null}
     </div>
   );
 }

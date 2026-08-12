@@ -14,6 +14,7 @@ type UserRepository interface {
 	Create(username, password, role, fullName string, mustReset bool) (domain.UserPublic, error)
 	SetRole(username, role string) (domain.UserPublic, error)
 	SetFullName(username, fullName string) (domain.UserPublic, error)
+	SetGeoWizardDismissed(username string, dismissed bool) (domain.UserPublic, error)
 	ResetPassword(username, password string, mustReset bool) (domain.UserPublic, error)
 	ChangePassword(username, oldPassword, newPassword string) (domain.UserPublic, error)
 	Delete(username, actorUsername string) error

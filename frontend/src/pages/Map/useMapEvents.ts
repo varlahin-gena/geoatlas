@@ -15,6 +15,7 @@ export function useMapEvents(toast: (msg: string, kind?: ToastKind) => void) {
   const [lines, setLines] = useState<MapLine[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [eventStats, setEventStats] = useState({ rawPairs: 0, skippedNoGeo: 0 });
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [dataSource, setDataSource] = useState<MapDataSource>('live');
   const [backupAttached, setBackupAttached] = useState('');
@@ -50,6 +51,10 @@ export function useMapEvents(toast: (msg: string, kind?: ToastKind) => void) {
       if (controller.signal.aborted) return;
       setPoints(data.points || {});
       setLines(data.lines || []);
+      setEventStats({
+        rawPairs: Number(data.stats?.raw_pairs) || 0,
+        skippedNoGeo: Number(data.stats?.skipped_no_geo) || 0,
+      });
       const attached = (data.backup_attached || '').trim();
       setBackupAttached(attached);
       if (!attached && dataSource === 'backup') {
@@ -97,6 +102,7 @@ export function useMapEvents(toast: (msg: string, kind?: ToastKind) => void) {
     lines,
     loading,
     fetchError,
+    eventStats,
     autoRefresh,
     setAutoRefresh,
     dataSource,

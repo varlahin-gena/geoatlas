@@ -28,6 +28,7 @@ func expectedAuthMatrix() map[string]authTier {
 		"POST /api/auth/logout":                     tierPublic,
 		"GET /api/auth/me":                          tierPublic, // handler returns 401 itself
 		"POST /api/auth/change-password":            tierPublic, // handler checks session
+		"POST /api/auth/geo-wizard-dismiss":         tierLogin,
 		"GET /api/auth/check":                       tierPublic,
 		"GET /api/auth/check-admin":                 tierPublic,
 		"GET /api/auth/check-ops":                   tierPublic,

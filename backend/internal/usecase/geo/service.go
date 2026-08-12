@@ -50,6 +50,22 @@ func (s *Service) IndexRangeCount() int {
 	return s.index.RangeCount()
 }
 
+type indexReadiness interface {
+	IndexReady() bool
+}
+
+// IndexReady — готовность in-memory индекса после стартового Reload.
+// Если индекс не реализует readiness (тесты/простые stubs) — считаем ready.
+func (s *Service) IndexReady() bool {
+	if s == nil || s.index == nil {
+		return true
+	}
+	if r, ok := s.index.(indexReadiness); ok {
+		return r.IndexReady()
+	}
+	return true
+}
+
 // PrecheckUpload отклоняет опасный full-replace до чтения тела (когда индекс уже крупный).
 // dry_run не блокирует — CSV можно проверить без записи.
 func (s *Service) PrecheckUpload(dryRun bool) error {

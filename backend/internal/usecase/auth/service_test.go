@@ -37,6 +37,16 @@ func (f *fakeUsers) SetRole(string, string) (domain.UserPublic, error) {
 func (f *fakeUsers) SetFullName(string, string) (domain.UserPublic, error) {
 	return domain.UserPublic{}, f.err
 }
+func (f *fakeUsers) SetGeoWizardDismissed(string, bool) (domain.UserPublic, error) {
+	if f.err != nil {
+		return domain.UserPublic{}, f.err
+	}
+	if f.user == nil {
+		return domain.UserPublic{}, domain.ErrUserNotFound
+	}
+	f.user.GeoWizardDismissed = true
+	return f.user.Public(), nil
+}
 func (f *fakeUsers) ResetPassword(string, string, bool) (domain.UserPublic, error) {
 	return domain.UserPublic{}, f.err
 }

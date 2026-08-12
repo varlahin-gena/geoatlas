@@ -36,30 +36,33 @@ const (
 
 // User — локальная учётная запись (пароль хранится как bcrypt-хеш).
 type User struct {
-	Username          string `json:"username"`
-	FullName          string `json:"full_name,omitempty"`
-	PasswordHash      string `json:"password_hash"`
-	Role              string `json:"role"`
-	MustResetPassword bool   `json:"must_reset_password"`
-	CreatedAt         string `json:"created_at,omitempty"`
+	Username           string `json:"username"`
+	FullName           string `json:"full_name,omitempty"`
+	PasswordHash       string `json:"password_hash"`
+	Role               string `json:"role"`
+	MustResetPassword  bool   `json:"must_reset_password"`
+	GeoWizardDismissed bool   `json:"geo_wizard_dismissed,omitempty"`
+	CreatedAt          string `json:"created_at,omitempty"`
 }
 
 // UserPublic — данные без хеша пароля для API/UI.
 type UserPublic struct {
-	Username          string `json:"username"`
-	FullName          string `json:"full_name,omitempty"`
-	Role              string `json:"role"`
-	MustResetPassword bool   `json:"must_reset_password"`
-	CreatedAt         string `json:"created_at,omitempty"`
+	Username           string `json:"username"`
+	FullName           string `json:"full_name,omitempty"`
+	Role               string `json:"role"`
+	MustResetPassword  bool   `json:"must_reset_password"`
+	GeoWizardDismissed bool   `json:"geo_wizard_dismissed,omitempty"`
+	CreatedAt          string `json:"created_at,omitempty"`
 }
 
 func (u User) Public() UserPublic {
 	return UserPublic{
-		Username:          u.Username,
-		FullName:          u.FullName,
-		Role:              u.Role,
-		MustResetPassword: u.MustResetPassword,
-		CreatedAt:         u.CreatedAt,
+		Username:           u.Username,
+		FullName:           u.FullName,
+		Role:               u.Role,
+		MustResetPassword:  u.MustResetPassword,
+		GeoWizardDismissed: u.GeoWizardDismissed,
+		CreatedAt:          u.CreatedAt,
 	}
 }
 
@@ -355,6 +358,24 @@ func (s *UserStore) SetFullName(username, fullName string) (UserPublic, error) {
 		return UserPublic{}, ErrUserNotFound
 	}
 	u.FullName = fn
+	if err := s.persistUnlocked(); err != nil {
+		return UserPublic{}, err
+	}
+	return u.Public(), nil
+}
+
+// SetGeoWizardDismissed — скрыть / снова показать first-run GeoIP wizard для УЗ.
+func (s *UserStore) SetGeoWizardDismissed(username string, dismissed bool) (UserPublic, error) {
+	if s == nil {
+		return UserPublic{}, ErrUserNotFound
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	u := s.byLower[strings.ToLower(strings.TrimSpace(username))]
+	if u == nil {
+		return UserPublic{}, ErrUserNotFound
+	}
+	u.GeoWizardDismissed = dismissed
 	if err := s.persistUnlocked(); err != nil {
 		return UserPublic{}, err
 	}
