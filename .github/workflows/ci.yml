@@ -10,7 +10,7 @@ jobs:
     name: release contract (VERSION / OpenAPI / CHANGELOG)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: check VERSION ↔ CHANGELOG ↔ OpenAPI
         run: bash scripts/check-release-contract.sh
 
@@ -18,7 +18,7 @@ jobs:
     name: shellcheck (deploy / start / scripts)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: shellcheck
@@ -31,9 +31,9 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version: "1.24.x"
           cache-dependency-path: |
@@ -91,9 +91,9 @@ jobs:
       run:
         working-directory: pkg/chconn
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version: "1.24.x"
           cache-dependency-path: |
@@ -110,9 +110,9 @@ jobs:
       run:
         working-directory: pkg/syslogngstats
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version: "1.24.x"
           cache-dependency-path: pkg/syslogngstats/go.mod
@@ -145,9 +145,9 @@ jobs:
           --health-retries 30
           --ulimit nofile=262144:262144
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version: "1.24.x"
           cache-dependency-path: |
@@ -214,9 +214,9 @@ jobs:
       run:
         working-directory: stats-collector
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version: "1.24.x"
           cache-dependency-path: |
@@ -245,7 +245,7 @@ jobs:
     name: frontend (SPA contract smoke)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: SPA / nginx contract
         run: bash scripts/frontend-smoke.sh
@@ -257,9 +257,9 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: aquasecurity/trivy-action@0.28.0
+      - uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -282,9 +282,9 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
