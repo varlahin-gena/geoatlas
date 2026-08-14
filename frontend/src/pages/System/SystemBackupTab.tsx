@@ -356,7 +356,7 @@ export function SystemBackupTab() {
           <div className="kv-row">
             <span className="k">Автобэкап</span>
             <span className="v">
-              <label className="side-toggle" style={{ margin: 0 }}>
+              <label className="toggle" style={{ margin: 0 }}>
                 <input
                   type="checkbox"
                   checked={!!sched.enabled}
@@ -447,7 +447,7 @@ export function SystemBackupTab() {
           <div className="kv-row">
             <span className="k">Edges</span>
             <span className="v">
-              <label className="side-toggle" style={{ margin: 0 }}>
+              <label className="toggle" style={{ margin: 0 }}>
                 <input
                   type="checkbox"
                   checked={!!sched.include_edges}
@@ -460,7 +460,7 @@ export function SystemBackupTab() {
           <div className="kv-row">
             <span className="k">Auth tarball</span>
             <span className="v">
-              <label className="side-toggle" style={{ margin: 0 }}>
+              <label className="toggle" style={{ margin: 0 }}>
                 <input
                   type="checkbox"
                   checked={!!sched.include_auth}
