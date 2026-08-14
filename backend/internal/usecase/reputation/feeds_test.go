@@ -2,11 +2,13 @@ package reputation_test
 
 import (
 	"context"
+	"net"
 	"path/filepath"
 	"testing"
 
 	"network_monitor/internal/adapter/reputationfeedsfile"
 	"network_monitor/internal/model"
+	"network_monitor/internal/safeurl"
 	usecasereputation "network_monitor/internal/usecase/reputation"
 )
 
@@ -63,6 +65,12 @@ func (s *stubRefresher) RefreshAll(ctx context.Context, force bool) (usecaserepu
 func (s *stubRefresher) SetFeeds(feeds []usecasereputation.Feed) { s.feeds = feeds }
 
 func TestAddRemoveFeed(t *testing.T) {
+	orig := safeurl.LookupIPv4
+	t.Cleanup(func() { safeurl.LookupIPv4 = orig })
+	safeurl.LookupIPv4 = func(host string) ([]net.IP, error) {
+		return []net.IP{net.ParseIP("93.184.216.34")}, nil
+	}
+
 	path := filepath.Join(t.TempDir(), "feeds.json")
 	store := reputationfeedsfile.New(path)
 	if err := store.Save(nil); err != nil {
@@ -89,6 +97,12 @@ func TestAddRemoveFeed(t *testing.T) {
 		Name: "dshield", URL: "https://example.com/other", Category: "attacks",
 	}); err == nil || !usecasereputation.IsConflict(err) {
 		t.Fatalf("expected conflict duplicate err, got %v", err)
+	}
+
+	if err := svc.AddFeed(context.Background(), usecasereputation.Feed{
+		Name: "evil", URL: "http://127.0.0.1/list", Category: "attacks", Format: "netset",
+	}); err == nil {
+		t.Fatal("expected SSRF reject for loopback URL")
 	}
 
 	if err := svc.RemoveFeed(context.Background(), "dshield"); err != nil {

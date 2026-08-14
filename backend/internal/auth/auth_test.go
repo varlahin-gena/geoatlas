@@ -128,7 +128,7 @@ func TestUserCreateResetAndMustReset(t *testing.T) {
 		t.Fatal(err)
 	}
 	must := true
-	pub, err := store.Create("op1", "operator1", RoleOperator, "Иванов Иван Иванович", must)
+	pub, err := store.Create("op1", "operator1x", RoleOperator, "Иванов Иван Иванович", must)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,10 +141,10 @@ func TestUserCreateResetAndMustReset(t *testing.T) {
 	if !store.MustReset("op1") {
 		t.Fatal("MustReset")
 	}
-	if _, err := store.ResetPassword("op1", "newpass12", true); err != nil {
+	if _, err := store.ResetPassword("op1", "newpass1234", true); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.ChangePassword("op1", "newpass12", "changed1"); err != nil {
+	if _, err := store.ChangePassword("op1", "newpass1234", "changed12a"); err != nil {
 		t.Fatal(err)
 	}
 	if store.MustReset("op1") {
@@ -158,7 +158,7 @@ func TestUserCreateResetAndMustReset(t *testing.T) {
 	if store2.Len() != 2 {
 		t.Fatalf("len=%d", store2.Len())
 	}
-	if _, ok := store2.Authenticate("op1", "changed1"); !ok {
+	if _, ok := store2.Authenticate("op1", "changed12a"); !ok {
 		t.Fatal("reloaded auth failed")
 	}
 }
@@ -249,5 +249,38 @@ func TestSeedUsersFromEnvMustReset(t *testing.T) {
 	}
 	if len(users) != 2 {
 		t.Fatalf("len=%d, want admin+operator when both set", len(users))
+	}
+}
+
+func TestValidatePasswordPolicy(t *testing.T) {
+	if err := ValidatePassword("short1"); err == nil {
+		t.Fatal("expected too short")
+	}
+	if err := ValidatePassword("password123"); err == nil {
+		t.Fatal("expected common password reject")
+	}
+	if err := ValidatePassword("abcdefghij"); err == nil {
+		t.Fatal("expected missing digit")
+	}
+	if err := ValidatePassword("1234567890"); err == nil {
+		t.Fatal("expected missing letter")
+	}
+	if err := ValidatePassword("Correct1ab"); err != nil {
+		t.Fatalf("strong password: %v", err)
+	}
+	if err := ValidatePasswordForUser("admin", "adminadmin1"); err == nil {
+		// adminadmin1 != admin, should pass length/complexity
+	} else {
+		t.Fatalf("unexpected: %v", err)
+	}
+	if err := ValidatePasswordForUser("alice", "alicealice1"); err != nil {
+		// alicealice1 != alice
+		t.Fatalf("unexpected: %v", err)
+	}
+	if err := ValidatePasswordForUser("alice", "alice"); err == nil {
+		t.Fatal("expected username match reject (also too short)")
+	}
+	if err := ValidatePasswordForUser("LongUser12", "LongUser12"); err == nil {
+		t.Fatal("expected username==password reject")
 	}
 }

@@ -18,7 +18,7 @@ nm_password_is_weak() {
     [[ -z "$pass" ]] && return 1
     [[ "$pass" == "$user" ]] && return 0
     case "$pass" in
-        admin|operator|password|changeme|123456) return 0 ;;
+        admin|operator|password|password1|password12|password123|changeme|123456|12345678|1234567890|qwerty|qwerty123|letmein|welcome|welcome1|admin123|administrator|passw0rd|p@ssw0rd|secret|default) return 0 ;;
     esac
     return 1
 }
@@ -27,8 +27,8 @@ nm_password_is_weak() {
 nm_validate_admin_password() {
     local user="$1" pass="$2"
     local n=${#pass}
-    if (( n < 8 )); then
-        echo "Пароль короче 8 символов." >&2
+    if (( n < 10 )); then
+        echo "Пароль короче 10 символов." >&2
         return 1
     fi
     if (( n > 128 )); then
@@ -43,8 +43,12 @@ nm_validate_admin_password() {
         echo "Пароль не должен содержать кавычки, \$, #, backtick или обратный слэш (ограничение .env)." >&2
         return 1
     fi
+    if ! [[ "$pass" =~ [[:alpha:]] ]] || ! [[ "$pass" =~ [[:digit:]] ]]; then
+        echo "Пароль должен содержать хотя бы одну букву и одну цифру." >&2
+        return 1
+    fi
     if nm_password_is_weak "$user" "$pass"; then
-        echo "Пароль слишком простой (не совпадайте с логином; не admin/password/changeme)." >&2
+        echo "Пароль слишком простой (не совпадайте с логином; не password/changeme/qwerty…)." >&2
         return 1
     fi
     return 0
@@ -61,7 +65,7 @@ nm_prompt_admin_password() {
     while true; do
         if ! a="$(nm_ui_passwordbox "Пароль администратора" \
             "Учётка ${user} (роль administrator).
-Минимум 8 символов, без пробелов и кавычек.
+Минимум 10 символов, буква и цифра, без пробелов и кавычек.
 Другие пользователи — после входа, в разделе «Пользователи».")"; then
             return 1
         fi
@@ -81,7 +85,7 @@ nm_prompt_admin_password() {
             fi
             continue
         fi
-        printf '%s\n' "$a"
+        printf '%s' "$a"
         return 0
     done
 }

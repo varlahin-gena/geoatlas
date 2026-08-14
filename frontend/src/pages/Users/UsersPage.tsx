@@ -12,7 +12,7 @@ import { useAuth } from '@/auth/AuthContext';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useToast } from '@/components/Toast';
 import { fmtDate } from '@/lib/format';
-
+import { MIN_PASSWORD_LEN, validatePasswordClient } from '@/lib/passwordPolicy';
 export default function UsersPage() {
   const { user: me, refresh } = useAuth();
   const { toast } = useToast();
@@ -44,6 +44,11 @@ export default function UsersPage() {
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
+    const policyErr = validatePasswordClient(password, username);
+    if (policyErr) {
+      toast(policyErr, 'error');
+      return;
+    }
     try {
       await createUser({
         username,
@@ -91,12 +96,12 @@ export default function UsersPage() {
                 id="cPass"
                 type="password"
                 required
-                minLength={8}
+                minLength={MIN_PASSWORD_LEN}
                 autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
-            </div>
+              <span className="hint">мин. {MIN_PASSWORD_LEN}, буква и цифра</span>            </div>
             <div className="field">
               <label htmlFor="cRole">Роль</label>
               <select id="cRole" value={role} onChange={(e) => setRole(e.target.value)}>
@@ -247,6 +252,11 @@ export default function UsersPage() {
             aria-modal="true"
             onSubmit={async (e) => {
               e.preventDefault();
+              const policyErr = validatePasswordClient(resetPass, resetTarget);
+              if (policyErr) {
+                toast(policyErr, 'error');
+                return;
+              }
               try {
                 await resetUserPassword(resetTarget, {
                   password: resetPass,
@@ -270,7 +280,7 @@ export default function UsersPage() {
                 id="rPass"
                 type="password"
                 required
-                minLength={8}
+                minLength={MIN_PASSWORD_LEN}
                 autoComplete="new-password"
                 value={resetPass}
                 onChange={(e) => setResetPass(e.target.value)}

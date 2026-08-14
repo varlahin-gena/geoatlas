@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"net/url"
 	"regexp"
 	"strings"
 	"sync"
@@ -15,6 +14,7 @@ import (
 	"network_monitor/internal/apperr"
 	"network_monitor/internal/model"
 	reppkg "network_monitor/internal/reputation"
+	"network_monitor/internal/safeurl"
 )
 
 var feedNameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$`)
@@ -269,9 +269,8 @@ func normalizeFeedInput(feed Feed) (Feed, error) {
 	if feed.URL == "" {
 		return feed, apperr.InvalidInput("url is required")
 	}
-	u, err := url.Parse(feed.URL)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		return feed, apperr.InvalidInput("url must be http(s)")
+	if err := safeurl.ValidateHTTPURL(feed.URL); err != nil {
+		return feed, apperr.InvalidInput(err.Error())
 	}
 	if feed.Category == "" {
 		feed.Category = "unknown"

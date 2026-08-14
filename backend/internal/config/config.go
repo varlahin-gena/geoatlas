@@ -169,7 +169,13 @@ type Config struct {
 	IngestFlushSec       int
 	IngestMaxConnections int
 	IngestConnIdleSec    int
-	QueryTimeout         time.Duration
+	// IngestSharedSecret — токен в маркере @@nm/{udp|tcp}/<token>/@@ (syslog-ng → :1514).
+	IngestSharedSecret string
+	// IngestAllowFrom — CSV hostnames/CIDRs peer для Accept (дефолт syslog-ng).
+	IngestAllowFrom string
+	// TrustedProxies — CSV hostnames/CIDRs для X-Real-IP (login throttle); дефолт frontend.
+	TrustedProxies string
+	QueryTimeout   time.Duration
 	CHMaxMemoryUsage     int64
 	CHExternalGroupBy    int64
 	CHExternalSort       int64
@@ -263,6 +269,9 @@ func FromEnv() Config {
 		IngestFlushSec:       parser.int("INGEST_FLUSH_SEC", 3),
 		IngestMaxConnections: parser.int("INGEST_MAX_CONNECTIONS", 256),
 		IngestConnIdleSec:    parser.int("INGEST_CONN_IDLE_SEC", 300),
+		IngestSharedSecret:   envOr("INGEST_SHARED_SECRET", ""),
+		IngestAllowFrom:      envOr("INGEST_ALLOW_FROM", "syslog-ng"),
+		TrustedProxies:       envOr("NM_TRUSTED_PROXIES", "frontend"),
 		QueryTimeout:         parser.durationSeconds("QUERY_TIMEOUT_SEC", 3*time.Minute),
 		CHMaxMemoryUsage:     parser.int64("CH_MAX_MEMORY_USAGE", 2<<30),
 		CHExternalGroupBy:    parser.int64("CH_EXTERNAL_GROUP_BY_BYTES", 256<<20),

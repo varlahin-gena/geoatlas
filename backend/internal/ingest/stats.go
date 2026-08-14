@@ -26,6 +26,7 @@ type StatsSnapshot struct {
 	QueueBytesCapacity int64          `json:"queue_bytes_capacity"`
 	DroppedTotal       int64          `json:"dropped_total"`        // queue admission drops
 	BufferDropsTotal   int64          `json:"buffer_drops_total"`   // processor buffer drops (CH outage path)
+	AuthRejectedTotal  int64          `json:"auth_rejected_total"`  // peer allowlist / bad ingest token
 	CircuitOpen        bool           `json:"circuit_open"`         // insert circuit currently blocking dequeue
 	LastDropAt         string         `json:"last_drop_at,omitempty"`
 	Connections        int64          `json:"connections"`
@@ -58,6 +59,7 @@ type stats struct {
 	bufferedLines    atomic.Int64
 	droppedTotal     atomic.Int64
 	bufferDropsTotal atomic.Int64
+	authRejected     atomic.Int64
 	lastDropAtUnix   atomic.Int64 // unix nano; 0 = never
 	connections      atomic.Int64
 	udp              transportStats
@@ -181,6 +183,7 @@ func (s *stats) snapshot() StatsSnapshot {
 		BufferedLines:    s.bufferedLines.Load(),
 		DroppedTotal:     s.droppedTotal.Load(),
 		BufferDropsTotal: s.bufferDropsTotal.Load(),
+		AuthRejectedTotal: s.authRejected.Load(),
 		LastDropAt:       lastDrop,
 		Connections:      s.connections.Load(),
 		UDP:              s.udp.snapshot(),

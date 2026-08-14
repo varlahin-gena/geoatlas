@@ -4,6 +4,7 @@ import { changePassword } from '@/api/auth';
 import { ApiError } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
 import { safeNext } from '@/lib/format';
+import { MIN_PASSWORD_LEN, validatePasswordClient } from '@/lib/passwordPolicy';
 import '@/styles/auth-form.css';
 
 export default function ChangePasswordPage() {
@@ -23,7 +24,6 @@ export default function ChangePasswordPage() {
     return () => document.body.classList.remove('page-auth');
   }, []);
 
-  // Auth gate is RequireAuth (allowMustReset). Keep next on login bounce if wrapper ever missing.
   useEffect(() => {
     if (loading) return;
     if (!user) {
@@ -39,8 +39,9 @@ export default function ChangePasswordPage() {
       setError('Пароли не совпадают');
       return;
     }
-    if (newPassword.length < 8) {
-      setError('Новый пароль: минимум 8 символов');
+    const policyErr = validatePasswordClient(newPassword, user?.username);
+    if (policyErr) {
+      setError(policyErr);
       return;
     }
     setBusy(true);
@@ -98,17 +99,18 @@ export default function ChangePasswordPage() {
           type="password"
           autoComplete="new-password"
           required
-          minLength={8}
+          minLength={MIN_PASSWORD_LEN}
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
         />
+        <p className="hint">Минимум {MIN_PASSWORD_LEN} символов, буква и цифра</p>
         <label htmlFor="confirm">Повтор</label>
         <input
           id="confirm"
           type="password"
           autoComplete="new-password"
           required
-          minLength={8}
+          minLength={MIN_PASSWORD_LEN}
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
         />

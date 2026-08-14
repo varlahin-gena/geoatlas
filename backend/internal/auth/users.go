@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -30,7 +31,7 @@ var (
 var usernameRe = regexp.MustCompile(`^[a-zA-Z0-9._-]{2,64}$`)
 
 const (
-	MinPasswordLen = 8
+	MinPasswordLen = 10
 	MaxFullNameLen = 200
 )
 
@@ -196,19 +197,7 @@ func SeedUsersFromEnv(adminUser, adminPass, operatorUser, operatorPass string, a
 }
 
 func seedPasswordWeak(user, pass string) bool {
-	u := strings.ToLower(strings.TrimSpace(user))
-	p := strings.ToLower(strings.TrimSpace(pass))
-	if p == "" {
-		return false
-	}
-	if p == u {
-		return true
-	}
-	switch p {
-	case "admin", "operator", "password", "changeme", "123456":
-		return true
-	}
-	return false
+	return PasswordMatchesUsername(user, pass) || IsCommonPassword(pass)
 }
 
 // HashPassword хеширует пароль для хранения в User.
@@ -216,12 +205,61 @@ func HashPassword(password string) ([]byte, error) {
 	return bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 }
 
+// IsCommonPassword — известные слабые литералы (case-insensitive).
+func IsCommonPassword(password string) bool {
+	p := strings.ToLower(strings.TrimSpace(password))
+	if p == "" {
+		return false
+	}
+	switch p {
+	case "admin", "operator", "password", "password1", "password12", "password123",
+		"changeme", "123456", "12345678", "1234567890", "qwerty", "qwerty123",
+		"letmein", "welcome", "welcome1", "admin123", "administrator",
+		"passw0rd", "p@ssw0rd", "secret", "default":
+		return true
+	}
+	return false
+}
+
+func PasswordMatchesUsername(username, password string) bool {
+	u := strings.ToLower(strings.TrimSpace(username))
+	p := strings.ToLower(strings.TrimSpace(password))
+	return u != "" && p != "" && u == p
+}
+
+// ValidatePassword — длина ≥10, буква+цифра, не из common-list.
 func ValidatePassword(password string) error {
 	if len(password) < MinPasswordLen {
 		return fmt.Errorf("%w: minimum %d characters", ErrInvalidPassword, MinPasswordLen)
 	}
 	if len(password) > 128 {
 		return fmt.Errorf("%w: too long", ErrInvalidPassword)
+	}
+	if IsCommonPassword(password) {
+		return fmt.Errorf("%w: too common", ErrInvalidPassword)
+	}
+	hasLetter, hasDigit := false, false
+	for _, r := range password {
+		switch {
+		case unicode.IsLetter(r):
+			hasLetter = true
+		case unicode.IsDigit(r):
+			hasDigit = true
+		}
+	}
+	if !hasLetter || !hasDigit {
+		return fmt.Errorf("%w: must include a letter and a digit", ErrInvalidPassword)
+	}
+	return nil
+}
+
+// ValidatePasswordForUser — ValidatePassword + запрет пароля = логин.
+func ValidatePasswordForUser(username, password string) error {
+	if err := ValidatePassword(password); err != nil {
+		return err
+	}
+	if PasswordMatchesUsername(username, password) {
+		return fmt.Errorf("%w: must not match username", ErrInvalidPassword)
 	}
 	return nil
 }
@@ -331,7 +369,7 @@ func (s *UserStore) Create(username, password, role, fullName string, mustReset 
 	if s == nil {
 		return UserPublic{}, ErrUserNotFound
 	}
-	if err := ValidatePassword(password); err != nil {
+	if err := ValidatePasswordForUser(username, password); err != nil {
 		return UserPublic{}, err
 	}
 	if !ValidRole(role) {
@@ -432,7 +470,7 @@ func (s *UserStore) ResetPassword(username, password string, mustReset bool) (Us
 	if s == nil {
 		return UserPublic{}, ErrUserNotFound
 	}
-	if err := ValidatePassword(password); err != nil {
+	if err := ValidatePasswordForUser(username, password); err != nil {
 		return UserPublic{}, err
 	}
 	hash, err := HashPassword(password)
@@ -459,7 +497,7 @@ func (s *UserStore) ChangePassword(username, oldPassword, newPassword string) (U
 	if s == nil {
 		return UserPublic{}, ErrUserNotFound
 	}
-	if err := ValidatePassword(newPassword); err != nil {
+	if err := ValidatePasswordForUser(username, newPassword); err != nil {
 		return UserPublic{}, err
 	}
 	s.mu.Lock()

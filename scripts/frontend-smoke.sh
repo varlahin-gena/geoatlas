@@ -214,6 +214,9 @@ grep -q 'listen 443 ssl' frontend/docker-entrypoint.sh || fail "entrypoint: list
 ok "nginx SPA / HTTPS"
 
 grep -q 'Content-Security-Policy' frontend/nginx-security-headers.inc || fail "nginx-security-headers: CSP"
+grep -q "style-src-elem 'self'" frontend/nginx-security-headers.inc || fail "nginx-security-headers: style-src-elem"
+grep -q "style-src-attr 'unsafe-inline'" frontend/nginx-security-headers.inc || fail "nginx-security-headers: style-src-attr"
+grep -qE "script-src 'self'" frontend/nginx-security-headers.inc || fail "nginx-security-headers: script-src self"
 grep -q 'include /etc/nginx/includes/security-headers.inc' frontend/nginx-app.inc || fail "nginx-app: security-headers include"
 grep -q 'include /etc/nginx/includes/proxy-headers.inc' frontend/nginx-app.inc || fail "nginx-app: proxy-headers include"
 grep -q 'include /etc/nginx/includes/auth-subrequest.inc' frontend/nginx-app.inc || fail "nginx-app: auth-subrequest include"

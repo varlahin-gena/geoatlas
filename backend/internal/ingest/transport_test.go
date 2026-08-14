@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestResolveTransport(t *testing.T) {
+func TestResolveTransportLegacy(t *testing.T) {
 	tests := []struct {
 		line     string
 		fallback string
@@ -22,5 +22,29 @@ func TestResolveTransport(t *testing.T) {
 			t.Fatalf("ResolveTransport(%q, %q) = (%q, %q), want (%q, %q)",
 				tc.line, tc.fallback, gotT, gotP, tc.wantT, tc.wantP)
 		}
+	}
+}
+
+func TestResolveTransportAuth(t *testing.T) {
+	const secret = "s3cret"
+	tr, payload, ok := ResolveTransportAuth("@@nm/udp/"+secret+"/@@hello", "", secret)
+	if !ok || tr != "udp" || payload != "hello" {
+		t.Fatalf("got tr=%q payload=%q ok=%v", tr, payload, ok)
+	}
+	_, _, ok = ResolveTransportAuth("@@nm/udp/wrong/@@hello", "", secret)
+	if ok {
+		t.Fatal("bad token must fail")
+	}
+	_, _, ok = ResolveTransportAuth("@@nm/udp/@@hello", "", secret)
+	if ok {
+		t.Fatal("legacy without token must fail when secret set")
+	}
+	tr, payload, ok = ResolveTransportAuth("@@nm/tcp/@@hello", "tcp", "")
+	if !ok || tr != "tcp" || payload != "hello" {
+		t.Fatalf("legacy ok when secret empty: tr=%q payload=%q ok=%v", tr, payload, ok)
+	}
+	_, _, ok = ResolveTransportAuth("plain", "", secret)
+	if ok {
+		t.Fatal("plain line must fail when secret required")
 	}
 }

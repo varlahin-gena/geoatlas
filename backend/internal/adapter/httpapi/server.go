@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"network_monitor/internal/adapter/searchtemplatesfile"
@@ -311,6 +312,8 @@ func NewServer(
 	}
 	h = recoverMW(h)
 	h = requestIDMW(h) // outermost
+
+	ConfigureTrustedProxies(strings.Split(cfg.TrustedProxies, ","))
 
 	return &Server{
 		deps:   deps,

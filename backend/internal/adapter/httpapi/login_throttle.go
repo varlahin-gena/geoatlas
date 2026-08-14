@@ -29,12 +29,12 @@ type loginBucket struct {
 
 // FailedLoginEvent — сводка неуспешных попыток входа для UI мониторинга.
 type FailedLoginEvent struct {
-	Username  string    `json:"username"`
-	IP        string    `json:"ip"`
-	Count     int       `json:"count"`
-	FirstAt   time.Time `json:"first_at"`
-	LastAt    time.Time `json:"last_at"`
-	Locked    bool      `json:"locked"`
+	Username    string    `json:"username"`
+	IP          string    `json:"ip"`
+	Count       int       `json:"count"`
+	FirstAt     time.Time `json:"first_at"`
+	LastAt      time.Time `json:"last_at"`
+	Locked      bool      `json:"locked"`
 	LockedUntil time.Time `json:"locked_until,omitempty"`
 }
 
@@ -61,23 +61,110 @@ func newLoginLimiter(maxFails int, window, lockout time.Duration) *loginLimiter 
 
 var defaultLoginLimiter = newLoginLimiter(10, time.Minute, 5*time.Minute)
 
-// clientIP — IP для throttle/аудита.
-// Доверяем только X-Real-IP (его выставляет nginx как $remote_addr).
-// X-Forwarded-For клиент может подделать, поэтому для лимита не используем.
-func clientIP(r *http.Request) string {
+var (
+	trustedProxyMu   sync.RWMutex
+	trustedProxyNets []*net.IPNet
+	trustedProxyHost map[string]struct{}
+)
+
+// ConfigureTrustedProxies — CIDR и/или hostnames (frontend). Loopback всегда доверен.
+func ConfigureTrustedProxies(entries []string) {
+	nets := make([]*net.IPNet, 0, len(entries)+2)
+	hosts := make(map[string]struct{})
+	addCIDR := func(cidr string) {
+		if _, n, err := net.ParseCIDR(cidr); err == nil {
+			nets = append(nets, n)
+		}
+	}
+	addCIDR("127.0.0.0/8")
+	addCIDR("::1/128")
+
+	for _, raw := range entries {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			continue
+		}
+		if strings.Contains(raw, "/") {
+			addCIDR(raw)
+			continue
+		}
+		if ip := net.ParseIP(raw); ip != nil {
+			bits := 32
+			if ip.To4() == nil {
+				bits = 128
+			}
+			nets = append(nets, &net.IPNet{IP: ip, Mask: net.CIDRMask(bits, bits)})
+			continue
+		}
+		hosts[strings.ToLower(raw)] = struct{}{}
+	}
+
+	trustedProxyMu.Lock()
+	trustedProxyNets = nets
+	trustedProxyHost = hosts
+	trustedProxyMu.Unlock()
+}
+
+func init() {
+	ConfigureTrustedProxies([]string{"frontend"})
+}
+
+func remoteIP(r *http.Request) string {
 	if r == nil {
 		return ""
-	}
-	if xri := strings.TrimSpace(r.Header.Get("X-Real-IP")); xri != "" {
-		if ip := net.ParseIP(xri); ip != nil {
-			return ip.String()
-		}
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		return r.RemoteAddr
 	}
 	return host
+}
+
+func isTrustedProxy(ipStr string) bool {
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return false
+	}
+	trustedProxyMu.RLock()
+	nets := trustedProxyNets
+	hosts := trustedProxyHost
+	trustedProxyMu.RUnlock()
+
+	for _, n := range nets {
+		if n.Contains(ip) {
+			return true
+		}
+	}
+	for name := range hosts {
+		addrs, err := net.LookupHost(name)
+		if err != nil {
+			continue
+		}
+		for _, a := range addrs {
+			if parsed := net.ParseIP(a); parsed != nil && parsed.Equal(ip) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// clientIP — IP для throttle/аудита.
+// X-Real-IP только если RemoteAddr — trusted proxy (nginx/frontend).
+// X-Forwarded-For клиент может подделать — не используем.
+func clientIP(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	remote := remoteIP(r)
+	if isTrustedProxy(remote) {
+		if xri := strings.TrimSpace(r.Header.Get("X-Real-IP")); xri != "" {
+			if ip := net.ParseIP(xri); ip != nil {
+				return ip.String()
+			}
+		}
+	}
+	return remote
 }
 
 func failureKey(username, ip string) string {

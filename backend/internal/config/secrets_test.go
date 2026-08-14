@@ -8,19 +8,36 @@ func TestValidateSecurityRejectsPlaceholders(t *testing.T) {
 	t.Setenv("NM_ALLOW_INSECURE", "")
 
 	cfg := Config{
-		APIAuthToken:  "dev-insecure-change-me",
-		SessionSecret: "ok-secret-not-placeholder",
+		APIAuthToken:       "dev-insecure-change-me",
+		SessionSecret:      "ok-secret-not-placeholder",
+		IngestSharedSecret: "ingest-secret-ok",
 	}
 	if err := cfg.ValidateSecurity(); err == nil {
 		t.Fatal("expected error for insecure API token")
 	}
 
 	cfg = Config{
-		APIAuthToken:  "unique-token-xyz",
-		SessionSecret: "dev-session-secret-change-me",
+		APIAuthToken:       "unique-token-xyz",
+		SessionSecret:      "dev-session-secret-change-me",
+		IngestSharedSecret: "ingest-secret-ok",
 	}
 	if err := cfg.ValidateSecurity(); err == nil {
 		t.Fatal("expected error for insecure session secret")
+	}
+}
+
+func TestValidateSecurityRequiresIngestSecret(t *testing.T) {
+	t.Setenv("NM_ALLOW_INSECURE", "")
+	cfg := Config{
+		APIAuthToken:  "unique-token-xyz",
+		SessionSecret: "ok-secret-not-placeholder",
+	}
+	if err := cfg.ValidateSecurity(); err == nil {
+		t.Fatal("expected error for missing INGEST_SHARED_SECRET")
+	}
+	t.Setenv("NM_ALLOW_INSECURE", "1")
+	if err := cfg.ValidateSecurity(); err != nil {
+		t.Fatalf("NM_ALLOW_INSECURE should permit empty ingest secret: %v", err)
 	}
 }
 
@@ -52,8 +69,9 @@ func TestValidateSecurityAllowsOverride(t *testing.T) {
 func TestValidateSecurityDisabledAuthRequiresInsecure(t *testing.T) {
 	t.Setenv("NM_ALLOW_INSECURE", "")
 	cfg := Config{
-		APIAuthDisabled: true,
-		AuthDisabled:    true,
+		APIAuthDisabled:    true,
+		AuthDisabled:       true,
+		IngestSharedSecret: "ingest-secret-ok",
 	}
 	if err := cfg.ValidateSecurity(); err == nil {
 		t.Fatal("expected error when *_DISABLED without NM_ALLOW_INSECURE")
@@ -68,8 +86,9 @@ func TestValidateSecurityDisabledAuthRequiresInsecure(t *testing.T) {
 func TestValidateSecurityAPIAuthDisabledAlone(t *testing.T) {
 	t.Setenv("NM_ALLOW_INSECURE", "")
 	cfg := Config{
-		APIAuthDisabled: true,
-		SessionSecret:   "unique-session-secret",
+		APIAuthDisabled:    true,
+		SessionSecret:      "unique-session-secret",
+		IngestSharedSecret: "ingest-secret-ok",
 	}
 	if err := cfg.ValidateSecurity(); err == nil {
 		t.Fatal("expected error for API_AUTH_DISABLED without NM_ALLOW_INSECURE")
@@ -95,6 +114,7 @@ func TestValidateSecurityRejectsPreviousPlaceholder(t *testing.T) {
 		APIAuthToken:         "unique-token-xyz",
 		APIAuthPreviousToken: "dev-insecure-change-me",
 		SessionSecret:        "ok-secret-not-placeholder",
+		IngestSharedSecret:   "ingest-secret-ok",
 	}
 	if err := cfg.ValidateSecurity(); err == nil {
 		t.Fatal("expected error for insecure previous token")

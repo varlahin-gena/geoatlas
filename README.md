@@ -924,6 +924,15 @@ Unit-тесты карты (репутация / heatmap focus / coords helpers)
 
 Уязвимости — только приватно, см. [SECURITY.md](SECURITY.md) (подтверждение в течение 5 рабочих дней). Обычные баги — в Issues.
 
+Краткий checklist для прод-установки:
+
+- Секреты только через `./start.sh` (`API_AUTH_TOKEN`, `SESSION_SECRET`, `INGEST_SHARED_SECRET`, `CLICKHOUSE_PASSWORD`)
+- Пароли УЗ: минимум 10 символов, буква и цифра, не из common-list
+- UI за HTTPS при доступе из сети; не публиковать ClickHouse `8123`/`9000` и backend `1514`
+- Syslog `:514` **без TLS/auth** — ограничьте источником МСЭ (`NM_SYSLOG_ALLOW_FROM` / Security Group / firewall)
+- Ingest внутри docker: маркер с `INGEST_SHARED_SECRET` + `INGEST_ALLOW_FROM=syslog-ng`
+- Reputation URL-фиды: только публичные IPv4-хосты (private/metadata блокируются)
+
 ## Структура репозитория
 
 ```

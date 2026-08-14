@@ -34,6 +34,11 @@ type Config struct {
 
 	MaxConnections  int
 	ConnIdleTimeout time.Duration
+
+	// SharedSecret — токен в @@nm/{udp|tcp}/<token>/@@; пусто = legacy (только insecure/dev).
+	SharedSecret string
+	// AllowFrom — CSV peer allowlist; пусто = любой peer (не рекомендуется).
+	AllowFrom string
 }
 
 type ingestedLine struct {
@@ -57,6 +62,7 @@ type Service struct {
 	stats      *stats
 	processors []*usecaseingest.Processor
 	circuit    *usecaseingest.CircuitBreaker
+	peers      *PeerAllowlist
 
 	lineCh      chan ingestedLine
 	queueBytes  atomic.Int64
@@ -104,6 +110,7 @@ func NewService(cfg Config, deps ProcessorDeps) *Service {
 		procDeps: deps,
 		stats:    st,
 		circuit:  circuit,
+		peers:    NewPeerAllowlist(cfg.AllowFrom),
 		lineCh:   make(chan ingestedLine, cfg.QueueSize),
 		connSem:  make(chan struct{}, cfg.MaxConnections),
 	}
@@ -207,6 +214,13 @@ func (s *Service) Run(ctx context.Context) error {
 						slog.Warn("ingest: accept error", "addr", ln.Addr().String(), "err", err)
 						continue
 					}
+				}
+				if s.peers != nil && !s.peers.Empty() && !s.peers.Allows(conn.RemoteAddr()) {
+					remote := conn.RemoteAddr().String()
+					_ = conn.Close()
+					s.stats.authRejected.Add(1)
+					slog.Warn("ingest: peer not allowed", "remote", remote)
+					continue
 				}
 				select {
 				case s.connSem <- struct{}{}:
@@ -511,7 +525,11 @@ func (s *Service) worker(ctx context.Context, proc *usecaseingest.Processor) {
 			return
 		case item := <-s.lineCh:
 			s.releaseQueueBytes(item.line)
-			transport, line := ResolveTransport(item.line, item.transport)
+			transport, line, ok := ResolveTransportAuth(item.line, item.transport, s.cfg.SharedSecret)
+			if !ok {
+				s.stats.authRejected.Add(1)
+				continue
+			}
 			if _, _, err := proc.ProcessLine(ctx, line, transport); err != nil {
 				noteErr(err)
 				slog.Error("ingest: process error", "err", err)
@@ -557,7 +575,11 @@ func (s *Service) drainWorker(ctx context.Context, proc *usecaseingest.Processor
 			return
 		case item := <-s.lineCh:
 			s.releaseQueueBytes(item.line)
-			transport, line := ResolveTransport(item.line, item.transport)
+			transport, line, ok := ResolveTransportAuth(item.line, item.transport, s.cfg.SharedSecret)
+			if !ok {
+				s.stats.authRejected.Add(1)
+				continue
+			}
 			if _, _, err := proc.ProcessLine(ctx, line, transport); err != nil {
 				slog.Error("ingest: drain process error", "err", err)
 			}

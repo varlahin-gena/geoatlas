@@ -41,6 +41,8 @@ func startIngest(a *app, cfg config.Config, geo *geostore.ReloadableGeoIndex, pa
 		QueryTimeout:    cfg.QueryTimeout,
 		MaxConnections:  cfg.IngestMaxConnections,
 		ConnIdleTimeout: time.Duration(cfg.IngestConnIdleSec) * time.Second,
+		SharedSecret:    cfg.IngestSharedSecret,
+		AllowFrom:       cfg.IngestAllowFrom,
 	}, ingest.ProcessorDeps{
 		Logs: ingestRepo, Errors: ingestRepo, Parser: lineParser,
 		Geo: geo, EnrichCountry: cfg.GeoEnrichOnIngest,

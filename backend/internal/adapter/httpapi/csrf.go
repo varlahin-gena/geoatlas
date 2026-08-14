@@ -85,9 +85,15 @@ func originAllowed(raw string, r *http.Request) bool {
 			return true
 		}
 	}
-	// Self-hosted по IP: Origin авторитетен при битом/внутреннем Host.
+	// Self-hosted по IP: Origin с literal IP только если hostname совпадает с Host/XFH.
 	if hostIsLiteralIP(u.Hostname()) {
-		return true
+		for _, candidate := range csrfHostCandidates(r) {
+			ch, _ := splitHostPortLoose(candidate)
+			if strings.EqualFold(u.Hostname(), strings.Trim(ch, "[]")) {
+				return true
+			}
+		}
+		return false
 	}
 	return false
 }

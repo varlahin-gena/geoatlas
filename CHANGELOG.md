@@ -26,6 +26,13 @@
 - SPA: `uplot` 1.6.30 → 1.6.32
 
 ### Security
+- Password policy: минимум 10 символов, буква+цифра, blocklist common; UI + `admin_auth.sh` синхронизированы
+- CSP: `style-src-elem 'self'` + `style-src-attr 'unsafe-inline'` (React style={}), без inline `<style>` injection
+- Reputation feeds: IPv4-only SSRF guards (block private/metadata; safe redirects) on AddFeed и fetch
+- Ingest `:1514`: `INGEST_SHARED_SECRET` в маркере `@@nm/{udp|tcp}/<token>/@@` + peer allowlist `INGEST_ALLOW_FROM` (дефолт `syslog-ng`); генерирует `./start.sh`
+- Публичный `/ready` без queue/drops/`last_error` (детали — `/api/ingest/stats`)
+- CSRF: Origin с literal IP только при совпадении с Host/X-Forwarded-Host
+- Login throttle: `X-Real-IP` только от trusted proxies (`NM_TRUSTED_PROXIES`, дефолт `frontend`)
 - Seed только **admin**: установщик спрашивает пароль; full-auto / `./start.sh` без TTY берут `AUTH_ADMIN_PASSWORD` или генерируют одноразовый. Operator с завода не создаётся (UI `/users`). Нет литерала `admin`/`admin`.
 - nginx: CSP/XFO/HSTS на HTML-шелл (include security-headers в location с Cache-Control)
 - Full-auto больше не выключает host firewall: allowlist UI + `:514`; `NM_DISABLE_HOST_FIREWALL=1` — старое поведение; `NM_SYSLOG_ALLOW_FROM` сужает syslog

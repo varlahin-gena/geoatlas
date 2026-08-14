@@ -302,24 +302,9 @@ func (s *Service) Health(ctx context.Context, pinger ClickHousePinger) (HealthRe
 	body := map[string]any{"ok": true, "status": "healthy", "clickhouse": "ok"}
 	if s.ingest != nil {
 		if snap, ok := s.ingest.Snapshot(); ok {
-			status, reasons, dropsPerSec := classifyIngest(snap, s.rates, s.slo)
+			status, _, _ := classifyIngest(snap, s.rates, s.slo)
 			body["status"] = status
-			ingestInfo := map[string]any{
-				"state": snap.State, "queue_depth": snap.QueueDepth, "queue_capacity": snap.QueueCapacity,
-				"queue_bytes": snap.QueueBytes, "queue_bytes_capacity": snap.QueueBytesCapacity,
-				"queue_ratio": queueRatio(snap), "dropped_total": snap.DroppedTotal, "drops_per_sec": dropsPerSec,
-				"buffer_drops_total": snap.BufferDropsTotal,
-			}
-			if snap.LastError != "" {
-				ingestInfo["last_error"] = snap.LastError
-			}
-			if snap.LastDropAt != "" {
-				ingestInfo["last_drop_at"] = snap.LastDropAt
-			}
-			if len(reasons) > 0 {
-				ingestInfo["reasons"] = reasons
-			}
-			body["ingest"] = ingestInfo
+			// Public /ready: no queue/drops/last_error (reconnaissance). Details: /api/ingest/stats.
 		}
 	}
 	return HealthResult{OK: true, HTTPStatus: http.StatusOK, Body: body}, nil

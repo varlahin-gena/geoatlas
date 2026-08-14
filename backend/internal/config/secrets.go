@@ -56,6 +56,11 @@ func (c Config) ValidateSecurity() error {
 		}
 	}
 
+	ingestSecret := strings.TrimSpace(c.IngestSharedSecret)
+	if ingestSecret == "" && !allowInsecure {
+		return fmt.Errorf("INGEST_SHARED_SECRET is required; generate via start.sh (NM_ALLOW_INSECURE=1 to override for local/dev)")
+	}
+
 	return nil
 }
 
@@ -84,7 +89,10 @@ func isWeakSeedPassword(user, pass string) bool {
 		return true
 	}
 	switch p {
-	case "admin", "operator", "password", "changeme", "123456":
+	case "admin", "operator", "password", "password1", "password12", "password123",
+		"changeme", "123456", "12345678", "1234567890", "qwerty", "qwerty123",
+		"letmein", "welcome", "welcome1", "admin123", "administrator",
+		"passw0rd", "p@ssw0rd", "secret", "default":
 		return true
 	}
 	return false

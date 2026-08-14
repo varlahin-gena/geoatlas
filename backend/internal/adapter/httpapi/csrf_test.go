@@ -162,9 +162,9 @@ func TestCSRFMiddlewareAcceptsIPOriginWhenHostIsUpstream(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 
-	// Типичный сбой прокси: Host=backend:8080, Origin=публичный IP:8080
+	// Host и Origin — один и тот же public IP (self-hosted UI).
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/change-password", nil)
-	req.Host = "backend:8080"
+	req.Host = "155.212.245.143:8080"
 	req.Header.Set("Origin", "http://155.212.245.143:8080")
 	req.AddCookie(&http.Cookie{Name: auth.CookieName, Value: tok})
 	req.AddCookie(&http.Cookie{Name: auth.CSRFCookieName, Value: csrf})
@@ -173,6 +173,34 @@ func TestCSRFMiddlewareAcceptsIPOriginWhenHostIsUpstream(t *testing.T) {
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("status=%d want 204 body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCSRFMiddlewareRejectsForeignIPOrigin(t *testing.T) {
+	mgr, err := auth.NewSessionManager("csrf-test-secret-key-32bytes!!", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tok, _, err := mgr.Issue("admin", auth.RoleAdministrator, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	csrf := "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899"
+
+	h := csrfMW(newBearerAuth([]string{"bearer-secret"}, nil), false)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/change-password", nil)
+	req.Host = "backend:8080"
+	req.Header.Set("Origin", "http://155.212.245.143:8080")
+	req.AddCookie(&http.Cookie{Name: auth.CookieName, Value: tok})
+	req.AddCookie(&http.Cookie{Name: auth.CSRFCookieName, Value: csrf})
+	req.Header.Set(auth.CSRFHeaderName, csrf)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status=%d want 403", rec.Code)
 	}
 }
 

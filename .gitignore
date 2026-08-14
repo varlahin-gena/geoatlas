@@ -8,6 +8,7 @@ install-modules.json
 install-meta.json
 clickhouse/users.d/zz_install_limits.xml
 syslog-ng.d/zz_profile.conf
+syslog-ng.d/zz_ingest_auth.conf
 
 # TLS (свои сертификаты) — ключи не коммитить
 certs/*

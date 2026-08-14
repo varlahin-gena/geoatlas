@@ -14,6 +14,7 @@ import (
 
 	"network_monitor/internal/model"
 	reppkg "network_monitor/internal/reputation"
+	"network_monitor/internal/safeurl"
 	usecasereputation "network_monitor/internal/usecase/reputation"
 )
 
@@ -50,9 +51,9 @@ func New(feeds []usecasereputation.Feed, interval time.Duration, enabled bool, a
 		interval: interval,
 		enabled:  enabled,
 		applier:  applier,
-		client: &http.Client{
+		client: safeurl.SecureHTTPClient(&http.Client{
 			Timeout: 120 * time.Second,
-		},
+		}),
 		etag:    map[string]string{},
 		lastMod: map[string]string{},
 		done:    make(chan struct{}),
@@ -191,6 +192,9 @@ func (s *Scheduler) pruneObsoleteURLLists(ctx context.Context, feeds []usecasere
 }
 
 func (s *Scheduler) fetchOne(ctx context.Context, feed usecasereputation.Feed, force bool) (string, int, error) {
+	if err := safeurl.ValidateHTTPURL(feed.URL); err != nil {
+		return "failed", 0, err
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, feed.URL, nil)
 	if err != nil {
 		return "failed", 0, err

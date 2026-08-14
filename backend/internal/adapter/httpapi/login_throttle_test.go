@@ -27,6 +27,9 @@ func TestLoginLimiterLockout(t *testing.T) {
 }
 
 func TestClientIPPrefersXRealIP(t *testing.T) {
+	ConfigureTrustedProxies([]string{"10.0.0.1"})
+	t.Cleanup(func() { ConfigureTrustedProxies([]string{"frontend"}) })
+
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", nil)
 	req.RemoteAddr = "10.0.0.1:1234"
 	req.Header.Set("X-Real-IP", "198.51.100.7")
@@ -36,7 +39,20 @@ func TestClientIPPrefersXRealIP(t *testing.T) {
 	}
 }
 
+func TestClientIPIgnoresXRealIPFromUntrusted(t *testing.T) {
+	ConfigureTrustedProxies([]string{"frontend"})
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", nil)
+	req.RemoteAddr = "203.0.113.50:9999"
+	req.Header.Set("X-Real-IP", "198.51.100.7")
+	if got := clientIP(req); got != "203.0.113.50" {
+		t.Fatalf("got %q, want RemoteAddr (untrusted must not spoof via X-Real-IP)", got)
+	}
+}
+
 func TestClientIPIgnoresClientXFF(t *testing.T) {
+	ConfigureTrustedProxies([]string{"10.0.0.1"})
+	t.Cleanup(func() { ConfigureTrustedProxies([]string{"frontend"}) })
+
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", nil)
 	req.RemoteAddr = "10.0.0.1:1234"
 	req.Header.Set("X-Forwarded-For", "198.51.100.7, 10.0.0.1")
@@ -46,6 +62,9 @@ func TestClientIPIgnoresClientXFF(t *testing.T) {
 }
 
 func TestClientIPIgnoresInvalidXRealIP(t *testing.T) {
+	ConfigureTrustedProxies([]string{"10.0.0.1"})
+	t.Cleanup(func() { ConfigureTrustedProxies([]string{"frontend"}) })
+
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", nil)
 	req.RemoteAddr = "10.0.0.1:1234"
 	req.Header.Set("X-Real-IP", "not-an-ip")
