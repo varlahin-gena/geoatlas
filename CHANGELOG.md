@@ -23,6 +23,7 @@
   - **1.9.0**: `/api/events` — AST-поиск `q` и фильтр репутации `rep_cat`/`rep_list`/`rep_side` до LIMIT; `reputation_facets`; схема `SystemStats`; SPA-типы из `openapi-typescript`
   - **1.10.0**: `GET /live` и `GET /ready` (+ `/api/*`); `/health` и `/api/health` — liveness без ClickHouse (503 по CH только на `/ready`)
   - **1.11.0**: схема `AuthUser` на login/me/geo-wizard-dismiss; nested `SystemStats` / `SystemStatus` / `SystemVersion`; SPA `apiGet`/`apiPost` по generated paths
+- SPA: `uplot` 1.6.30 → 1.6.32
 
 ### Security
 - Seed только **admin**: установщик спрашивает пароль; full-auto / `./start.sh` без TTY берут `AUTH_ADMIN_PASSWORD` или генерируют одноразовый. Operator с завода не создаётся (UI `/users`). Нет литерала `admin`/`admin`.
@@ -31,10 +32,11 @@
 - `CLICKHOUSE_PASSWORD` генерируется в `./start.sh` / `detect_resources.sh`; compose fail-closed; default user `from_env`
 - Мастер GeoIP: abort polling при закрытии, `apiFetchRaw` (401 → session expired), Escape / focus trap / клик по backdrop
 - nginx не отдаёт `*.map` (в т.ч. `/assets/`); Vite sourcemap только при `NM_SOURCEMAP=1`
-- Dependabot (Go / npm / Docker / Actions): только patch (Docker — без minor/major тегов; `clickhouse-go` без minor); Trivy fs в CI + weekly scan образов; GitHub Release из CHANGELOG на тег `v*`
+- Dependabot: ignore minor/major на экосистему (группа `patch` иначе открывает отдельные minor); Docker без minor/major; Actions без major; Trivy fs в CI + weekly scan образов; GitHub Release из CHANGELOG на тег `v*`
 
 ### Fixed
 - CI: `aquasecurity/trivy-action` pinned на v0.36.0 (тег `0.28.0` снят после инцидента 2026); `setup-node@v5`
+- CI: `GOWORK=off` — bump `go 1.25` в одном модуле не валит остальные через `go.work`
 - Integration map-path: `stubGeoJobs` больше не паникует на нулевом счётчике при `POST /upload-geo`
 - SPA: 401 вне `/api/auth/*` сбрасывает сессию и ведёт на `/login?next=`
 - Карта: period/group/filter/q/country в query string

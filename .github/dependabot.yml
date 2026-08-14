@@ -1,6 +1,7 @@
 version: 2
-# Appliance: pin runtime images and ClickHouse driver ourselves.
-# Auto-PRs are patch-only so majors (Node 26, nginx 1.31, Alpine 3.24, clickhouse-go 2.48) stay closed.
+# Appliance: pin runtime images, Go 1.24, and ClickHouse driver ourselves.
+# Group update-types only buckets matching PRs — unmatched versions still open
+# individually. Ignore minor/major at the ecosystem so they never open.
 updates:
   - package-ecosystem: gomod
     directory: /backend
@@ -8,8 +9,8 @@ updates:
       interval: weekly
     open-pull-requests-limit: 3
     ignore:
-      - dependency-name: "github.com/ClickHouse/clickhouse-go/v2"
-        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
     groups:
       backend-go:
         patterns: ["*"]
@@ -21,8 +22,8 @@ updates:
       interval: weekly
     open-pull-requests-limit: 3
     ignore:
-      - dependency-name: "github.com/ClickHouse/clickhouse-go/v2"
-        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
     groups:
       stats-go:
         patterns: ["*"]
@@ -34,8 +35,8 @@ updates:
       interval: weekly
     open-pull-requests-limit: 3
     ignore:
-      - dependency-name: "github.com/ClickHouse/clickhouse-go/v2"
-        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
     groups:
       chconn-go:
         patterns: ["*"]
@@ -46,6 +47,9 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 3
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
     groups:
       syslogngstats-go:
         patterns: ["*"]
@@ -56,6 +60,9 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 3
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
     groups:
       frontend-deps:
         patterns: ["*"]
@@ -89,6 +96,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       github-actions:
         patterns: ["*"]

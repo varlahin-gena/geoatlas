@@ -5,6 +5,12 @@ on:
     branches: [main, develop]
   pull_request:
 
+# Isolate modules: a Dependabot bump that raises one go.mod to 1.25 must not
+# fail chconn/stats via go.work. GOTOOLCHAIN=local keeps CI on setup-go 1.24.x.
+env:
+  GOWORK: "off"
+  GOTOOLCHAIN: local
+
 jobs:
   release-contract:
     name: release contract (VERSION / OpenAPI / CHANGELOG)
