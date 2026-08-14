@@ -712,6 +712,8 @@ docker compose exec clickhouse clickhouse-client --query "
 | Drops под нагрузкой / очередь полная | `/system` (плитка Drops, стадии Syslog-NG и Backend Ingest); `pipeline.syslogng.dropped_total` / `queued`; `/api/ingest/stats` → `dropped_total`, `buffer_drops_total`; алёрты `syslogng_dropping*`, `ingest_dropping*`; `./scripts/watch-ingest.sh` |
 | UDP/TCP EPS не разделяются       | Перезапустить `syslog-ng` (маркеры `@@nm/udp/@@` / `@@nm/tcp/@@`) |
 | syslog-ng: kernel refused SO_RCVBUF | `net.core.rmem_max` / `wmem_max` на хосте (см. буферы профиля) |
+| git pull: local changes (только chmod +x) | `git restore -- '*.sh'` затем `git pull --ff-only`; либо `git reset --hard origin/main` |
+| syslog-ng ругается на `log-iw-size` / `flush_timeout` / нет `zz_profile.conf` | На сервере всё ещё старый `syslog-ng.conf`. `git log -1` и `grep flow-control-window-size syslog-ng.conf`; затем hard reset на `origin/main` и `./start.sh` |
 | GeoIP upload → 502 / OOM, backend перезапускается | Не заливать большой CSV поверх уже загруженного индекса через браузер; `dmesg`/`oom-kill`; см. [GeoIP](#geoip) |
 | GeoIP: `Failed to fetch` при смене страницы | Уход со страницы во время POST обрывает `fetch`; дождитесь окончания или `curl` с сервера |
 | После рестарта backend страницы 500 (auth) | Обновить до ≥1.1.3 (индекс GeoIP грузится асинхронно); дождаться `geo index loaded` |
@@ -740,9 +742,13 @@ sudo ./deploy/oracle_linux/install_oraclelinux.sh
 cd /opt/network-monitor
 ./stop.sh
 git fetch origin --tags
-git pull --ff-only   # на ветке; на теге обычно checkout нового тега (см. ниже)
+# chmod +x на скриптах 100644 блокирует pull — сбросить только бит исполнения:
+git restore --worktree --staged -- '*.sh' 'clickhouse/*.sh' 'deploy/**/*.sh' 'scripts/*.sh' 2>/dev/null || true
+git pull --ff-only origin main   # на ветке; на теге обычно checkout нового тега (см. ниже)
 ./start.sh
 ```
+
+Проверка, что syslog-ng 4.11 на месте: `git log -1 --oneline` (ожидается коммит с `flow-control-window-size`), `grep flow-control-window-size syslog-ng.conf`, `ls syslog-ng.d/zz_profile.conf`. Если `git pull` всё ещё ругается на локальные правки, а своих изменений в tracked-файлах нет: `git reset --hard origin/main` (`.env`, `docker-compose.override.yml`, `install-profile.json` в git не входят).
 
 #### Переключение: релиз → `main`
 

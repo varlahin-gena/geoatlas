@@ -70,7 +70,8 @@ require_docker() {
 }
 
 # syslog-ng.d/zz_profile.conf — gitignored; без него 4.11 берёт medium-дефолты из syslog-ng.conf.
-# Пишем при отсутствии или старом формате (нет tcp_iw_size).
+# Сначала копируем example (файл должен появиться всегда), затем уточняем профиль в подпроцессе,
+# чтобы сбой source detect_resources.sh не ронял start.sh.
 ensure_syslog_profile() {
     local dest="${SCRIPT_DIR}/syslog-ng.d/zz_profile.conf"
     local example="${SCRIPT_DIR}/syslog-ng.d/zz_profile.conf.example"
@@ -78,8 +79,9 @@ ensure_syslog_profile() {
     local profile=""
 
     mkdir -p "${SCRIPT_DIR}/syslog-ng.d"
-    if [[ -f "$dest" ]] && grep -qE '@define[[:space:]]+tcp_iw_size' "$dest"; then
-        return 0
+    if [[ ! -f "$dest" && -f "$example" ]]; then
+        cp "$example" "$dest"
+        log "syslog-ng буферы: создан syslog-ng.d/zz_profile.conf из example"
     fi
 
     if [[ -f install-profile.json ]]; then
@@ -89,18 +91,24 @@ ensure_syslog_profile() {
     fi
 
     if [[ -f "$detect" && -n "$profile" ]]; then
-        # shellcheck source=deploy/common/detect_resources.sh
-        source "$detect"
-        if profile_params "$profile"; then
-            write_syslog_profile "$SCRIPT_DIR" "$profile"
+        if bash -c '
+            set -euo pipefail
+            # shellcheck disable=SC1090
+            source "$1"
+            profile_params "$2"
+            write_syslog_profile "$3" "$2"
+        ' bash "$detect" "$profile" "$SCRIPT_DIR"; then
             log "syslog-ng буферы: syslog-ng.d/zz_profile.conf (профиль ${profile})"
-            return 0
+        else
+            log "syslog-ng буферы: профиль ${profile} не применён, оставлен ${dest}"
         fi
     fi
+}
 
-    if [[ -f "$example" ]]; then
-        cp "$example" "$dest"
-        log "syslog-ng буферы: скопирован zz_profile.conf.example (medium)"
+warn_old_syslog_conf() {
+    local conf="${SCRIPT_DIR}/syslog-ng.conf"
+    if grep -qE 'log_iw_size\(' "$conf" 2>/dev/null; then
+        log "ВНИМАНИЕ: ${conf} старый (global log_iw_size). На сервере: git fetch origin && git reset --hard origin/main"
     fi
 }
 
@@ -110,6 +118,7 @@ prepare_mounts() {
         echo '{}' > install-profile.json
     fi
     ensure_syslog_profile
+    warn_old_syslog_conf
     if [[ -f "${SCRIPT_DIR}/deploy/common/install_meta.sh" ]]; then
         # shellcheck source=deploy/common/install_meta.sh
         source "${SCRIPT_DIR}/deploy/common/install_meta.sh"
