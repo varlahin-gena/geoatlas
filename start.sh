@@ -6,6 +6,8 @@ cd "$SCRIPT_DIR"
 
 # shellcheck source=deploy/common/compose.sh
 source "${SCRIPT_DIR}/deploy/common/compose.sh"
+# shellcheck source=deploy/common/admin_auth.sh
+source "${SCRIPT_DIR}/deploy/common/admin_auth.sh"
 
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-120}"
 DO_BUILD="${DO_BUILD:-1}"          # 1 = пересобирать образы, 0 = только поднять
@@ -147,10 +149,12 @@ ensure_compose_profiles() {
     log "Compose-профили (по умолчанию): ${COMPOSE_PROFILES}"
 }
 
-# Генерирует API_AUTH_TOKEN, SESSION_SECRET и seed-пароли в .env, если ещё нет.
+# Генерирует API_AUTH_TOKEN, SESSION_SECRET и пароль admin в .env, если ещё нет.
+# Operator не сеем — УЗ создают в UI после входа.
 ensure_api_auth_token() {
     local env_file=".env"
-    local need_token=1 need_session=1 need_admin=1 need_operator=1
+    local need_token=1 need_session=1 need_admin=1
+    NM_ADMIN_PASSWORD_PRINT="${NM_ADMIN_PASSWORD_PRINT:-0}"
     if [[ -f "$env_file" ]] && grep -qE '^[[:space:]]*API_AUTH_TOKEN=' "$env_file"; then
         need_token=0
     fi
@@ -160,42 +164,50 @@ ensure_api_auth_token() {
     if [[ -f "$env_file" ]] && grep -qE '^[[:space:]]*AUTH_ADMIN_PASSWORD=' "$env_file"; then
         need_admin=0
     fi
-    if [[ -f "$env_file" ]] && grep -qE '^[[:space:]]*AUTH_OPERATOR_PASSWORD=' "$env_file"; then
-        need_operator=0
+    if [[ -n "${AUTH_ADMIN_PASSWORD:-}" ]]; then
+        need_admin=0
+        if [[ ! -f "$env_file" ]] || ! grep -qE '^[[:space:]]*AUTH_ADMIN_PASSWORD=' "$env_file"; then
+            {
+                echo ""
+                echo "AUTH_ADMIN_USER=${AUTH_ADMIN_USER:-admin}"
+                echo "AUTH_ADMIN_PASSWORD=${AUTH_ADMIN_PASSWORD}"
+                echo "AUTH_ADMIN_MUST_RESET=${AUTH_ADMIN_MUST_RESET:-0}"
+            } >>"$env_file"
+        fi
     fi
-    if (( need_token == 0 && need_session == 0 && need_admin == 0 && need_operator == 0 )); then
+    if (( need_token == 0 && need_session == 0 && need_admin == 0 )); then
         return 0
     fi
-    local rand
-    if command -v openssl >/dev/null 2>&1; then
-        rand="$(openssl rand -hex 32)"
-    else
-        rand="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+    local rand admin_user admin_pass
+    rand="$(nm_rand_hex 32)"
+    admin_user="${AUTH_ADMIN_USER:-admin}"
+    if (( need_admin == 1 )); then
+        admin_pass="$(nm_rand_hex 12)"
+        AUTH_ADMIN_USER="$admin_user"
+        AUTH_ADMIN_PASSWORD="$admin_pass"
+        AUTH_ADMIN_MUST_RESET=1
+        NM_ADMIN_PASSWORD_PRINT=1
+        export AUTH_ADMIN_USER AUTH_ADMIN_PASSWORD AUTH_ADMIN_MUST_RESET NM_ADMIN_PASSWORD_PRINT
     fi
     {
         echo ""
         if (( need_token == 1 )); then
             echo "# Сгенерировано start.sh — токен для мутирующих API"
             echo "API_AUTH_TOKEN=${rand}"
-            rand="$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+            rand="$(nm_rand_hex 32)"
         fi
         if (( need_session == 1 )); then
             echo "# Сгенерировано start.sh — секрет cookie-сессий UI"
             echo "SESSION_SECRET=${rand}"
         fi
-        if (( need_admin == 1 || need_operator == 1 )); then
-            echo "# Смените пароли после первого входа"
-        fi
         if (( need_admin == 1 )); then
-            echo "AUTH_ADMIN_USER=admin"
-            echo "AUTH_ADMIN_PASSWORD=admin"
-        fi
-        if (( need_operator == 1 )); then
-            echo "AUTH_OPERATOR_USER=operator"
-            echo "AUTH_OPERATOR_PASSWORD=operator"
+            echo "# Сгенерировано start.sh — пароль admin (смените при первом входе)"
+            echo "AUTH_ADMIN_USER=${admin_user}"
+            echo "AUTH_ADMIN_PASSWORD=${admin_pass}"
+            echo "AUTH_ADMIN_MUST_RESET=1"
         fi
     } >>"$env_file"
-    log "Сгенерированы секреты авторизации в .env (API_AUTH_TOKEN / SESSION_SECRET / пользователи по умолчанию, если отсутствовали)"
+    log "Сгенерированы секреты авторизации в .env (API_AUTH_TOKEN / SESSION_SECRET / пароль admin, если отсутствовали)"
 }
 
 # Не даём поднять стек без секретов / с legacy-плейсхолдерами.
@@ -342,7 +354,13 @@ main() {
         log "Страница входа: http://${IP_ADDR}:${HTTP_PORT}/login.html"
         log "Health check  : http://${IP_ADDR}:${HTTP_PORT}/api/health"
     fi
-    log "Логин по умолчанию: admin / admin (смена пароля при первом входе)"
+    log "Первый вход: пользователь ${AUTH_ADMIN_USER:-admin}"
+    if [[ "${NM_ADMIN_PASSWORD_PRINT:-0}" == "1" && -n "${AUTH_ADMIN_PASSWORD:-}" ]]; then
+        log "Пароль (покажется только сейчас): ${AUTH_ADMIN_PASSWORD}"
+        log "При входе система попросит сменить пароль."
+    else
+        log "Пароль задан при установке или лежит в .env (AUTH_ADMIN_PASSWORD)."
+    fi
 }
 
 main "$@"

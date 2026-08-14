@@ -536,6 +536,7 @@ prepare_project() {
              deploy/common/select_https.sh \
              deploy/common/full_auto_preset.sh \
              deploy/common/ui.sh \
+             deploy/common/admin_auth.sh \
              deploy/common/uninstall.sh \
              deploy/ubuntu/install_ubuntu.sh \
              deploy/ubuntu/uninstall_ubuntu.sh; do

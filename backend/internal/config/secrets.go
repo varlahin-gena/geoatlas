@@ -17,7 +17,7 @@ var (
 
 // ValidateSecurity проверяет секреты перед стартом.
 // Legacy placeholders и флаги *_DISABLED запрещены без NM_ALLOW_INSECURE=1.
-// Слабые seed-пароли (admin/admin) не блокируют старт — у них must_reset_password;
+// Слабые seed-пароли (литерал admin) не блокируют старт — у них must_reset_password;
 // см. SecurityWarnings.
 func (c Config) ValidateSecurity() error {
 	allowInsecure := envBool("NM_ALLOW_INSECURE", false)

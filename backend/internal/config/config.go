@@ -144,6 +144,7 @@ type Config struct {
 	SessionTTLHours      int
 	AuthAdminUser        string
 	AuthAdminPassword    string
+	AuthAdminMustReset   bool
 	AuthOperatorUser     string
 	AuthOperatorPassword string
 	AuthUsersFile        string
@@ -195,12 +196,12 @@ type Config struct {
 	SkipStartupBackfill bool
 
 	// Backup: UI + native BACKUP TO Disk('backups').
-	BackupEnabled       bool
-	BackupDir           string // смонтированный том clickhouse-backups
-	BackupKeep          int
-	BackupIncludeEdges  bool
-	BackupIncludeAuth   bool
-	BackupScheduleFile  string // BACKUP_SCHEDULE_FILE
+	BackupEnabled      bool
+	BackupDir          string // смонтированный том clickhouse-backups
+	BackupKeep         int
+	BackupIncludeEdges bool
+	BackupIncludeAuth  bool
+	BackupScheduleFile string // BACKUP_SCHEDULE_FILE
 
 	// Reputation: офлайн-списки (FireHOL и др.).
 	MaxReputationUploadSize int64
@@ -243,18 +244,19 @@ func FromEnv() Config {
 		SessionTTLHours:      parser.int("SESSION_TTL_HOURS", 12),
 		AuthAdminUser:        envOr("AUTH_ADMIN_USER", "admin"),
 		AuthAdminPassword:    envOr("AUTH_ADMIN_PASSWORD", ""),
-		AuthOperatorUser:     envOr("AUTH_OPERATOR_USER", "operator"),
+		AuthAdminMustReset:   parser.bool("AUTH_ADMIN_MUST_RESET", false),
+		AuthOperatorUser:     envOr("AUTH_OPERATOR_USER", ""),
 		AuthOperatorPassword: envOr("AUTH_OPERATOR_PASSWORD", ""),
 		AuthUsersFile:        envOr("AUTH_USERS_FILE", "/app/data/users.json"),
 		APITokensFile:        envOr("API_TOKENS_FILE", "/app/data/api_tokens.json"),
 		RetentionFile:        envOr("RETENTION_FILE", "/app/data/retention.json"),
 		SearchTemplatesFile:  envOr("SEARCH_TEMPLATES_FILE", "/app/data/search_templates.json"),
 		AllowMultiInstance:   parser.bool("NM_ALLOW_MULTI_INSTANCE", false),
-		MaxLogUploadSize: parser.int64("MAX_LOG_UPLOAD_SIZE", 1<<30), // 1 GiB
+		MaxLogUploadSize:     parser.int64("MAX_LOG_UPLOAD_SIZE", 1<<30), // 1 GiB
 		// GeoIP: временные дефолты (small/2 GiB); ResolveGeoUploadLimits подставит профиль.
-		MaxGeoUploadSize:   firstEnvInt64(&parser, 512<<20, "GEOIP_UPLOAD_MAX_BYTES", "MAX_GEO_UPLOAD_SIZE"),
-		MaxGeoUploadRanges: firstEnvInt(&parser, 4_000_000, "GEOIP_UPLOAD_MAX_RANGES"),
-		IngestBatchSize:    parser.int("INGEST_BATCH_SIZE", 10000),
+		MaxGeoUploadSize:     firstEnvInt64(&parser, 512<<20, "GEOIP_UPLOAD_MAX_BYTES", "MAX_GEO_UPLOAD_SIZE"),
+		MaxGeoUploadRanges:   firstEnvInt(&parser, 4_000_000, "GEOIP_UPLOAD_MAX_RANGES"),
+		IngestBatchSize:      parser.int("INGEST_BATCH_SIZE", 10000),
 		IngestQueueSize:      parser.int("INGEST_QUEUE_SIZE", 300000),
 		IngestQueueMaxBytes:  parser.int("INGEST_QUEUE_MAX_BYTES", 256<<20), // 256 MiB
 		IngestWorkers:        parser.int("INGEST_WORKERS", 4),

@@ -539,6 +539,7 @@ prepare_project() {
              deploy/common/select_https.sh \
              deploy/common/full_auto_preset.sh \
              deploy/common/ui.sh \
+             deploy/common/admin_auth.sh \
              deploy/common/uninstall.sh \
              deploy/oracle_linux/install_oraclelinux.sh \
              deploy/oracle_linux/uninstall_oraclelinux.sh; do

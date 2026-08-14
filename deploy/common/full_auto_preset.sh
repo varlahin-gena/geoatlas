@@ -277,15 +277,23 @@ nm_full_auto_finish() {
         fi
     fi
 
-    local msg
+    local msg login_hint
+    login_hint="Пароль: тот, что задали в установщике (или AUTH_ADMIN_PASSWORD в .env)."
+    if [[ "${NM_ADMIN_PASSWORD_PRINT:-0}" == "1" && -n "${AUTH_ADMIN_PASSWORD:-}" ]]; then
+        login_hint="Пароль (покажется только сейчас): ${AUTH_ADMIN_PASSWORD}
+При входе система попросит сменить пароль."
+    elif [[ "${AUTH_ADMIN_MUST_RESET:-}" == "1" ]]; then
+        login_hint="Пароль: см. вывод ./start.sh или AUTH_ADMIN_PASSWORD в .env.
+При входе система попросит сменить пароль."
+    fi
     msg="Установка завершена.
 
 Веб-интерфейс: ${base}
 Вход:          ${login_url}
 
 Логин:  admin
-Пароль: admin
-(при первом входе система попросит сменить пароль)
+${login_hint}
+Operator не создаётся — заведите в UI «Пользователи», если нужен.
 
 Health: ${health_url}"
 

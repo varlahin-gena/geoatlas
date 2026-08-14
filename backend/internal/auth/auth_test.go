@@ -214,3 +214,40 @@ func TestCookieRoundTrip(t *testing.T) {
 		t.Fatalf("username = %s", sess.Username)
 	}
 }
+
+func TestSeedUsersFromEnvMustReset(t *testing.T) {
+	users, err := SeedUsersFromEnv("admin", "correct-horse", "", "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(users) != 1 {
+		t.Fatalf("len=%d, want 1 admin only", len(users))
+	}
+	if users[0].MustResetPassword {
+		t.Fatal("chosen strong password should not force reset")
+	}
+
+	users, err = SeedUsersFromEnv("admin", "correct-horse", "", "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !users[0].MustResetPassword {
+		t.Fatal("AUTH_ADMIN_MUST_RESET should force reset")
+	}
+
+	users, err = SeedUsersFromEnv("admin", "admin", "", "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !users[0].MustResetPassword {
+		t.Fatal("weak seed password must force reset")
+	}
+
+	users, err = SeedUsersFromEnv("admin", "s3cretxx", "operator", "s3cretxx", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(users) != 2 {
+		t.Fatalf("len=%d, want admin+operator when both set", len(users))
+	}
+}

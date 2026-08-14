@@ -155,7 +155,7 @@ func LoadUsersFile(path string) (*UserStore, error) {
 	return s, nil
 }
 
-func SeedUsersFromEnv(adminUser, adminPass, operatorUser, operatorPass string) ([]User, error) {
+func SeedUsersFromEnv(adminUser, adminPass, operatorUser, operatorPass string, adminMustReset bool) ([]User, error) {
 	var users []User
 	now := time.Now().UTC().Format(time.RFC3339)
 
@@ -171,7 +171,7 @@ func SeedUsersFromEnv(adminUser, adminPass, operatorUser, operatorPass string) (
 			FullName:          "Администратор",
 			PasswordHash:      string(hash),
 			Role:              RoleAdministrator,
-			MustResetPassword: true, // дефолтные env-пароли — сменить при первом входе
+			MustResetPassword: adminMustReset || seedPasswordWeak(adminUser, adminPass),
 			CreatedAt:         now,
 		})
 	}
@@ -193,6 +193,22 @@ func SeedUsersFromEnv(adminUser, adminPass, operatorUser, operatorPass string) (
 		})
 	}
 	return users, nil
+}
+
+func seedPasswordWeak(user, pass string) bool {
+	u := strings.ToLower(strings.TrimSpace(user))
+	p := strings.ToLower(strings.TrimSpace(pass))
+	if p == "" {
+		return false
+	}
+	if p == u {
+		return true
+	}
+	switch p {
+	case "admin", "operator", "password", "changeme", "123456":
+		return true
+	}
+	return false
 }
 
 // HashPassword хеширует пароль для хранения в User.
@@ -532,7 +548,7 @@ func (s *UserStore) persistUnlocked() error {
 
 // BuildUserStoreFromEnv — совместимость со старыми тестами (только память).
 func BuildUserStoreFromEnv(adminUser, adminPass, operatorUser, operatorPass string) (*UserStore, error) {
-	users, err := SeedUsersFromEnv(adminUser, adminPass, operatorUser, operatorPass)
+	users, err := SeedUsersFromEnv(adminUser, adminPass, operatorUser, operatorPass, false)
 	if err != nil {
 		return nil, err
 	}

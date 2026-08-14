@@ -323,6 +323,20 @@ _nm_env_get() {
     grep -E "^[[:space:]]*${key}=" "$file" 2>/dev/null | tail -n1 | cut -d= -f2- || true
 }
 
+_nm_ensure_admin_auth() {
+    if declare -F nm_rand_hex >/dev/null 2>&1; then
+        return 0
+    fi
+    local dir helper
+    dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+    helper="${dir}/admin_auth.sh"
+    if [[ ! -f "$helper" ]]; then
+        return 1
+    fi
+    # shellcheck source=deploy/common/admin_auth.sh
+    source "$helper"
+}
+
 write_env_file() {
     local project_dir="$1" profile="$2"
     local env_file="${project_dir}/.env"
@@ -351,9 +365,13 @@ write_env_file() {
     fi
 
     local admin_user="${AUTH_ADMIN_USER:-admin}"
-    local admin_pass="${AUTH_ADMIN_PASSWORD:-admin}"
-    local operator_user="${AUTH_OPERATOR_USER:-operator}"
-    local operator_pass="${AUTH_OPERATOR_PASSWORD:-operator}"
+    local admin_pass="${AUTH_ADMIN_PASSWORD:-}"
+    local admin_must="${AUTH_ADMIN_MUST_RESET:-}"
+    local operator_user="${AUTH_OPERATOR_USER:-}"
+    local operator_pass="${AUTH_OPERATOR_PASSWORD:-}"
+    local operator_block=""
+    local can_ask=0
+    NM_ADMIN_PASSWORD_PRINT="${NM_ADMIN_PASSWORD_PRINT:-0}"
     local auth_disabled="${AUTH_DISABLED:-false}"
     local api_auth_disabled="${API_AUTH_DISABLED:-false}"
     local allow_insecure="${NM_ALLOW_INSECURE:-0}"
@@ -372,9 +390,18 @@ write_env_file() {
     if [[ -f "$env_file" ]]; then
         local v
         v="$(_nm_env_get "$env_file" AUTH_ADMIN_USER)"; [[ -n "$v" ]] && admin_user="$v"
-        v="$(_nm_env_get "$env_file" AUTH_ADMIN_PASSWORD)"; [[ -n "$v" ]] && admin_pass="$v"
-        v="$(_nm_env_get "$env_file" AUTH_OPERATOR_USER)"; [[ -n "$v" ]] && operator_user="$v"
-        v="$(_nm_env_get "$env_file" AUTH_OPERATOR_PASSWORD)"; [[ -n "$v" ]] && operator_pass="$v"
+        if [[ -z "$admin_pass" ]]; then
+            v="$(_nm_env_get "$env_file" AUTH_ADMIN_PASSWORD)"; [[ -n "$v" ]] && admin_pass="$v"
+        fi
+        if [[ -z "$admin_must" ]]; then
+            v="$(_nm_env_get "$env_file" AUTH_ADMIN_MUST_RESET)"; [[ -n "$v" ]] && admin_must="$v"
+        fi
+        if [[ -z "$operator_pass" ]]; then
+            v="$(_nm_env_get "$env_file" AUTH_OPERATOR_PASSWORD)"; [[ -n "$v" ]] && operator_pass="$v"
+        fi
+        if [[ -z "$operator_user" ]]; then
+            v="$(_nm_env_get "$env_file" AUTH_OPERATOR_USER)"; [[ -n "$v" ]] && operator_user="$v"
+        fi
         # Флаги модулей: текущие env (после confirm_modules) имеют приоритет над файлом.
         if [[ -z "${NM_MODULE_AUTH:-}" ]]; then
             v="$(_nm_env_get "$env_file" NM_MODULE_AUTH)"; [[ -n "$v" ]] && mod_auth="$v"
@@ -418,6 +445,49 @@ write_env_file() {
         allow_insecure="1"
     fi
 
+    if [[ -z "$admin_pass" ]]; then
+        _nm_res_ensure_ui || true
+        if ! _nm_ensure_admin_auth; then
+            _nm_log "ОШИБКА: не найден deploy/common/admin_auth.sh"
+            exit 1
+        fi
+        if [[ "${NM_FULL_AUTO:-0}" != "1" ]] \
+            && [[ "${NM_UI_AVAILABLE:-0}" == "1" ]] \
+            && declare -F nm_ui_passwordbox >/dev/null 2>&1; then
+            can_ask=1
+        fi
+        if (( can_ask == 1 )); then
+            admin_pass="$(nm_prompt_admin_password "$admin_user")" || {
+                _nm_log "Пароль администратора не задан — установка прервана."
+                exit 1
+            }
+            admin_must=0
+        else
+            admin_pass="$(nm_rand_hex 12)"
+            admin_must=1
+            NM_ADMIN_PASSWORD_PRINT=1
+            _nm_log "Сгенерирован пароль администратора (один раз в конце установки / ./start.sh)."
+        fi
+    elif [[ -z "$admin_must" ]]; then
+        if _nm_ensure_admin_auth && nm_password_is_weak "$admin_user" "$admin_pass"; then
+            admin_must=1
+        else
+            admin_must=0
+        fi
+    fi
+    export AUTH_ADMIN_USER="$admin_user"
+    export AUTH_ADMIN_PASSWORD="$admin_pass"
+    export AUTH_ADMIN_MUST_RESET="$admin_must"
+    export NM_ADMIN_PASSWORD_PRINT
+
+    if [[ -n "$operator_pass" && -z "$operator_user" ]]; then
+        operator_user="operator"
+    fi
+    if [[ -n "$operator_pass" ]]; then
+        operator_block="AUTH_OPERATOR_USER=${operator_user}
+AUTH_OPERATOR_PASSWORD=${operator_pass}"
+    fi
+
     local syslog_stats_url=""
     if [[ "$mod_syslog" == "1" ]]; then
         syslog_stats_url="http://syslog-ng:9577/stats"
@@ -440,8 +510,8 @@ API_AUTH_TOKEN=${token}
 SESSION_SECRET=${session}
 AUTH_ADMIN_USER=${admin_user}
 AUTH_ADMIN_PASSWORD=${admin_pass}
-AUTH_OPERATOR_USER=${operator_user}
-AUTH_OPERATOR_PASSWORD=${operator_pass}
+AUTH_ADMIN_MUST_RESET=${admin_must}
+${operator_block}
 
 # --- Модули (select_modules.sh) ---
 NM_MODULE_AUTH=${mod_auth}

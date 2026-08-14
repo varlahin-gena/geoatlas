@@ -23,6 +23,7 @@ func buildAuth(cfg config.Config) (authParts, error) {
 		seed, err := auth.SeedUsersFromEnv(
 			cfg.AuthAdminUser, cfg.AuthAdminPassword,
 			cfg.AuthOperatorUser, cfg.AuthOperatorPassword,
+			cfg.AuthAdminMustReset,
 		)
 		if err != nil {
 			return out, fmt.Errorf("auth seed: %w", err)

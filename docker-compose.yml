@@ -134,14 +134,15 @@ services:
       # Обязателен, если API_AUTH_DISABLED не true. Генерируется в start.sh → .env
       API_AUTH_TOKEN: ${API_AUTH_TOKEN:?set API_AUTH_TOKEN in .env}
       API_AUTH_DISABLED: ${API_AUTH_DISABLED:-false}
-      # Локальный логин (роли administrator / operator). Пароли — в .env (start.sh).
+      # Локальный логин (seed только admin). Operator — опционально, иначе УЗ в UI.
       AUTH_DISABLED: ${AUTH_DISABLED:-false}
       SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
       SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-12}
       AUTH_ADMIN_USER: ${AUTH_ADMIN_USER:-admin}
       AUTH_ADMIN_PASSWORD: ${AUTH_ADMIN_PASSWORD:?set AUTH_ADMIN_PASSWORD in .env}
-      AUTH_OPERATOR_USER: ${AUTH_OPERATOR_USER:-operator}
-      AUTH_OPERATOR_PASSWORD: ${AUTH_OPERATOR_PASSWORD:?set AUTH_OPERATOR_PASSWORD in .env}
+      AUTH_ADMIN_MUST_RESET: ${AUTH_ADMIN_MUST_RESET:-0}
+      AUTH_OPERATOR_USER: ${AUTH_OPERATOR_USER:-}
+      AUTH_OPERATOR_PASSWORD: ${AUTH_OPERATOR_PASSWORD:-}
       AUTH_USERS_FILE: /app/data/users.json
       RETENTION_FILE: /app/data/retention.json
       REPUTATION_FEEDS_FILE: /app/data/reputation_feeds.json

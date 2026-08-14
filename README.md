@@ -47,7 +47,7 @@
 - Ручная загрузка логов через веб-интерфейс
 - Парсинг **UserGate, FortiGate, Cisco ASA, Cisco FTD (FirePower), Cowrie (honeypot)** и универсальный фолбэк (Generic KV)
 - **Осознанный пропуск** событий: распознанные, но несетевые строки (например, часть `cowrie.*`) не попадают в `parse_errors`
-- **Авторизация по умолчанию**: роли `administrator` / `operator`, cookie-сессии, CSRF, Bearer `API_AUTH_TOKEN` (+ `API_AUTH_PREVIOUS_TOKEN`); именованные API-токены со scopes `read`/`ops`/`admin` (UI `/api-tokens`); управление УЗ в UI
+- **Авторизация по умолчанию**: одна seed-учётка `admin`; роли `administrator` / `operator` (operator — через UI `/users`); cookie-сессии, CSRF, Bearer `API_AUTH_TOKEN` (+ `API_AUTH_PREVIOUS_TOKEN`); именованные API-токены со scopes `read`/`ops`/`admin` (UI `/api-tokens`); управление УЗ в UI
 - Веб-интерфейс — **React SPA** (Vite + TypeScript); clean paths, legacy `*.html` редиректятся
 - Опциональный **HTTPS** на nginx со своими PEM-сертификатами (редирект HTTP→HTTPS)
 - Загрузка и правка **GeoIP-базы** (CSV SIEM KUMA, `/geo-ranges`, IP без координат на `/geo-missing`); лимиты upload по профилю, очистка базы, большие CSV — с сервера через `curl` (см. [GeoIP](#geoip))
@@ -240,16 +240,14 @@ http://<IP_сервера>/
 
 При HTTPS (сертификаты в `certs/` + `HTTPS_ENABLED`): `https://<IP_сервера>/`.
 
-По умолчанию включена UI-авторизация. Первый вход:
+По умолчанию включена UI-авторизация. Первый вход — учётка **admin** (роль administrator). Пароля по умолчанию нет:
 
-| Учётка     | Пароль     | Роль          |
-|------------|------------|---------------|
-| `admin`    | `admin`    | administrator |
-| `operator` | `operator` | operator      |
+- пошаговая установка спрашивает пароль (дважды, мин. 8 символов);
+- `--full-auto` / нет TTY / голый `./start.sh` — берут `AUTH_ADMIN_PASSWORD` из окружения или генерируют одноразовый и печатают его один раз.
 
-Обе учётки создаются с `must_reset_password: true` — после входа нужно сменить пароль (мин. 8 символов).
-`./start.sh` при необходимости генерирует `API_AUTH_TOKEN`, `SESSION_SECRET` и seed-пароли в `.env`.
-Голый `docker compose up` без этих переменных в `.env` не стартует (fail-closed).
+Если пароль сгенерирован, при входе его нужно сменить (`must_reset_password`). Operator с завода не создаётся — заведите в UI `/users`.
+`./start.sh` при необходимости генерирует `API_AUTH_TOKEN`, `SESSION_SECRET` и пароль admin в `.env`.
+Голый `docker compose up` без `AUTH_ADMIN_PASSWORD` в `.env` не стартует (fail-closed).
 
 ---
 
@@ -303,6 +301,7 @@ sudo ./install_ubuntu.sh --full-auto
 |------------|------------|
 | `NM_UI=whiptail\|dialog\|text` | принудительный бэкенд диалогов |
 | `NM_FULL_AUTO=1` / `--full-auto` | «Сделай мне хорошо»: релиз, все модули, порт 8080, автопрофиль, firewall OFF, старт стека |
+| `AUTH_ADMIN_PASSWORD` | пароль admin для full-auto / без TTY; иначе установщик спросит или сгенерирует |
 | `NM_AUTO_MODULES=1` | без вопросов: модули по умолчанию, порт 80, стабильный релиз |
 | нет TTY (CI/pipe) | то же, что авто-режим; gauge пишет прогресс в лог |
 
@@ -367,7 +366,8 @@ cd /opt/network-monitor
 
 # 3. Права на скрипты
 chmod +x start.sh stop.sh scripts/tune-resources.sh \
-  deploy/common/detect_resources.sh deploy/common/select_modules.sh deploy/common/ui.sh
+  deploy/common/detect_resources.sh deploy/common/select_modules.sh deploy/common/ui.sh \
+  deploy/common/admin_auth.sh
 
 # 4. (Рекомендуется) Выбрать модули и профиль производительности
 ./deploy/common/select_modules.sh .

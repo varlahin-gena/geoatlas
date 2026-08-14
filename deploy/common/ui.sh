@@ -9,6 +9,7 @@
 #   nm_ui_checklist "Заголовок" "Подсказка" TAG "Desc" ON TAG2 "Desc2" OFF ...
 #   nm_ui_radiolist "Заголовок" "Подсказка" TAG "Desc" ON TAG2 "Desc2" OFF ...
 #   nm_ui_inputbox "Заголовок" "Подсказка" ["default"]  # stdout = ввод
+#   nm_ui_passwordbox "Заголовок" "Подсказка"          # скрытый ввод, stdout = пароль
 #   nm_ui_gauge "Заголовок" "Текст" PERCENT
 #   nm_ui_run_with_gauge "Заголовок" "Текст" CMD [ARGS...]
 #
@@ -315,6 +316,25 @@ _nm_ui_text_inputbox() {
     echo "$answer"
 }
 
+_nm_ui_text_passwordbox() {
+    local title="$1"
+    local text="$2"
+    local answer=""
+    echo "" >&2
+    echo "  ${title}" >&2
+    echo "  ${text}" >&2
+    if [[ -r /dev/tty && -w /dev/tty ]]; then
+        printf '  пароль: ' >/dev/tty
+        read -rs answer </dev/tty || return 1
+        printf '\n' >/dev/tty
+    else
+        printf '  пароль: ' >&2
+        read -rs answer || return 1
+        printf '\n' >&2
+    fi
+    printf '%s\n' "$answer"
+}
+
 # --- whiptail / dialog ------------------------------------------------------
 
 _nm_ui_tui_cmd() {
@@ -427,6 +447,22 @@ _nm_ui_tui_inputbox() {
     else
         out="$("$cmd" --backtitle "$NM_UI_BACKTITLE" --title "$title" \
             --inputbox "$text" "$NM_UI_HEIGHT" "$NM_UI_WIDTH" "$def" 3>&1 1>&2 2>&3)" || rc=$?
+    fi
+    (( rc == 0 )) || return 1
+    echo "$out"
+}
+
+_nm_ui_tui_passwordbox() {
+    local title="$1"
+    local text="$2"
+    local cmd out rc=0
+    cmd="$(_nm_ui_tui_cmd)"
+    if [[ "$cmd" == "dialog" ]]; then
+        out="$("$cmd" --backtitle "$NM_UI_BACKTITLE" --title "$title" \
+            --insecure --passwordbox "$text" "$NM_UI_HEIGHT" "$NM_UI_WIDTH" 2>&1 >/dev/tty)" || rc=$?
+    else
+        out="$("$cmd" --backtitle "$NM_UI_BACKTITLE" --title "$title" \
+            --passwordbox "$text" "$NM_UI_HEIGHT" "$NM_UI_WIDTH" 3>&1 1>&2 2>&3)" || rc=$?
     fi
     (( rc == 0 )) || return 1
     echo "$out"
@@ -641,6 +677,34 @@ nm_ui_inputbox() {
             ;;
         *)
             out="$(_nm_ui_text_inputbox "$title" "$text" "$def")"
+            echo "$out"
+            return 0
+            ;;
+    esac
+}
+
+# nm_ui_passwordbox TITLE TEXT
+# скрытый ввод; stdout = пароль; return 1 при отмене. Без значения по умолчанию.
+nm_ui_passwordbox() {
+    local title="$1"
+    local text="$2"
+    local out
+    case "${NM_UI_BACKEND:-text}" in
+        whiptail|dialog)
+            if [[ "${NM_UI_AVAILABLE:-0}" != "1" ]]; then
+                return 1
+            fi
+            if out="$(_nm_ui_tui_passwordbox "$title" "$text")"; then
+                echo "$out"
+                return 0
+            fi
+            return 1
+            ;;
+        *)
+            if [[ "${NM_UI_AVAILABLE:-0}" != "1" ]]; then
+                return 1
+            fi
+            out="$(_nm_ui_text_passwordbox "$title" "$text")" || return 1
             echo "$out"
             return 0
             ;;
