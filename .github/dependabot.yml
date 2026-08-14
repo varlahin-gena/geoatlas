@@ -1,31 +1,45 @@
 version: 2
+# Appliance: pin runtime images and ClickHouse driver ourselves.
+# Auto-PRs are patch-only so majors (Node 26, nginx 1.31, Alpine 3.24, clickhouse-go 2.48) stay closed.
 updates:
   - package-ecosystem: gomod
     directory: /backend
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
+    ignore:
+      - dependency-name: "github.com/ClickHouse/clickhouse-go/v2"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
     groups:
       backend-go:
         patterns: ["*"]
+        update-types: ["patch"]
 
   - package-ecosystem: gomod
     directory: /stats-collector
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
+    ignore:
+      - dependency-name: "github.com/ClickHouse/clickhouse-go/v2"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
     groups:
       stats-go:
         patterns: ["*"]
+        update-types: ["patch"]
 
   - package-ecosystem: gomod
     directory: /pkg/chconn
     schedule:
       interval: weekly
     open-pull-requests-limit: 3
+    ignore:
+      - dependency-name: "github.com/ClickHouse/clickhouse-go/v2"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
     groups:
       chconn-go:
         patterns: ["*"]
+        update-types: ["patch"]
 
   - package-ecosystem: gomod
     directory: /pkg/syslogngstats
@@ -35,30 +49,41 @@ updates:
     groups:
       syslogngstats-go:
         patterns: ["*"]
+        update-types: ["patch"]
 
   - package-ecosystem: npm
     directory: /frontend
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
     groups:
       frontend-deps:
         patterns: ["*"]
+        update-types: ["patch"]
 
   - package-ecosystem: docker
     directory: /backend
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
   - package-ecosystem: docker
     directory: /frontend
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
   - package-ecosystem: docker
     directory: /stats-collector
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
   - package-ecosystem: github-actions
     directory: /
@@ -67,3 +92,4 @@ updates:
     groups:
       github-actions:
         patterns: ["*"]
+        update-types: ["minor", "patch"]

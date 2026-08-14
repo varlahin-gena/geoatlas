@@ -31,9 +31,10 @@
 - `CLICKHOUSE_PASSWORD` генерируется в `./start.sh` / `detect_resources.sh`; compose fail-closed; default user `from_env`
 - Мастер GeoIP: abort polling при закрытии, `apiFetchRaw` (401 → session expired), Escape / focus trap / клик по backdrop
 - nginx не отдаёт `*.map` (в т.ч. `/assets/`); Vite sourcemap только при `NM_SOURCEMAP=1`
-- Dependabot (Go / npm / Docker / Actions); Trivy fs в CI + weekly scan образов; GitHub Release из CHANGELOG на тег `v*`
+- Dependabot (Go / npm / Docker / Actions): только patch (Docker — без minor/major тегов; `clickhouse-go` без minor); Trivy fs в CI + weekly scan образов; GitHub Release из CHANGELOG на тег `v*`
 
 ### Fixed
+- CI: `aquasecurity/trivy-action` pinned на v0.36.0 (тег `0.28.0` снят после инцидента 2026); `setup-node@v5`
 - Integration map-path: `stubGeoJobs` больше не паникует на нулевом счётчике при `POST /upload-geo`
 - SPA: 401 вне `/api/auth/*` сбрасывает сессию и ведёт на `/login?next=`
 - Карта: period/group/filter/q/country в query string
