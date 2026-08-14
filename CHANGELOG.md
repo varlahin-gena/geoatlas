@@ -5,6 +5,18 @@
 
 ## [Unreleased]
 
+### Added
+- Лицензия **Apache License 2.0** (`LICENSE`, `NOTICE`); продукт бесплатный, доработки через GitHub Issues
+- Политика уязвимостей: [`SECURITY.md`](SECURITY.md) (приватный GitHub advisory, ответ за 5 рабочих дней)
+- Контракт релизов: `scripts/check-release-contract.sh` (CI) — VERSION, CHANGELOG Notes и OpenAPI не разъезжаются
+- CI: путь «лог → карта» (`TestIntegrationMapPathLogToEvents`: upload-geo + parser samples → `/api/events`)
+- CI: `scripts/shellcheck.sh` (`-S error`) на `start.sh` / `stop.sh` / `scripts/` / `deploy/`
+
+### Changed
+- HTTP API doc **1.5.0 → 1.8.0** (после v1.3.1, ещё не в продуктовом теге):
+  - **1.7.0**: `GET /metrics` (Prometheus, Bearer≥ops), `POST /api/auth/logout-all` в спецификации, ingest SLO в `/api/system/stats`
+  - **1.8.0**: `/api/events` — серверные `filter` / `limit` / `country` / `q`; live `pipeline.syslogng` в `/api/system/stats`
+
 ## [1.3.1] — 2026-08-12
 
 Патч-релиз: экономнее память GeoIP, лучше наблюдаемость индекса и чище empty-state карты.
@@ -239,6 +251,8 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[1.3.1]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.3.1
+[1.3.0]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.3.0
 [1.2.1]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.2.1
 [1.2.0]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.2.0
 [1.1.4]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.1.4

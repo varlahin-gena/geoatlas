@@ -1,0 +1,14 @@
+name: Release tag
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  release-contract:
+    name: tag matches VERSION / CHANGELOG / OpenAPI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: check release contract
+        run: bash scripts/check-release-contract.sh

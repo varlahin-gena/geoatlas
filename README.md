@@ -35,6 +35,8 @@
 - [GeoIP](#geoip)
 - [Веб-интерфейс](#веб-интерфейс)
   - [HTTP API](#http-api)
+- [Лицензия](#лицензия)
+- [Безопасность](#безопасность)
 - [Структура репозитория](#структура-репозитория)
 
 ---
@@ -65,7 +67,7 @@
 - Страница системного мониторинга (Обзор / Pipeline / Безопасность / Графики / **Резервное копирование**): метрики контейнеров, пайплайна (в т.ч. **UDP/TCP EPS**, drops, circuit breaker), **форма TTL**, неуспешные логины, хранилище, профиль установки, **индикатор ёмкости**, алёрты; ручной maintenance backfill агрегатов
 - Индикатор здоровья системы на главной странице (ссылка на `/system`); **версия установки** (`main` / тег) в меню пользователя
 - Docker: fail-closed секреты в compose, hardened контейнеры (`cap_drop: ALL`); запуск через `./start.sh`
-- Контракт HTTP API: [`openapi.yaml`](openapi.yaml) (OpenAPI **1.7.0**)
+- Контракт HTTP API: [`openapi.yaml`](openapi.yaml) (OpenAPI **1.8.0**)
 
 ---
 
@@ -907,7 +909,17 @@ Unit-тесты карты (репутация / heatmap focus / coords helpers)
 
 ### HTTP API
 
-Контракт REST API (в т.ч. auth, events, geo, reputation, retention, tokens, search-templates, backups, `/metrics`): [`openapi.yaml`](openapi.yaml), версия документа **1.7.0**. Проверка живости: `GET /api/health` (публичный). Остальные эндпоинты — cookie-сессия и/или Bearer (`API_AUTH_TOKEN` / именованный токен со scope). Prometheus scrape: `GET /metrics` (Bearer≥ops / administrator).
+Контракт REST API (в т.ч. auth, events, geo, reputation, retention, tokens, search-templates, backups, `/metrics`): [`openapi.yaml`](openapi.yaml), версия документа OpenAPI **1.8.0**. Проверка живости: `GET /api/health` (публичный). Остальные эндпоинты — cookie-сессия и/или Bearer (`API_AUTH_TOKEN` / именованный токен со scope). Prometheus scrape: `GET /metrics` (Bearer≥ops / administrator).
+
+## Лицензия
+
+ГеоАтлас распространяется под [Apache License 2.0](LICENSE). Продукт бесплатный и общедоступный; релизы публикуются на GitHub.
+
+Баги, вопросы и заказ доработок — через [Issues](https://github.com/varlahin-gena/network_monitor/issues).
+
+## Безопасность
+
+Уязвимости — только приватно, см. [SECURITY.md](SECURITY.md) (подтверждение в течение 5 рабочих дней). Обычные баги — в Issues.
 
 ## Структура репозитория
 
@@ -960,6 +972,8 @@ network_monitor/
 │   ├── backfill_edges_agg.sh         # то же для BLOCKED=…
 │   └── reset_data.sql / reset_data.sh
 ├── scripts/
+│   ├── check-release-contract.sh     # CI: VERSION / CHANGELOG / OpenAPI
+│   ├── shellcheck.sh                 # CI: start/stop, scripts/, deploy/
 │   ├── backup-clickhouse.sh          # native BACKUP → том clickhouse-backups
 │   └── restore-clickhouse.sh         # RESTORE + optional auth tarball
 ├── certs/                            # PEM (fullchain/privkey); README + .gitkeep; ключи в .gitignore
@@ -984,7 +998,9 @@ network_monitor/
 │   └── internal/
 │       ├── config/
 │       └── collector/
-├── openapi.yaml                      # контракт HTTP API (OpenAPI 1.7.0)
+├── openapi.yaml                      # контракт HTTP API (OpenAPI 1.8.0)
+├── LICENSE / NOTICE                  # Apache License 2.0
+├── SECURITY.md                       # как сообщать об уязвимостях
 ├── VERSION / CHANGELOG.md / RELEASING.md
 ├── .github/workflows/ci.yml
 ├── start.sh / stop.sh

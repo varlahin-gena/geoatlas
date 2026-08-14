@@ -6,6 +6,24 @@ on:
   pull_request:
 
 jobs:
+  release-contract:
+    name: release contract (VERSION / OpenAPI / CHANGELOG)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: check VERSION ↔ CHANGELOG ↔ OpenAPI
+        run: bash scripts/check-release-contract.sh
+
+  shellcheck:
+    name: shellcheck (deploy / start / scripts)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: shellcheck
+        run: bash scripts/shellcheck.sh
+
   backend:
     name: backend (test + lint)
     runs-on: ubuntu-latest
@@ -166,7 +184,9 @@ jobs:
           set +e
           go test -tags=integration -count=1 ./internal/adapter/clickhouse/ -run Integration -v
           status=$?
-          if [ "$status" -ne 0 ]; then
+          go test -tags=integration -count=1 ./internal/adapter/httpapi/ -run Integration -v
+          status2=$?
+          if [ "$status" -ne 0 ] || [ "$status2" -ne 0 ]; then
             echo "::group::ClickHouse diagnostics"
             curl -fsS -G http://127.0.0.1:8123/ \
               --data-urlencode "user=default" \
@@ -181,8 +201,11 @@ jobs:
               docker logs --tail 200 "$container_id" || true
             fi
             echo "::endgroup::"
+            if [ "$status" -ne 0 ]; then
+              exit "$status"
+            fi
+            exit "$status2"
           fi
-          exit "$status"
 
   stats-collector:
     name: stats-collector (test + lint)

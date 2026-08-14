@@ -1,35 +1,57 @@
 # Releasing ГеоАтлас
 
-## Версии
+Три оси версий **не сливаются** в одну цифру. Релиз обязан назвать, какая тройка в теге.
 
-| Что | Где | Пример |
-|-----|-----|--------|
-| Продукт | `VERSION`, git tag `vX.Y.Z` | `1.2.0` |
-| HTTP API (OpenAPI) | `openapi.yaml` → `info.version` | `1.4.0` |
-| Схема CH | `nm_schema_version` (Go Ensure*) | независимо |
+| Ось | Где | Когда двигать |
+|-----|-----|----------------|
+| Продукт | `VERSION`, git tag `vX.Y.Z`, `install-meta.json` | Только в коммите релиза. На `main` до тега `VERSION` = прошлый релиз (UI пишет `main`). |
+| HTTP API | `openapi.yaml` → `info.version` | Новый путь / поле / breaking schema. Не за лицензию, баг парсера или описание. |
+| Схема CH | `nm_schema_version` (`Ensure*`) | Как сейчас, независимо. В Notes релиза — строка, если Ensure* менялся. |
+
+CI: `bash scripts/check-release-contract.sh` (job **release-contract**). Инвариант: если OpenAPI на дереве новее, чем в Notes секции текущего `VERSION`, блок **Unreleased** обязан содержать эту цифру. README цитирует `OpenAPI **N**` = `info.version`.
+
+На push тега `v*` тот же скрипт сверяет `v`+`VERSION` и что Notes уже догнали OpenAPI (Unreleased перенесён).
+
+## Когда какой bump продукта
+
+| Вид | Пример | Тег |
+|-----|--------|-----|
+| Патч | баг, парсер по семплу, security, доки | `1.4.x` |
+| Минор | заметное поведение для оператора | `1.5.0` |
+| Мажор | осознанно ломаем install или HTTP API | `2.0.0` |
+
+Ритм: не чаще одного продуктового релиза в **2 недели**, лучше 2–4. Несколько тегов в один день — только security. Между релизами копим Unreleased, не клеим тег на каждый коммит.
+
+OpenAPI: минор (`1.8` → `1.9`) — новый endpoint или новое поле; патч (`1.8.0` → `1.8.1`) — изменение уже описанной схемы, которое видит клиент. Опечатка в description — номер не трогать.
 
 ## Чеклист перед тегом
 
-1. CI зелёный на `main` (backend test+lint, CH integration, frontend smoke).
-2. `VERSION` и секция в `CHANGELOG.md` совпадают с тегом.
-3. Локальный smoke после `./start.sh`:
+1. Перенести `## [Unreleased]` в `## [X.Y.Z] — YYYY-MM-DD`.
+2. Notes секции: `OpenAPI API doc version: **N**` (= `openapi.yaml`); схема CH, если менялась; продуктовая версия.
+3. `VERSION` = `X.Y.Z`. Ссылка `[X.Y.Z]:` внизу CHANGELOG. Unreleased снова пустой (только заголовок).
+4. CI зелёный, в т.ч. **release-contract**.
+5. Локальный smoke после `./start.sh`:
    - `/api/health`
-   - логин admin, карта, `/system`
-   - создать API-токен scope=ops, `curl -H "Authorization: Bearer …" /api/ingest/stats`
-4. (Опционально) `./scripts/watch-ingest.sh` без drops в покое.
+   - логин, карта, `/system`
+   - API-токен scope=ops, `curl -H "Authorization: Bearer …" /api/ingest/stats`
+6. (Опционально) `./scripts/watch-ingest.sh` без drops в покое.
 
 ## Создать релиз
 
 ```bash
-# убедиться что working tree clean и main запушен
-git tag -a v1.2.0 -m "ГеоАтлас v1.2.0"
-git push origin v1.2.0
+# working tree clean, main запушен, VERSION уже X.Y.Z
+git tag -a "v$(tr -d '[:space:]' < VERSION)" -m "ГеоАтлас v$(tr -d '[:space:]' < VERSION)"
+git push origin "v$(tr -d '[:space:]' < VERSION)"
 
-gh release create v1.2.0 --title "v1.2.0" --notes-file /tmp/release-notes-1.2.0.md
-# или вручную на GitHub → Releases, вставить секцию из CHANGELOG
+gh release create "v$(tr -d '[:space:]' < VERSION)" \
+  --title "v$(tr -d '[:space:]' < VERSION)" \
+  --notes-file /tmp/release-notes.md
+# или GitHub → Releases, вставить секцию из CHANGELOG
 ```
+
+Не тегировать раньше секции в CHANGELOG: job на `v*` упадёт, если OpenAPI ещё только в Unreleased.
 
 ## После релиза
 
-- Обновить install-скрипты / README только если меняется UX установки.
-- Следующая версия: правка `VERSION` + новая секция в `CHANGELOG.md` в отдельном PR/коммите.
+- Установщик / README — только если менялся UX установки.
+- Следующие коммиты **не** двигают `VERSION`, пока не решите релизить снова. Новое — в Unreleased (и bump `info.version`, если менялся HTTP-контракт).
