@@ -300,7 +300,7 @@ func NewServer(
 		chain(http.HandlerFunc(repH.UploadReputation), opsMW, csrf, maxBytesMW(cfg.MaxReputationUploadSize)),
 	)
 
-	var h http.Handler = rr.Handler()
+	h := rr.Handler()
 	h = loggingMW(h)
 	if deps.prom != nil {
 		h = metricsMW(deps.prom)(h)
