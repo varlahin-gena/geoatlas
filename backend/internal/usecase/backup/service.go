@@ -7,15 +7,17 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"network_monitor/internal/apperr"
 )
 
 var (
 	ErrUnavailable  = errors.New("backup service unavailable")
-	ErrBusy         = errors.New("backup already running")
+	ErrBusy         = apperr.Conflict("backup already running")
 	ErrDisabled     = errors.New("backups disabled")
-	ErrNotFound     = errors.New("backup not found")
-	ErrNotAttached  = errors.New("backup is not attached")
-	ErrDeleteActive = errors.New("cannot delete attached backup; detach first")
+	ErrNotFound     = apperr.NotFound("backup not found")
+	ErrNotAttached  = apperr.InvalidInput("backup is not attached")
+	ErrDeleteActive = apperr.Conflict("cannot delete attached backup; detach first")
 )
 
 // Entry — один полный бэкап на disk backups.

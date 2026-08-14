@@ -5,8 +5,6 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/gorilla/mux"
-
 	"network_monitor/internal/auth"
 )
 
@@ -52,7 +50,7 @@ func (h *APITokensHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "api tokens not configured"})
 		return
 	}
-	id := mux.Vars(r)["id"]
+	id := r.PathValue("id")
 	if err := h.apiTokens.Revoke(id); err != nil {
 		writeTokenStoreError(w, err)
 		return

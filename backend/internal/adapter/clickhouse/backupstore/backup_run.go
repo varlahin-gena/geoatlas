@@ -1,4 +1,4 @@
-package clickhouse
+package backupstore
 
 import (
 	"context"

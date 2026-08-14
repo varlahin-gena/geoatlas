@@ -14,7 +14,7 @@ func TestSessionCookieRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	token, _, err := mgr.Issue("operator", auth.RoleOperator)
+	token, _, err := mgr.Issue("operator", auth.RoleOperator, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

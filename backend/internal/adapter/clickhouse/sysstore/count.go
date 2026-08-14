@@ -1,4 +1,4 @@
-package clickhouse
+package sysstore
 
 import (
 	"context"

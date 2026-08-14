@@ -14,6 +14,7 @@ type SystemStatsResponse struct {
 	Storage        map[string]map[string]float64 `json:"storage"`
 	Health         map[string]map[string]any     `json:"health"`
 	Alerts         []Alert                       `json:"alerts"`
+	IngestSLO      IngestSLO                     `json:"ingest_slo"`
 	Backend        BackendInfo                   `json:"backend_info"`
 	InstallProfile *CapacityProfile              `json:"install_profile,omitempty"`
 	EdgesAgg       EdgesAggView                  `json:"edges_agg"`

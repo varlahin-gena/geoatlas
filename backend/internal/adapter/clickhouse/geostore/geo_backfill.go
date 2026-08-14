@@ -1,4 +1,4 @@
-package clickhouse
+package geostore
 
 import (
 	"context"
@@ -24,8 +24,8 @@ const geoStrMaxRunes = 256
 // 0 = без ограничения по времени (полный скан, дорого по CPU).
 const DefaultGeoBackfillLookbackDays = 7
 
-// GeoResolver — порт для backfill (реализация: *geoip.Index).
-// Пакет не импортирует geoip, чтобы не тянуть доменный индекс в слой CH.
+// GeoResolver — порт для backfill (реализация: *geoip.Index / *ReloadableGeoIndex).
+// EnrichLogsMissingGeo принимает интерфейс, чтобы не требовать конкретный тип индекса.
 type GeoResolver interface {
 	RangeCount() int
 	Lookup(ipStr string) model.GeoLookup

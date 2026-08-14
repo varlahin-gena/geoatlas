@@ -7,7 +7,9 @@ import (
 
 	"network_monitor/internal/adapter/bootstrapadapter"
 	chadapter "network_monitor/internal/adapter/clickhouse"
+	"network_monitor/internal/adapter/clickhouse/geostore"
 	"network_monitor/internal/adapter/clickhouse/migrate"
+	"network_monitor/internal/adapter/clickhouse/repstore"
 	"network_monitor/internal/adapter/geojob"
 	"network_monitor/internal/adapter/reputationfeedsfile"
 	"network_monitor/internal/adapter/reputationjob"
@@ -20,14 +22,14 @@ import (
 
 // backgroundParts — индексы/UC, нужные ingest и HTTP после wireBackground.
 type backgroundParts struct {
-	geo         *chadapter.ReloadableGeoIndex
-	repIdx      *chadapter.ReloadableReputationIndex
+	geo         *geostore.ReloadableGeoIndex
+	repIdx      *repstore.ReloadableReputationIndex
 	repUC       *usecasereputation.Service
 	retentionUC *usecaseretention.Service
 }
 
 func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backgroundParts {
-	geo := chadapter.NewReloadableGeoIndex(a.pools.Background)
+	geo := geostore.NewReloadableGeoIndex(a.pools.Background)
 	a.geoJobs = geojob.New(geo, chadapter.NewMaintenanceStore(a.pools.Background), cfg.GeoBackfillLookbackDays)
 	// Не блокируем старт HTTP на полной загрузке GeoIP (миллионы диапазонов → минуты).
 	// Иначе после OOM/рестарта nginx auth_request падает → клиенту 500 на всех страницах.
@@ -48,11 +50,11 @@ func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backg
 		slog.Warn("geo edges agg schema ensure (early) failed", "err", err)
 	}
 
-	var repIdx *chadapter.ReloadableReputationIndex
+	var repIdx *repstore.ReloadableReputationIndex
 	var repUC *usecasereputation.Service
 	if cfg.ReputationFetchEnabled {
-		repIdx = chadapter.NewReloadableReputationIndex(a.pools.Background)
-		repRepo := chadapter.NewReputationRepository(a.pools.API, a.pools.Ingest)
+		repIdx = repstore.NewReloadableReputationIndex(a.pools.Background)
+		repRepo := repstore.NewReputationRepository(a.pools.API, a.pools.Ingest)
 		repFeedStore := reputationfeedsfile.New(cfg.ReputationFeedsFile)
 		repFeeds, err := repFeedStore.LoadOrSeed(reputationFeedsFromConfig(cfg.ReputationFeeds))
 		if err != nil {
@@ -134,7 +136,7 @@ func reputationFeedsFromConfig(feeds []config.ReputationFeed) []usecasereputatio
 
 func dropRetiredReputationFeeds(feeds []usecasereputation.Feed) (cleaned []usecasereputation.Feed, dropped int) {
 	if len(feeds) == 0 {
-		return nil, 0
+		return nil, dropped
 	}
 	cleaned = make([]usecasereputation.Feed, 0, len(feeds))
 	for _, f := range feeds {

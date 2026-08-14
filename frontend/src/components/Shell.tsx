@@ -175,7 +175,7 @@ export function AdminSidebar({ adminLinksOnly = false }: { adminLinksOnly?: bool
 }
 
 export function UserMenu() {
-  const { user, theme, toggleTheme, logout } = useAuth();
+  const { user, theme, toggleTheme, logout, logoutAll } = useAuth();
   const [open, setOpen] = useState(false);
   const [versionText, setVersionText] = useState('');
   const [versionTitle, setVersionTitle] = useState('');
@@ -272,6 +272,26 @@ export function UserMenu() {
           <span className="nm-theme-value">{themeLabel(theme)}</span>
         </button>
         <div className="nm-user-menu-sep" />
+        <button
+          type="button"
+          className="nm-user-menu-item danger"
+          role="menuitem"
+          title="Инвалидирует сессии на всех устройствах"
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen(false);
+            if (
+              !window.confirm(
+                'Завершить все сессии на всех устройствах?\nПотребуется войти снова на каждом из них.',
+              )
+            ) {
+              return;
+            }
+            void logoutAll();
+          }}
+        >
+          Выйти везде
+        </button>
         <button
           type="button"
           className="nm-user-menu-item danger"

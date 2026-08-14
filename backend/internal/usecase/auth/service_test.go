@@ -27,7 +27,20 @@ func (f *fakeUsers) Get(username string) (domain.UserPublic, bool) {
 	}
 	return f.user.Public(), true
 }
-func (f *fakeUsers) List() []domain.UserPublic                       { return f.list }
+func (f *fakeUsers) SessionVersion(username string) (int64, bool) {
+	if f.user == nil || f.user.Username != username {
+		return 0, false
+	}
+	return f.user.SessionVersion, true
+}
+func (f *fakeUsers) BumpSessionVersion(username string) error {
+	if f.user == nil || f.user.Username != username {
+		return domain.ErrUserNotFound
+	}
+	f.user.SessionVersion++
+	return nil
+}
+func (f *fakeUsers) List() []domain.UserPublic { return f.list }
 func (f *fakeUsers) Create(string, string, string, string, bool) (domain.UserPublic, error) {
 	return domain.UserPublic{}, f.err
 }
@@ -54,6 +67,11 @@ func (f *fakeUsers) ChangePassword(string, string, string) (domain.UserPublic, e
 	if f.err != nil {
 		return domain.UserPublic{}, f.err
 	}
+	if f.user == nil {
+		return domain.UserPublic{}, domain.ErrUserNotFound
+	}
+	// bump session version on success like real store
+	f.user.SessionVersion++
 	return f.user.Public(), nil
 }
 func (f *fakeUsers) Delete(string, string) error { return f.err }
@@ -62,11 +80,11 @@ type fakeSessions struct {
 	fail bool
 }
 
-func (f *fakeSessions) Issue(username, role string) (string, domain.Session, error) {
+func (f *fakeSessions) Issue(username, role string, sessionVersion int64) (string, domain.Session, error) {
 	if f.fail {
 		return "", domain.Session{}, errors.New("boom")
 	}
-	return "tok", domain.Session{Username: username, Role: role}, nil
+	return "tok", domain.Session{Username: username, Role: role, SessionVersion: sessionVersion}, nil
 }
 func (f *fakeSessions) TTL() time.Duration { return time.Hour }
 
@@ -101,5 +119,31 @@ func TestMeUnauthorized(t *testing.T) {
 	_, err := svc.Me("ghost")
 	if !errors.Is(err, ErrUnauthorized) {
 		t.Fatalf("want ErrUnauthorized, got %v", err)
+	}
+}
+
+func TestChangePasswordReissuesToken(t *testing.T) {
+	users := &fakeUsers{user: &domain.User{Username: "admin", Role: domain.RoleAdministrator, SessionVersion: 0}}
+	svc := New(users, &fakeSessions{})
+	out, err := svc.ChangePassword("admin", "old", "new")
+	if err != nil {
+		t.Fatalf("ChangePassword: %v", err)
+	}
+	if out.Token != "tok" {
+		t.Fatalf("token = %q, want tok", out.Token)
+	}
+	if users.user.SessionVersion != 1 {
+		t.Fatalf("session version = %d, want 1", users.user.SessionVersion)
+	}
+}
+
+func TestLogoutAll(t *testing.T) {
+	users := &fakeUsers{user: &domain.User{Username: "admin", Role: domain.RoleAdministrator, SessionVersion: 2}}
+	svc := New(users, &fakeSessions{})
+	if err := svc.LogoutAll("admin"); err != nil {
+		t.Fatalf("LogoutAll: %v", err)
+	}
+	if users.user.SessionVersion != 3 {
+		t.Fatalf("session version = %d, want 3", users.user.SessionVersion)
 	}
 }

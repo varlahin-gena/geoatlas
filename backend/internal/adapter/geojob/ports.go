@@ -15,13 +15,13 @@ type Store interface {
 	RebuildGeoEdgesLookback(ctx context.Context, lookbackDays int) error
 }
 
-// GeoResolver — минимум для EnrichLogsMissingGeo (совпадает с clickhouse.GeoResolver).
+// GeoResolver — минимум для EnrichLogsMissingGeo (совпадает с geostore.GeoResolver).
 type GeoResolver interface {
 	RangeCount() int
 	Lookup(ipStr string) model.GeoLookup
 }
 
-// GeoIndex — reload + lookup для backfill (реализация: *clickhouse.ReloadableGeoIndex).
+// GeoIndex — reload + lookup для backfill (реализация: *geostore.ReloadableGeoIndex).
 type GeoIndex interface {
 	Reload(ctx context.Context) error
 	RangeCount() int

@@ -1,14 +1,14 @@
-package clickhouse_test
+package repstore_test
 
 import (
 	"testing"
 
-	chadapter "network_monitor/internal/adapter/clickhouse"
+	"network_monitor/internal/adapter/clickhouse/repstore"
 	"network_monitor/internal/model"
 )
 
 func TestReloadableReputationIndexLookupNilReceiver(t *testing.T) {
-	var idx *chadapter.ReloadableReputationIndex
+	var idx *repstore.ReloadableReputationIndex
 	// typed nil in interface — Lookup must not panic (nil-safe method).
 	var lookuper interface {
 		Lookup(string) []model.ReputationHit

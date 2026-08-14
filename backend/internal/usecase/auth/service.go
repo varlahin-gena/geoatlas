@@ -45,7 +45,7 @@ func (s *Service) Login(username, password string) (LoginResult, error) {
 	if !ok || user == nil {
 		return LoginResult{}, ErrInvalidCredentials
 	}
-	token, _, err := s.sessions.Issue(user.Username, user.Role)
+	token, _, err := s.sessions.Issue(user.Username, user.Role, user.SessionVersion)
 	if err != nil {
 		return LoginResult{}, ErrSession
 	}
@@ -63,11 +63,37 @@ func (s *Service) Me(username string) (domain.UserPublic, error) {
 	return pub, nil
 }
 
-func (s *Service) ChangePassword(username, oldPassword, newPassword string) (domain.UserPublic, error) {
-	if s == nil || s.users == nil {
-		return domain.UserPublic{}, ErrNotConfigured
+// ChangePasswordResult — после смены пароля выдаём новый token (старые cookie revoke).
+type ChangePasswordResult struct {
+	User  domain.UserPublic
+	Token string
+}
+
+func (s *Service) ChangePassword(username, oldPassword, newPassword string) (ChangePasswordResult, error) {
+	if s == nil || s.users == nil || s.sessions == nil {
+		return ChangePasswordResult{}, ErrNotConfigured
 	}
-	return s.users.ChangePassword(username, oldPassword, newPassword)
+	pub, err := s.users.ChangePassword(username, oldPassword, newPassword)
+	if err != nil {
+		return ChangePasswordResult{}, err
+	}
+	sv, ok := s.users.SessionVersion(username)
+	if !ok {
+		return ChangePasswordResult{}, ErrUnauthorized
+	}
+	token, _, err := s.sessions.Issue(pub.Username, pub.Role, sv)
+	if err != nil {
+		return ChangePasswordResult{}, ErrSession
+	}
+	return ChangePasswordResult{User: pub, Token: token}, nil
+}
+
+// LogoutAll bump'ает session_version — все ранее выданные cookie перестают быть валидными.
+func (s *Service) LogoutAll(username string) error {
+	if s == nil || s.users == nil {
+		return ErrNotConfigured
+	}
+	return s.users.BumpSessionVersion(username)
 }
 
 func (s *Service) ListUsers() ([]domain.UserPublic, error) {

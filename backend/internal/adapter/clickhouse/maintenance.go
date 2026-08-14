@@ -5,6 +5,7 @@ import (
 
 	ch "github.com/ClickHouse/clickhouse-go/v2"
 
+	"network_monitor/internal/adapter/clickhouse/geostore"
 	"network_monitor/internal/adapter/clickhouse/migrate"
 	"network_monitor/internal/adapter/geojob"
 )
@@ -39,7 +40,7 @@ func (m *MaintenanceStore) EnrichLogsMissingGeo(ctx context.Context, geo geojob.
 	if m == nil || m.ch == nil || geo == nil {
 		return 0, nil
 	}
-	return EnrichLogsMissingGeo(ctx, m.ch, geo, lookbackDays)
+	return geostore.EnrichLogsMissingGeo(ctx, m.ch, geo, lookbackDays)
 }
 
 func (m *MaintenanceStore) RebuildGeoEdgesLookback(ctx context.Context, lookbackDays int) error {

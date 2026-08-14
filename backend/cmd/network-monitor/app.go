@@ -2,12 +2,16 @@ package main
 
 import (
 	"context"
+	"log/slog"
+	"path/filepath"
 	"sync"
 
 	chadapter "network_monitor/internal/adapter/clickhouse"
 	"network_monitor/internal/adapter/backupjob"
+	"network_monitor/internal/adapter/datalock"
 	"network_monitor/internal/adapter/geojob"
 	httpapi "network_monitor/internal/adapter/httpapi"
+	appmetrics "network_monitor/internal/adapter/metrics"
 	"network_monitor/internal/adapter/reputationjob"
 	"network_monitor/internal/config"
 	"network_monitor/internal/ingest"
@@ -16,10 +20,12 @@ import (
 type app struct {
 	pools      *chadapter.Pools
 	ingestSvc  *ingest.Service
+	prom       *appmetrics.Registry
 	srv        *httpapi.Server
 	geoJobs    *geojob.Scheduler
 	repJobs    *reputationjob.Scheduler
 	backupJobs *backupjob.Scheduler
+	dataLock   *datalock.Lock
 	bgCancel   context.CancelFunc
 	bgWg       sync.WaitGroup
 	ingestDone chan error
@@ -29,13 +35,35 @@ type app struct {
 }
 
 func buildApp(ctx context.Context, cfg config.Config) (*app, error) {
+	dataDir := filepath.Dir(cfg.AuthUsersFile)
+	if dataDir == "" || dataDir == "." {
+		dataDir = "/app/data"
+	}
+	var dataLock *datalock.Lock
+	if !cfg.AllowMultiInstance {
+		lock, err := datalock.Acquire(dataDir)
+		if err != nil {
+			return nil, err
+		}
+		dataLock = lock
+		slog.Info("control-plane lock acquired", "dir", dataDir, "file", ".nm_backend.lock")
+	} else {
+		slog.Warn("NM_ALLOW_MULTI_INSTANCE=1 — control-plane file lock disabled (unsafe for shared /app/data)")
+	}
+
 	authParts, err := buildAuth(cfg)
 	if err != nil {
+		if dataLock != nil {
+			_ = dataLock.Close()
+		}
 		return nil, err
 	}
 
 	pools, err := connectPools(ctx, cfg)
 	if err != nil {
+		if dataLock != nil {
+			_ = dataLock.Close()
+		}
 		return nil, err
 	}
 
@@ -49,11 +77,14 @@ func buildApp(ctx context.Context, cfg config.Config) (*app, error) {
 		ctx:        aCtx,
 		cancel:     cancel,
 		listenAddr: cfg.ListenAddr,
+		dataLock:   dataLock,
 	}
 
 	bg := wireBackground(ctx, bgCtx, a, cfg)
 	parsers := newParserRegistry()
+	a.prom = appmetrics.New(nil)
 	startIngest(a, cfg, bg.geo, parsers)
+	a.prom.SetIngest(a.ingestSvc)
 	a.srv = buildHTTP(cfg, a, authParts, bg, parsers)
 	if a.repJobs != nil {
 		a.repJobs.Start(bgCtx)

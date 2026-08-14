@@ -252,6 +252,7 @@ jobs:
           grep -q 'id="username"' src/pages/Login/LoginPage.tsx
           grep -q 'id="password"' src/pages/Login/LoginPage.tsx
           grep -q '/api/auth/login' src/api/auth.ts
+          grep -q '/api/auth/logout-all' src/api/auth.ts
           grep -q 'X-CSRF-Token' src/api/client.ts
           grep -q 'nm_csrf' src/api/client.ts
           grep -q 'nm-theme-change' src/auth/theme.ts

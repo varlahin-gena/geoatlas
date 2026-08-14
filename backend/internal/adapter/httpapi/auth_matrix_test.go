@@ -4,8 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gorilla/mux"
-
 	"network_monitor/internal/config"
 )
 
@@ -24,8 +22,10 @@ func expectedAuthMatrix() map[string]authTier {
 	return map[string]authTier{
 		"GET /health":                               tierPublic,
 		"GET /api/health":                           tierPublic,
+		"GET /metrics":                              tierOps,
 		"POST /api/auth/login":                      tierPublic,
 		"POST /api/auth/logout":                     tierPublic,
+		"POST /api/auth/logout-all":                 tierPublic, // handler checks session; CSRF
 		"GET /api/auth/me":                          tierPublic, // handler returns 401 itself
 		"POST /api/auth/change-password":            tierPublic, // handler checks session
 		"POST /api/auth/geo-wizard-dismiss":         tierLogin,
@@ -113,26 +113,14 @@ func TestAuthMatrixCoversServerRoutes(t *testing.T) {
 		nil,           // authUC
 		nil, nil, nil, // users, sessions, apiTokens
 	)
-	router, ok := srv.httpSrv.Handler.(*mux.Router)
-	if !ok {
-		t.Fatalf("handler type %T, want *mux.Router", srv.httpSrv.Handler)
-	}
 
 	muxRoutes := map[string]struct{}{}
-	_ = router.Walk(func(route *mux.Route, _ *mux.Router, _ []*mux.Route) error {
-		path, err := route.GetPathTemplate()
-		if err != nil || path == "" {
-			return nil
+	for _, route := range srv.Routes() {
+		if route.Path == "" || route.Method == "" {
+			continue
 		}
-		methods, err := route.GetMethods()
-		if err != nil || len(methods) == 0 {
-			return nil
-		}
-		for _, m := range methods {
-			muxRoutes[strings.ToUpper(m)+" "+path] = struct{}{}
-		}
-		return nil
-	})
+		muxRoutes[strings.ToUpper(route.Method)+" "+route.Path] = struct{}{}
+	}
 
 	for route, tier := range want {
 		switch tier {

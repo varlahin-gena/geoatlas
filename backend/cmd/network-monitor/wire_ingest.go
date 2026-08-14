@@ -4,11 +4,13 @@ import (
 	"log/slog"
 	"time"
 
-	chadapter "network_monitor/internal/adapter/clickhouse"
+	"network_monitor/internal/adapter/clickhouse/geostore"
+	"network_monitor/internal/adapter/clickhouse/ingeststore"
 	"network_monitor/internal/adapter/parseradapter"
 	"network_monitor/internal/config"
 	"network_monitor/internal/ingest"
 	"network_monitor/internal/parser"
+	usecaseingest "network_monitor/internal/usecase/ingest"
 )
 
 func newParserRegistry() *parser.Registry {
@@ -22,9 +24,13 @@ func newParserRegistry() *parser.Registry {
 	)
 }
 
-func startIngest(a *app, cfg config.Config, geo *chadapter.ReloadableGeoIndex, parsers *parser.Registry) {
+func startIngest(a *app, cfg config.Config, geo *geostore.ReloadableGeoIndex, parsers *parser.Registry) {
 	lineParser := parseradapter.New(parsers)
-	ingestRepo := chadapter.NewIngestRepository(a.pools.Ingest)
+	ingestRepo := ingeststore.NewIngestRepository(a.pools.Ingest)
+	var insertObs usecaseingest.InsertObserver
+	if a.prom != nil {
+		insertObs = a.prom
+	}
 	a.ingestSvc = ingest.NewService(ingest.Config{
 		Bindings:        ingestBindings(cfg),
 		BatchSize:       cfg.IngestBatchSize,
@@ -38,6 +44,7 @@ func startIngest(a *app, cfg config.Config, geo *chadapter.ReloadableGeoIndex, p
 	}, ingest.ProcessorDeps{
 		Logs: ingestRepo, Errors: ingestRepo, Parser: lineParser,
 		Geo: geo, EnrichCountry: cfg.GeoEnrichOnIngest,
+		InsertObs: insertObs,
 	})
 	a.ingestDone = make(chan error, 1)
 	go func() {

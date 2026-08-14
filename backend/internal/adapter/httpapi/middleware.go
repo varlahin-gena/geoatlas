@@ -11,16 +11,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/mux"
-
 	"network_monitor/internal/auth"
 )
 
 type ctxKey int
 
 const (
-	sessionCtxKey   ctxKey = 1
-	requestIDCtxKey ctxKey = 2
+	sessionCtxKey      ctxKey = 1
+	requestIDCtxKey    ctxKey = 2
+	routePatternCtxKey ctxKey = 3
 )
 
 const requestIDHeader = "X-Request-ID"
@@ -126,12 +125,27 @@ func (s *statusRecorder) Write(b []byte) (int, error) {
 	return n, err
 }
 
-// routeLabel возвращает path template mux (низкая cardinality), иначе "unmatched".
+// withRoutePattern кладёт path template в context для низкокардинальных лейблов.
+func withRoutePattern(pattern string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), routePatternCtxKey, pattern)))
+	})
+}
+
+// routeLabel возвращает path template (низкая cardinality), иначе "unmatched".
 func routeLabel(r *http.Request) string {
-	if route := mux.CurrentRoute(r); route != nil {
-		if tpl, err := route.GetPathTemplate(); err == nil && tpl != "" {
-			return tpl
+	if r == nil {
+		return "unmatched"
+	}
+	if p, ok := r.Context().Value(routePatternCtxKey).(string); ok && p != "" {
+		return p
+	}
+	// ServeMux мутирует r.Pattern на исходном *Request (например "GET /api/events").
+	if pat := strings.TrimSpace(r.Pattern); pat != "" {
+		if _, path, ok := strings.Cut(pat, " "); ok && path != "" {
+			return path
 		}
+		return pat
 	}
 	return "unmatched"
 }
@@ -153,6 +167,28 @@ func loggingMW(next http.Handler) http.Handler {
 			"duration", elapsed.Round(time.Millisecond).String(),
 		)
 	})
+}
+
+// metricsMW пишет Prometheus HTTP latency (route template — низкая cardinality).
+func metricsMW(m MetricsRecorder) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		if m == nil {
+			return next
+		}
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Не считаем scrape самого /metrics — иначе self-noise.
+			if r.URL.Path == "/metrics" {
+				next.ServeHTTP(w, r)
+				return
+			}
+			start := time.Now()
+			m.IncInFlight()
+			rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+			next.ServeHTTP(rec, r)
+			m.DecInFlight()
+			m.ObserveHTTP(r.Method, routeLabel(r), rec.status, time.Since(start))
+		})
+	}
 }
 
 // maxBytesMW ограничивает размер тела запроса.

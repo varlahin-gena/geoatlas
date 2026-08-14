@@ -6,9 +6,7 @@ import (
 	"strconv"
 
 	"network_monitor/internal/apperr"
-	"network_monitor/internal/usecase/parseerrors"
 	usecasebackup "network_monitor/internal/usecase/backup"
-	usecaseretention "network_monitor/internal/usecase/retention"
 )
 
 // writeDomainError maps application sentinel errors to HTTP status.
@@ -32,20 +30,10 @@ func writeDomainError(w http.ResponseWriter, logMsg string, err error) {
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": err.Error()})
 	case errors.Is(err, apperr.ErrConflict):
 		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error()})
-	case errors.Is(err, usecasebackup.ErrBusy),
-		errors.Is(err, usecasebackup.ErrDeleteActive):
-		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error()})
-	case errors.Is(err, usecasebackup.ErrNotFound):
-		writeJSON(w, http.StatusNotFound, map[string]any{"error": err.Error()})
-	case errors.Is(err, usecasebackup.ErrNotAttached),
-		errors.Is(err, usecasebackup.ErrInvalidSchedule):
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 	case errors.Is(err, usecasebackup.ErrDisabled),
 		errors.Is(err, usecasebackup.ErrUnavailable):
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": err.Error()})
-	case apperr.IsClient(err),
-		errors.Is(err, parseerrors.ErrNoIDs),
-		errors.Is(err, usecaseretention.ErrInvalidDays):
+	case apperr.IsClient(err):
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 	default:
 		writeInternalError(w, logMsg, err)

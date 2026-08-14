@@ -16,6 +16,17 @@ func alertLevel(alerts []Alert) string {
 }
 
 func computeAlerts(stats SystemStatsResponse) []Alert {
+	slo := stats.IngestSLO
+	if slo == (IngestSLO{}) {
+		slo = DefaultIngestSLO()
+	} else {
+		slo = slo.Normalize()
+	}
+	return computeAlertsWithSLO(stats, slo)
+}
+
+func computeAlertsWithSLO(stats SystemStatsResponse, slo IngestSLO) []Alert {
+	slo = slo.Normalize()
 	alerts := []Alert{}
 	if health, ok := stats.Health["backend"]; ok {
 		if up, _ := health["up"].(float64); up < 1 {
@@ -36,27 +47,27 @@ func computeAlerts(stats SystemStatsResponse) []Alert {
 		}
 	}
 	if pipeline, ok := stats.Pipeline["ingest"]; ok {
-		if buffered := pipeline["buffered_lines"]; buffered > 100000 {
-			alerts = append(alerts, Alert{Level: "error", Code: "ingest_buffer_critical", Target: "ingest", Message: "Ingest buffer is critically full (>100k lines)"})
-		} else if buffered > 10000 {
-			alerts = append(alerts, Alert{Level: "warn", Code: "ingest_buffer_high", Target: "ingest", Message: "Ingest buffer is filling up (>10k lines)"})
+		if buffered := pipeline["buffered_lines"]; buffered > slo.BufferCriticalLines {
+			alerts = append(alerts, Alert{Level: "error", Code: "ingest_buffer_critical", Target: "ingest", Message: "Ingest buffer is critically full"})
+		} else if buffered > slo.BufferWarnLines {
+			alerts = append(alerts, Alert{Level: "warn", Code: "ingest_buffer_high", Target: "ingest", Message: "Ingest buffer is filling up"})
 		}
 		depth, capacity := pipeline["queue_depth"], pipeline["queue_capacity"]
 		if capacity > 0 {
 			ratio := depth / capacity
-			if ratio >= 0.9 {
-				alerts = append(alerts, Alert{Level: "error", Code: "ingest_queue_critical", Target: "ingest", Message: "Ingest queue is critically full (>=90% capacity)"})
-			} else if ratio >= 0.75 {
-				alerts = append(alerts, Alert{Level: "warn", Code: "ingest_queue_high", Target: "ingest", Message: "Ingest queue is filling up (>=75% capacity)"})
+			if ratio >= slo.QueueCriticalRatio {
+				alerts = append(alerts, Alert{Level: "error", Code: "ingest_queue_critical", Target: "ingest", Message: "Ingest queue is critically full (SLO breach)"})
+			} else if ratio >= slo.QueueWarnRatio {
+				alerts = append(alerts, Alert{Level: "warn", Code: "ingest_queue_high", Target: "ingest", Message: "Ingest queue is filling up (approaching SLO)"})
 			}
 		}
 		bytesUsed, bytesCap := pipeline["queue_bytes"], pipeline["queue_bytes_capacity"]
 		if bytesCap > 0 {
 			br := bytesUsed / bytesCap
-			if br >= 0.9 {
-				alerts = append(alerts, Alert{Level: "error", Code: "ingest_queue_bytes_critical", Target: "ingest", Message: "Ingest queue byte budget critically full (>=90%)"})
-			} else if br >= 0.75 {
-				alerts = append(alerts, Alert{Level: "warn", Code: "ingest_queue_bytes_high", Target: "ingest", Message: "Ingest queue byte budget filling up (>=75%)"})
+			if br >= slo.QueueCriticalRatio {
+				alerts = append(alerts, Alert{Level: "error", Code: "ingest_queue_bytes_critical", Target: "ingest", Message: "Ingest queue byte budget critically full (SLO breach)"})
+			} else if br >= slo.QueueWarnRatio {
+				alerts = append(alerts, Alert{Level: "warn", Code: "ingest_queue_bytes_high", Target: "ingest", Message: "Ingest queue byte budget filling up (approaching SLO)"})
 			}
 		}
 		dropsPerSec := 0.0
@@ -66,23 +77,24 @@ func computeAlerts(stats SystemStatsResponse) []Alert {
 			bufferDropsPerSec = rate["buffer_drops_per_sec"]
 		}
 		switch {
-		case dropsPerSec >= 100:
-			alerts = append(alerts, Alert{Level: "error", Code: "ingest_dropping_critical", Target: "ingest", Message: "Ingest dropping >=100 lines/s — raise install profile (tune-resources.sh) or cut input EPS"})
-		case dropsPerSec > 0:
-			alerts = append(alerts, Alert{Level: "warn", Code: "ingest_dropping", Target: "ingest", Message: "Ingest queue full — lines dropped (capacity SLO: any sustained drops/s is an incident)"})
+		case dropsPerSec >= slo.DropsCriticalPerSec:
+			alerts = append(alerts, Alert{Level: "error", Code: "ingest_dropping_critical", Target: "ingest", Message: "Ingest dropping above critical SLO — raise install profile (tune-resources.sh) or cut input EPS"})
+		case dropsPerSec > slo.DropsWarnPerSec:
+			alerts = append(alerts, Alert{Level: "warn", Code: "ingest_dropping", Target: "ingest", Message: "Ingest queue full — lines dropped (SLO: sustained drops/s is an incident)"})
 		case pipeline["dropped_total"] > 0:
 			alerts = append(alerts, Alert{Level: "warn", Code: "ingest_dropped_total", Target: "ingest", Message: "Ingest dropped lines since start (queue was full); check profile capacity if this grows"})
 		}
 		switch {
-		case bufferDropsPerSec >= 100:
-			alerts = append(alerts, Alert{Level: "error", Code: "ingest_buffer_dropping_critical", Target: "ingest", Message: "Processor buffer dropping >=100 lines/s — ClickHouse insert path unhealthy"})
-		case bufferDropsPerSec > 0:
+		case bufferDropsPerSec >= slo.DropsCriticalPerSec:
+			alerts = append(alerts, Alert{Level: "error", Code: "ingest_buffer_dropping_critical", Target: "ingest", Message: "Processor buffer dropping above critical SLO — ClickHouse insert path unhealthy"})
+		case bufferDropsPerSec > slo.DropsWarnPerSec:
 			alerts = append(alerts, Alert{Level: "warn", Code: "ingest_buffer_dropping", Target: "ingest", Message: "Processor buffer dropping lines (usually ClickHouse outage / open insert circuit)"})
 		case pipeline["buffer_drops_total"] > 0:
 			alerts = append(alerts, Alert{Level: "warn", Code: "ingest_buffer_dropped_total", Target: "ingest", Message: "Processor buffer dropped lines since start; check ClickHouse health and insert circuit"})
 		}
 		if pipeline["circuit_open"] >= 1 {
-			alerts = append(alerts, Alert{Level: "warn", Code: "ingest_circuit_open", Target: "ingest", Message: "Insert circuit open — dequeue paused; queue will back up until ClickHouse recovers"})
+			// Circuit open → inserts paused; SLO treats this as warn (queue will climb → critical via queue/drops).
+			alerts = append(alerts, Alert{Level: "warn", Code: "ingest_circuit_open", Target: "ingest", Message: "Insert circuit open — dequeue paused; SLO risk until ClickHouse recovers"})
 		}
 		rate := pipeline["events_per_sec_db"]
 		if rate == 0 {
@@ -91,10 +103,10 @@ func computeAlerts(stats SystemStatsResponse) []Alert {
 			}
 		}
 		if rate > 0 {
-			if lag := pipeline["lag_sec"]; lag > 300 {
-				alerts = append(alerts, Alert{Level: "error", Code: "pipeline_lag_critical", Target: "ingest", Message: "Ingest lag exceeds 5 minutes"})
-			} else if lag > 60 {
-				alerts = append(alerts, Alert{Level: "warn", Code: "pipeline_lag_high", Target: "ingest", Message: "Ingest lag exceeds 1 minute"})
+			if lag := pipeline["lag_sec"]; lag > slo.LagCriticalSec {
+				alerts = append(alerts, Alert{Level: "error", Code: "pipeline_lag_critical", Target: "ingest", Message: "Ingest lag exceeds critical SLO"})
+			} else if lag > slo.LagWarnSec {
+				alerts = append(alerts, Alert{Level: "warn", Code: "pipeline_lag_high", Target: "ingest", Message: "Ingest lag exceeds warn SLO"})
 			}
 		}
 	}
@@ -115,9 +127,9 @@ func computeAlerts(stats SystemStatsResponse) []Alert {
 			}
 		}
 		maxEPS := float64(stats.InstallProfile.Capacity.ExpectedEPSMax)
-		if rate > maxEPS*1.25 {
-			alerts = append(alerts, Alert{Level: "error", Code: "capacity_exceeded", Target: "pipeline", Message: "Ingest rate exceeds install profile capacity (>125% of expected max)"})
-		} else if rate > maxEPS*1.05 {
+		if rate > maxEPS*slo.CapacityCriticalRatio {
+			alerts = append(alerts, Alert{Level: "error", Code: "capacity_exceeded", Target: "pipeline", Message: "Ingest rate exceeds install profile capacity (critical SLO)"})
+		} else if rate > maxEPS*slo.CapacityWarnRatio {
 			alerts = append(alerts, Alert{Level: "warn", Code: "capacity_high", Target: "pipeline", Message: "Ingest rate is near install profile capacity limit"})
 		}
 	}

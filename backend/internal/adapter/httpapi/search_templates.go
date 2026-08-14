@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gorilla/mux"
-
 	"network_monitor/internal/adapter/searchtemplatesfile"
 )
 
@@ -74,7 +72,7 @@ func (h *SearchTemplatesHandler) UpdateMine(w http.ResponseWriter, r *http.Reque
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
 		return
 	}
-	id := strings.TrimSpace(mux.Vars(r)["id"])
+	id := strings.TrimSpace(r.PathValue("id"))
 	if id == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "missing id"})
 		return
@@ -104,7 +102,7 @@ func (h *SearchTemplatesHandler) DeleteMine(w http.ResponseWriter, r *http.Reque
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
 		return
 	}
-	id := strings.TrimSpace(mux.Vars(r)["id"])
+	id := strings.TrimSpace(r.PathValue("id"))
 	if id == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "missing id"})
 		return

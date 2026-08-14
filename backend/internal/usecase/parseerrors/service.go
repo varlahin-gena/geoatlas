@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 
+	"network_monitor/internal/apperr"
 	"network_monitor/internal/model"
 )
 
@@ -57,7 +58,7 @@ type DeleteInput struct {
 }
 
 var (
-	ErrNoIDs = errors.New("no ids provided")
+	ErrNoIDs = apperr.InvalidInput("no ids provided")
 )
 
 func (s *Service) Delete(ctx context.Context, in DeleteInput) error {
@@ -71,5 +72,5 @@ func (s *Service) Delete(ctx context.Context, in DeleteInput) error {
 }
 
 func IsClientError(err error) bool {
-	return errors.Is(err, ErrNoIDs)
+	return errors.Is(err, ErrNoIDs) || apperr.IsClient(err)
 }

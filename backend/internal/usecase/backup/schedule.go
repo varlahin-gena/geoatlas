@@ -1,10 +1,11 @@
 package backup
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
+
+	"network_monitor/internal/apperr"
 )
 
 const (
@@ -12,7 +13,7 @@ const (
 	MaxKeep = 90
 )
 
-var ErrInvalidSchedule = errors.New("invalid backup schedule")
+var ErrInvalidSchedule = apperr.InvalidInput("invalid backup schedule")
 
 // FormatBackupName — имя каталога бэкапа: локальное время пояса + числовой оффсет.
 // Пример Europe/Moscow: nm-20260811T102119+0300. Старые nm-…Z (UTC) остаются валидны на диске.

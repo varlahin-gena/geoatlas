@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"network_monitor/internal/apperr"
 )
 
 const (
@@ -18,7 +20,7 @@ const (
 )
 
 var (
-	ErrInvalidDays = errors.New("invalid retention days")
+	ErrInvalidDays = apperr.InvalidInput("invalid retention days")
 )
 
 // Defaults — значения из init.sql / Ensure*.
@@ -143,5 +145,5 @@ func normalizeOrDefaults(s Settings) Settings {
 }
 
 func IsClientError(err error) bool {
-	return errors.Is(err, ErrInvalidDays)
+	return errors.Is(err, ErrInvalidDays) || apperr.IsClient(err)
 }

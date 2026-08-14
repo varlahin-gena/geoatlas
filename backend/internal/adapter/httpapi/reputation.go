@@ -8,8 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/mux"
-
 	usecasereputation "network_monitor/internal/usecase/reputation"
 )
 
@@ -71,7 +69,7 @@ func (h *ReputationHandler) DeleteList(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "reputation service unavailable"})
 		return
 	}
-	name := mux.Vars(r)["name"]
+	name := r.PathValue("name")
 	if err := h.reputationUC.DeleteList(r.Context(), name); err != nil {
 		writeDomainError(w, "reputation delete failed", err)
 		return
@@ -167,7 +165,7 @@ func (h *ReputationHandler) RemoveFeed(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "reputation service unavailable"})
 		return
 	}
-	name := mux.Vars(r)["name"]
+	name := r.PathValue("name")
 	if err := h.reputationUC.RemoveFeed(r.Context(), name); err != nil {
 		writeDomainError(w, "reputation remove feed failed", err)
 		return

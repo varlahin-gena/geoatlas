@@ -10,7 +10,7 @@ func TestSessionRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	token, sess, err := mgr.Issue("admin", RoleAdministrator)
+	token, sess, err := mgr.Issue("admin", RoleAdministrator, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func TestLiveSessionRefreshesRoleAndDropsDeleted(t *testing.T) {
 	}
 
 	// Cookie still says administrator after demotion in store.
-	sticky := Session{Username: "demoted", Role: RoleAdministrator, Expires: time.Now().Add(time.Hour).Unix()}
+	sticky := Session{Username: "demoted", Role: RoleAdministrator, Expires: time.Now().Add(time.Hour).Unix(), SessionVersion: 0}
 	if _, err := store.SetRole("demoted", RoleOperator); err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +52,7 @@ func TestLiveSessionRefreshesRoleAndDropsDeleted(t *testing.T) {
 		t.Fatalf("role = %q, want operator", live.Role)
 	}
 
-	missing := Session{Username: "gone", Role: RoleOperator, Expires: sticky.Expires}
+	missing := Session{Username: "gone", Role: RoleOperator, Expires: sticky.Expires, SessionVersion: 0}
 	if _, ok := LiveSession(store, missing); ok {
 		t.Fatal("deleted/missing user must fail")
 	}
@@ -61,6 +61,38 @@ func TestLiveSessionRefreshesRoleAndDropsDeleted(t *testing.T) {
 	kept, ok := LiveSession(nil, sticky)
 	if !ok || kept.Role != RoleAdministrator {
 		t.Fatalf("nil store: %+v ok=%v", kept, ok)
+	}
+}
+
+func TestLiveSessionRejectsStaleVersion(t *testing.T) {
+	hash, err := HashPassword("adminpass1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := NewUserStore(User{Username: "alice", PasswordHash: string(hash), Role: RoleOperator})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mgr, err := NewSessionManager("test-secret-key-32bytes-minimum!!", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, sess, err := mgr.Issue("alice", RoleOperator, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sess.SessionVersion != 0 {
+		t.Fatalf("session version = %d, want 0", sess.SessionVersion)
+	}
+	if err := store.BumpSessionVersion("alice"); err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := mgr.Parse(token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := LiveSession(store, parsed); ok {
+		t.Fatal("stale session version must fail")
 	}
 }
 
@@ -167,7 +199,7 @@ func TestCookieRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	token, _, err := mgr.Issue("operator", RoleOperator)
+	token, _, err := mgr.Issue("operator", RoleOperator, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

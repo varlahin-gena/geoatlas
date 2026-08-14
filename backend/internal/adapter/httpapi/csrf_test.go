@@ -15,7 +15,7 @@ func TestCSRFMiddlewareRejectsMissingToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tok, _, err := mgr.Issue("admin", auth.RoleAdministrator)
+	tok, _, err := mgr.Issue("admin", auth.RoleAdministrator, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +42,7 @@ func TestCSRFMiddlewareAcceptsMatchingToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tok, _, err := mgr.Issue("admin", auth.RoleAdministrator)
+	tok, _, err := mgr.Issue("admin", auth.RoleAdministrator, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +124,7 @@ func TestCSRFMiddlewareAcceptsOriginWithPortVsHostWithout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tok, _, err := mgr.Issue("admin", auth.RoleAdministrator)
+	tok, _, err := mgr.Issue("admin", auth.RoleAdministrator, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +152,7 @@ func TestCSRFMiddlewareAcceptsIPOriginWhenHostIsUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tok, _, err := mgr.Issue("admin", auth.RoleAdministrator)
+	tok, _, err := mgr.Issue("admin", auth.RoleAdministrator, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +181,7 @@ func TestCSRFMiddlewareAcceptsViaXForwardedHost(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tok, _, err := mgr.Issue("admin", auth.RoleAdministrator)
+	tok, _, err := mgr.Issue("admin", auth.RoleAdministrator, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

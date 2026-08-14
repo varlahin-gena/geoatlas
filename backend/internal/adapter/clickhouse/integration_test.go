@@ -12,6 +12,8 @@ import (
 
 	"network_monitor/internal/adapter/clickhouse"
 	"network_monitor/internal/adapter/clickhouse/aggstate"
+	"network_monitor/internal/adapter/clickhouse/ingeststore"
+	"network_monitor/internal/adapter/clickhouse/perrorstore"
 	"network_monitor/internal/adapter/clickhouse/query"
 	"network_monitor/internal/model"
 )
@@ -135,7 +137,7 @@ func TestIntegrationInsertAndScan(t *testing.T) {
 		DstCountry: "United States",
 		Raw:        "blocked test line",
 	}}
-	if err := clickhouse.InsertTrafficLogs(ctx, conn, logs); err != nil {
+	if err := ingeststore.InsertTrafficLogs(ctx, conn, logs); err != nil {
 		t.Fatalf("InsertTrafficLogs: %v", err)
 	}
 
@@ -167,7 +169,7 @@ func TestIntegrationInsertParseErrors(t *testing.T) {
 	ensureSchema(t, conn)
 	ctx := context.Background()
 
-	err := clickhouse.InsertParseErrors(ctx, conn, []model.ParseError{{
+	err := ingeststore.InsertParseErrors(ctx, conn, []model.ParseError{{
 		Timestamp: time.Now().UTC(),
 		Vendor:    "test",
 		Reason:    "boom",
@@ -176,7 +178,7 @@ func TestIntegrationInsertParseErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InsertParseErrors: %v", err)
 	}
-	rows, err := clickhouse.ListParseErrors(ctx, conn, 10, "garbage")
+	rows, err := perrorstore.ListParseErrors(ctx, conn, 10, "garbage")
 	if err != nil {
 		t.Fatalf("ListParseErrors: %v", err)
 	}

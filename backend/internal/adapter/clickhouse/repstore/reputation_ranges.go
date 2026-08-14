@@ -1,4 +1,4 @@
-package clickhouse
+package repstore
 
 import (
 	"context"

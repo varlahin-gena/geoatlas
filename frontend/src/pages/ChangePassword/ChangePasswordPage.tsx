@@ -73,7 +73,11 @@ export default function ChangePasswordPage() {
           <img className="logo" src="/logo.png" alt="" width={40} height={40} />
           <div>
             <h1>Смена пароля</h1>
-            <p>{user?.must_reset_password ? 'Требуется сменить пароль' : 'Новый пароль'}</p>
+            <p>
+              {user?.must_reset_password
+                ? 'Требуется сменить пароль'
+                : 'Новый пароль · остальные сессии будут завершены'}
+            </p>
           </div>
         </div>
         <div className={`auth-error${error ? ' show' : ''}`} role="alert">

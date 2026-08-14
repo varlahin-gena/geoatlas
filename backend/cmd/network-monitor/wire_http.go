@@ -4,10 +4,14 @@ import (
 	"path/filepath"
 	"time"
 
-	chadapter "network_monitor/internal/adapter/clickhouse"
 	"network_monitor/internal/adapter/backupfs"
 	"network_monitor/internal/adapter/backupjob"
 	"network_monitor/internal/adapter/backupschedulefile"
+	"network_monitor/internal/adapter/clickhouse/backupstore"
+	"network_monitor/internal/adapter/clickhouse/geostore"
+	"network_monitor/internal/adapter/clickhouse/perrorstore"
+	"network_monitor/internal/adapter/clickhouse/sysstore"
+	"network_monitor/internal/adapter/clickhouse/trafficstore"
 	"network_monitor/internal/adapter/geoipcodec"
 	httpapi "network_monitor/internal/adapter/httpapi"
 	"network_monitor/internal/adapter/parseradapter"
@@ -24,8 +28,8 @@ import (
 )
 
 func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, parsers *parser.Registry) *httpapi.Server {
-	trafficRepo := chadapter.NewTrafficRepository(a.pools.API)
-	geoRepo := chadapter.NewGeoRepository(a.pools.API, a.pools.Ingest)
+	trafficRepo := trafficstore.NewTrafficRepository(a.pools.API)
+	geoRepo := geostore.NewGeoRepository(a.pools.API, a.pools.Ingest)
 	// Не передавать typed-nil *ReloadableReputationIndex в ReputationLookuper:
 	// interface!=nil при dyn=nil → enrichMapReputation падает на Lookup.
 	var repLookuper usecaseevents.ReputationLookuper
@@ -34,10 +38,10 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 	}
 	eventsUC := usecaseevents.New(trafficRepo, bg.geo, repLookuper)
 	geoUC := usecasegeo.New(geoRepo, trafficRepo, bg.geo, a.geoJobs, geoipcodec.New(), cfg.MaxGeoUploadRanges)
-	parseErrorsUC := parseerrors.New(chadapter.NewParseErrorRepository(a.pools.API, a.pools.Ingest))
+	parseErrorsUC := parseerrors.New(perrorstore.NewParseErrorRepository(a.pools.API, a.pools.Ingest))
 	parseTestAdapter := parseradapter.NewParseTest(parsers)
 	parseTestUC := parsetest.New(parseTestAdapter, bg.geo, parseTestAdapter)
-	systemRepo := chadapter.NewSystemRepository(a.pools.API)
+	systemRepo := sysstore.NewSystemRepository(a.pools.API)
 	systemUC := usecasesystem.New(usecasesystem.Dependencies{
 		Metrics:            systemRepo,
 		Edges:              systemRepo,
@@ -62,10 +66,11 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 		IncludeAuth:  cfg.BackupIncludeAuth,
 	}
 	schedStore := backupschedulefile.New(cfg.BackupScheduleFile, usecasebackup.DefaultsSchedule(opts))
-	backupUC := usecasebackup.New(opts, chadapter.NewBackupRunner(a.pools.Background), backupfs.New(cfg.BackupDir), schedStore)
+	backupUC := usecasebackup.New(opts, backupstore.NewBackupRunner(a.pools.Background), backupfs.New(cfg.BackupDir), schedStore)
 	a.backupJobs = backupjob.NewFromService(backupUC, time.Minute)
 	return httpapi.NewServer(
 		cfg, a.ingestSvc, eventsUC, geoUC, bg.repUC, parseErrorsUC, systemUC, systemRepo,
 		parseTestUC, bg.retentionUC, backupUC, authUC, auth.users, auth.sessions, auth.apiTokens,
+		httpapi.WithMetrics(a.prom),
 	)
 }

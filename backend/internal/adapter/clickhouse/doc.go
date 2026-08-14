@@ -1,14 +1,26 @@
-// Package clickhouse — ClickHouse adapter: SQL/DDL SoT + репозитории для usecase-портов.
+// Package clickhouse — ClickHouse adapter: pool/retention/maintenance + domain sibling stores.
 //
-//	clickhouse/           — pool, Insert*, geo_ranges, metrics, parse_errors, enrich, repos
-//	clickhouse/aggstate   — EdgesAggStatus, PreferDailyEdgesAgg, PreferGeoEdgesAgg
-//	clickhouse/sqlclause  — actionWhere / sumBlocked / geo key exprs
-//	clickhouse/migrate    — schema_version, Ensure*, DDL, backfill edges/geo
-//	clickhouse/query      — ScanRawAggs*, ScanGeoEdges*, TimeRange, ConfigureQuerySettings
+//	clickhouse/              — pool, Connect*, retention, maintenance
+//	clickhouse/ingeststore   — IngestRepository, InsertTrafficLogs, InsertParseErrors
+//	clickhouse/perrorstore   — ParseErrorRepository, list/delete parse_errors SQL
+//	clickhouse/trafficstore  — TrafficRepository (events / missing-IP scans via query)
+//	clickhouse/geostore      — GeoRepository, ReloadableGeoIndex, ranges, EnrichLogsMissingGeo
+//	clickhouse/repstore      — ReputationRepository, ReloadableReputationIndex, ranges
+//	clickhouse/sysstore      — SystemRepository, metrics, CountTableRows
+//	clickhouse/backupstore   — BackupRunner (BACKUP/RESTORE)
+//	clickhouse/aggstate      — EdgesAggStatus, PreferDailyEdgesAgg, PreferGeoEdgesAgg
+//	clickhouse/sqlclause     — actionWhere / sumBlocked / geo key exprs
+//	clickhouse/migrate       — schema_version, Ensure*, DDL, backfill edges/geo
+//	clickhouse/query         — ScanRawAggs*, ScanGeoEdges*, TimeRange, ConfigureQuerySettings
 //
-// Правила импорта: migrate и query могут импортировать aggstate и sqlclause;
-// migrate может импортировать query (AggSettings); migrate/query не импортируют parent clickhouse.
-// Parent не импортирует geoip — EnrichLogsMissingGeo принимает GeoResolver
+// Правила импорта:
+//   - siblings may import parent (Conn/Pools), sqlclause, query, migrate, aggstate
+//   - siblings must NOT import each other if avoidable
+//   - migrate и query могут импортировать aggstate и sqlclause;
+//     migrate может импортировать query (AggSettings);
+//     migrate/query не импортируют parent clickhouse и не импортируют siblings
+//
+// Parent не импортирует geoip — EnrichLogsMissingGeo (geostore) принимает GeoResolver
 // и пишет nm_geo_enrich_ip (IPv4, без ALTER UPDATE traffic_logs);
 // ReplaceGeoRanges пишет готовые []model.GeoRange атомарно (staging + EXCHANGE).
 //

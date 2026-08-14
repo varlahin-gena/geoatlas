@@ -24,6 +24,7 @@ type Processor struct {
 	stats         LineStats
 	geo           GeoLookup
 	enrichCountry bool
+	insertObs     InsertObserver
 
 	buf         []model.TrafficLog
 	errBuf      []model.ParseError
@@ -50,6 +51,7 @@ func NewProcessor(d Deps, stats LineStats) *Processor {
 		stats:         stats,
 		geo:           d.Geo,
 		enrichCountry: d.EnrichCountry,
+		insertObs:     d.InsertObs,
 		buf:           make([]model.TrafficLog, 0, batch),
 		errBuf:        make([]model.ParseError, 0, 256),
 		circuit:       circuit,
@@ -170,12 +172,16 @@ func (p *Processor) flushLogs(ctx context.Context) error {
 	}
 
 	n := len(p.buf)
+	start := time.Now()
 	err := insertWithRetry(ctx, p.queryTimeout, "traffic_logs", func(actx context.Context) error {
 		if p.logs == nil {
 			return nil
 		}
 		return p.logs.InsertTrafficLogs(actx, p.buf)
 	})
+	if p.insertObs != nil {
+		p.insertObs.ObserveInsert(time.Since(start), n, err == nil)
+	}
 	if err != nil {
 		p.noteInsertFailure()
 		return err

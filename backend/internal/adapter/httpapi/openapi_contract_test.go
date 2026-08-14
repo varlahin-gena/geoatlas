@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gorilla/mux"
 	"gopkg.in/yaml.v3"
 
 	"network_monitor/internal/config"
@@ -58,29 +57,17 @@ func TestOpenAPIPathsMatchMux(t *testing.T) {
 		nil, // authUC
 		nil, nil, nil, // users, sessions, apiTokens
 	)
-	router, ok := srv.httpSrv.Handler.(*mux.Router)
-	if !ok {
-		t.Fatalf("handler type %T, want *mux.Router", srv.httpSrv.Handler)
-	}
 
 	muxRoutes := map[string]map[string]struct{}{} // path -> methods
-	_ = router.Walk(func(route *mux.Route, _ *mux.Router, _ []*mux.Route) error {
-		path, err := route.GetPathTemplate()
-		if err != nil || path == "" {
-			return nil
+	for _, route := range srv.Routes() {
+		if route.Path == "" || route.Method == "" {
+			continue
 		}
-		methods, err := route.GetMethods()
-		if err != nil || len(methods) == 0 {
-			return nil
+		if muxRoutes[route.Path] == nil {
+			muxRoutes[route.Path] = map[string]struct{}{}
 		}
-		if muxRoutes[path] == nil {
-			muxRoutes[path] = map[string]struct{}{}
-		}
-		for _, m := range methods {
-			muxRoutes[path][strings.ToUpper(m)] = struct{}{}
-		}
-		return nil
-	})
+		muxRoutes[route.Path][strings.ToUpper(route.Method)] = struct{}{}
+	}
 
 	httpMethods := map[string]struct{}{
 		"get": {}, "post": {}, "put": {}, "patch": {}, "delete": {}, "head": {}, "options": {},

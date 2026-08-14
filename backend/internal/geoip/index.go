@@ -147,7 +147,7 @@ func findContainingRow(rows []rangeRow, ip uint32) (rangeRow, bool) {
 
 // Index — immutable snapshot диапазонов за atomic.Pointer.
 // Lookup на hot path без RWMutex; ReplaceRanges публикует новый compact snapshot.
-// Загрузка из ClickHouse — через adapter/clickhouse.ReloadableGeoIndex.
+// Загрузка из ClickHouse — через adapter/clickhouse/geostore.ReloadableGeoIndex.
 type Index struct {
 	data atomic.Pointer[snapshot] // nil или *snapshot (не мутировать после Store)
 }

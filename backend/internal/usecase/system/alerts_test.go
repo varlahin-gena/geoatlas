@@ -84,7 +84,7 @@ func hasAlertCode(alerts []Alert, code string) bool {
 func TestClassifyIngestQueueCritical(t *testing.T) {
 	st, reasons, _ := classifyIngest(IngestSnapshot{
 		State: "running", QueueDepth: 950, QueueCapacity: 1000,
-	}, &RateSampler{})
+	}, &RateSampler{}, DefaultIngestSLO())
 	if st != "overloaded" {
 		t.Fatalf("status=%s want overloaded", st)
 	}
@@ -97,7 +97,7 @@ func TestClassifyIngestQueueBytesCritical(t *testing.T) {
 	st, reasons, _ := classifyIngest(IngestSnapshot{
 		State: "running", QueueDepth: 10, QueueCapacity: 1000,
 		QueueBytes: 95 << 20, QueueBytesCapacity: 100 << 20,
-	}, &RateSampler{})
+	}, &RateSampler{}, DefaultIngestSLO())
 	if st != "overloaded" {
 		t.Fatalf("status=%s want overloaded", st)
 	}
@@ -131,7 +131,7 @@ func TestComputeAlertsQueueBytes(t *testing.T) {
 func TestClassifyIngestHealthy(t *testing.T) {
 	st, reasons, _ := classifyIngest(IngestSnapshot{
 		State: "running", QueueDepth: 10, QueueCapacity: 1000,
-	}, &RateSampler{})
+	}, &RateSampler{}, DefaultIngestSLO())
 	if st != "healthy" {
 		t.Fatalf("status=%s want healthy, reasons=%v", st, reasons)
 	}
@@ -141,11 +141,11 @@ func TestClassifyIngestBufferDropping(t *testing.T) {
 	rates := &RateSampler{}
 	_, _, _ = classifyIngest(IngestSnapshot{
 		State: "running", QueueDepth: 1, QueueCapacity: 1000, BufferDropsTotal: 0,
-	}, rates)
+	}, rates, DefaultIngestSLO())
 	time.Sleep(30 * time.Millisecond)
 	st, reasons, _ := classifyIngest(IngestSnapshot{
 		State: "running", QueueDepth: 1, QueueCapacity: 1000, BufferDropsTotal: 5,
-	}, rates)
+	}, rates, DefaultIngestSLO())
 	if st != "degraded" && st != "overloaded" {
 		t.Fatalf("status=%s want degraded/overloaded, reasons=%v", st, reasons)
 	}

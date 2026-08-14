@@ -7,8 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gorilla/mux"
-
 	"network_monitor/internal/auth"
 	"network_monitor/internal/config"
 )
@@ -128,7 +126,7 @@ func TestRequireAdminMWForbiddenForOperator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	token, _, err := mgr.Issue("op", auth.RoleOperator)
+	token, _, err := mgr.Issue("op", auth.RoleOperator, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +147,7 @@ func TestRequireAdminMWAllowsAdministrator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	token, _, err := mgr.Issue("admin", auth.RoleAdministrator)
+	token, _, err := mgr.Issue("admin", auth.RoleAdministrator, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +179,7 @@ func TestRequireAdminMWDeniesStickyAdminAfterDemote(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	token, _, err := mgr.Issue("was-admin", auth.RoleAdministrator)
+	token, _, err := mgr.Issue("was-admin", auth.RoleAdministrator, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +204,7 @@ func TestRequireLoginMWAllowsSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	token, _, err := mgr.Issue("op", auth.RoleOperator)
+	token, _, err := mgr.Issue("op", auth.RoleOperator, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,7 +236,7 @@ func TestOpsMWForbidsOperator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	token, _, err := mgr.Issue("op", auth.RoleOperator)
+	token, _, err := mgr.Issue("op", auth.RoleOperator, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -299,16 +297,16 @@ func TestParseOptionalLimitDefaults(t *testing.T) {
 }
 
 func TestRouteLabelUsesMuxTemplate(t *testing.T) {
-	r := mux.NewRouter()
+	mux := http.NewServeMux()
 	var got string
-	r.HandleFunc("/api/events", func(w http.ResponseWriter, req *http.Request) {
+	mux.Handle("GET /api/events", withRoutePattern("/api/events", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		got = routeLabel(req)
 		w.WriteHeader(http.StatusNoContent)
-	}).Methods("GET")
+	})))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/events?days=1", nil)
 	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
+	mux.ServeHTTP(rec, req)
 	if got != "/api/events" {
 		t.Fatalf("routeLabel = %q, want /api/events", got)
 	}

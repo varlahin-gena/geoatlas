@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/mux"
-
 	"network_monitor/internal/auth"
 	usecaseauth "network_monitor/internal/usecase/auth"
 )
@@ -171,6 +169,13 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if live, ok := auth.LiveSession(h.users, sess); ok {
+		sess = live
+	} else {
+		ClearCookie(w, r)
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
+		return
+	}
 	if h.authUC == nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "auth not configured"})
 		return
@@ -189,7 +194,8 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, h.withModuleFlags(userPublicResponse(pub)))
 }
 
-// ChangePassword — POST /api/auth/change-password (любой залогиненный)
+// ChangePassword — POST /api/auth/change-password (любой залогиненный).
+// Bump session_version + выдаёт новый cookie (остальные сессии revoke).
 func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	if h.authDisabled() {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
@@ -197,6 +203,11 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	sess, err := SessionFromRequest(r, h.sessions)
 	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
+		return
+	}
+	if _, ok := auth.LiveSession(h.users, sess); !ok {
+		ClearCookie(w, r)
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
 		return
 	}
@@ -211,12 +222,45 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "auth not configured"})
 		return
 	}
-	pub, err := h.authUC.ChangePassword(sess.Username, req.OldPassword, req.NewPassword)
+	out, err := h.authUC.ChangePassword(sess.Username, req.OldPassword, req.NewPassword)
 	if err != nil {
 		writeUserStoreError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, userPublicResponse(pub))
+	if h.sessions != nil {
+		SetCookie(w, r, out.Token, h.sessions.TTL())
+	}
+	writeJSON(w, http.StatusOK, userPublicResponse(out.User))
+}
+
+// LogoutAll — POST /api/auth/logout-all: revoke всех сессий пользователя + clear cookie.
+func (h *AuthHandler) LogoutAll(w http.ResponseWriter, r *http.Request) {
+	if h.authDisabled() {
+		ClearCookie(w, r)
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+		return
+	}
+	sess, err := SessionFromRequest(r, h.sessions)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
+		return
+	}
+	live, ok := auth.LiveSession(h.users, sess)
+	if !ok {
+		ClearCookie(w, r)
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
+		return
+	}
+	if h.authUC == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "auth not configured"})
+		return
+	}
+	if err := h.authUC.LogoutAll(live.Username); err != nil {
+		writeUserStoreError(w, err)
+		return
+	}
+	ClearCookie(w, r)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 // DismissGeoWizard — POST /api/auth/geo-wizard-dismiss (свой флаг first-run GeoIP).
@@ -424,7 +468,7 @@ func (h *UsersHandler) SetRole(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "auth not configured"})
 		return
 	}
-	username := mux.Vars(r)["username"]
+	username := r.PathValue("username")
 	var req setRoleRequest
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
 	dec.DisallowUnknownFields()
@@ -448,7 +492,7 @@ func (h *UsersHandler) SetFullName(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "auth not configured"})
 		return
 	}
-	username := mux.Vars(r)["username"]
+	username := r.PathValue("username")
 	var req setFullNameRequest
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
 	dec.DisallowUnknownFields()
@@ -472,7 +516,7 @@ func (h *UsersHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "auth not configured"})
 		return
 	}
-	username := mux.Vars(r)["username"]
+	username := r.PathValue("username")
 	var req resetPasswordRequest
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
 	dec.DisallowUnknownFields()
@@ -504,7 +548,7 @@ func (h *UsersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "auth not configured"})
 		return
 	}
-	username := mux.Vars(r)["username"]
+	username := r.PathValue("username")
 	actor := ""
 	if sess, ok := SessionFromContext(r.Context()); ok {
 		actor = sess.Username

@@ -1,4 +1,4 @@
-package clickhouse
+package perrorstore
 
 import (
 	"context"

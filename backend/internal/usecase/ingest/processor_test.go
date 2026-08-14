@@ -13,12 +13,8 @@ import (
 
 type registryParser struct{ reg *parser.Registry }
 
-func (r registryParser) ParseVerbose(line string) ParseResult {
-	res := r.reg.ParseVerbose(line)
-	return ParseResult{
-		OK: res.OK, Skipped: res.Skipped, Log: res.Log,
-		Vendor: res.Vendor, Reason: res.Reason,
-	}
+func (r registryParser) ParseVerbose(line string) parser.ParseResult {
+	return r.reg.ParseVerbose(line)
 }
 
 func (r registryParser) ContainsIPv4(line string) bool {

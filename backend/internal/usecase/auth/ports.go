@@ -10,6 +10,8 @@ import (
 type UserRepository interface {
 	Authenticate(username, password string) (*domain.User, bool)
 	Get(username string) (domain.UserPublic, bool)
+	SessionVersion(username string) (int64, bool)
+	BumpSessionVersion(username string) error
 	List() []domain.UserPublic
 	Create(username, password, role, fullName string, mustReset bool) (domain.UserPublic, error)
 	SetRole(username, role string) (domain.UserPublic, error)
@@ -23,6 +25,6 @@ type UserRepository interface {
 // SessionIssuer — выдача сессионных токенов (реализация: *auth.SessionManager).
 // Cookie/CSRF остаются в HTTP-слое.
 type SessionIssuer interface {
-	Issue(username, role string) (string, domain.Session, error)
+	Issue(username, role string, sessionVersion int64) (string, domain.Session, error)
 	TTL() time.Duration
 }

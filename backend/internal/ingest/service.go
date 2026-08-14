@@ -48,6 +48,7 @@ type ProcessorDeps struct {
 	Parser        usecaseingest.LineParser
 	Geo           usecaseingest.GeoLookup
 	EnrichCountry bool
+	InsertObs     usecaseingest.InsertObserver
 }
 
 type Service struct {
@@ -110,7 +111,7 @@ func NewService(cfg Config, deps ProcessorDeps) *Service {
 		Logs: deps.Logs, Errors: deps.Errors, Parser: deps.Parser,
 		Geo: deps.Geo, EnrichCountry: deps.EnrichCountry,
 		BatchSize: cfg.BatchSize, QueryTimeout: cfg.QueryTimeout,
-		Circuit: circuit,
+		Circuit: circuit, InsertObs: deps.InsertObs,
 	}
 	s.processors = make([]*usecaseingest.Processor, cfg.Workers)
 	for i := range s.processors {

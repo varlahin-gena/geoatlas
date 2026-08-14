@@ -17,15 +17,11 @@ func New(reg *parser.Registry) *Adapter {
 
 var _ usecaseingest.LineParser = (*Adapter)(nil)
 
-func (a *Adapter) ParseVerbose(line string) usecaseingest.ParseResult {
+func (a *Adapter) ParseVerbose(line string) parser.ParseResult {
 	if a == nil || a.reg == nil {
-		return usecaseingest.ParseResult{Reason: "parser unavailable"}
+		return parser.ParseResult{Reason: "parser unavailable"}
 	}
-	res := a.reg.ParseVerbose(line)
-	return usecaseingest.ParseResult{
-		OK: res.OK, Skipped: res.Skipped, Log: res.Log,
-		Vendor: res.Vendor, Reason: res.Reason,
-	}
+	return a.reg.ParseVerbose(line)
 }
 
 func (a *Adapter) ContainsIPv4(line string) bool {
@@ -46,15 +42,11 @@ var (
 	_ parsetest.SamplesProvider = (*ParseTestAdapter)(nil)
 )
 
-func (a *ParseTestAdapter) ParseVerbose(line string) parsetest.ParseResult {
+func (a *ParseTestAdapter) ParseVerbose(line string) parser.ParseResult {
 	if a == nil || a.reg == nil {
-		return parsetest.ParseResult{Reason: "parser unavailable"}
+		return parser.ParseResult{Reason: "parser unavailable"}
 	}
-	res := a.reg.ParseVerbose(line)
-	return parsetest.ParseResult{
-		OK: res.OK, Skipped: res.Skipped, Log: res.Log,
-		Vendor: res.Vendor, Reason: res.Reason,
-	}
+	return a.reg.ParseVerbose(line)
 }
 
 func (a *ParseTestAdapter) SamplesByVendor() map[string][]string {

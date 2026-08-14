@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"network_monitor/internal/model"
+	"network_monitor/internal/parser"
 )
 
 // TrafficLogInserter — batch INSERT в traffic_logs.
@@ -22,18 +23,9 @@ type GeoLookup interface {
 	Lookup(ipStr string) model.GeoLookup
 }
 
-// ParseResult — итог разбора одной строки (без зависимости от parser package).
-type ParseResult struct {
-	OK      bool
-	Skipped bool
-	Log     model.TrafficLog
-	Vendor  string
-	Reason  string
-}
-
 // LineParser — разбор syslog/лог-строк.
 type LineParser interface {
-	ParseVerbose(line string) ParseResult
+	ParseVerbose(line string) parser.ParseResult
 	ContainsIPv4(line string) bool
 }
 
@@ -50,6 +42,11 @@ type LineStats interface {
 	SetLastFlushAt(t time.Time)
 }
 
+// InsertObserver — latency/outcome батчевых INSERT (опционально; Prometheus).
+type InsertObserver interface {
+	ObserveInsert(d time.Duration, rows int, success bool)
+}
+
 // Deps — зависимости Processor / sync ProcessReader.
 type Deps struct {
 	Logs          TrafficLogInserter
@@ -61,4 +58,6 @@ type Deps struct {
 	QueryTimeout  time.Duration
 	// Circuit — общий breaker для workers; nil → NewProcessor создаёт приватный.
 	Circuit *CircuitBreaker
+	// InsertObs — опциональные метрики insert; nil = no-op.
+	InsertObs InsertObserver
 }

@@ -24,9 +24,10 @@ var (
 
 // Session — содержимое cookie после успешного логина.
 type Session struct {
-	Username string `json:"u"`
-	Role     string `json:"r"`
-	Expires  int64  `json:"e"` // unix seconds
+	Username       string `json:"u"`
+	Role           string `json:"r"`
+	Expires        int64  `json:"e"` // unix seconds
+	SessionVersion int64  `json:"sv"` // must match User.SessionVersion (revoke stamp)
 }
 
 // SessionManager подписывает и проверяет cookie сессии.
@@ -48,14 +49,15 @@ func NewSessionManager(secret string, ttl time.Duration) (*SessionManager, error
 
 func (m *SessionManager) TTL() time.Duration { return m.ttl }
 
-func (m *SessionManager) Issue(username, role string) (string, Session, error) {
+func (m *SessionManager) Issue(username, role string, sessionVersion int64) (string, Session, error) {
 	if m == nil {
 		return "", Session{}, ErrInvalidSession
 	}
 	sess := Session{
-		Username: username,
-		Role:     role,
-		Expires:  time.Now().Add(m.ttl).Unix(),
+		Username:       username,
+		Role:           role,
+		Expires:        time.Now().Add(m.ttl).Unix(),
+		SessionVersion: sessionVersion,
 	}
 	raw, err := json.Marshal(sess)
 	if err != nil {
@@ -94,13 +96,15 @@ func (m *SessionManager) Parse(token string) (Session, error) {
 	return sess, nil
 }
 
-// UserLookup supplies the current public user record for a live session.
+// UserLookup supplies live session checks against the user store.
 type UserLookup interface {
 	Get(username string) (UserPublic, bool)
+	// SessionVersion — stamp for revoke; missing user → ok=false.
+	SessionVersion(username string) (version int64, ok bool)
 }
 
-// LiveSession подставляет актуальную роль из UserStore.
-// Пользователь, удалённый после выдачи cookie, даёт ok=false.
+// LiveSession подставляет актуальную роль и проверяет session_version.
+// Пользователь удалён / stamp не совпал → ok=false (stolen cookie после revoke).
 // users == nil — оставляет cookie как есть (тесты / AUTH_DISABLED path).
 func LiveSession(users UserLookup, sess Session) (Session, bool) {
 	if users == nil {
@@ -110,7 +114,12 @@ func LiveSession(users UserLookup, sess Session) (Session, bool) {
 	if !ok {
 		return Session{}, false
 	}
+	sv, ok := users.SessionVersion(sess.Username)
+	if !ok || sess.SessionVersion != sv {
+		return Session{}, false
+	}
 	sess.Role = pub.Role
+	sess.SessionVersion = sv
 	return sess, true
 }
 

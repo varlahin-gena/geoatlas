@@ -1,13 +1,15 @@
 openapi: 3.0.3
 info:
   title: ГеоАтлас API
-  version: "1.5.0"
+  version: "1.7.0"
   description: |
     Backend API для приёма syslog/логов МСЭ, GeoIP и карты трафика.
 
     Локальная авторизация (cookie `nm_session` после `POST /api/auth/login`):
     - **administrator** — полный доступ (карта, загрузки, система, парсеры, УЗ, API-токены);
     - **operator** — только карта (`GET /api/events`); без загрузок, мониторинга и парсеров.
+    - Cookie содержит `session_version`; смена пароля / `logout-all` / admin reset инвалидируют
+      все ранее выданные сессии пользователя.
 
     Bearer:
     - env `API_AUTH_TOKEN` (+ опционально `API_AUTH_PREVIOUS_TOKEN`) — всегда scope **admin**;
@@ -15,12 +17,12 @@ info:
       (admin ⊃ ops ⊃ read).
 
     Уровни доступа (backend middleware):
-    - **public** — `/health`, `/api/health`, login/logout/me/change-password/check*;
+    - **public** — `/health`, `/api/health`, login/logout/logout-all/me/change-password/check*;
     - **login** — любой залогиненный или Bearer≥read (`GET /api/events`);
     - **admin** — роль administrator ИЛИ Bearer scope=admin
       (system/*, parse-*, управление УЗ/токенами);
     - **ops** — administrator или Bearer≥ops для мутаций и pipeline (`POST /api/ingest`,
-      `/upload-logs`, `/upload-geo`, `/upload-reputation`, `GET /api/ingest/stats`).
+      `/upload-logs`, `/upload-geo`, `/upload-reputation`, `GET /api/ingest/stats`, `GET /metrics`).
       При `AUTH_DISABLED=1` / `API_AUTH_DISABLED=1` ops открыты; старт только с `NM_ALLOW_INSECURE=1`.
 
 servers:
@@ -64,6 +66,17 @@ paths:
       responses:
         "200":
           description: OK
+  /api/auth/logout-all:
+    post:
+      tags: [auth]
+      summary: Revoke всех сессий текущего пользователя (bump session_version) + clear cookie
+      description: |
+        Инвалидирует все cookie с прежним `session_version`. Требует валидную сессию и CSRF.
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Нет сессии
   /api/auth/me:
     get:
       tags: [auth]
@@ -76,7 +89,10 @@ paths:
   /api/auth/change-password:
     post:
       tags: [auth]
-      summary: Смена своего пароля (снимает must_reset_password)
+      summary: Смена своего пароля (revoke старых сессий, выдаёт новый cookie)
+      description: |
+        Bump `session_version` и перевыпускает `nm_session` для текущего браузера.
+        Остальные сессии того же пользователя перестают быть валидными.
       responses:
         "200":
           description: OK
@@ -303,6 +319,31 @@ paths:
                 $ref: "#/components/schemas/HealthResponse"
         "503":
           description: ClickHouse недоступен
+
+  /metrics:
+    get:
+      tags: [health]
+      summary: Prometheus metrics
+      description: |
+        Text exposition format. Требует Bearer≥ops или administrator session
+        (как `GET /api/ingest/stats`). Метрики: HTTP latency by route, ingest queue/drops/circuit,
+        insert batch latency, Go/process collectors.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Prometheus text format
+          content:
+            text/plain:
+              schema:
+                type: string
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "503":
+          description: Metrics registry not wired
 
   /api/health:
     get:
@@ -954,13 +995,16 @@ paths:
     get:
       tags: [system]
       summary: Сводка системы (ingest, storage, alerts)
-      description: Только administrator или Bearer.
+      description: |
+        Только administrator или Bearer.
+        В ответе `ingest_slo` — пороги capacity SLO; `alerts` строятся по этим порогам
+        (queue/drops/circuit/lag/profile EPS). См. README «Ingest SLO».
       security:
         - bearerAuth: []
         - cookieAuth: []
       responses:
         "200":
-          description: System stats
+          description: System stats (includes ingest_slo + alerts)
         "401":
           description: unauthorized
         "403":

@@ -23,6 +23,7 @@ type Dependencies struct {
 	InstallProfilePath string
 	InstallMetaPath    string
 	StartupTime        time.Time
+	IngestSLO          IngestSLO
 }
 
 type Service struct {
@@ -36,12 +37,19 @@ type Service struct {
 	installMetaPath    string
 	startupTime        time.Time
 	rates              *RateSampler
+	slo                IngestSLO
 }
 
 func New(deps Dependencies) *Service {
 	startupTime := deps.StartupTime
 	if startupTime.IsZero() {
 		startupTime = time.Now()
+	}
+	slo := deps.IngestSLO
+	if slo == (IngestSLO{}) {
+		slo = DefaultIngestSLO()
+	} else {
+		slo = slo.Normalize()
 	}
 	return &Service{
 		metrics:            deps.Metrics,
@@ -54,6 +62,7 @@ func New(deps Dependencies) *Service {
 		installMetaPath:    deps.InstallMetaPath,
 		startupTime:        startupTime,
 		rates:              &RateSampler{},
+		slo:                slo,
 	}
 }
 
@@ -139,6 +148,7 @@ func (s *Service) CollectStats(ctx context.Context) (SystemStatsResponse, error)
 	}
 
 	resp.EdgesAgg = s.EdgesAgg(ctx)
+	resp.IngestSLO = s.slo
 	resp.Alerts = computeAlerts(resp)
 	return resp, nil
 }
@@ -284,7 +294,7 @@ func (s *Service) Health(ctx context.Context, pinger ClickHousePinger) (HealthRe
 	body := map[string]any{"ok": true, "status": "healthy", "clickhouse": "ok"}
 	if s.ingest != nil {
 		if snap, ok := s.ingest.Snapshot(); ok {
-			status, reasons, dropsPerSec := classifyIngest(snap, s.rates)
+			status, reasons, dropsPerSec := classifyIngest(snap, s.rates, s.slo)
 			body["status"] = status
 			ingestInfo := map[string]any{
 				"state": snap.State, "queue_depth": snap.QueueDepth, "queue_capacity": snap.QueueCapacity,
@@ -459,7 +469,8 @@ func queueRatio(snap IngestSnapshot) float64 {
 	return depthRatio
 }
 
-func classifyIngest(snap IngestSnapshot, rates *RateSampler) (status string, reasons []string, dropsPerSec float64) {
+func classifyIngest(snap IngestSnapshot, rates *RateSampler, slo IngestSLO) (status string, reasons []string, dropsPerSec float64) {
+	slo = slo.Normalize()
 	status = "healthy"
 	var bufferDropsPerSec float64
 	if rates != nil {
@@ -472,25 +483,28 @@ func classifyIngest(snap IngestSnapshot, rates *RateSampler) (status string, rea
 	if snap.LastError != "" {
 		status, reasons = "degraded", append(reasons, "last_flush_error")
 	}
-	if ratio >= 0.9 {
+	if ratio >= slo.QueueCriticalRatio {
 		reason := "queue_critical"
-		if snap.QueueBytesCapacity > 0 && float64(snap.QueueBytes)/float64(snap.QueueBytesCapacity) >= 0.9 {
+		if snap.QueueBytesCapacity > 0 && float64(snap.QueueBytes)/float64(snap.QueueBytesCapacity) >= slo.QueueCriticalRatio {
 			reason = "queue_bytes_critical"
 		}
 		return "overloaded", append(reasons, reason), dropsPerSec
 	}
-	if ratio >= 0.75 {
+	if ratio >= slo.QueueWarnRatio {
 		reason := "queue_high"
-		if snap.QueueBytesCapacity > 0 && float64(snap.QueueBytes)/float64(snap.QueueBytesCapacity) >= 0.75 {
+		if snap.QueueBytesCapacity > 0 && float64(snap.QueueBytes)/float64(snap.QueueBytesCapacity) >= slo.QueueWarnRatio {
 			reason = "queue_bytes_high"
 		}
 		status, reasons = "degraded", append(reasons, reason)
 	}
-	if dropsPerSec >= 100 || bufferDropsPerSec >= 100 {
+	if dropsPerSec >= slo.DropsCriticalPerSec || bufferDropsPerSec >= slo.DropsCriticalPerSec {
 		return "overloaded", append(reasons, "dropping_critical"), dropsPerSec
 	}
-	if dropsPerSec > 0 || bufferDropsPerSec > 0 {
+	if dropsPerSec > slo.DropsWarnPerSec || bufferDropsPerSec > slo.DropsWarnPerSec {
 		status, reasons = "degraded", append(reasons, "dropping")
+	}
+	if snap.CircuitOpen {
+		status, reasons = "degraded", append(reasons, "circuit_open")
 	}
 	return status, reasons, dropsPerSec
 }

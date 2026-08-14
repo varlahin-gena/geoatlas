@@ -42,7 +42,9 @@ type User struct {
 	Role               string `json:"role"`
 	MustResetPassword  bool   `json:"must_reset_password"`
 	GeoWizardDismissed bool   `json:"geo_wizard_dismissed,omitempty"`
-	CreatedAt          string `json:"created_at,omitempty"`
+	// SessionVersion — stamp в cookie; bump инвалидирует все ранее выданные сессии.
+	SessionVersion int64  `json:"session_version,omitempty"`
+	CreatedAt      string `json:"created_at,omitempty"`
 }
 
 // UserPublic — данные без хеша пароля для API/UI.
@@ -260,6 +262,34 @@ func (s *UserStore) Get(username string) (UserPublic, bool) {
 	return u.Public(), true
 }
 
+func (s *UserStore) SessionVersion(username string) (int64, bool) {
+	if s == nil {
+		return 0, false
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	u := s.byLower[strings.ToLower(strings.TrimSpace(username))]
+	if u == nil {
+		return 0, false
+	}
+	return u.SessionVersion, true
+}
+
+// BumpSessionVersion инвалидирует все cookie-сессии пользователя.
+func (s *UserStore) BumpSessionVersion(username string) error {
+	if s == nil {
+		return ErrUserNotFound
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	u := s.byLower[strings.ToLower(strings.TrimSpace(username))]
+	if u == nil {
+		return ErrUserNotFound
+	}
+	u.SessionVersion++
+	return s.persistUnlocked()
+}
+
 func (s *UserStore) MustReset(username string) bool {
 	u, ok := s.Get(username)
 	return ok && u.MustResetPassword
@@ -401,13 +431,14 @@ func (s *UserStore) ResetPassword(username, password string, mustReset bool) (Us
 	}
 	u.PasswordHash = string(hash)
 	u.MustResetPassword = mustReset
+	u.SessionVersion++
 	if err := s.persistUnlocked(); err != nil {
 		return UserPublic{}, err
 	}
 	return u.Public(), nil
 }
 
-// ChangePassword — смена своего пароля; снимает must_reset_password.
+// ChangePassword — смена своего пароля; снимает must_reset_password и revoke'ит старые сессии.
 func (s *UserStore) ChangePassword(username, oldPassword, newPassword string) (UserPublic, error) {
 	if s == nil {
 		return UserPublic{}, ErrUserNotFound
@@ -430,6 +461,7 @@ func (s *UserStore) ChangePassword(username, oldPassword, newPassword string) (U
 	}
 	u.PasswordHash = string(hash)
 	u.MustResetPassword = false
+	u.SessionVersion++
 	if err := s.persistUnlocked(); err != nil {
 		return UserPublic{}, err
 	}

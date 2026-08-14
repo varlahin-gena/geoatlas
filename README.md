@@ -65,7 +65,7 @@
 - Страница системного мониторинга (Обзор / Pipeline / Безопасность / Графики / **Резервное копирование**): метрики контейнеров, пайплайна (в т.ч. **UDP/TCP EPS**, drops, circuit breaker), **форма TTL**, неуспешные логины, хранилище, профиль установки, **индикатор ёмкости**, алёрты; ручной maintenance backfill агрегатов
 - Индикатор здоровья системы на главной странице (ссылка на `/system`); **версия установки** (`main` / тег) в меню пользователя
 - Docker: fail-closed секреты в compose, hardened контейнеры (`cap_drop: ALL`); запуск через `./start.sh`
-- Контракт HTTP API: [`openapi.yaml`](openapi.yaml) (OpenAPI **1.5.0**)
+- Контракт HTTP API: [`openapi.yaml`](openapi.yaml) (OpenAPI **1.7.0**)
 
 ---
 
@@ -121,7 +121,22 @@
 | Ограничение | Суть |
 |-------------|------|
 | **IPv4-only** | Success path GeoIP / карта / lookup — IPv4. IPv6 не обогащается и не строится на карте. |
-| **Single-host control plane** | Учётки, API-токены, retention, reputation feeds — JSON-файлы на томе `/app/data` (`users.json` и др.). Не multi-instance / не shared store. |
+| **Single-host control plane** | Учётки, API-токены, retention, reputation feeds, schedules — JSON на `/app/data`. Backend берёт exclusive lock (`/app/data/.nm_backend.lock`); второй процесс на том же томе не стартует. Обход только для стендов: `NM_ALLOW_MULTI_INSTANCE=1` (небезопасно при shared volume). |
+
+### Ingest SLO (at-most-once)
+
+Доставка — **best-effort / at-most-once** (очередь может дропать). Product SLO описывает, когда потери — инцидент (алёрты на `/system`, поле `ingest_slo` в `/api/system/stats`, метрики Prometheus):
+
+| Сигнал | Warn | Critical (error) |
+|--------|------|------------------|
+| Queue depth / byte budget | ≥ 75% capacity | ≥ 90% |
+| Processor buffer lines | > 10k | > 100k |
+| Admission / buffer drops/s | любое > 0 | ≥ 100/s |
+| Insert circuit open | да (warn) | (эскалация через queue/drops) |
+| Pipeline lag (при ненулевом rate) | > 60s | > 300s |
+| EPS vs install profile max | > 105% | > 125% |
+
+Runbook кратко: warn drops → проверить syslog-ng buffer / profile / CH; critical → `tune-resources.sh` или снизить входной EPS; circuit open → здоровье ClickHouse.
 
 ### Хранение данных (TTL)
 
@@ -865,7 +880,7 @@ Unit-тесты карты (репутация / heatmap focus / coords helpers)
 
 ### HTTP API
 
-Контракт REST API (в т.ч. auth, events, geo, reputation, retention, tokens, search-templates, backups): [`openapi.yaml`](openapi.yaml), версия документа **1.5.0**. Проверка живости: `GET /api/health` (публичный). Остальные эндпоинты — cookie-сессия и/или Bearer (`API_AUTH_TOKEN` / именованный токен со scope).
+Контракт REST API (в т.ч. auth, events, geo, reputation, retention, tokens, search-templates, backups, `/metrics`): [`openapi.yaml`](openapi.yaml), версия документа **1.7.0**. Проверка живости: `GET /api/health` (публичный). Остальные эндпоинты — cookie-сессия и/или Bearer (`API_AUTH_TOKEN` / именованный токен со scope). Prometheus scrape: `GET /metrics` (Bearer≥ops / administrator).
 
 ## Структура репозитория
 
@@ -878,7 +893,14 @@ network_monitor/
 │   └── internal/
 │       ├── adapter/
 │       │   ├── httpapi/              # HTTP delivery (handlers, middleware, cookies/CSRF)
-│       │   ├── clickhouse/           # SQL/DDL SoT + repos + ReloadableGeoIndex + RetentionApplier
+│       │   ├── clickhouse/           # pool/retention/maintenance + domain stores
+│       │   │   ├── ingeststore/      # INSERT traffic_logs / parse_errors
+│       │   │   ├── perrorstore/      # list/delete parse_errors
+│       │   │   ├── trafficstore/     # map/events scans
+│       │   │   ├── geostore/         # GeoIP ranges + ReloadableGeoIndex
+│       │   │   ├── repstore/         # reputation ranges + index
+│       │   │   ├── sysstore/         # system metrics
+│       │   │   ├── backupstore/      # BACKUP/RESTORE
 │       │   │   ├── aggstate/         # Prefer* / статус edges agg
 │       │   │   ├── migrate/          # Ensure* / DDL / backfill (SoT схемы)
 │       │   │   ├── query/            # Scan* / settings
@@ -934,7 +956,7 @@ network_monitor/
 │   └── internal/
 │       ├── config/
 │       └── collector/
-├── openapi.yaml                      # контракт HTTP API (OpenAPI 1.5.0)
+├── openapi.yaml                      # контракт HTTP API (OpenAPI 1.7.0)
 ├── VERSION / CHANGELOG.md / RELEASING.md
 ├── .github/workflows/ci.yml
 ├── start.sh / stop.sh

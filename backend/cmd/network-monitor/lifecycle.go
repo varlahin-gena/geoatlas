@@ -14,6 +14,15 @@ func (a *app) run(ctx context.Context) error {
 	}
 	defer a.pools.Close()
 	defer a.cancel()
+	defer func() {
+		if a.dataLock != nil {
+			if err := a.dataLock.Close(); err != nil {
+				slog.Warn("control-plane lock release failed", "err", err)
+			} else {
+				slog.Info("control-plane lock released")
+			}
+		}
+	}()
 
 	go func() {
 		slog.Info("backend listening", "addr", a.listenAddr)

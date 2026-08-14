@@ -5,10 +5,16 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gorilla/mux"
-
 	"network_monitor/internal/adapter/searchtemplatesfile"
 	"network_monitor/internal/config"
+	usecaseauth "network_monitor/internal/usecase/auth"
+	usecasebackup "network_monitor/internal/usecase/backup"
+	usecaseevents "network_monitor/internal/usecase/events"
+	usecasegeo "network_monitor/internal/usecase/geo"
+	"network_monitor/internal/usecase/parseerrors"
+	"network_monitor/internal/usecase/parsetest"
+	usecasereputation "network_monitor/internal/usecase/reputation"
+	usecaseretention "network_monitor/internal/usecase/retention"
 	usecasesystem "network_monitor/internal/usecase/system"
 )
 
@@ -23,28 +29,46 @@ const (
 type Server struct {
 	httpSrv *http.Server
 	deps    *Deps
+	routes  []RouteInfo
+}
+
+// ServerOption — опциональная настройка HTTP-сервера (метрики и т.п.).
+type ServerOption func(*Deps)
+
+func WithMetrics(m MetricsRecorder) ServerOption {
+	return func(d *Deps) {
+		if d != nil {
+			d.WithMetrics(m)
+		}
+	}
 }
 
 func NewServer(
 	cfg config.Config,
 	ingestSvc Ingester,
-	eventsUC EventsAPI,
-	geoUC GeoAPI,
-	reputationUC ReputationAPI,
-	parseErrorsUC ParseErrorsAPI,
-	systemUC SystemAPI,
+	eventsUC *usecaseevents.Service,
+	geoUC *usecasegeo.Service,
+	reputationUC *usecasereputation.Service,
+	parseErrorsUC *parseerrors.Service,
+	systemUC *usecasesystem.Service,
 	systemPinger usecasesystem.ClickHousePinger,
-	parseTestUC ParseTestAPI,
-	retentionUC RetentionAPI,
-	backupUC BackupAPI,
-	authUC AuthAPI,
+	parseTestUC *parsetest.Service,
+	retentionUC *usecaseretention.Service,
+	backupUC *usecasebackup.Service,
+	authUC *usecaseauth.Service,
 	users UserDirectory,
 	sessions SessionParser,
 	apiTokens APITokenStore,
+	opts ...ServerOption,
 ) *Server {
 	deps := NewDeps(cfg, ingestSvc, eventsUC, geoUC, reputationUC, parseErrorsUC, systemUC, systemPinger, parseTestUC, retentionUC, backupUC).
 		WithAuth(authUC, users, sessions, apiTokens).
 		WithSearchTemplates(searchtemplatesfile.New(cfg.SearchTemplatesFile))
+	for _, opt := range opts {
+		if opt != nil {
+			opt(deps)
+		}
+	}
 	health := &HealthHandler{deps}
 	events := &EventsHandler{deps}
 	ingestH := &IngestHandler{deps}
@@ -71,216 +95,225 @@ func NewServer(
 	opsMW := requireOpsMW(ba, sessions, users, apiAuthOff, uiAuthOff)
 	csrf := csrfMW(ba, uiAuthOff)
 
-	r := mux.NewRouter()
-
-	// Глобальные middleware: паника -> 500, access-логи.
-	r.Use(requestIDMW)
-	r.Use(recoverMW)
-	r.Use(loggingMW)
+	rr := newRouteRegistrar()
 
 	// --- Auth (публичные / собственные) ---
-	r.Handle("/api/auth/login", chain(http.HandlerFunc(authH.Login), maxBytesMW(64<<10))).Methods("POST")
-	r.Handle("/api/auth/logout",
+	rr.Handle("POST", "/api/auth/login", chain(http.HandlerFunc(authH.Login), maxBytesMW(64<<10)))
+	rr.Handle("POST", "/api/auth/logout",
 		chain(http.HandlerFunc(authH.Logout), csrf),
-	).Methods("POST")
-	r.HandleFunc("/api/auth/me", authH.Me).Methods("GET")
-	r.Handle("/api/auth/change-password",
+	)
+	rr.Handle("POST", "/api/auth/logout-all",
+		chain(http.HandlerFunc(authH.LogoutAll), csrf),
+	)
+	rr.Handle("GET", "/api/auth/me", http.HandlerFunc(authH.Me))
+	rr.Handle("POST", "/api/auth/change-password",
 		chain(http.HandlerFunc(authH.ChangePassword), csrf, maxBytesMW(64<<10)),
-	).Methods("POST")
-	r.Handle("/api/auth/geo-wizard-dismiss",
+	)
+	rr.Handle("POST", "/api/auth/geo-wizard-dismiss",
 		chain(http.HandlerFunc(authH.DismissGeoWizard), loginMW, csrf, maxBytesMW(64<<10)),
-	).Methods("POST")
-	r.HandleFunc("/api/auth/check", authH.Check).Methods("GET")
-	r.HandleFunc("/api/auth/check-ops", authH.CheckOps).Methods("GET")
-	r.HandleFunc("/api/auth/check-admin", authH.CheckAdmin).Methods("GET")
+	)
+	rr.Handle("GET", "/api/auth/check", http.HandlerFunc(authH.Check))
+	rr.Handle("GET", "/api/auth/check-ops", http.HandlerFunc(authH.CheckOps))
+	rr.Handle("GET", "/api/auth/check-admin", http.HandlerFunc(authH.CheckAdmin))
 
 	// --- Управление УЗ (только администратор) ---
-	r.Handle("/api/users",
+	rr.Handle("GET", "/api/users",
 		withTimeout(chain(http.HandlerFunc(usersH.List), adminMW), healthTimeout),
-	).Methods("GET")
-	r.Handle("/api/users",
+	)
+	rr.Handle("POST", "/api/users",
 		chain(http.HandlerFunc(usersH.Create), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
-	).Methods("POST")
-	r.Handle("/api/users/{username}/role",
+	)
+	rr.Handle("POST", "/api/users/{username}/role",
 		chain(http.HandlerFunc(usersH.SetRole), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
-	).Methods("POST")
-	r.Handle("/api/users/{username}/full-name",
+	)
+	rr.Handle("POST", "/api/users/{username}/full-name",
 		chain(http.HandlerFunc(usersH.SetFullName), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
-	).Methods("POST")
-	r.Handle("/api/users/{username}/reset-password",
+	)
+	rr.Handle("POST", "/api/users/{username}/reset-password",
 		chain(http.HandlerFunc(usersH.ResetPassword), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
-	).Methods("POST")
-	r.Handle("/api/users/{username}",
+	)
+	rr.Handle("DELETE", "/api/users/{username}",
 		chain(http.HandlerFunc(usersH.Delete), adminMW, csrf),
-	).Methods("DELETE")
+	)
 
 	// --- Личные шаблоны поиска (карта) ---
-	r.Handle("/api/me/search-templates",
+	rr.Handle("GET", "/api/me/search-templates",
 		withTimeout(chain(http.HandlerFunc(tplH.ListMine), loginMW), healthTimeout),
-	).Methods("GET")
-	r.Handle("/api/me/search-templates",
+	)
+	rr.Handle("POST", "/api/me/search-templates",
 		chain(http.HandlerFunc(tplH.CreateMine), loginMW, csrf, maxBytesMW(64<<10)),
-	).Methods("POST")
-	r.Handle("/api/me/search-templates/{id}",
+	)
+	rr.Handle("PUT", "/api/me/search-templates/{id}",
 		chain(http.HandlerFunc(tplH.UpdateMine), loginMW, csrf, maxBytesMW(64<<10)),
-	).Methods("PUT")
-	r.Handle("/api/me/search-templates/{id}",
+	)
+	rr.Handle("DELETE", "/api/me/search-templates/{id}",
 		chain(http.HandlerFunc(tplH.DeleteMine), loginMW, csrf),
-	).Methods("DELETE")
-	r.Handle("/api/search-templates",
+	)
+	rr.Handle("GET", "/api/search-templates",
 		withTimeout(chain(http.HandlerFunc(tplH.ListAll), adminMW), healthTimeout),
-	).Methods("GET")
+	)
 
 	// --- API-токены (administrator) ---
-	r.Handle("/api/tokens",
+	rr.Handle("GET", "/api/tokens",
 		withTimeout(chain(http.HandlerFunc(tokensH.List), adminMW), healthTimeout),
-	).Methods("GET")
-	r.Handle("/api/tokens",
+	)
+	rr.Handle("POST", "/api/tokens",
 		chain(http.HandlerFunc(tokensH.Create), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
-	).Methods("POST")
-	r.Handle("/api/tokens/{id}",
+	)
+	rr.Handle("DELETE", "/api/tokens/{id}",
 		chain(http.HandlerFunc(tokensH.Revoke), adminMW, csrf),
-	).Methods("DELETE")
+	)
 
 	// --- Health открыт (docker/k8s probes). Pipeline stats — opsMW. ---
-	r.Handle("/health", withTimeout(http.HandlerFunc(health.Health), healthTimeout)).Methods("GET")
-	r.Handle("/api/health", withTimeout(http.HandlerFunc(health.Health), healthTimeout)).Methods("GET")
-	r.Handle("/api/ingest/stats",
+	rr.Handle("GET", "/health", withTimeout(http.HandlerFunc(health.Health), healthTimeout))
+	rr.Handle("GET", "/api/health", withTimeout(http.HandlerFunc(health.Health), healthTimeout))
+	rr.Handle("GET", "/api/ingest/stats",
 		withTimeout(chain(http.HandlerFunc(ingestH.GetIngestStats), opsMW), healthTimeout),
-	).Methods("GET")
+	)
+	// Prometheus scrape: Bearer≥ops / administrator (как ingest/stats).
+	rr.Handle("GET", "/metrics", chain(metricsHandler(deps.prom), opsMW))
 
 	// --- Карта / статус: любой залогиненный ---
-	r.Handle("/api/events",
+	rr.Handle("GET", "/api/events",
 		withTimeout(chain(http.HandlerFunc(events.GetEvents), loginMW), readTimeout),
-	).Methods("GET")
-	r.Handle("/api/events/series",
+	)
+	rr.Handle("GET", "/api/events/series",
 		withTimeout(chain(http.HandlerFunc(events.GetEventsSeries), loginMW), readTimeout),
-	).Methods("GET")
-	r.Handle("/api/system/status",
+	)
+	rr.Handle("GET", "/api/system/status",
 		withTimeout(chain(http.HandlerFunc(system.GetSystemStatus), loginMW), readTimeout),
-	).Methods("GET")
-	r.Handle("/api/system/version",
+	)
+	rr.Handle("GET", "/api/system/version",
 		withTimeout(chain(http.HandlerFunc(system.GetSystemVersion), loginMW), healthTimeout),
-	).Methods("GET")
-	r.Handle("/api/geo-missing",
+	)
+	rr.Handle("GET", "/api/geo-missing",
 		withTimeout(chain(http.HandlerFunc(geoH.GetGeoMissing), adminMW), readTimeout),
-	).Methods("GET")
-	r.Handle("/api/geo-ranges/export",
+	)
+	rr.Handle("GET", "/api/geo-ranges/export",
 		withTimeout(chain(http.HandlerFunc(geoH.ExportGeoRangesCSV), opsMW), 10*time.Minute),
-	).Methods("GET")
-	r.Handle("/api/geo-ranges/clear",
+	)
+	rr.Handle("POST", "/api/geo-ranges/clear",
 		chain(http.HandlerFunc(geoH.ClearGeoRanges), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
-	).Methods("POST")
-	r.Handle("/api/geo-ranges",
+	)
+	rr.Handle("GET", "/api/geo-ranges",
 		withTimeout(chain(http.HandlerFunc(geoH.ListGeoRanges), adminMW), readTimeout),
-	).Methods("GET")
-	r.Handle("/api/geo-ranges",
+	)
+	rr.Handle("POST", "/api/geo-ranges",
 		chain(http.HandlerFunc(geoH.AppendGeoRange), opsMW, csrf, maxBytesMW(maxJSONBodySize)),
-	).Methods("POST")
-	r.Handle("/api/geo-ranges",
+	)
+	rr.Handle("PUT", "/api/geo-ranges",
 		chain(http.HandlerFunc(geoH.UpdateGeoRange), opsMW, csrf, maxBytesMW(maxJSONBodySize)),
-	).Methods("PUT")
+	)
 
-	r.Handle("/api/reputation/lists",
+	rr.Handle("GET", "/api/reputation/lists",
 		withTimeout(chain(http.HandlerFunc(repH.ListLists), adminMW), readTimeout),
-	).Methods("GET")
-	r.Handle("/api/reputation/lists/{name}",
+	)
+	rr.Handle("DELETE", "/api/reputation/lists/{name}",
 		chain(http.HandlerFunc(repH.DeleteList), opsMW, csrf),
-	).Methods("DELETE")
-	r.Handle("/api/reputation/feeds",
+	)
+	rr.Handle("GET", "/api/reputation/feeds",
 		withTimeout(chain(http.HandlerFunc(repH.ListFeeds), adminMW), readTimeout),
-	).Methods("GET")
-	r.Handle("/api/reputation/feeds",
+	)
+	rr.Handle("POST", "/api/reputation/feeds",
 		chain(http.HandlerFunc(repH.AddFeed), opsMW, csrf, maxBytesMW(maxJSONBodySize)),
-	).Methods("POST")
-	r.Handle("/api/reputation/feeds/{name}",
+	)
+	rr.Handle("DELETE", "/api/reputation/feeds/{name}",
 		chain(http.HandlerFunc(repH.RemoveFeed), opsMW, csrf),
-	).Methods("DELETE")
-	r.Handle("/api/reputation/catalog",
+	)
+	rr.Handle("GET", "/api/reputation/catalog",
 		withTimeout(chain(http.HandlerFunc(repH.ListCatalog), adminMW), readTimeout),
-	).Methods("GET")
-	r.Handle("/api/reputation/refresh",
+	)
+	rr.Handle("POST", "/api/reputation/refresh",
 		chain(http.HandlerFunc(repH.Refresh), opsMW, csrf, maxBytesMW(maxJSONBodySize)),
-	).Methods("POST")
-	r.Handle("/api/reputation/lookup",
+	)
+	rr.Handle("GET", "/api/reputation/lookup",
 		withTimeout(chain(http.HandlerFunc(repH.Lookup), loginMW), healthTimeout),
-	).Methods("GET")
+	)
 
 	// --- Только администратор ---
-	r.Handle("/api/system/stats",
+	rr.Handle("GET", "/api/system/stats",
 		withTimeout(chain(http.HandlerFunc(system.GetSystemStats), adminMW), readTimeout),
-	).Methods("GET")
-	r.Handle("/api/system/history",
+	)
+	rr.Handle("GET", "/api/system/history",
 		withTimeout(chain(http.HandlerFunc(system.GetSystemHistory), adminMW), readTimeout),
-	).Methods("GET")
-	r.Handle("/api/system/edges-agg",
+	)
+	rr.Handle("GET", "/api/system/edges-agg",
 		withTimeout(chain(http.HandlerFunc(system.GetEdgesAggStatus), adminMW), healthTimeout),
-	).Methods("GET")
-	r.Handle("/api/system/maintenance/backfill",
+	)
+	rr.Handle("POST", "/api/system/maintenance/backfill",
 		chain(http.HandlerFunc(system.PostMaintenanceBackfill), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
-	).Methods("POST")
-	r.Handle("/api/system/install-profile",
+	)
+	rr.Handle("GET", "/api/system/install-profile",
 		withTimeout(chain(http.HandlerFunc(system.GetInstallProfile), adminMW), healthTimeout),
-	).Methods("GET")
-	r.Handle("/api/system/retention",
+	)
+	rr.Handle("GET", "/api/system/retention",
 		withTimeout(chain(http.HandlerFunc(system.GetRetention), adminMW), healthTimeout),
-	).Methods("GET")
-	r.Handle("/api/system/retention",
+	)
+	rr.Handle("PUT", "/api/system/retention",
 		chain(http.HandlerFunc(system.PutRetention), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
-	).Methods("PUT")
-	r.Handle("/api/system/backups",
+	)
+	rr.Handle("GET", "/api/system/backups",
 		withTimeout(chain(http.HandlerFunc(system.GetBackups), adminMW), healthTimeout),
-	).Methods("GET")
-	r.Handle("/api/system/backups",
+	)
+	rr.Handle("POST", "/api/system/backups",
 		chain(http.HandlerFunc(system.PostBackup), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
-	).Methods("POST")
-	r.Handle("/api/system/backups/{name}/attach",
+	)
+	rr.Handle("POST", "/api/system/backups/{name}/attach",
 		chain(http.HandlerFunc(system.PostBackupAttach), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
-	).Methods("POST")
-	r.Handle("/api/system/backups/{name}/detach",
+	)
+	rr.Handle("POST", "/api/system/backups/{name}/detach",
 		chain(http.HandlerFunc(system.PostBackupDetach), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
-	).Methods("POST")
-	r.Handle("/api/system/backups/{name}",
+	)
+	rr.Handle("DELETE", "/api/system/backups/{name}",
 		chain(http.HandlerFunc(system.DeleteBackup), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
-	).Methods("DELETE")
-	r.Handle("/api/system/backup-schedule",
+	)
+	rr.Handle("GET", "/api/system/backup-schedule",
 		withTimeout(chain(http.HandlerFunc(system.GetBackupSchedule), adminMW), healthTimeout),
-	).Methods("GET")
-	r.Handle("/api/system/backup-schedule",
+	)
+	rr.Handle("PUT", "/api/system/backup-schedule",
 		chain(http.HandlerFunc(system.PutBackupSchedule), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
-	).Methods("PUT")
-	r.Handle("/api/parse-errors",
+	)
+	rr.Handle("GET", "/api/parse-errors",
 		withTimeout(chain(http.HandlerFunc(parse.ListParseErrors), adminMW), readTimeout),
-	).Methods("GET")
-	r.Handle("/api/parse-samples",
+	)
+	rr.Handle("GET", "/api/parse-samples",
 		withTimeout(chain(http.HandlerFunc(parse.ParseSamples), adminMW), readTimeout),
-	).Methods("GET")
-	r.Handle("/api/parse-test",
+	)
+	rr.Handle("POST", "/api/parse-test",
 		chain(http.HandlerFunc(parse.ParseTest), adminMW, csrf, maxBytesMW(maxParseTestSize)),
-	).Methods("POST")
-	r.Handle("/api/parse-errors/delete",
+	)
+	rr.Handle("POST", "/api/parse-errors/delete",
 		chain(http.HandlerFunc(parse.DeleteParseErrors), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
-	).Methods("POST")
+	)
 
 	// --- Мутирующие: Bearer / administrator (не operator); open если *AUTH_DISABLED ---
-	r.Handle("/api/ingest",
+	rr.Handle("POST", "/api/ingest",
 		chain(http.HandlerFunc(ingestH.IngestLogs), opsMW, csrf, maxBytesMW(cfg.MaxLogUploadSize)),
-	).Methods("POST")
-	r.Handle("/upload-logs",
+	)
+	rr.Handle("POST", "/upload-logs",
 		chain(http.HandlerFunc(ingestH.UploadLogs), opsMW, csrf, maxBytesMW(cfg.MaxLogUploadSize)),
-	).Methods("POST")
-	r.Handle("/upload-geo",
+	)
+	rr.Handle("POST", "/upload-geo",
 		chain(http.HandlerFunc(geoH.UploadGeo), opsMW, csrf, maxBytesMW(cfg.MaxGeoUploadSize)),
-	).Methods("POST")
-	r.Handle("/upload-reputation",
+	)
+	rr.Handle("POST", "/upload-reputation",
 		chain(http.HandlerFunc(repH.UploadReputation), opsMW, csrf, maxBytesMW(cfg.MaxReputationUploadSize)),
-	).Methods("POST")
+	)
+
+	var h http.Handler = rr.Handler()
+	h = loggingMW(h)
+	if deps.prom != nil {
+		h = metricsMW(deps.prom)(h)
+	}
+	h = recoverMW(h)
+	h = requestIDMW(h) // outermost
 
 	return &Server{
-		deps: deps,
+		deps:   deps,
+		routes: rr.Routes(),
 		httpSrv: &http.Server{
 			Addr:    cfg.ListenAddr,
-			Handler: r,
+			Handler: h,
 
 			// Заголовки должны прийти быстро — защита от slowloris по заголовкам.
 			ReadHeaderTimeout: 15 * time.Second,
@@ -303,4 +336,14 @@ func (s *Server) Handler() http.Handler {
 		return nil
 	}
 	return s.httpSrv.Handler
+}
+
+// Routes returns registered method+path templates (for contract / auth-matrix tests).
+func (s *Server) Routes() []RouteInfo {
+	if s == nil {
+		return nil
+	}
+	out := make([]RouteInfo, len(s.routes))
+	copy(out, s.routes)
+	return out
 }

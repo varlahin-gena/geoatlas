@@ -235,7 +235,7 @@ func ReadCSVSnapshot(r io.Reader) ([]model.GeoRange, *BuiltSnapshot, error) {
 }
 
 // ReadCSV парсит GeoIP CSV в память: валидация колонок, отказ при overlapping ranges.
-// Запись в ClickHouse — clickhouse.ReplaceGeoRanges (geoip не зависит от CH для импорта).
+// Запись в ClickHouse — geostore.ReplaceGeoRanges (geoip не зависит от CH для импорта).
 func ReadCSV(r io.Reader) ([]model.GeoRange, error) {
 	ranges, _, err := ReadCSVSnapshot(r)
 	return ranges, err

@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/mux"
-
 	usecasebackup "network_monitor/internal/usecase/backup"
 	usecaseretention "network_monitor/internal/usecase/retention"
 	"network_monitor/internal/usecase/system"
@@ -195,7 +193,7 @@ func (h *SystemHandler) PostBackupAttach(w http.ResponseWriter, r *http.Request)
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "backup service unavailable"})
 		return
 	}
-	name := strings.TrimSpace(mux.Vars(r)["name"])
+	name := strings.TrimSpace(r.PathValue("name"))
 	err := h.backupUC.ScheduleAttach(r.Context(), name)
 	if err != nil {
 		writeDomainError(w, "backup attach failed", err)
@@ -211,7 +209,7 @@ func (h *SystemHandler) PostBackupDetach(w http.ResponseWriter, r *http.Request)
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "backup service unavailable"})
 		return
 	}
-	name := strings.TrimSpace(mux.Vars(r)["name"])
+	name := strings.TrimSpace(r.PathValue("name"))
 	err := h.backupUC.ScheduleDetach(r.Context(), name)
 	if err != nil {
 		writeDomainError(w, "backup detach failed", err)
@@ -227,7 +225,7 @@ func (h *SystemHandler) DeleteBackup(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "backup service unavailable"})
 		return
 	}
-	name := strings.TrimSpace(mux.Vars(r)["name"])
+	name := strings.TrimSpace(r.PathValue("name"))
 	if err := h.backupUC.DeleteBackup(name); err != nil {
 		writeDomainError(w, "backup delete failed", err)
 		return

@@ -23,6 +23,8 @@ interface AuthContextValue {
   refresh: () => Promise<AuthUser | null>;
   login: (username: string, password: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
+  /** Завершить все сессии (все устройства) и перейти на /login. */
+  logoutAll: () => Promise<void>;
   setTheme: (t: Theme) => void;
   toggleTheme: () => void;
 }
@@ -80,6 +82,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     navigate('/login');
   }, [navigate]);
 
+  const logoutAll = useCallback(async () => {
+    try {
+      await authApi.logoutAll();
+    } catch {
+      /* ignore — всё равно сбрасываем локальную сессию */
+    }
+    setUser(null);
+    navigate('/login');
+  }, [navigate]);
+
   const setTheme = useCallback((t: Theme) => {
     setThemeState(applyTheme(t));
   }, []);
@@ -99,10 +111,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refresh,
       login,
       logout,
+      logoutAll,
       setTheme,
       toggleTheme: doToggleTheme,
     };
-  }, [user, loading, theme, refresh, login, logout, setTheme, doToggleTheme]);
+  }, [user, loading, theme, refresh, login, logout, logoutAll, setTheme, doToggleTheme]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

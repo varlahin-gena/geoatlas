@@ -1,4 +1,4 @@
-package clickhouse
+package ingeststore
 
 import (
 	"context"
@@ -8,14 +8,6 @@ import (
 
 	"network_monitor/internal/model"
 )
-
-// Сбрасываем агрегацию/сортировку на диск раньше, чем упрёмся в max_memory_usage.
-// Значения задаются через query.ConfigureQuerySettings (env CH_*).
-
-// Connect — совместимая обёртка над ConnectWithPool с дефолтным размером пула.
-func Connect(ctx context.Context, addr string) (clickhouse.Conn, error) {
-	return ConnectWithPool(ctx, addr, Auth{}, PoolOptions{Name: "default"})
-}
 
 func InsertTrafficLogs(ctx context.Context, ch clickhouse.Conn, logs []model.TrafficLog) error {
 	if len(logs) == 0 {

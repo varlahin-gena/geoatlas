@@ -154,6 +154,10 @@ type Config struct {
 	// SearchTemplatesFile — персональные шаблоны поиска карты по username.
 	SearchTemplatesFile string
 
+	// AllowMultiInstance — отключить exclusive lock на data dir (только тесты/особые стенды).
+	// По умолчанию false: один backend на том /app/data (JSON control plane).
+	AllowMultiInstance bool
+
 	MaxLogUploadSize     int64
 	MaxGeoUploadSize     int64 // байты тела /upload-geo (GEOIP_UPLOAD_MAX_BYTES или MAX_GEO_UPLOAD_SIZE)
 	MaxGeoUploadRanges   int   // макс. диапазонов в одном CSV (GEOIP_UPLOAD_MAX_RANGES)
@@ -244,6 +248,7 @@ func FromEnv() Config {
 		APITokensFile:        envOr("API_TOKENS_FILE", "/app/data/api_tokens.json"),
 		RetentionFile:        envOr("RETENTION_FILE", "/app/data/retention.json"),
 		SearchTemplatesFile:  envOr("SEARCH_TEMPLATES_FILE", "/app/data/search_templates.json"),
+		AllowMultiInstance:   parser.bool("NM_ALLOW_MULTI_INSTANCE", false),
 		MaxLogUploadSize: parser.int64("MAX_LOG_UPLOAD_SIZE", 1<<30), // 1 GiB
 		// GeoIP: временные дефолты (small/2 GiB); ResolveGeoUploadLimits подставит профиль.
 		MaxGeoUploadSize:   firstEnvInt64(&parser, 512<<20, "GEOIP_UPLOAD_MAX_BYTES", "MAX_GEO_UPLOAD_SIZE"),
