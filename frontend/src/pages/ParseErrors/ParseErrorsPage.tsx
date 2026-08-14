@@ -1,16 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import { apiFetch } from '@/api/client';
+import {
+  deleteAllParseErrors,
+  deleteParseErrors,
+  listParseErrors,
+  type ParseErrorRow,
+} from '@/api/parseErrors';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useToast } from '@/components/Toast';
 import { fmtDate } from '@/lib/format';
-
-interface ParseErrorRow {
-  id: string;
-  timestamp?: string;
-  vendor?: string;
-  reason?: string;
-  raw?: string;
-}
 
 export default function ParseErrorsPage() {
   const { toast } = useToast();
@@ -23,8 +20,7 @@ export default function ParseErrorsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const q = new URLSearchParams({ limit, search: search.trim() });
-      const data = await apiFetch<{ errors: ParseErrorRow[] }>(`/api/parse-errors?${q}`);
+      const data = await listParseErrors({ limit, search });
       setRows(data.errors || []);
       setSelected(new Set());
     } catch (e) {
@@ -46,10 +42,7 @@ export default function ParseErrorsPage() {
   async function deleteIds(ids: string[]) {
     if (!ids.length) return;
     try {
-      await apiFetch('/api/parse-errors/delete', {
-        method: 'POST',
-        body: JSON.stringify({ ids }),
-      });
+      await deleteParseErrors(ids);
       setRows((prev) => prev.filter((r) => !ids.includes(r.id)));
       setSelected(new Set());
       toast(`Удалено записей: ${ids.length}`, 'success');
@@ -96,10 +89,7 @@ export default function ParseErrorsPage() {
             onClick={async () => {
               if (!confirm('Удалить ВСЕ нераспознанные строки? Действие необратимо.')) return;
               try {
-                await apiFetch('/api/parse-errors/delete', {
-                  method: 'POST',
-                  body: JSON.stringify({ all: true }),
-                });
+                await deleteAllParseErrors();
                 setRows([]);
                 toast('Таблица очищена', 'success');
               } catch (e) {

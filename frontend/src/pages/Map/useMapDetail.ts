@@ -8,7 +8,6 @@ import {
   buildPointDetail,
   fetchCountrySeries,
   linesForCountry,
-  renderSparklineSVG,
 } from './mapDetailBuilders';
 import { getCountryStatsCache, type GeoFeature, type GeoFeatureCollection } from './mapHeatmap';
 import type {
@@ -166,7 +165,7 @@ export function useMapDetail(opts: {
             return {
               ...prev,
               sparklineLoading: false,
-              sparklineHtml: renderSparklineSVG(data.points || []),
+              sparklinePoints: data.points || [],
               bucketSec: data.bucket_sec,
             };
           });

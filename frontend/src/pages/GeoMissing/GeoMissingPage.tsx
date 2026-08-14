@@ -1,28 +1,15 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { apiFetch, apiFetchRaw } from '@/api/client';
+import {
+  createGeoRange,
+  exportGeoRanges,
+  fetchGeoMissing,
+  type GeoMissingRow as MissingRow,
+  type GeoMissingSummary as Summary,
+} from '@/api/geo';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useToast } from '@/components/Toast';
 import { fmtNumber } from '@/lib/format';
 import { buildPeriodQuery } from '@/pages/Map/mapConstants';
-
-interface MissingRow {
-  ip: string;
-  kind?: string;
-  count?: number;
-  as_src?: number;
-  as_dst?: number;
-  sample_peer?: string;
-  log_country?: string;
-  log_city?: string;
-  action_hint?: string;
-}
-
-interface Summary {
-  unique_ips?: number;
-  events?: number;
-  public_focus?: number;
-  by_kind?: Record<string, number>;
-}
 
 const KIND_LABELS: Record<string, string> = {
   public_unknown: 'public',
@@ -115,10 +102,7 @@ export default function GeoMissingPage() {
     try {
       // SoT: minutes=/hours=/days= — not period=.
       const periodQs = buildPeriodQuery(period, '', '').replace(/^&/, '');
-      const data = await apiFetch<{
-        items?: MissingRow[];
-        summary?: Summary;
-      }>(`/api/geo-missing?${periodQs}&limit=${encodeURIComponent(limit)}`);
+      const data = await fetchGeoMissing(`${periodQs}&limit=${encodeURIComponent(limit)}`);
       setRows(data.items || []);
       setSummary(data.summary || {});
     } catch (e) {
@@ -154,7 +138,7 @@ export default function GeoMissingPage() {
 
   async function exportCsv() {
     try {
-      const res = await apiFetchRaw('/api/geo-ranges/export');
+      const res = await exportGeoRanges();
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const blob = await res.blob();
       const cd = res.headers.get('Content-Disposition') || '';
@@ -205,14 +189,7 @@ export default function GeoMissingPage() {
       return;
     }
     try {
-      const data = await apiFetch<{
-        ranges?: number;
-        added?: string;
-        entry?: { network?: string };
-      }>('/api/geo-ranges', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      });
+      const data = await createGeoRange(body);
       const net = data.entry?.network || data.added || body.network;
       const bounds = parseNetworkBounds(net);
       let removed = 0;

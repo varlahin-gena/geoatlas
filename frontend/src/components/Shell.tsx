@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthContext';
-import { apiFetch, isAbortError } from '@/api/client';
-import type { SystemVersion } from '@/api/types';
+import { isAbortError } from '@/api/client';
+import { fetchSystemStatus, fetchSystemVersion } from '@/api/system';
 import { ROLE_ADMIN } from '@/api/types';
 import { themeLabel } from '@/auth/theme';
 import { usePolling } from '@/lib/usePolling';
@@ -183,7 +183,7 @@ export function UserMenu() {
 
   useEffect(() => {
     if (!user || user.authDisabled) return;
-    apiFetch<SystemVersion>('/api/system/version')
+    fetchSystemVersion()
       .then((data) => {
         const label = (data.display || data.ref || data.version || '').trim();
         if (!label) return;
@@ -318,10 +318,7 @@ export function SystemHealthPill() {
   usePolling(
     async (signal) => {
       try {
-        const data = await apiFetch<{
-          level?: string;
-          alerts?: Array<{ level?: string; target?: string; message?: string }>;
-        }>('/api/system/status', { signal, cache: 'no-store' });
+        const data = await fetchSystemStatus({ signal });
         if (signal.aborted) return;
         const alerts = data.alerts || [];
         const count = alerts.length;

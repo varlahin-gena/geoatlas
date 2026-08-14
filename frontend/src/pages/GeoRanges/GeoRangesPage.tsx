@@ -1,18 +1,16 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { apiFetch, apiFetchRaw, authHeaders } from '@/api/client';
+import { authHeaders } from '@/api/client';
+import {
+  clearGeoRanges,
+  exportGeoRanges,
+  fetchGeoRanges,
+  updateGeoRange,
+  type GeoRange,
+} from '@/api/geo';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useToast } from '@/components/Toast';
 import { fmtNumber } from '@/lib/format';
-
-interface GeoRange {
-  network: string;
-  country?: string;
-  region?: string;
-  city?: string;
-  lat?: number;
-  lon?: number;
-}
 
 function isIPv4(s: string): boolean {
   const m = String(s || '')
@@ -54,10 +52,8 @@ export default function GeoRangesPage() {
 
   const load = useCallback(async () => {
     const ip = ipSearch.trim();
-    const qs = new URLSearchParams();
     let lookup = false;
     if (ip && isIPv4(ip)) {
-      qs.set('ip', ip);
       lookup = true;
     } else if (ip) {
       setIpStatus({ mode: 'miss', text: 'Введите корректный IPv4' });
@@ -68,12 +64,9 @@ export default function GeoRangesPage() {
     }
     setIpLookupActive(lookup);
     try {
-      const data = await apiFetch<{
-        ranges?: GeoRange[];
-        count?: number;
-        ip_hit?: boolean;
-        limits?: { upload_max_bytes?: number; upload_max_ranges?: number };
-      }>(`/api/geo-ranges${qs.toString() ? `?${qs}` : ''}`);
+      const data = await fetchGeoRanges(
+        lookup ? { ip } : undefined,
+      );
       setRows(data.ranges || []);
       setTotalInDb(Number(data.count) || (data.ranges || []).length);
       if (data.limits) {
@@ -152,10 +145,7 @@ export default function GeoRangesPage() {
       return;
     }
     try {
-      const data = await apiFetch<{ updated?: string }>('/api/geo-ranges', {
-        method: 'PUT',
-        body: JSON.stringify(body),
-      });
+      const data = await updateGeoRange(body);
       setEdit(null);
       toast(`Сохранено: ${data.updated || body.network}`, 'success');
       void load();
@@ -177,10 +167,7 @@ export default function GeoRangesPage() {
     }
     setBusy(true);
     try {
-      const data = await apiFetch<{ index_before?: number }>('/api/geo-ranges/clear', {
-        method: 'POST',
-        body: '{}',
-      });
+      const data = await clearGeoRanges();
       toast(
         `База очищена (было в индексе: ${fmtNumber(Number(data.index_before) || 0)}). Можно загрузить CSV.`,
         'success',
@@ -277,7 +264,7 @@ export default function GeoRangesPage() {
             disabled={busy}
             onClick={async () => {
               try {
-                const res = await apiFetchRaw('/api/geo-ranges/export');
+                const res = await exportGeoRanges();
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const blob = await res.blob();
                 const cd = res.headers.get('Content-Disposition') || '';

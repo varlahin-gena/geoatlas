@@ -1,5 +1,5 @@
 import uPlot from 'uplot';
-import { fmtNumber, escapeHTML } from '@/lib/format';
+import { fmtNumber } from '@/lib/format';
 import { getTheme } from '@/auth/theme';
 import { fmtBytes, fmtBytesAxisTicks, num } from './systemFormat';
 import type { HistoryPoint } from './systemTypes';
@@ -47,10 +47,16 @@ export function buildChartLegend(labels: string[], colors: string[]): HTMLDivEle
     const item = document.createElement('div');
     item.className = 'chart-legend-item';
     const color = colors[i % colors.length];
-    item.innerHTML =
-      `<span class="chart-legend-marker" style="background:${escapeHTML(color)};"></span>` +
-      `<span class="chart-legend-label">${escapeHTML(label)}</span>` +
-      `<span class="chart-legend-value">—</span>`;
+    const marker = document.createElement('span');
+    marker.className = 'chart-legend-marker';
+    marker.style.background = color;
+    const labelEl = document.createElement('span');
+    labelEl.className = 'chart-legend-label';
+    labelEl.textContent = label;
+    const valueEl = document.createElement('span');
+    valueEl.className = 'chart-legend-value';
+    valueEl.textContent = '—';
+    item.append(marker, labelEl, valueEl);
     legend.appendChild(item);
   });
   return legend;
@@ -88,7 +94,7 @@ export function makeChart(
   ys: number[][],
   opts?: ChartFormatOpts,
 ): uPlot {
-  host.innerHTML = '';
+  host.replaceChildren();
   const titleEl = document.createElement('div');
   titleEl.className = 'chart-title';
   titleEl.textContent = title;

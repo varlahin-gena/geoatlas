@@ -1,17 +1,17 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { apiFetch } from '@/api/client';
+import {
+  createUser,
+  deleteUser,
+  listUsers,
+  resetUserPassword,
+  updateUserFullName,
+  updateUserRole,
+  type UserRow,
+} from '@/api/users';
 import { useAuth } from '@/auth/AuthContext';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useToast } from '@/components/Toast';
 import { fmtDate } from '@/lib/format';
-
-interface UserRow {
-  username: string;
-  full_name?: string;
-  role: string;
-  must_reset_password?: boolean;
-  created_at?: string;
-}
 
 export default function UsersPage() {
   const { user: me, refresh } = useAuth();
@@ -29,7 +29,7 @@ export default function UsersPage() {
 
   const load = useCallback(async () => {
     try {
-      const data = await apiFetch<{ users: UserRow[] }>('/api/users');
+      const data = await listUsers();
       setUsers(data.users || []);
       setError('');
     } catch (e) {
@@ -45,15 +45,12 @@ export default function UsersPage() {
   async function onCreate(e: FormEvent) {
     e.preventDefault();
     try {
-      await apiFetch('/api/users', {
-        method: 'POST',
-        body: JSON.stringify({
-          username,
-          password,
-          role,
-          full_name: fio,
-          must_reset_password: mustReset,
-        }),
+      await createUser({
+        username,
+        password,
+        role,
+        full_name: fio,
+        must_reset_password: mustReset,
       });
       toast('Создано', 'success');
       setUsername('');
@@ -162,10 +159,7 @@ export default function UsersPage() {
                               const v = e.target.value;
                               if (v === (u.full_name || '')) return;
                               try {
-                                await apiFetch(`/api/users/${encodeURIComponent(u.username)}/full-name`, {
-                                  method: 'POST',
-                                  body: JSON.stringify({ full_name: v }),
-                                });
+                                await updateUserFullName(u.username, v);
                                 toast('ФИО сохранено', 'success');
                                 if (isSelf) void refresh();
                                 void load();
@@ -187,10 +181,7 @@ export default function UsersPage() {
                             defaultValue={u.role}
                             onChange={async (e) => {
                               try {
-                                await apiFetch(`/api/users/${encodeURIComponent(u.username)}/role`, {
-                                  method: 'POST',
-                                  body: JSON.stringify({ role: e.target.value }),
-                                });
+                                await updateUserRole(u.username, e.target.value);
                                 toast('Роль обновлена', 'success');
                                 void load();
                               } catch (err) {
@@ -222,9 +213,7 @@ export default function UsersPage() {
                             onClick={async () => {
                               if (!confirm(`Удалить пользователя «${u.username}»?`)) return;
                               try {
-                                await apiFetch(`/api/users/${encodeURIComponent(u.username)}`, {
-                                  method: 'DELETE',
-                                });
+                                await deleteUser(u.username);
                                 toast('Удалено', 'success');
                                 void load();
                               } catch (err) {
@@ -259,12 +248,9 @@ export default function UsersPage() {
             onSubmit={async (e) => {
               e.preventDefault();
               try {
-                await apiFetch(`/api/users/${encodeURIComponent(resetTarget)}/reset-password`, {
-                  method: 'POST',
-                  body: JSON.stringify({
-                    password: resetPass,
-                    must_reset_password: resetMust,
-                  }),
+                await resetUserPassword(resetTarget, {
+                  password: resetPass,
+                  must_reset_password: resetMust,
                 });
                 toast('Пароль сброшен', 'success');
                 setResetTarget(null);

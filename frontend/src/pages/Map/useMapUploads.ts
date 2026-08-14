@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { apiFetch, authHeaders, isAbortError } from '@/api/client';
+import { authHeaders, isAbortError } from '@/api/client';
+import { fetchGeoRanges } from '@/api/geo';
 import type { ToastKind } from '@/components/Toast';
 import { fmtNumber } from '@/lib/format';
 
@@ -17,10 +18,7 @@ export function useMapUploads(opts: {
   useEffect(() => {
     if (!isAdmin) return;
     const controller = new AbortController();
-    void apiFetch<{
-      count?: number;
-      limits?: { upload_max_bytes?: number; upload_max_ranges?: number };
-    }>('/api/geo-ranges?limit=1', { signal: controller.signal })
+    void fetchGeoRanges({ limit: 1 }, { signal: controller.signal })
       .then((data) => {
         if (controller.signal.aborted) return;
         setGeoIndexCount(Number(data.count) || 0);

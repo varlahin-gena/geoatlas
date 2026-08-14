@@ -110,7 +110,7 @@ export interface DetailState {
   sections: DetailSection[];
   actions: DetailAction[];
   countryKey?: string;
-  sparklineHtml?: string;
+  sparklinePoints?: SeriesPoint[];
   sparklineLoading?: boolean;
   sparklineError?: string;
   bucketSec?: number;

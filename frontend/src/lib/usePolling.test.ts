@@ -5,6 +5,7 @@ import { usePolling } from './usePolling';
 describe('usePolling', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    Object.defineProperty(document, 'hidden', { configurable: true, value: false });
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -18,6 +19,16 @@ describe('usePolling', () => {
     expect(tick).toHaveBeenCalledTimes(2);
     vi.advanceTimersByTime(2000);
     expect(tick).toHaveBeenCalledTimes(4);
+  });
+
+  it('skips immediate run when runImmediately is false', () => {
+    const tick = vi.fn();
+    renderHook(() => usePolling(tick, 1000, true, { runImmediately: false }));
+    expect(tick).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1000);
+    expect(tick).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(1000);
+    expect(tick).toHaveBeenCalledTimes(2);
   });
 
   it('does not run when disabled', () => {
@@ -40,5 +51,19 @@ describe('usePolling', () => {
     expect(signals[1]?.aborted).toBe(false);
     unmount();
     expect(signals[1]?.aborted).toBe(true);
+  });
+
+  it('skips ticks while document is hidden and resumes on visible', () => {
+    const tick = vi.fn();
+    renderHook(() => usePolling(tick, 1000, true));
+    expect(tick).toHaveBeenCalledTimes(1);
+
+    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+    vi.advanceTimersByTime(3000);
+    expect(tick).toHaveBeenCalledTimes(1);
+
+    Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(tick).toHaveBeenCalledTimes(2);
   });
 });

@@ -1,6 +1,11 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import uPlot from 'uplot';
-import { apiFetch } from '@/api/client';
+import {
+  fetchRetention,
+  fetchSystemHistory,
+  fetchSystemStats,
+  putRetention,
+} from '@/api/system';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useToast } from '@/components/Toast';
 import { fmtNumber } from '@/lib/format';
@@ -61,10 +66,11 @@ export default function SystemPage() {
   const chartBuffer = useRef<HTMLDivElement>(null);
   const chartStorage = useRef<HTMLDivElement>(null);
   const plotsRef = useRef<uPlot[]>([]);
+  const historyFetching = useRef(false);
 
   const loadStats = useCallback(async () => {
     try {
-      const data = await apiFetch<SystemStats>('/api/system/stats');
+      const data = await fetchSystemStats();
       setStats(data);
       setUpdatedAt(new Date());
     } catch (e) {
@@ -74,7 +80,7 @@ export default function SystemPage() {
 
   const loadRetention = useCallback(async () => {
     try {
-      const data = await apiFetch<{ retention?: Retention } & Retention>('/api/system/retention');
+      const data = await fetchRetention();
       setRetention(data.retention || data);
     } catch {
       /* optional */
@@ -130,7 +136,16 @@ export default function SystemPage() {
         if (!ref.current) return;
         const { xs, ys } = alignSeries(data.series, keys);
         if (!xs.length) {
-          ref.current.innerHTML = `<div class="chart-title">${title}</div><div class="empty" style="padding:24px">Нет данных</div>`;
+          const host = ref.current;
+          host.replaceChildren();
+          const titleEl = document.createElement('div');
+          titleEl.className = 'chart-title';
+          titleEl.textContent = title;
+          const empty = document.createElement('div');
+          empty.className = 'empty';
+          empty.style.padding = '24px';
+          empty.textContent = 'Нет данных';
+          host.append(titleEl, empty);
           return;
         }
         plotsRef.current.push(makeChart(ref.current, title, labels, xs, ys, opts));
@@ -173,56 +188,49 @@ export default function SystemPage() {
     [],
   );
 
+  const loadHistory = useCallback(async () => {
+    if (historyFetching.current) return;
+    historyFetching.current = true;
+    try {
+      const data = await fetchSystemHistory(period);
+      paintHistory(data);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Ошибка history', 'error');
+    } finally {
+      historyFetching.current = false;
+    }
+  }, [period, paintHistory, toast]);
+
   useEffect(() => {
     if (tab !== 'charts') {
       plotsRef.current.forEach((p) => p.destroy());
       plotsRef.current = [];
       return;
     }
-    let cancelled = false;
-    let fetching = false;
-    const loadHistory = async () => {
-      if (fetching) return;
-      fetching = true;
-      try {
-        const data = await apiFetch<HistoryPayload>(
-          `/api/system/history?period=${encodeURIComponent(period)}`,
-        );
-        if (cancelled) return;
-        paintHistory(data);
-      } catch (e) {
-        if (!cancelled) toast(e instanceof Error ? e.message : 'Ошибка history', 'error');
-      } finally {
-        fetching = false;
-      }
-    };
     void loadHistory();
-    // SoT: history timer 30s while auto-refresh on (independent of stats 5s).
-    const histId =
-      autoRefresh
-        ? window.setInterval(() => {
-            void loadHistory();
-          }, 30000)
-        : 0;
     return () => {
-      cancelled = true;
-      if (histId) window.clearInterval(histId);
       plotsRef.current.forEach((p) => p.destroy());
       plotsRef.current = [];
     };
-  }, [tab, period, toast, themeTick, autoRefresh, paintHistory]);
+  }, [tab, period, themeTick, loadHistory]);
+
+  usePolling(
+    async () => {
+      await loadHistory();
+    },
+    30000,
+    autoRefresh && tab === 'charts',
+    { runImmediately: false },
+  );
 
   async function saveRetention(e: FormEvent) {
     e.preventDefault();
     try {
-      const data = await apiFetch<{ retention?: Retention }>('/api/system/retention', {
-        method: 'PUT',
-        body: JSON.stringify({
-          traffic_logs_days: retention.traffic_logs_days,
-          edges_days: retention.edges_days,
-          parse_errors_days: retention.parse_errors_days,
-          system_metrics_days: retention.system_metrics_days,
-        }),
+      const data = await putRetention({
+        traffic_logs_days: retention.traffic_logs_days,
+        edges_days: retention.edges_days,
+        parse_errors_days: retention.parse_errors_days,
+        system_metrics_days: retention.system_metrics_days,
       });
       setRetention(data.retention || retention);
       toast('TTL сохранён', 'success');

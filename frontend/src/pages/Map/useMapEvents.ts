@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { apiFetch, isAbortError } from '@/api/client';
+import { isAbortError } from '@/api/client';
+import { fetchMapEvents } from '@/api/events';
 import type { ToastKind } from '@/components/Toast';
+import { usePolling } from '@/lib/usePolling';
 import { buildPeriodQuery } from './mapConstants';
-import type { EventsPayload, MapLine, MapPoint } from './mapTypes';
+import type { MapLine, MapPoint } from './mapTypes';
 
 export type MapDataSource = 'live' | 'backup';
 
@@ -41,12 +43,12 @@ export function useMapEvents(toast: (msg: string, kind?: ToastKind) => void) {
     setLoading(true);
     try {
       const apiLimit = groupBy === 'ip' || groupBy === 'subnet' ? 50000 : 10000;
-      const url =
-        `/api/events?group_by=${encodeURIComponent(groupBy)}&limit=${apiLimit}` +
-        `${periodQuery}&source=${encodeURIComponent(dataSource)}`;
-      const data = await apiFetch<EventsPayload>(url, {
+      const data = await fetchMapEvents({
+        groupBy,
+        limit: apiLimit,
+        periodQuery,
+        source: dataSource,
         signal: controller.signal,
-        cache: 'no-store',
       });
       if (controller.signal.aborted) return;
       setPoints(data.points || {});
@@ -83,11 +85,14 @@ export function useMapEvents(toast: (msg: string, kind?: ToastKind) => void) {
     };
   }, [fetchData]);
 
-  useEffect(() => {
-    if (!autoRefresh || dataSource !== 'live') return;
-    const id = window.setInterval(() => void fetchData(), 30000);
-    return () => window.clearInterval(id);
-  }, [autoRefresh, dataSource, fetchData]);
+  usePolling(
+    async () => {
+      await fetchData();
+    },
+    30000,
+    autoRefresh && dataSource === 'live',
+    { runImmediately: false },
+  );
 
   return {
     period,

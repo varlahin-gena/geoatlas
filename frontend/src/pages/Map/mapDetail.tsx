@@ -1,4 +1,27 @@
-import type { DetailState } from './mapTypes';
+import type { DetailState, SeriesPoint } from './mapTypes';
+
+function sparklinePolylines(points: SeriesPoint[]) {
+  const w = 280;
+  const h = 48;
+  const pad = 2;
+  let max = 1;
+  for (const p of points) {
+    const t = (p.allowed || 0) + (p.blocked || 0) || p.total || 0;
+    if (t > max) max = t;
+  }
+  const n = points.length;
+  const step = n <= 1 ? w : (w - pad * 2) / (n - 1);
+  const toPoints = (key: 'allowed' | 'blocked') =>
+    points
+      .map((p, i) => {
+        const v = p[key] || 0;
+        const x = pad + i * step;
+        const y = h - pad - (v / max) * (h - pad * 2);
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      })
+      .join(' ');
+  return { w, h, allowed: toPoints('allowed'), blocked: toPoints('blocked') };
+}
 
 function DetailSparkline({ detail }: { detail: DetailState }) {
   if (detail.kind !== 'country') return null;
@@ -27,15 +50,53 @@ function DetailSparkline({ detail }: { detail: DetailState }) {
     );
   }
 
-  if (!detail.sparklineHtml) return null;
+  const points = detail.sparklinePoints;
+  if (!points) return null;
+
+  if (!points.length) {
+    return (
+      <>
+        <div className="detail-section-title">Динамика</div>
+        <div className="detail-sparkline">
+          <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Нет данных ряда</div>
+        </div>
+      </>
+    );
+  }
+
+  const poly = sparklinePolylines(points);
 
   return (
     <>
       {detail.bucketSec != null ? (
         <div className="detail-section-title">Динамика (bucket {detail.bucketSec}s)</div>
       ) : null}
-      {/* Trusted SVG from renderSparklineSVG (numeric coords only) */}
-      <div dangerouslySetInnerHTML={{ __html: detail.sparklineHtml }} />
+      <div className="detail-sparkline">
+        <svg viewBox={`0 0 ${poly.w} ${poly.h}`} preserveAspectRatio="none" aria-hidden="true">
+          <polyline
+            fill="none"
+            stroke="var(--green, #3fb950)"
+            strokeWidth="1.5"
+            points={poly.allowed}
+          />
+          <polyline
+            fill="none"
+            stroke="var(--red, #f85149)"
+            strokeWidth="1.5"
+            points={poly.blocked}
+          />
+        </svg>
+        <div className="detail-sparkline-legend">
+          <span>
+            <i style={{ background: 'var(--green)' }} />
+            Allowed
+          </span>
+          <span>
+            <i style={{ background: 'var(--red)' }} />
+            Blocked
+          </span>
+        </div>
+      </div>
     </>
   );
 }

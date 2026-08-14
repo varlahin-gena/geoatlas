@@ -1,36 +1,20 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { apiFetch, authHeaders } from '@/api/client';
+import { authHeaders } from '@/api/client';
+import {
+  createReputationFeed,
+  deleteReputationList,
+  listReputationCatalog,
+  listReputationFeeds,
+  listReputationLists,
+  refreshReputation,
+  type ReputationFeed as Feed,
+  type ReputationList as RepList,
+} from '@/api/reputation';
 import { useAuth } from '@/auth/AuthContext';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useToast } from '@/components/Toast';
 import { fmtDate, fmtNumber } from '@/lib/format';
-
-interface Feed {
-  name: string;
-  url?: string;
-  category?: string;
-  format?: string;
-  enabled?: boolean;
-  last_refresh?: string;
-}
-
-interface RepList {
-  name: string;
-  category?: string;
-  count?: number;
-  source?: string;
-  updated_at?: string;
-  last_error?: string;
-}
-
-interface RefreshResult {
-  updated?: string[];
-  skipped?: string[];
-  failed?: string[];
-  errors?: Record<string, string>;
-  counts?: Record<string, number>;
-}
 
 export default function ReputationPage() {
   const { toast } = useToast();
@@ -90,9 +74,9 @@ export default function ReputationPage() {
   const load = useCallback(async () => {
     try {
       const [f, l, c] = await Promise.all([
-        apiFetch<{ feeds?: Feed[] }>('/api/reputation/feeds'),
-        apiFetch<{ lists?: RepList[] }>('/api/reputation/lists'),
-        apiFetch<{ feeds?: Feed[] }>('/api/reputation/catalog'),
+        listReputationFeeds(),
+        listReputationLists(),
+        listReputationCatalog(),
       ]);
       setFeeds(f.feeds || []);
       setLists(l.lists || []);
@@ -117,10 +101,7 @@ export default function ReputationPage() {
     category: string;
     format: string;
   }) {
-    await apiFetch('/api/reputation/feeds', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    });
+    await createReputationFeed(body);
   }
 
   async function onAddFeed(e: FormEvent) {
@@ -146,10 +127,7 @@ export default function ReputationPage() {
     setRefreshBusy(true);
     toast('Обновление фидов… это может занять несколько минут', 'info');
     try {
-      const data = await apiFetch<RefreshResult>('/api/reputation/refresh?force=1', {
-        method: 'POST',
-        body: '{}',
-      });
+      const data = await refreshReputation(true);
       const updated = Array.isArray(data.updated) ? data.updated : [];
       const skipped = Array.isArray(data.skipped) ? data.skipped : [];
       const failNames = Array.isArray(data.failed) ? data.failed : [];
@@ -334,9 +312,7 @@ export default function ReputationPage() {
                               return;
                             }
                             try {
-                              await apiFetch(`/api/reputation/lists/${encodeURIComponent(r.name)}`, {
-                                method: 'DELETE',
-                              });
+                              await deleteReputationList(r.name);
                               toast(`Удалено: ${r.name}`, 'success');
                               void load();
                             } catch (e) {

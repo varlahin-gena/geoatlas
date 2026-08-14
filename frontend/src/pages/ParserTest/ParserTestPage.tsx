@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { apiFetch, apiFetchRaw } from '@/api/client';
+import { fetchParseSamples, runParseTest } from '@/api/parseTest';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useToast } from '@/components/Toast';
 import { fmtNumber } from '@/lib/format';
@@ -46,7 +46,7 @@ export default function ParserTestPage() {
       /* ignore */
     }
     // SoT: GET /api/parse-samples → map[vendor][]string (not wrapped).
-    apiFetch<Record<string, string[]>>('/api/parse-samples')
+    fetchParseSamples()
       .then((d) => setSamples(d && typeof d === 'object' ? d : {}))
       .catch(() => {});
   }, []);
@@ -56,11 +56,7 @@ export default function ParserTestPage() {
     setBusy(true);
     try {
       // SoT: raw text/plain body (not JSON { text }).
-      const res = await apiFetchRaw('/api/parse-test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: text,
-      });
+      const res = await runParseTest(text);
       const data = (await res.json().catch(() => ({}))) as ParseTestResult & { error?: string };
       if (!res.ok) {
         toast(data.error || `HTTP ${res.status}`, 'error');

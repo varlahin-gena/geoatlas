@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { apiFetch, isAbortError } from '@/api/client';
+import { isAbortError } from '@/api/client';
+import {
+  createSearchTemplate,
+  deleteSearchTemplate,
+  listSearchTemplates,
+  type SearchTemplate as Template,
+} from '@/api/searchTemplates';
 import { useAuth } from '@/auth/AuthContext';
 import { useToast } from '@/components/Toast';
 import type { SearchField } from '@/lib/search';
@@ -14,14 +20,6 @@ import {
 } from '@/lib/searchBuilder';
 
 type Tab = 'builder' | 'mine' | 'all';
-
-interface Template {
-  id: string;
-  name: string;
-  query: string;
-  owner?: string;
-  username?: string;
-}
 
 export function SearchBuilder({
   open,
@@ -66,15 +64,11 @@ export function SearchBuilder({
   async function loadTemplates(which: 'mine' | 'all', signal?: AbortSignal) {
     try {
       if (which === 'mine') {
-        const data = await apiFetch<{ templates?: Template[] }>('/api/me/search-templates', {
-          signal,
-        });
+        const data = await listSearchTemplates(undefined, { signal });
         if (signal?.aborted) return;
         setMine(data.templates || []);
       } else {
-        const data = await apiFetch<{ templates?: Template[] }>('/api/me/search-templates?scope=all', {
-          signal,
-        });
+        const data = await listSearchTemplates('all', { signal });
         if (signal?.aborted) return;
         setAll(data.templates || []);
       }
@@ -326,10 +320,7 @@ export function SearchBuilder({
                   return;
                 }
                 try {
-                  await apiFetch('/api/me/search-templates', {
-                    method: 'POST',
-                    body: JSON.stringify({ name, query: search }),
-                  });
+                  await createSearchTemplate({ name, query: search });
                   toast('Сохранено', 'success');
                   void loadTemplates('mine');
                 } catch (e) {
@@ -371,9 +362,7 @@ export function SearchBuilder({
                       onClick={async () => {
                         if (!confirm('Удалить шаблон?')) return;
                         try {
-                          await apiFetch(`/api/me/search-templates/${encodeURIComponent(t.id)}`, {
-                            method: 'DELETE',
-                          });
+                          await deleteSearchTemplate(t.id);
                           void loadTemplates('mine');
                         } catch (e) {
                           toast(e instanceof Error ? e.message : 'Ошибка', 'error');

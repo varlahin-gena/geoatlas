@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as authApi from '@/api/auth';
-import { apiFetch, authHeaders, isAbortError } from '@/api/client';
+import { authHeaders, isAbortError } from '@/api/client';
+import { fetchGeoRanges } from '@/api/geo';
 import type { AuthUser } from '@/api/types';
 import type { ToastKind } from '@/components/Toast';
 import { fmtNumber } from '@/lib/format';
@@ -49,11 +50,7 @@ export function useGeoWizard(opts: {
     async (signal?: AbortSignal) => {
       if (!isAdmin) return null;
       try {
-        const data = await apiFetch<{
-          count?: number;
-          index_ready?: boolean;
-          limits?: { upload_max_bytes?: number; upload_max_ranges?: number };
-        }>('/api/geo-ranges?limit=1', { signal });
+        const data = await fetchGeoRanges({ limit: 1 }, { signal });
         if (signal?.aborted) return null;
         const next: GeoStatus = {
           count: Number(data.count) || 0,

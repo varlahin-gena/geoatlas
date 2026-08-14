@@ -1,15 +1,8 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { apiFetch } from '@/api/client';
+import { createToken, deleteToken, listTokens, type TokenRow } from '@/api/tokens';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useToast } from '@/components/Toast';
 import { fmtDate } from '@/lib/format';
-
-interface TokenRow {
-  id: string;
-  name: string;
-  scope: string;
-  created_at?: string;
-}
 
 export default function ApiTokensPage() {
   const { toast } = useToast();
@@ -21,7 +14,7 @@ export default function ApiTokensPage() {
 
   const load = useCallback(async () => {
     try {
-      const data = await apiFetch<{ tokens: TokenRow[] }>('/api/tokens');
+      const data = await listTokens();
       setTokens(data.tokens || []);
       setError('');
     } catch (e) {
@@ -37,10 +30,7 @@ export default function ApiTokensPage() {
   async function onCreate(e: FormEvent) {
     e.preventDefault();
     try {
-      const data = await apiFetch<{ secret?: string }>('/api/tokens', {
-        method: 'POST',
-        body: JSON.stringify({ name: name.trim(), scope }),
-      });
+      const data = await createToken({ name: name.trim(), scope });
       setSecret(data.secret || '');
       setName('');
       toast('Токен создан', 'success');
@@ -152,9 +142,7 @@ export default function ApiTokensPage() {
                           onClick={async () => {
                             if (!confirm('Отозвать токен?')) return;
                             try {
-                              await apiFetch(`/api/tokens/${encodeURIComponent(t.id)}`, {
-                                method: 'DELETE',
-                              });
+                              await deleteToken(t.id);
                               toast('Отозван', 'success');
                               void load();
                             } catch (err) {

@@ -7,16 +7,7 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <script>
-      (function () {
-        try {
-          var t = localStorage.getItem('nm.theme');
-          if (t === 'light' || t === 'dark') {
-            document.documentElement.setAttribute('data-theme', t);
-          }
-        } catch (e) {}
-      })();
-    </script>
+    <script src="/theme-boot.js"></script>
     <script src="/config.js"></script>
   </head>
   <body>

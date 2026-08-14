@@ -95,8 +95,8 @@ grep -q 'Buffer drops' frontend/src/pages/System/SystemPipelineTab.tsx || fail "
 grep -q 'Queue bytes\|queue_bytes' frontend/src/pages/System/SystemPipelineTab.tsx || fail "system: queue_bytes"
 ok "system ingest drop visibility"
 
-grep -q 'geo-ranges/clear' frontend/src/pages/GeoRanges/GeoRangesPage.tsx || fail "geo-ranges clear API"
-grep -q 'Очистить базу' frontend/src/pages/GeoRanges/GeoRangesPage.tsx || fail "geo-ranges clear button"
+grep -q 'geo-ranges/clear' frontend/src/api/geo.ts || fail "geo-ranges clear API"
+grep -q 'clearGeoRanges\|Очистить базу' frontend/src/pages/GeoRanges/GeoRangesPage.tsx || fail "geo-ranges clear button"
 grep -q 'Загрузить CSV' frontend/src/pages/GeoRanges/GeoRangesPage.tsx || fail "geo-ranges upload button"
 ok "geo-ranges clear/upload"
 
@@ -146,7 +146,7 @@ if grep -q 'location = /index.html' frontend/nginx-app.inc; then
   fail "nginx-app: /index.html must not redirect (SPA try_files loop)"
 fi
 # Drift lock vs backend auth_matrix: reputation mutations = ops, lookup = login
-python3 - <<'PY' || fail "nginx-app: reputation auth matrix drift"
+"$PYTHON_BIN" - <<'PY' || fail "nginx-app: reputation auth matrix drift"
 from pathlib import Path
 text = Path("frontend/nginx-app.inc").read_text(encoding="utf-8")
 
@@ -182,7 +182,7 @@ for loc, want in checks.items():
 print("reputation auth matrix ok")
 PY
 # EventsResponse schema ↔ mapTypes field lock (OpenAPI MapLine / MapPoint)
-python3 - <<'PY' || fail "openapi EventsResponse ↔ mapTypes drift"
+"$PYTHON_BIN" - <<'PY' || fail "openapi EventsResponse ↔ mapTypes drift"
 from pathlib import Path
 import re
 oa = Path("openapi.yaml").read_text(encoding="utf-8")
@@ -209,5 +209,18 @@ grep -q 'include /etc/nginx/includes/app.inc' frontend/nginx.conf || fail "nginx
 grep -q 'HTTPS_ENABLED' frontend/docker-entrypoint.sh || fail "entrypoint: HTTPS_ENABLED"
 grep -q 'listen 443 ssl' frontend/docker-entrypoint.sh || fail "entrypoint: listen 443 ssl"
 ok "nginx SPA / HTTPS"
+
+grep -q 'Content-Security-Policy' frontend/nginx-app.inc || fail "nginx-app: CSP"
+grep -q 'theme-boot.js' frontend/index.html || fail "index.html: theme-boot.js"
+[[ -f frontend/public/theme-boot.js ]] || fail "missing theme-boot.js"
+[[ -f frontend/src/api/users.ts ]] || fail "missing api/users.ts"
+[[ -f frontend/src/api/system.ts ]] || fail "missing api/system.ts"
+[[ -f frontend/src/api/events.ts ]] || fail "missing api/events.ts"
+[[ -f frontend/e2e/auth.spec.ts ]] || fail "missing e2e/auth.spec.ts"
+grep -q 'pauseWhenHidden\|runImmediately' frontend/src/lib/usePolling.ts || fail "usePolling: visibility options"
+if grep -q 'dangerouslySetInnerHTML' frontend/src/pages/Map/mapDetail.tsx; then
+  fail "mapDetail: dangerouslySetInnerHTML must be gone"
+fi
+ok "api modules / CSP / e2e / polling / sparkline React"
 
 echo "frontend-smoke: all checks passed"

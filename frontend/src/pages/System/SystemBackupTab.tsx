@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { apiFetch } from '@/api/client';
+import {
+  attachBackup,
+  createBackup,
+  deleteBackup,
+  detachBackup,
+  fetchBackups,
+  putBackupSchedule,
+} from '@/api/system';
 import { useToast } from '@/components/Toast';
 import { fmtDate, fmtNumber } from '@/lib/format';
+import { usePolling } from '@/lib/usePolling';
 import { fmtBytes } from './systemFormat';
 import type { BackupCatalog, BackupEntry, BackupSchedule } from './systemTypes';
 
@@ -55,7 +63,7 @@ export function SystemBackupTab() {
 
   const load = useCallback(async () => {
     try {
-      const data = await apiFetch<BackupCatalog>('/api/system/backups');
+      const data = await fetchBackups();
       setCat(data);
       const next = normalizeSched(data.schedule);
       setSavedSched(next);
@@ -72,11 +80,14 @@ export function SystemBackupTab() {
     void load();
   }, [load]);
 
-  useEffect(() => {
-    if (cat?.status?.state !== 'running') return;
-    const id = window.setInterval(() => void load(), 3000);
-    return () => window.clearInterval(id);
-  }, [cat?.status?.state, load]);
+  usePolling(
+    async () => {
+      await load();
+    },
+    3000,
+    cat?.status?.state === 'running',
+    { runImmediately: false },
+  );
 
   const dirty = useMemo(
     () => scheduleSignature(sched) !== scheduleSignature(savedSched),
@@ -90,7 +101,7 @@ export function SystemBackupTab() {
   const create = async () => {
     setCreating(true);
     try {
-      await apiFetch('/api/system/backups', { method: 'POST', body: '{}' });
+      await createBackup();
       toast('Бэкап запущен', 'success');
       await load();
     } catch (e) {
@@ -103,21 +114,15 @@ export function SystemBackupTab() {
   const saveSchedule = async () => {
     setSavingSchedule(true);
     try {
-      const res = await apiFetch<{ ok?: boolean; schedule?: BackupSchedule }>(
-        '/api/system/backup-schedule',
-        {
-          method: 'PUT',
-          body: JSON.stringify({
-            enabled: !!sched.enabled,
-            hour: Number(sched.hour) || 0,
-            minute: Number(sched.minute) || 0,
-            timezone: (sched.timezone || 'UTC').trim(),
-            keep: Number(sched.keep) || 7,
-            include_edges: !!sched.include_edges,
-            include_auth: !!sched.include_auth,
-          }),
-        },
-      );
+      const res = await putBackupSchedule({
+        enabled: !!sched.enabled,
+        hour: Number(sched.hour) || 0,
+        minute: Number(sched.minute) || 0,
+        timezone: (sched.timezone || 'UTC').trim(),
+        keep: Number(sched.keep) || 7,
+        include_edges: !!sched.include_edges,
+        include_auth: !!sched.include_auth,
+      });
       const applied = normalizeSched(res.schedule || sched);
       setSavedSched(applied);
       setSched(applied);
@@ -148,10 +153,7 @@ export function SystemBackupTab() {
     }
     setBusyName(b.name);
     try {
-      await apiFetch(`/api/system/backups/${encodeURIComponent(b.name)}/attach`, {
-        method: 'POST',
-        body: '{}',
-      });
+      await attachBackup(b.name);
       toast('Подключение запущено', 'success');
       await load();
     } catch (e) {
@@ -171,10 +173,7 @@ export function SystemBackupTab() {
     }
     setBusyName(b.name);
     try {
-      await apiFetch(`/api/system/backups/${encodeURIComponent(b.name)}/detach`, {
-        method: 'POST',
-        body: '{}',
-      });
+      await detachBackup(b.name);
       toast('Отключение запущено', 'success');
       await load();
     } catch (e) {
@@ -194,9 +193,7 @@ export function SystemBackupTab() {
     }
     setBusyName(b.name);
     try {
-      await apiFetch(`/api/system/backups/${encodeURIComponent(b.name)}`, {
-        method: 'DELETE',
-      });
+      await deleteBackup(b.name);
       toast('Бэкап удалён', 'success');
       await load();
     } catch (e) {

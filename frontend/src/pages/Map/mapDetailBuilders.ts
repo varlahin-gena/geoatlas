@@ -1,4 +1,3 @@
-import { apiFetch } from '@/api/client';
 import { fmtNumber } from '@/lib/format';
 import { mapRuCountry } from './mapConstants';
 import { countryAliases } from './mapHeatmap';
@@ -11,8 +10,9 @@ import type {
   MapLine,
   MapPoint,
   MapPointEntry,
-  SeriesPayload,
 } from './mapTypes';
+
+export { fetchCountrySeries } from '@/api/events';
 
 const colorByStatus: Record<string, string> = {
   allowed: 'green',
@@ -289,53 +289,4 @@ export function buildCountryDetailBase(
     sections,
     sparklineLoading: true,
   };
-}
-
-export function renderSparklineSVG(points: { allowed?: number; blocked?: number; total?: number }[]): string {
-  if (!points || !points.length) {
-    return '<div class="detail-sparkline"><div style="color:var(--text-muted);font-size:11px">Нет данных ряда</div></div>';
-  }
-  const w = 280;
-  const h = 48;
-  const pad = 2;
-  let max = 1;
-  points.forEach((p) => {
-    const t = (p.allowed || 0) + (p.blocked || 0) || p.total || 0;
-    if (t > max) max = t;
-  });
-  const n = points.length;
-  const step = n <= 1 ? w : (w - pad * 2) / (n - 1);
-  function poly(key: 'allowed' | 'blocked', color: string) {
-    const coords = points
-      .map((p, i) => {
-        const v = p[key] || 0;
-        const x = pad + i * step;
-        const y = h - pad - (v / max) * (h - pad * 2);
-        return `${x.toFixed(1)},${y.toFixed(1)}`;
-      })
-      .join(' ');
-    return `<polyline fill="none" stroke="${color}" stroke-width="1.5" points="${coords}" />`;
-  }
-  return `<div class="detail-sparkline">
-      <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-        ${poly('allowed', 'var(--green, #3fb950)')}
-        ${poly('blocked', 'var(--red, #f85149)')}
-      </svg>
-      <div class="detail-sparkline-legend">
-        <span><i style="background:var(--green)"></i>Allowed</span>
-        <span><i style="background:var(--red)"></i>Blocked</span>
-      </div>
-    </div>`;
-}
-
-export async function fetchCountrySeries(
-  country: string,
-  periodQuery: string,
-  dataSource: 'live' | 'backup' = 'live',
-  signal?: AbortSignal,
-): Promise<SeriesPayload> {
-  const url =
-    `/api/events/series?country=${encodeURIComponent(country)}` +
-    `${periodQuery}&source=${encodeURIComponent(dataSource)}`;
-  return apiFetch<SeriesPayload>(url, { signal, cache: 'no-store' });
 }

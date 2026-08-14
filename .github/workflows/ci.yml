@@ -237,6 +237,12 @@ jobs:
       - name: vite build
         run: npm run build
 
+      - name: Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Playwright e2e (auth/CSRF/roles)
+        run: npm run test:e2e
+
       - name: Built shell + auth contract
         run: |
           python3 -m http.server 8765 --directory dist >/tmp/http-frontend.log 2>&1 &
@@ -248,6 +254,7 @@ jobs:
           html=$(curl -sf http://127.0.0.1:8765/)
           echo "$html" | grep -q 'id="root"'
           echo "$html" | grep -q 'config.js'
+          echo "$html" | grep -q 'theme-boot.js'
           kill "$(cat /tmp/http-frontend.pid)" || true
           grep -q 'id="username"' src/pages/Login/LoginPage.tsx
           grep -q 'id="password"' src/pages/Login/LoginPage.tsx
