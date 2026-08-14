@@ -30,3 +30,4 @@ services:
         limits:
           cpus: "1.0"
           memory: 768m
+    # Буферы: syslog-ng.d/zz_profile.conf (fifo 25k, mem 64 MiB, disk 512 MiB)

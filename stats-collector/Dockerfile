@@ -1,8 +1,9 @@
-# context: репозиторий (.) — нужен pkg/chconn
+# context: репозиторий (.) — нужен pkg/chconn и pkg/syslogngstats
 FROM golang:1.24-alpine AS build
 WORKDIR /src
 
 COPY pkg/chconn ./pkg/chconn
+COPY pkg/syslogngstats ./pkg/syslogngstats
 COPY stats-collector/go.mod stats-collector/go.sum ./stats-collector/
 
 WORKDIR /src/stats-collector

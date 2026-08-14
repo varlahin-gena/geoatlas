@@ -9,9 +9,12 @@ require (
 	golang.org/x/sys v0.30.0
 	gopkg.in/yaml.v3 v3.0.1
 	network_monitor/pkg/chconn v0.0.0
+	network_monitor/pkg/syslogngstats v0.0.0
 )
 
 replace network_monitor/pkg/chconn => ../pkg/chconn
+
+replace network_monitor/pkg/syslogngstats => ../pkg/syslogngstats
 
 require (
 	github.com/ClickHouse/ch-go v0.58.2 // indirect

@@ -5,9 +5,12 @@ go 1.24.0
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.17.1
 	network_monitor/pkg/chconn v0.0.0
+	network_monitor/pkg/syslogngstats v0.0.0
 )
 
 replace network_monitor/pkg/chconn => ../pkg/chconn
+
+replace network_monitor/pkg/syslogngstats => ../pkg/syslogngstats
 
 require (
 	github.com/ClickHouse/ch-go v0.58.2 // indirect

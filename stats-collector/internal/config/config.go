@@ -16,6 +16,7 @@ type Config struct {
 	QueryTimeout     time.Duration
 	BackendHealthURL string
 	IngestStatsURL   string
+	SyslogStatsURL   string
 	APIAuthToken     string
 	CgroupRoot       string
 	HostProcRoot     string
@@ -49,6 +50,7 @@ func Load() Config {
 		QueryTimeout:     time.Duration(envInt("QUERY_TIMEOUT", 10)) * time.Second,
 		BackendHealthURL: envStr("BACKEND_HEALTH_URL", "http://backend:8080/health"),
 		IngestStatsURL:   envStr("INGEST_STATS_URL", "http://backend:8080/api/ingest/stats"),
+		SyslogStatsURL:   envStr("SYSLOG_STATS_URL", ""),
 		APIAuthToken:     envStr("API_AUTH_TOKEN", ""),
 		CgroupRoot:       envStr("CGROUP_ROOT", "/sys/fs/cgroup"),
 		HostProcRoot:     envStr("HOST_PROC", "/host/proc"),

@@ -76,6 +76,39 @@ func TestCollectIngestMetricsPersistsQueueHealth(t *testing.T) {
 	}
 }
 
+func TestCollectSyslogNGMetrics(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("dst.network;d_backend_udp;a;dropped;2\ndst.network;d_backend_udp;a;queued;9\n"))
+	}))
+	defer srv.Close()
+
+	c := &Collector{cfg: config.Config{SyslogStatsURL: srv.URL}, http: srv.Client()}
+	metrics := c.collectSyslogNGMetrics(context.Background(), time.Now().UTC())
+	got := map[string]float64{}
+	var up float64
+	for _, m := range metrics {
+		if m.Type == "pipeline" && m.Target == "syslogng" {
+			got[m.Name] = m.Value
+		}
+		if m.Type == "health" && m.Target == "syslogng" && m.Name == "up" {
+			up = m.Value
+		}
+	}
+	if up != 1 {
+		t.Fatalf("up=%v", up)
+	}
+	if got["dropped_total"] != 2 || got["queued"] != 9 {
+		t.Fatalf("got %#v", got)
+	}
+}
+
+func TestCollectSyslogNGMetricsSkippedWhenUnset(t *testing.T) {
+	c := &Collector{cfg: config.Config{}, http: http.DefaultClient}
+	if ms := c.collectSyslogNGMetrics(context.Background(), time.Now().UTC()); len(ms) != 0 {
+		t.Fatalf("len=%d", len(ms))
+	}
+}
+
 func TestWriteMetricsSkipsNaN(t *testing.T) {
 	c := &Collector{}
 	ms := []Metric{

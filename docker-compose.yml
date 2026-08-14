@@ -58,18 +58,27 @@ services:
         max-file: "3"
 
   syslog-ng:
-    image: balabit/syslog-ng:4.8.3
+    image: balabit/syslog-ng:4.11.0
     container_name: syslog-ng
     profiles: ["syslog"]
     ports:
       - "514:514/tcp"
       - "514:514/udp"
+    expose:
+      - "9577"
     volumes:
       - ./syslog-ng.conf:/etc/syslog-ng/syslog-ng.conf:ro
+      - ./syslog-ng.d:/etc/syslog-ng/conf.d:ro
       - syslog-ng-buffer:/var/lib/syslog-ng-buffer
     depends_on:
       backend:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "syslog-ng-ctl", "stats"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
     restart: unless-stopped
     deploy:
       resources:
@@ -120,6 +129,8 @@ services:
       LOG_FORMAT: text
       INSTALL_PROFILE_PATH: /app/install-profile.json
       INSTALL_META_PATH: /app/install-meta.json
+      # Пустая строка в .env отключает scrape (модуль syslog выключен).
+      SYSLOG_STATS_URL: "${SYSLOG_STATS_URL-http://syslog-ng:9577/stats}"
       # Обязателен, если API_AUTH_DISABLED не true. Генерируется в start.sh → .env
       API_AUTH_TOKEN: ${API_AUTH_TOKEN:?set API_AUTH_TOKEN in .env}
       API_AUTH_DISABLED: ${API_AUTH_DISABLED:-false}
@@ -196,6 +207,7 @@ services:
       COLLECT_INTERVAL: "30"
       BACKEND_HEALTH_URL: http://backend:8080/health
       INGEST_STATS_URL: http://backend:8080/api/ingest/stats
+      SYSLOG_STATS_URL: "${SYSLOG_STATS_URL-http://syslog-ng:9577/stats}"
       API_AUTH_TOKEN: ${API_AUTH_TOKEN:?set API_AUTH_TOKEN in .env}
       CGROUP_ROOT: /sys/fs/cgroup
       HOST_PROC: /host/proc

@@ -67,8 +67,13 @@ type ProfileBackendLimits struct {
 }
 
 type ProfileSyslogLimits struct {
-	MemoryMB int `json:"memory_mb"`
-	CPUs     int `json:"cpus"`
+	MemoryMB       int   `json:"memory_mb"`
+	CPUs           int   `json:"cpus"`
+	FifoSize       int   `json:"fifo_size,omitempty"`
+	MemBufBytes    int64 `json:"mem_buf_bytes,omitempty"`
+	DiskBufBytes   int64 `json:"disk_buf_bytes,omitempty"`
+	UDPRcvbufBytes int64 `json:"udp_rcvbuf_bytes,omitempty"`
+	IWSize         int   `json:"iw_size,omitempty"`
 }
 
 type ProfileLimits struct {

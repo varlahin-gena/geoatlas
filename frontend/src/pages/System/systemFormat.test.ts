@@ -4,6 +4,7 @@ import {
   dropsTone,
   fmtBytes,
   pipelineIngestStatus,
+  pipelineSyslogStatus,
   queueTone,
 } from './systemFormat';
 
@@ -40,5 +41,15 @@ describe('systemFormat', () => {
     expect(pipelineIngestStatus({ drops_per_sec: 100 }, {}, 0)).toBe('bad');
     expect(pipelineIngestStatus({}, {}, 0.9)).toBe('bad');
     expect(pipelineIngestStatus({}, { buffered_lines: 20000 }, 0)).toBe('warn');
+  });
+
+  it('pipelineSyslogStatus', () => {
+    expect(pipelineSyslogStatus({}, undefined, 0, 0)).toBe('ok');
+    expect(pipelineSyslogStatus({}, 0, 0, 0)).toBe('bad');
+    expect(pipelineSyslogStatus({ dropped_total: 1 }, 1, 0, 0)).toBe('warn');
+    expect(pipelineSyslogStatus({}, 1, 0, 1)).toBe('warn');
+    expect(pipelineSyslogStatus({}, 1, 0, 100)).toBe('bad');
+    expect(pipelineSyslogStatus({ queued: 80 }, 1, 50, 0)).toBe('warn');
+    expect(pipelineSyslogStatus({ queued: 90 }, 1, 50, 0)).toBe('bad');
   });
 });

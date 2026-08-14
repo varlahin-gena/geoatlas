@@ -115,6 +115,7 @@ func computeAlertsWithSLO(stats SystemStatsResponse, slo IngestSLO) []Alert {
 			alerts = append(alerts, Alert{Level: "warn", Code: "cpu_high", Target: name, Message: "Container CPU usage is very high"})
 		}
 	}
+	alerts = append(alerts, syslogNGAlerts(stats, slo)...)
 	if clickhouse, ok := stats.Storage["clickhouse"]; ok && clickhouse["active_parts"] > 1000 {
 		alerts = append(alerts, Alert{Level: "warn", Code: "clickhouse_parts_high", Target: "clickhouse", Message: "Active parts count is high — possible merge backlog"})
 	}
@@ -150,6 +151,47 @@ func computeAlertsWithSLO(stats SystemStatsResponse, slo IngestSLO) []Alert {
 		alerts = append(alerts, Alert{Level: level, Code: code, Target: "edges_agg", Message: message})
 	case "error":
 		alerts = append(alerts, Alert{Level: "error", Code: "edges_agg_error", Target: "edges_agg", Message: "Edges agg failed: " + edges.Message})
+	}
+	return alerts
+}
+
+func syslogNGAlerts(stats SystemStatsResponse, slo IngestSLO) []Alert {
+	alerts := []Alert{}
+	if health, ok := stats.Health["syslogng"]; ok {
+		up, _ := health["up"].(float64)
+		if up < 1 {
+			if _, seen := stats.Containers["syslog-ng"]; seen {
+				alerts = append(alerts, Alert{Level: "error", Code: "syslogng_down", Target: "syslog-ng", Message: "syslog-ng stats-exporter unreachable while container is running"})
+			}
+		}
+	}
+	pipe, ok := stats.Pipeline["syslogng"]
+	if !ok {
+		return alerts
+	}
+	dropsPerSec := pipe["drops_per_sec"]
+	switch {
+	case dropsPerSec >= slo.DropsCriticalPerSec:
+		alerts = append(alerts, Alert{Level: "error", Code: "syslogng_dropping_critical", Target: "syslog-ng", Message: "syslog-ng dropping above critical SLO — buffer/profile too small or backend not draining"})
+	case dropsPerSec > slo.DropsWarnPerSec:
+		alerts = append(alerts, Alert{Level: "warn", Code: "syslogng_dropping", Target: "syslog-ng", Message: "syslog-ng disk-buffer dropping lines (before backend ingest)"})
+	case pipe["dropped_total"] > 0:
+		alerts = append(alerts, Alert{Level: "warn", Code: "syslogng_dropped_total", Target: "syslog-ng", Message: "syslog-ng dropped lines since start; check disk-buffer and backend health"})
+	}
+	fifo := 0
+	if stats.InstallProfile != nil {
+		fifo = stats.InstallProfile.Limits.SyslogNG.FifoSize
+	}
+	if fifo > 0 {
+		capEst := float64(fifo * 2) // two destinations share the fifo window
+		if capEst > 0 {
+			ratio := pipe["queued"] / capEst
+			if ratio >= slo.QueueCriticalRatio {
+				alerts = append(alerts, Alert{Level: "error", Code: "syslogng_queue_critical", Target: "syslog-ng", Message: "syslog-ng destination queue is critically full"})
+			} else if ratio >= slo.QueueWarnRatio {
+				alerts = append(alerts, Alert{Level: "warn", Code: "syslogng_queue_high", Target: "syslog-ng", Message: "syslog-ng destination queue is filling up"})
+			}
+		}
 	}
 	return alerts
 }

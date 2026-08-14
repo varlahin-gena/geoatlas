@@ -17,6 +17,10 @@ type RateSampler struct {
 	prevBufDrop int64
 	prevTS      time.Time
 
+	prevSyslogDrop int64
+	prevSyslogProc int64
+	prevSyslogTS   time.Time
+
 	healthPrevDrop    int64
 	healthPrevBufDrop int64
 	healthPrevTS      time.Time
@@ -64,6 +68,33 @@ func (r *RateSampler) ObserveRates(snap IngestSnapshot) map[string]float64 {
 	rate["drops_per_sec"] = delta(snap.DroppedTotal, prevDrop)
 	rate["buffer_drops_per_sec"] = delta(snap.BufferDropsTotal, prevBufDrop)
 	return rate
+}
+
+// ObserveSyslogNG returns syslog-ng drop and processed rates between scrapes.
+func (r *RateSampler) ObserveSyslogNG(droppedTotal, processedTotal int64) (dropsPerSec, eventsPerSec float64) {
+	if r == nil {
+		return 0, 0
+	}
+	now := time.Now()
+	r.mu.Lock()
+	prevTS, prevDrop, prevProc := r.prevSyslogTS, r.prevSyslogDrop, r.prevSyslogProc
+	r.prevSyslogDrop, r.prevSyslogProc, r.prevSyslogTS = droppedTotal, processedTotal, now
+	r.mu.Unlock()
+	if prevTS.IsZero() {
+		return 0, 0
+	}
+	dt := now.Sub(prevTS).Seconds()
+	if dt <= 0 {
+		return 0, 0
+	}
+	delta := func(current, previous int64) float64 {
+		value := float64(current - previous)
+		if value < 0 {
+			return 0
+		}
+		return value / dt
+	}
+	return delta(droppedTotal, prevDrop), delta(processedTotal, prevProc)
 }
 
 // HealthDropRates — admission и buffer drop rates между вызовами Health (один dt).

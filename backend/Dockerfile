@@ -1,10 +1,11 @@
 # ---------- build stage ----------
-# context: репозиторий (.) — нужен pkg/chconn
+# context: репозиторий (.) — нужен pkg/chconn и pkg/syslogngstats
 FROM golang:1.24-alpine AS build
 
 WORKDIR /src
 
 COPY pkg/chconn ./pkg/chconn
+COPY pkg/syslogngstats ./pkg/syslogngstats
 COPY backend/go.mod backend/go.sum ./backend/
 
 WORKDIR /src/backend

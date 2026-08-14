@@ -91,8 +91,10 @@ profile_params() {
             BE_MEM_GB=1; BE_CPUS=1
             BE_WORKERS=1; BE_QUEUE=50000; BE_BATCH=3000; BE_FLUSH=3
             BE_CH_CONNS=1
-            # syslog-ng держит два mem-buf по 128 MiB + свой overhead; ниже 512 MiB тесно.
+            # 2×32 MiB mem-buf + ~80 MiB процесс; fifo больше не гигабайтный.
             SYSLOG_MEM_MB=512; SYSLOG_CPUS=1
+            SYSLOG_FIFO=10000; SYSLOG_MEM_BUF=33554432; SYSLOG_DISK_BUF=268435456
+            SYSLOG_UDP_RCVBUF=16777216; SYSLOG_IW_SIZE=1000
             ;;
         small)
             # 4 CPU / 8 GiB: ClickHouse — узкое место INSERT.
@@ -102,6 +104,8 @@ profile_params() {
             BE_WORKERS=2; BE_QUEUE=200000; BE_BATCH=20000; BE_FLUSH=1
             BE_CH_CONNS=2
             SYSLOG_MEM_MB=768; SYSLOG_CPUS=1
+            SYSLOG_FIFO=25000; SYSLOG_MEM_BUF=67108864; SYSLOG_DISK_BUF=536870912
+            SYSLOG_UDP_RCVBUF=33554432; SYSLOG_IW_SIZE=2000
             ;;
         medium)
             CH_MEM_GB=6; CH_CPUS=4
@@ -109,6 +113,8 @@ profile_params() {
             BE_WORKERS=3; BE_QUEUE=300000; BE_BATCH=20000; BE_FLUSH=1
             BE_CH_CONNS=3
             SYSLOG_MEM_MB=1024; SYSLOG_CPUS=2
+            SYSLOG_FIFO=50000; SYSLOG_MEM_BUF=100663296; SYSLOG_DISK_BUF=1073741824
+            SYSLOG_UDP_RCVBUF=67108864; SYSLOG_IW_SIZE=4000
             ;;
         large)
             CH_MEM_GB=12; CH_CPUS=8
@@ -116,6 +122,8 @@ profile_params() {
             BE_WORKERS=4; BE_QUEUE=500000; BE_BATCH=30000; BE_FLUSH=1
             BE_CH_CONNS=4
             SYSLOG_MEM_MB=2048; SYSLOG_CPUS=3
+            SYSLOG_FIFO=100000; SYSLOG_MEM_BUF=201326592; SYSLOG_DISK_BUF=2147483648
+            SYSLOG_UDP_RCVBUF=134217728; SYSLOG_IW_SIZE=8000
             ;;
         xlarge)
             CH_MEM_GB=24; CH_CPUS=16
@@ -123,6 +131,8 @@ profile_params() {
             BE_WORKERS=6; BE_QUEUE=750000; BE_BATCH=40000; BE_FLUSH=1
             BE_CH_CONNS=6
             SYSLOG_MEM_MB=4096; SYSLOG_CPUS=4
+            SYSLOG_FIFO=200000; SYSLOG_MEM_BUF=402653184; SYSLOG_DISK_BUF=4294967296
+            SYSLOG_UDP_RCVBUF=134217728; SYSLOG_IW_SIZE=16000
             ;;
         *)
             _nm_log "Неизвестный профиль: $profile"
@@ -407,6 +417,11 @@ write_env_file() {
         allow_insecure="1"
     fi
 
+    local syslog_stats_url=""
+    if [[ "$mod_syslog" == "1" ]]; then
+        syslog_stats_url="http://syslog-ng:9577/stats"
+    fi
+
     cat >"$env_file" <<EOF
 # Сгенерировано detect_resources.sh — не редактируйте вручную, перезапустите tune-resources.sh
 NM_INSTALL_PROFILE=${profile}
@@ -438,6 +453,7 @@ API_AUTH_DISABLED=${api_auth_disabled}
 REPUTATION_FETCH_ENABLED=${reputation_fetch_enabled}
 NM_ALLOW_INSECURE=${allow_insecure}
 COMPOSE_PROFILES=${compose_profiles}
+SYSLOG_STATS_URL=${syslog_stats_url}
 
 # --- HTTP / HTTPS (select_http_port.sh, certs/) ---
 HTTP_PORT=${http_port}
@@ -495,6 +511,23 @@ services:
         limits:
           cpus: "${SYSLOG_CPUS}.0"
           memory: ${SYSLOG_MEM_MB}m
+EOF
+}
+
+write_syslog_profile() {
+    local project_dir="$1" profile="$2"
+    local conf_dir="${project_dir}/syslog-ng.d"
+    local tcp_rcv=16777216
+
+    mkdir -p "$conf_dir"
+    cat >"${conf_dir}/zz_profile.conf" <<EOF
+# Сгенерировано detect_resources.sh — профиль: ${profile}
+@define fifo_size ${SYSLOG_FIFO}
+@define mem_buf ${SYSLOG_MEM_BUF}
+@define disk_buf ${SYSLOG_DISK_BUF}
+@define udp_rcvbuf ${SYSLOG_UDP_RCVBUF}
+@define tcp_rcvbuf ${tcp_rcv}
+@define iw_size ${SYSLOG_IW_SIZE}
 EOF
 }
 
@@ -564,7 +597,12 @@ write_install_profile_json() {
     },
     "syslog_ng": {
       "memory_mb": ${SYSLOG_MEM_MB},
-      "cpus": ${SYSLOG_CPUS}
+      "cpus": ${SYSLOG_CPUS},
+      "fifo_size": ${SYSLOG_FIFO},
+      "mem_buf_bytes": ${SYSLOG_MEM_BUF},
+      "disk_buf_bytes": ${SYSLOG_DISK_BUF},
+      "udp_rcvbuf_bytes": ${SYSLOG_UDP_RCVBUF},
+      "iw_size": ${SYSLOG_IW_SIZE}
     }
   },
   "capacity": {
@@ -580,13 +618,14 @@ print_applied_config() {
     echo "Применён профиль: $(profile_label_ru "$profile") [$profile]"
     echo "  ClickHouse : ${CH_MEM_GB} GiB RAM, ${CH_CPUS} CPU"
     echo "  Backend    : ${BE_MEM_GB} GiB RAM, ${BE_CPUS} CPU, workers=${BE_WORKERS}, queue=${BE_QUEUE}, batch=${BE_BATCH}, flush=${BE_FLUSH}s, ch_conns=${BE_CH_CONNS}"
-    echo "  syslog-ng  : ${SYSLOG_MEM_MB} MiB RAM, ${SYSLOG_CPUS} CPU"
+    echo "  syslog-ng  : ${SYSLOG_MEM_MB} MiB RAM, ${SYSLOG_CPUS} CPU, fifo=${SYSLOG_FIFO}, mem-buf=$((SYSLOG_MEM_BUF / 1048576)) MiB, disk=$((SYSLOG_DISK_BUF / 1048576)) MiB"
     echo "  Ёмкость    : ${EPS_MIN}–${EPS_MAX} eps"
     echo ""
     echo "Созданы файлы:"
     echo "  docker-compose.override.yml"
     echo "  .env"
     echo "  clickhouse/users.d/zz_install_limits.xml"
+    echo "  syslog-ng.d/zz_profile.conf"
     echo "  install-profile.json"
 }
 
@@ -647,6 +686,7 @@ apply_resource_profile() {
     write_env_file "$project_dir" "$profile"
     write_compose_override "$project_dir" "$profile"
     write_clickhouse_limits "$project_dir" "$profile"
+    write_syslog_profile "$project_dir" "$profile"
     write_install_profile_json "$project_dir" "$profile" "$cpu" "$ram_mb" "$disk_gb" "$cgroup"
 
     echo ""

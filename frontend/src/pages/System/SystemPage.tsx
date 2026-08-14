@@ -21,6 +21,7 @@ import {
   lagTone,
   num,
   pipelineIngestStatus,
+  pipelineSyslogStatus,
   queueTone,
   toneClass,
   fmtLag,
@@ -172,9 +173,9 @@ export default function SystemPage() {
       );
       mk(
         chartBuffer,
-        'Буфер импортера',
-        ['Buffered lines'],
-        ['pipeline.ingest.buffered_lines'],
+        'Буферы',
+        ['Ingest buffered', 'syslog-ng queued'],
+        ['pipeline.ingest.buffered_lines', 'pipeline.syslogng.queued'],
         { isInt: true },
       );
       mk(
@@ -267,6 +268,20 @@ export default function SystemPage() {
   const parseErr1h = num(pipeline.parse_errors?.count_1h ?? ingest.parse_errors_1h);
   const uptimeSec = num(stats?.uptime_sec ?? ingest.uptime_sec);
   const ingestStageStatus = pipelineIngestStatus(rate as Record<string, number>, ingest as Record<string, number>, queuePct);
+  const syslogng = pipeline.syslogng || {};
+  const syslogngDropsPerSec = num(syslogng.drops_per_sec);
+  const syslogngFifo = num(
+    (stats?.install_profile?.limits?.syslog_ng as { fifo_size?: number } | undefined)?.fifo_size,
+  );
+  const syslogngUpRaw = stats?.health?.syslogng?.up;
+  const syslogngUp = syslogngUpRaw == null ? undefined : num(syslogngUpRaw);
+  const syslogStageStatus = pipelineSyslogStatus(
+    syslogng as Record<string, number>,
+    syslogngUp,
+    syslogngFifo,
+    syslogngDropsPerSec,
+  );
+  const syslogEps = num(syslogng.events_per_sec) || eps;
   const edgesHint = edgesAggHint(edges);
   const edgesBadge = edges?.phase
     ? `${edges.state || 'idle'}/${edges.phase}`
@@ -387,11 +402,11 @@ export default function SystemPage() {
               <div className="status-metric">
                 <span className="sm-label">Drops</span>
                 <span
-                  className={`sm-value ${toneClass(dropsTone(dropsPerSec, bufferDropsPerSec))}`}
+                  className={`sm-value ${toneClass(dropsTone(dropsPerSec + syslogngDropsPerSec, bufferDropsPerSec))}`}
                   id="statusDrops"
-                  title={`admission ${fmtNumber(dropsPerSec)}/s · buffer ${fmtNumber(bufferDropsPerSec)}/s`}
+                  title={`admission ${fmtNumber(dropsPerSec)}/s · buffer ${fmtNumber(bufferDropsPerSec)}/s · syslog-ng ${fmtNumber(syslogngDropsPerSec)}/s`}
                 >
-                  {fmtNumber(dropsPerSec + bufferDropsPerSec)}/s
+                  {fmtNumber(dropsPerSec + bufferDropsPerSec + syslogngDropsPerSec)}/s
                 </span>
               </div>
               <div className="status-metric" id="statusCapacityWrap" hidden={!epsMax}>
@@ -452,7 +467,11 @@ export default function SystemPage() {
 
             {tab === 'pipeline' ? (
               <SystemPipelineTab
-                eps={eps}
+                syslogEps={syslogEps}
+                syslogStageStatus={syslogStageStatus}
+                syslogng={syslogng as Record<string, number>}
+                syslogngDropsPerSec={syslogngDropsPerSec}
+                syslogngFifo={syslogngFifo}
                 rate={rate as Record<string, number>}
                 ingest={ingest as Record<string, number>}
                 ingestStageStatus={ingestStageStatus}

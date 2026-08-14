@@ -175,6 +175,7 @@ type Config struct {
 	CHMaxThreads         int
 	InstallProfilePath   string
 	InstallMetaPath      string
+	SyslogStatsURL       string // SYSLOG_STATS_URL; empty = do not scrape syslog-ng
 
 	// Размеры пулов ClickHouse (отдельные Conn на write/read/background).
 	CHIngestMaxOpen     int
@@ -267,6 +268,7 @@ func FromEnv() Config {
 		CHMaxThreads:         parser.int("CH_MAX_THREADS", 2),
 		InstallProfilePath:   envOr("INSTALL_PROFILE_PATH", "/app/install-profile.json"),
 		InstallMetaPath:      envOr("INSTALL_META_PATH", "/app/install-meta.json"),
+		SyslogStatsURL:       strings.TrimSpace(os.Getenv("SYSLOG_STATS_URL")),
 
 		CHIngestMaxOpen:         parser.int("CH_INGEST_MAX_OPEN_CONNS", 4),
 		CHAPIMaxOpen:            parser.int("CH_API_MAX_OPEN_CONNS", 8),

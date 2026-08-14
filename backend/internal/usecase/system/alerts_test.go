@@ -163,6 +163,50 @@ func containsReason(reasons []string, want string) bool {
 	return false
 }
 
+func TestComputeAlertsSyslogNG(t *testing.T) {
+	base := SystemStatsResponse{
+		Pipeline: map[string]map[string]float64{
+			"syslogng": {"dropped_total": 4, "queued": 10, "drops_per_sec": 0},
+		},
+		Health:     map[string]map[string]any{"syslogng": {"up": 1.0}},
+		Containers: map[string]map[string]float64{"syslog-ng": {"mem_bytes": 1}},
+		Storage:    map[string]map[string]float64{},
+		InstallProfile: &CapacityProfile{
+			Limits:   ProfileLimits{SyslogNG: ProfileSyslogLimits{FifoSize: 50}},
+			Capacity: ProfileCapacity{},
+		},
+	}
+	if alerts := computeAlerts(base); !hasAlertCode(alerts, "syslogng_dropped_total") {
+		t.Fatalf("expected syslogng_dropped_total, got %#v", alerts)
+	}
+	base.Pipeline["syslogng"]["drops_per_sec"] = 5
+	if alerts := computeAlerts(base); !hasAlertCode(alerts, "syslogng_dropping") {
+		t.Fatalf("expected syslogng_dropping, got %#v", alerts)
+	}
+	base.Pipeline["syslogng"]["drops_per_sec"] = 150
+	if alerts := computeAlerts(base); !hasAlertCode(alerts, "syslogng_dropping_critical") {
+		t.Fatalf("expected syslogng_dropping_critical, got %#v", alerts)
+	}
+	base.Pipeline["syslogng"]["drops_per_sec"] = 0
+	base.Pipeline["syslogng"]["dropped_total"] = 0
+	base.Pipeline["syslogng"]["queued"] = 80
+	if alerts := computeAlerts(base); !hasAlertCode(alerts, "syslogng_queue_high") {
+		t.Fatalf("expected syslogng_queue_high, got %#v", alerts)
+	}
+	base.Pipeline["syslogng"]["queued"] = 95
+	if alerts := computeAlerts(base); !hasAlertCode(alerts, "syslogng_queue_critical") {
+		t.Fatalf("expected syslogng_queue_critical, got %#v", alerts)
+	}
+	base.Health["syslogng"]["up"] = 0.0
+	if alerts := computeAlerts(base); !hasAlertCode(alerts, "syslogng_down") {
+		t.Fatalf("expected syslogng_down, got %#v", alerts)
+	}
+	delete(base.Containers, "syslog-ng")
+	if alerts := computeAlerts(base); hasAlertCode(alerts, "syslogng_down") {
+		t.Fatalf("syslogng_down without container metrics: %#v", alerts)
+	}
+}
+
 func TestMergeLiveIngestStatsConcurrent(t *testing.T) {
 	rates := &RateSampler{}
 	var wg sync.WaitGroup
@@ -183,4 +227,26 @@ func TestMergeLiveIngestStatsConcurrent(t *testing.T) {
 		}(int64(i * 100))
 	}
 	wg.Wait()
+}
+
+func TestMergeLiveSyslogNG(t *testing.T) {
+	resp := &SystemStatsResponse{
+		Pipeline: map[string]map[string]float64{"syslogng": {"queued": 1}},
+		Health:   map[string]map[string]any{},
+	}
+	mergeLiveSyslogNG(resp, SyslogNGSnapshot{Up: false}, &RateSampler{})
+	if resp.Health["syslogng"]["up"].(float64) != 0 {
+		t.Fatalf("up=%v", resp.Health["syslogng"]["up"])
+	}
+	if resp.Pipeline["syslogng"]["queued"] != 1 {
+		t.Fatal("failed scrape must not wipe CH queued")
+	}
+	mergeLiveSyslogNG(resp, SyslogNGSnapshot{Up: true, DroppedTotal: 4, Queued: 9, ProcessedTotal: 20, UDPProcessed: 12, TCPProcessed: 8}, &RateSampler{})
+	p := resp.Pipeline["syslogng"]
+	if p["dropped_total"] != 4 || p["queued"] != 9 || p["udp_processed"] != 12 {
+		t.Fatalf("%#v", p)
+	}
+	if resp.Health["syslogng"]["up"].(float64) != 1 {
+		t.Fatal("up")
+	}
 }

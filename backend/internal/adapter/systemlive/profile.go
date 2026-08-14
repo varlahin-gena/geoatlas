@@ -39,6 +39,9 @@ func (ProfileAdapter) Load(path string) (*system.CapacityProfile, error) {
 			},
 			SyslogNG: system.ProfileSyslogLimits{
 				MemoryMB: profile.Limits.SyslogNG.MemoryMB, CPUs: profile.Limits.SyslogNG.CPUs,
+				FifoSize: profile.Limits.SyslogNG.FifoSize, MemBufBytes: profile.Limits.SyslogNG.MemBufBytes,
+				DiskBufBytes: profile.Limits.SyslogNG.DiskBufBytes, UDPRcvbufBytes: profile.Limits.SyslogNG.UDPRcvbufBytes,
+				IWSize: profile.Limits.SyslogNG.IWSize,
 			},
 		},
 		Capacity: system.ProfileCapacity{

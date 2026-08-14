@@ -42,10 +42,25 @@ type IngestSnapshot struct {
 	LastDropAt                                                                string // RFC3339; empty if never dropped
 }
 
+// SyslogNGSnapshot is live stats-exporter data (drops/queue before backend ingest).
+type SyslogNGSnapshot struct {
+	Up             bool
+	DroppedTotal   int64
+	Queued         int64
+	ProcessedTotal int64
+	UDPProcessed   int64
+	TCPProcessed   int64
+}
+
 // IngestLive exposes optional live ingest metrics.
 type IngestLive interface {
 	// Snapshot returns ok=false when ingest is disabled.
 	Snapshot() (IngestSnapshot, bool)
+}
+
+// SyslogNGLive scrapes syslog-ng stats-exporter. ok=false when URL is not configured.
+type SyslogNGLive interface {
+	Snapshot(ctx context.Context) (SyslogNGSnapshot, bool)
 }
 
 // GeoIndexLive exposes compact GeoIP index size for observability.

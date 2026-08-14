@@ -1,0 +1,8 @@
+# Пример zz_profile.conf для medium (compose 1 GiB).
+# Не копируйте вручную — пишет ./scripts/tune-resources.sh / detect_resources.sh.
+@define fifo_size 50000
+@define mem_buf 100663296
+@define disk_buf 1073741824
+@define udp_rcvbuf 67108864
+@define tcp_rcvbuf 16777216
+@define iw_size 4000

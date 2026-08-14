@@ -93,6 +93,25 @@ export function pipelineIngestStatus(
   return 'ok';
 }
 
+export function pipelineSyslogStatus(
+  syslogng: Record<string, number>,
+  up: number | undefined,
+  fifoSize: number,
+  dropsPerSec: number,
+): 'ok' | 'warn' | 'bad' {
+  if (up === 0) return 'bad';
+  if (dropsPerSec >= 100) return 'bad';
+  if (dropsPerSec > 0) return 'warn';
+  if (num(syslogng.dropped_total) > 0) return 'warn';
+  const cap = fifoSize * 2;
+  if (cap > 0) {
+    const ratio = num(syslogng.queued) / cap;
+    if (ratio >= 0.9) return 'bad';
+    if (ratio >= 0.75) return 'warn';
+  }
+  return 'ok';
+}
+
 export function dropsTone(admPerSec: number, bufPerSec: number): 'ok' | 'warn' | 'bad' {
   const total = admPerSec + bufPerSec;
   if (total >= 100) return 'bad';

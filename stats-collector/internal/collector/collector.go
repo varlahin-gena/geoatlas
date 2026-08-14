@@ -137,6 +137,7 @@ func (c *Collector) Collect(ctx context.Context) {
 	var metrics []Metric
 	metrics = append(metrics, c.collectContainerMetrics(ts)...)
 	metrics = append(metrics, c.collectIngestMetrics(qctx, ts)...)
+	metrics = append(metrics, c.collectSyslogNGMetrics(qctx, ts)...)
 	metrics = append(metrics, c.collectHealthMetrics(qctx, ts)...)
 	metrics = append(metrics, c.collectStorageMetrics(qctx, ts)...)
 

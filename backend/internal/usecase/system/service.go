@@ -17,6 +17,7 @@ type Dependencies struct {
 	Metrics            MetricsStore
 	Edges              EdgesAggReader
 	Ingest             IngestLive
+	SyslogNG           SyslogNGLive
 	GeoIndex           GeoIndexLive
 	Profiles           ProfileLoader
 	Maintenance        MaintenanceScheduler
@@ -30,6 +31,7 @@ type Service struct {
 	metrics            MetricsStore
 	edges              EdgesAggReader
 	ingest             IngestLive
+	syslogNG           SyslogNGLive
 	geoIndex           GeoIndexLive
 	profiles           ProfileLoader
 	maintenance        MaintenanceScheduler
@@ -55,6 +57,7 @@ func New(deps Dependencies) *Service {
 		metrics:            deps.Metrics,
 		edges:              deps.Edges,
 		ingest:             deps.Ingest,
+		syslogNG:           deps.SyslogNG,
 		geoIndex:           deps.GeoIndex,
 		profiles:           deps.Profiles,
 		maintenance:        deps.Maintenance,
@@ -139,6 +142,11 @@ func (s *Service) CollectStats(ctx context.Context) (SystemStatsResponse, error)
 	if s.ingest != nil {
 		if snapshot, ok := s.ingest.Snapshot(); ok {
 			mergeLiveIngestStats(&resp, snapshot, s.rates)
+		}
+	}
+	if s.syslogNG != nil {
+		if snapshot, ok := s.syslogNG.Snapshot(ctx); ok {
+			mergeLiveSyslogNG(&resp, snapshot, s.rates)
 		}
 	}
 	if s.profiles != nil {
@@ -385,6 +393,35 @@ func mergeLiveIngestStats(resp *SystemStatsResponse, ingestStats IngestSnapshot,
 	}
 }
 
+func mergeLiveSyslogNG(resp *SystemStatsResponse, snap SyslogNGSnapshot, rates *RateSampler) {
+	if resp.Health["syslogng"] == nil {
+		resp.Health["syslogng"] = map[string]any{}
+	}
+	up := 0.0
+	if snap.Up {
+		up = 1
+	}
+	resp.Health["syslogng"]["up"] = up
+	if !snap.Up {
+		return
+	}
+	if resp.Pipeline["syslogng"] == nil {
+		resp.Pipeline["syslogng"] = map[string]float64{}
+	}
+	p := resp.Pipeline["syslogng"]
+	p["dropped_total"] = float64(snap.DroppedTotal)
+	p["queued"] = float64(snap.Queued)
+	p["processed_total"] = float64(snap.ProcessedTotal)
+	p["udp_processed"] = float64(snap.UDPProcessed)
+	p["tcp_processed"] = float64(snap.TCPProcessed)
+	dropsPerSec, eventsPerSec := 0.0, 0.0
+	if rates != nil {
+		dropsPerSec, eventsPerSec = rates.ObserveSyslogNG(snap.DroppedTotal, snap.ProcessedTotal)
+	}
+	p["drops_per_sec"] = dropsPerSec
+	p["events_per_sec"] = eventsPerSec
+}
+
 func parsePeriod(input string) time.Duration {
 	switch strings.ToLower(strings.TrimSpace(input)) {
 	case "1h", "":
@@ -450,6 +487,8 @@ func defaultDashboardMetrics() []model.MetricKey {
 		model.MetricKey{Type: "pipeline", Target: "ingest", Name: "lag_sec"},
 		model.MetricKey{Type: "pipeline", Target: "ingest", Name: "buffered_lines"},
 		model.MetricKey{Type: "pipeline", Target: "ingest", Name: "queue_depth"},
+		model.MetricKey{Type: "pipeline", Target: "syslogng", Name: "queued"},
+		model.MetricKey{Type: "pipeline", Target: "syslogng", Name: "dropped_total"},
 		model.MetricKey{Type: "storage", Target: "traffic_logs", Name: "row_count"},
 		model.MetricKey{Type: "storage", Target: "traffic_logs", Name: "bytes_on_disk"},
 	)

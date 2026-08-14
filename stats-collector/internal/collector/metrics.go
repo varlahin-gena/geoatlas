@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"network_monitor/pkg/syslogngstats"
 )
 
 type IngestStats struct {
@@ -147,6 +149,27 @@ func (c *Collector) collectIngestMetrics(ctx context.Context, ts time.Time) []Me
 	c.prevSent = status.InsertedTotal
 	c.prevSentTS = ts
 
+	return out
+}
+
+func (c *Collector) collectSyslogNGMetrics(ctx context.Context, ts time.Time) []Metric {
+	if c.cfg.SyslogStatsURL == "" {
+		return nil
+	}
+	out := []Metric{}
+	snap, err := syslogngstats.Fetch(ctx, c.http, c.cfg.SyslogStatsURL)
+	up := 0.0
+	if err == nil {
+		up = 1
+		out = append(out,
+			Metric{Timestamp: ts, Type: "pipeline", Target: "syslogng", Name: "dropped_total", Value: snap.DroppedTotal},
+			Metric{Timestamp: ts, Type: "pipeline", Target: "syslogng", Name: "queued", Value: snap.Queued},
+			Metric{Timestamp: ts, Type: "pipeline", Target: "syslogng", Name: "processed_total", Value: snap.ProcessedTotal},
+			Metric{Timestamp: ts, Type: "pipeline", Target: "syslogng", Name: "udp_processed", Value: snap.UDPProcessed},
+			Metric{Timestamp: ts, Type: "pipeline", Target: "syslogng", Name: "tcp_processed", Value: snap.TCPProcessed},
+		)
+	}
+	out = append(out, Metric{Timestamp: ts, Type: "health", Target: "syslogng", Name: "up", Value: up})
 	return out
 }
 

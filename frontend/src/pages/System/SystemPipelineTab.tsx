@@ -11,7 +11,11 @@ import {
 import type { Retention } from './systemTypes';
 
 export function SystemPipelineTab({
-  eps,
+  syslogEps,
+  syslogStageStatus,
+  syslogng,
+  syslogngDropsPerSec,
+  syslogngFifo,
   rate,
   ingest,
   ingestStageStatus,
@@ -31,7 +35,11 @@ export function SystemPipelineTab({
   setRetention,
   saveRetention,
 }: {
-  eps: number;
+  syslogEps: number;
+  syslogStageStatus: 'ok' | 'warn' | 'bad';
+  syslogng: Record<string, number>;
+  syslogngDropsPerSec: number;
+  syslogngFifo: number;
   rate: Record<string, number>;
   ingest: Record<string, number>;
   ingestStageStatus: 'ok' | 'warn' | 'bad';
@@ -51,17 +59,27 @@ export function SystemPipelineTab({
   setRetention: (r: Retention) => void;
   saveRetention: (e: FormEvent) => void | Promise<void>;
 }) {
+  const syslogCap = syslogngFifo * 2;
+  const syslogQueuePct = syslogCap > 0 ? num(syslogng.queued) / syslogCap : 0;
   return (
     <div className="tab-panel active" id="tab-pipeline" role="tabpanel">
       <section className="card card-compact">
         <h3 className="card-title">Pipeline</h3>
         <div className="pipeline" id="pipelineRow">
-          <div className="pipeline-stage ok">
+          <div className={`pipeline-stage ${syslogStageStatus}`}>
             <div className="stage-name">Syslog-NG</div>
-            <div className="stage-value">{fmtNumber(eps)} eps</div>
+            <div className="stage-value">{fmtNumber(syslogEps)} eps</div>
             <div className="stage-meta">
               udp: {fmtNumber(rate.udp_events_per_sec)}/s · tcp:{' '}
               {fmtNumber(rate.tcp_events_per_sec)}/s
+              {num(syslogng.queued) > 0
+                ? ` · q: ${fmtNumber(syslogng.queued)}${
+                    syslogCap > 0 ? ` (${fmtPercent(syslogQueuePct)})` : ''
+                  }`
+                : ''}
+              {num(syslogng.dropped_total) > 0
+                ? ` · drop: ${fmtNumber(syslogng.dropped_total)} (${fmtNumber(syslogngDropsPerSec)}/s)`
+                : ''}
             </div>
           </div>
           <div className="pipeline-arrow">→</div>
@@ -131,6 +149,11 @@ export function SystemPipelineTab({
                 ['Parse (1h)', fmtNumber(parseErr1h)],
                 ['Circuit', num(ingest.circuit_open) >= 1 ? 'open' : 'closed'],
                 ['Uptime', fmtUptime(uptimeSec)],
+                ['syslog-ng queued', fmtNumber(syslogng.queued)],
+                [
+                  'syslog-ng dropped',
+                  `${fmtNumber(syslogng.dropped_total)} (${fmtNumber(syslogngDropsPerSec)}/s)`,
+                ],
               ] as const
             ).map(([k, v]) => (
               <div className="kv-row" key={k}>

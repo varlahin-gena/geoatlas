@@ -114,7 +114,9 @@
 4. **frontend** отдаёт статику и проксирует API-запросы на backend.
 5. **stats-collector** каждые 30 секунд собирает метрики CPU/RAM контейнеров и состояние пайплайна (включая разбивку UDP/TCP).
 
-**Буфер syslog-ng (включён по умолчанию):** в `syslog-ng.conf` у назначений UDP/TCP стоят `disk-buffer` — ~128 MiB mem + ~1 GiB disk на каждое (`reliable(no)`), каталоги в volume `syslog-ng-buffer` (`/var/lib/syslog-ng-buffer/...`). Это сглаживает краткие пики/рестарты backend; после буфера доставка в backend всё равно at-most-once (очередь может дропать). Смотрите drops на `/system` и `/api/ingest/stats`.
+**Буфер syslog-ng (включён по умолчанию):** в `syslog-ng.conf` у назначений UDP/TCP стоят `disk-buffer` (`reliable(no)`), каталоги в volume `syslog-ng-buffer`. Размеры **fifo / mem-buf / disk** задаёт профиль установки (`syslog-ng.d/zz_profile.conf`, пишет `tune-resources.sh`). Без профиля действуют безопасные дефолты под compose 1 GiB (не гигабайтный FIFO). Это сглаживает краткие пики/рестарты backend; после буфера доставка в backend всё равно at-most-once. Потери **до** backend видны на стадии Syslog-NG (`/system`, `pipeline.syslogng.dropped_total` / `queued`); drops очереди ingest — `/api/ingest/stats`.
+
+syslog-ng **4.11** (`balabit/syslog-ng:4.11.0`): healthcheck `syslog-ng-ctl stats`, внутренний stats-exporter `:9577` (не публикуется). Backend скрейпит live (`SYSLOG_STATS_URL`), stats-collector пишет историю в `system_metrics`.
 
 ### Product limits (appliance)
 
@@ -131,12 +133,12 @@
 |--------|------|------------------|
 | Queue depth / byte budget | ≥ 75% capacity | ≥ 90% |
 | Processor buffer lines | > 10k | > 100k |
-| Admission / buffer drops/s | любое > 0 | ≥ 100/s |
+| Admission / buffer / syslog-ng drops/s | любое > 0 | ≥ 100/s |
 | Insert circuit open | да (warn) | (эскалация через queue/drops) |
 | Pipeline lag (при ненулевом rate) | > 60s | > 300s |
 | EPS vs install profile max | > 105% | > 125% |
 
-Runbook кратко: warn drops → проверить syslog-ng buffer / profile / CH; critical → `tune-resources.sh` или снизить входной EPS; circuit open → здоровье ClickHouse.
+Runbook кратко: warn drops → проверить стадию Syslog-NG (queued/dropped) / syslog-ng buffer / profile / CH; critical → `tune-resources.sh` или снизить входной EPS; circuit open → здоровье ClickHouse.
 
 ### Хранение данных (TTL)
 
@@ -487,9 +489,20 @@ docker compose restart clickhouse
 | Файл                                       | Назначение                                              |
 |--------------------------------------------|---------------------------------------------------------|
 | `docker-compose.override.yml`              | Лимиты CPU/RAM контейнеров, параметры ingest, `CH_MAX_THREADS` |
-| `.env`                                     | Переменные для compose                                  |
+| `.env`                                     | Переменные для compose (`SYSLOG_STATS_URL` при модуле syslog) |
 | `clickhouse/users.d/zz_install_limits.xml` | Лимиты памяти и `max_threads` запросов ClickHouse       |
+| `syslog-ng.d/zz_profile.conf`              | `@define` буферов syslog-ng (fifo / mem-buf / disk)     |
 | `install-profile.json`                     | Сводка профиля (отображается в UI «Система»)            |
+
+**Буферы syslog-ng по профилю** (на каждое из двух назначений UDP/TCP; `reliable(no)`):
+
+| Профиль  | RAM контейнера | fifo (сообщений) | mem-buf | disk-buf | UDP rcvbuf |
+|----------|----------------|------------------|---------|----------|------------|
+| `tiny`   | 512 MiB        | 10 000           | 32 MiB  | 256 MiB  | 16 MiB     |
+| `small`  | 768 MiB        | 25 000           | 64 MiB  | 512 MiB  | 32 MiB     |
+| `medium` | 1 GiB          | 50 000           | 96 MiB  | 1 GiB    | 64 MiB     |
+| `large`  | 2 GiB          | 100 000          | 192 MiB | 2 GiB    | 128 MiB    |
+| `xlarge` | 4 GiB          | 200 000          | 384 MiB | 4 GiB    | 128 MiB    |
 
 **Доступные профили:**
 
@@ -689,7 +702,7 @@ docker compose exec clickhouse clickhouse-client --query "
 | ClickHouse idle CPU высокий, мало данных | `system.trace_log`/`text_log` — см. `config.d/z_system_logs.xml`; `TRUNCATE`/`DROP` старых system-логов |
 | Нет метрик на странице «Система» | `docker compose logs stats-collector`, cgroup, `/proc` и `/sys/fs/cgroup` на хосте |
 | Превышена расчётная ёмкость      | `/system` → алёрты `capacity_high` / `capacity_exceeded`, пересчёт профиля |
-| Drops под нагрузкой / очередь полная | `/system` (плитка Drops, карточка Ingest: admission + buffer drops, queue bytes); `/api/ingest/stats` → `dropped_total`, `buffer_drops_total`, `circuit_open`; алерты `ingest_dropping*`, `ingest_buffer_dropping*`, `ingest_circuit_open`; syslog-ng disk-buffer уже в compose; `./scripts/watch-ingest.sh` |
+| Drops под нагрузкой / очередь полная | `/system` (плитка Drops, стадии Syslog-NG и Backend Ingest); `pipeline.syslogng.dropped_total` / `queued`; `/api/ingest/stats` → `dropped_total`, `buffer_drops_total`; алёрты `syslogng_dropping*`, `ingest_dropping*`; `./scripts/watch-ingest.sh` |
 | UDP/TCP EPS не разделяются       | Перезапустить `syslog-ng` (маркеры `@@nm/udp/@@` / `@@nm/tcp/@@`) |
 | GeoIP upload → 502 / OOM, backend перезапускается | Не заливать большой CSV поверх уже загруженного индекса через браузер; `dmesg`/`oom-kill`; см. [GeoIP](#geoip) |
 | GeoIP: `Failed to fetch` при смене страницы | Уход со страницы во время POST обрывает `fetch`; дождитесь окончания или `curl` с сервера |
@@ -869,7 +882,7 @@ docker compose logs backend --since=10m 2>&1 | grep -iE 'geo index loaded|geo cs
 | `/geo-missing`    | IP без GeoIP          | Адреса без координат; добавление в GeoIP; выгрузка CSV; мгновенная перефильтрация списка                                                             |
 | `/geo-ranges`     | База GeoIP            | Просмотр/правка диапазонов, выгрузка CSV                                                                                                             |
 | `/parser-test`    | Тест парсеров         | До 200 строк за запрос, пресеты по вендорам, статусы parsed/skipped/error                                                                            |
-| `/system`         | Системный мониторинг  | Обзор / Pipeline (EPS/drops/queue bytes) / Безопасность / Графики / Резервное копирование; алёрты, ёмкость, профиль установки                              |
+| `/system`         | Системный мониторинг  | Обзор / Pipeline (Syslog-NG queued/drops + ingest EPS) / Безопасность / Графики / Резервное копирование; алёрты, ёмкость, профиль установки |
 | `/users`          | Учётные записи        | Список/создание УЗ (скрыто, если UI-auth выключен)                                                                                                   |
 | `/api-tokens`     | API-токены            | Именованные Bearer со scope read/ops/admin; секрет показывается один раз                                                                             |
 | `/change-password`| Смена пароля          | Смена своего пароля                                                                                                                                  |
@@ -886,7 +899,7 @@ Unit-тесты карты (репутация / heatmap focus / coords helpers)
 
 ```
 network_monitor/
-├── go.work                           # workspace: backend + stats-collector + pkg/chconn
+├── go.work                           # workspace: backend + stats-collector + pkg/chconn + pkg/syslogngstats
 ├── backend/                          # Go: API, парсеры, geoip, ingest
 │   ├── cmd/network-monitor/main.go
 │   ├── Dockerfile
@@ -910,7 +923,7 @@ network_monitor/
 │       │   ├── geoipcodec/           # GeoIP CSV/CIDR helpers
 │       │   ├── bootstrapadapter/     # Ensure*/Backfill* для usecase/bootstrap
 │       │   ├── retentionfile/        # JSON-store TTL (`retention.json`)
-│       │   └── systemlive/           # live ingest/profile adapters
+│       │   └── systemlive/           # live ingest / syslog-ng stats / profile adapters
 │       ├── usecase/                  # application use cases + ports (bootstrap, retention, …)
 │       ├── auth/                     # users / sessions / roles
 │       ├── config/                   # конфигурация из env
@@ -922,7 +935,8 @@ network_monitor/
 │       ├── mapagg/                   # агрегация рёбер/узлов для карты
 │       └── parser/                   # парсеры вендоров
 ├── pkg/
-│   └── chconn/                       # общий ClickHouse connect
+│   ├── chconn/                       # общий ClickHouse connect
+│   └── syslogngstats/                # CSV/Prometheus parser stats-exporter
 ├── clickhouse/
 │   ├── config.d/override.xml
 │   ├── config.d/backups.xml          # disk `backups` для BACKUP/RESTORE
@@ -960,7 +974,8 @@ network_monitor/
 ├── VERSION / CHANGELOG.md / RELEASING.md
 ├── .github/workflows/ci.yml
 ├── start.sh / stop.sh
-└── syslog-ng.conf
+├── syslog-ng.conf
+└── syslog-ng.d/                      # 00-keep.conf + zz_profile.conf.example; zz_profile.conf генерируется
 ```
 
 **Генерируемые при установке (не в git):**
@@ -970,5 +985,6 @@ network_monitor/
 ├── docker-compose.override.yml   # Лимиты по профилю
 ├── .env                          # COMPOSE_PROFILES, секреты, лимиты
 ├── install-profile.json          # Сводка установки
+├── syslog-ng.d/zz_profile.conf   # Буферы syslog-ng
 └── clickhouse/users.d/zz_install_limits.xml
 ```
