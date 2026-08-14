@@ -9,7 +9,7 @@ import {
   fetchCountrySeries,
   linesForCountry,
   renderSparklineSVG,
-} from './mapDetail';
+} from './mapDetailBuilders';
 import { getCountryStatsCache, type GeoFeature, type GeoFeatureCollection } from './mapHeatmap';
 import type {
   DetailState,

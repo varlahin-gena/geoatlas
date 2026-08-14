@@ -261,9 +261,10 @@ export default function MapPage() {
       ? null
       : emptyOverlay;
 
+  const reloadGeoStatus = geoWizard.reloadStatus;
   useEffect(() => {
     if (!isAdmin) return;
-    const refreshGeo = () => void geoWizard.reloadStatus();
+    const refreshGeo = () => void reloadGeoStatus();
     const onVisibility = () => {
       if (document.visibilityState === 'visible') refreshGeo();
     };
@@ -273,7 +274,7 @@ export default function MapPage() {
       window.removeEventListener('focus', refreshGeo);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [isAdmin, geoWizard.reloadStatus]);
+  }, [isAdmin, reloadGeoStatus]);
 
   return (
     <div className={`app${sidebarCollapsed ? ' sidebar-collapsed' : ''}`} id="app">
