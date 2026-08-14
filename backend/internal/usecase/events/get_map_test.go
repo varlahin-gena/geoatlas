@@ -14,11 +14,11 @@ type stubRepo struct {
 	raws    []model.RawAgg
 }
 
-func (s *stubRepo) ScanMapAggs(ctx context.Context, tr model.TimeRange, groupBy string, limit int, filter string, timeout time.Duration) (MapAggScanResult, error) {
+func (s *stubRepo) ScanMapAggs(ctx context.Context, tr model.TimeRange, q MapScanQuery, timeout time.Duration) (MapAggScanResult, error) {
 	if s.geoOK {
-		return MapAggScanResult{Source: "geo_" + groupBy, GeoEdges: s.geoRows}, nil
+		return MapAggScanResult{Source: "geo_" + q.GroupBy, GeoEdges: s.geoRows}, nil
 	}
-	return MapAggScanResult{Source: "ip_live_" + groupBy, Raws: s.raws}, nil
+	return MapAggScanResult{Source: "ip_live_" + q.GroupBy, Raws: s.raws}, nil
 }
 
 func (s *stubRepo) ScanCountrySeries(ctx context.Context, tr model.TimeRange, country string, timeout time.Duration) ([]SeriesPoint, int, error) {

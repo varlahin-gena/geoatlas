@@ -18,24 +18,23 @@ func ScanRawAggsForTimeRange(
 	ctx context.Context,
 	ch clickhouse.Conn,
 	tr model.TimeRange,
-	limit int,
-	filter string,
+	sel MapSelect,
 	timeout time.Duration,
 ) ([]model.RawAgg, error) {
 	switch tr.Mode {
 	case "minutes", "hours":
-		return scanRawLogsRelative(ctx, ch, tr.Mode, tr.Amount, limit, filter, timeout)
+		return scanRawLogsRelative(ctx, ch, tr.Mode, tr.Amount, sel, timeout)
 	case "days":
 		// traffic_edges_daily без lat/lon — для карты IP/subnet нужны координаты из traffic_logs.
 		// (PreferDailyEdgesAgg оставляем для ScanRawAggs / прочих счётчиков.)
-		return scanRawLogsRelative(ctx, ch, "days", tr.Amount, limit, filter, timeout)
+		return scanRawLogsRelative(ctx, ch, "days", tr.Amount, sel, timeout)
 	case "absolute":
 		if !tr.To.After(tr.From) {
 			return nil, nil
 		}
-		return scanRawLogsAbsolute(ctx, ch, tr.From, tr.To, limit, filter, timeout)
+		return scanRawLogsAbsolute(ctx, ch, tr.From, tr.To, sel, timeout)
 	default:
-		return scanRawLogsRelative(ctx, ch, "days", 1, limit, filter, timeout)
+		return scanRawLogsRelative(ctx, ch, "days", 1, sel, timeout)
 	}
 }
 
@@ -83,8 +82,7 @@ func scanRawLogsRelative(
 	ch clickhouse.Conn,
 	mode string,
 	amount int,
-	limit int,
-	filter string,
+	sel MapSelect,
 	timeout time.Duration,
 ) ([]model.RawAgg, error) {
 	var unit string
@@ -99,17 +97,19 @@ func scanRawLogsRelative(
 		return nil, fmt.Errorf("unknown relative mode %q", mode)
 	}
 
-	where := fmt.Sprintf("timestamp >= now() - INTERVAL ? %s%s", unit, sqlclause.ActionWhereSQL(filter))
-	q := rawAggSelectSQL(TablesOf(ctx).Logs, where, filter, limit)
+	scopeSQL, scopeArgs := sel.scope().LogsWhere()
+	where := fmt.Sprintf("timestamp >= now() - INTERVAL ? %s%s%s", unit, sqlclause.ActionWhereSQL(sel.Filter), scopeSQL)
+	q := rawAggSelectSQL(TablesOf(ctx).Logs, where, sel.Filter, sel.Limit)
 
 	qctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	rows, err := ch.Query(qctx, q, amount)
+	args := append([]any{amount}, scopeArgs...)
+	rows, err := ch.Query(qctx, q, args...)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"query raw aggregates (mode=%s amount=%d filter=%q): %w\nSQL:\n%s",
-			mode, amount, filter, err, q,
+			mode, amount, sel.Filter, err, q,
 		)
 	}
 	defer rows.Close()
@@ -121,21 +121,22 @@ func scanRawLogsAbsolute(
 	ctx context.Context,
 	ch clickhouse.Conn,
 	from, to time.Time,
-	limit int,
-	filter string,
+	sel MapSelect,
 	timeout time.Duration,
 ) ([]model.RawAgg, error) {
-	where := fmt.Sprintf("timestamp >= ? AND timestamp < ?%s", sqlclause.ActionWhereSQL(filter))
-	q := rawAggSelectSQL(TablesOf(ctx).Logs, where, filter, limit)
+	scopeSQL, scopeArgs := sel.scope().LogsWhere()
+	where := fmt.Sprintf("timestamp >= ? AND timestamp < ?%s%s", sqlclause.ActionWhereSQL(sel.Filter), scopeSQL)
+	q := rawAggSelectSQL(TablesOf(ctx).Logs, where, sel.Filter, sel.Limit)
 
 	qctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	rows, err := ch.Query(qctx, q, from, to)
+	args := append([]any{from, to}, scopeArgs...)
+	rows, err := ch.Query(qctx, q, args...)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"query raw aggregates (from=%s to=%s filter=%q): %w\nSQL:\n%s",
-			from.UTC().Format(time.RFC3339Nano), to.UTC().Format(time.RFC3339Nano), filter, err, q,
+			from.UTC().Format(time.RFC3339Nano), to.UTC().Format(time.RFC3339Nano), sel.Filter, err, q,
 		)
 	}
 	defer rows.Close()

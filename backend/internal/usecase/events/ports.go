@@ -10,7 +10,7 @@ import (
 
 // TrafficRepository — чтение агрегатов для карты.
 type TrafficRepository interface {
-	ScanMapAggs(ctx context.Context, tr model.TimeRange, groupBy string, limit int, filter string, timeout time.Duration) (MapAggScanResult, error)
+	ScanMapAggs(ctx context.Context, tr model.TimeRange, q MapScanQuery, timeout time.Duration) (MapAggScanResult, error)
 	ScanCountrySeries(ctx context.Context, tr model.TimeRange, country string, timeout time.Duration) ([]SeriesPoint, int, error)
 }
 

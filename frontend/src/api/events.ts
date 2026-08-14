@@ -4,13 +4,25 @@ import type { EventsPayload, SeriesPayload } from '@/pages/Map/mapTypes';
 export function fetchMapEvents(opts: {
   groupBy: string;
   limit: number;
+  filter?: string;
+  country?: string;
+  q?: string;
   periodQuery: string;
   source: 'live' | 'backup';
   signal?: AbortSignal;
 }): Promise<EventsPayload> {
-  const url =
+  let url =
     `/api/events?group_by=${encodeURIComponent(opts.groupBy)}&limit=${opts.limit}` +
     `${opts.periodQuery}&source=${encodeURIComponent(opts.source)}`;
+  if (opts.filter && opts.filter !== 'all') {
+    url += `&filter=${encodeURIComponent(opts.filter)}`;
+  }
+  if (opts.country) {
+    url += `&country=${encodeURIComponent(opts.country)}`;
+  }
+  if (opts.q) {
+    url += `&q=${encodeURIComponent(opts.q)}`;
+  }
   return apiFetch<EventsPayload>(url, {
     signal: opts.signal,
     cache: 'no-store',

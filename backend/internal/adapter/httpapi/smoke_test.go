@@ -347,7 +347,7 @@ func (s *stubGeoJobs) ScheduleReloadAndEnrich(context.Context, time.Duration) {
 
 type stubTraffic struct{}
 
-func (stubTraffic) ScanMapAggs(context.Context, model.TimeRange, string, int, string, time.Duration) (usecaseevents.MapAggScanResult, error) {
+func (stubTraffic) ScanMapAggs(context.Context, model.TimeRange, usecaseevents.MapScanQuery, time.Duration) (usecaseevents.MapAggScanResult, error) {
 	return usecaseevents.MapAggScanResult{}, nil
 }
 func (stubTraffic) ScanCountrySeries(context.Context, model.TimeRange, string, time.Duration) ([]usecaseevents.SeriesPoint, int, error) {

@@ -398,8 +398,20 @@ paths:
             default: all
         - name: limit
           in: query
-          description: Макс. сырых пар (по умолчанию 10000, макс. 50000)
+          description: Макс. сырых пар (по умолчанию 10000, макс. 50000). UI шлёт maxArcs.
           schema: { type: integer, minimum: 1, maximum: 50000, default: 10000 }
+        - name: country
+          in: query
+          description: |
+            Точное имя страны (как в traffic_logs / src_country).
+            Рёбра, где src или dst совпадает; LIMIT применяется после фильтра.
+          schema: { type: string, maxLength: 80 }
+        - name: q
+          in: query
+          description: |
+            Простой substring (без AST) по IP, странам, городам, rule, device, proto, zone.
+            Сложный query builder остаётся на клиенте.
+          schema: { type: string, maxLength: 120 }
       responses:
         "200":
           description: lines + points
@@ -1449,6 +1461,8 @@ components:
       properties:
         group_by: { type: string }
         filter: { type: string }
+        country: { type: string }
+        q: { type: string }
         period: { type: string }
         days: { type: integer }
         hours: { type: integer }

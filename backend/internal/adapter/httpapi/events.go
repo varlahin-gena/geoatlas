@@ -191,6 +191,8 @@ func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 		Limit:     parseOptionalLimit(q.Get("limit")),
 		GroupBy:   normalizeGroupBy(q.Get("group_by")),
 		Filter:    normalizeFilter(q.Get("filter")),
+		Country:   q.Get("country"),
+		Query:     q.Get("q"),
 		Timeout:   h.cfg.QueryTimeout,
 	})
 	if err != nil {
@@ -201,6 +203,8 @@ func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]any{
 		"group_by":        result.GroupBy,
 		"filter":          result.Filter,
+		"country":         result.Country,
+		"q":               result.Query,
 		"period":          result.Period,
 		"data_source":     dataSource,
 		"backup_attached": attached,

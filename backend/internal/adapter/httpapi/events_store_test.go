@@ -18,13 +18,15 @@ type stubTraffic struct {
 	geoCalled bool
 	geoMode   string
 	rawCalled bool
+	lastQuery usecaseevents.MapScanQuery
 }
 
-func (s *stubTraffic) ScanMapAggs(ctx context.Context, tr model.TimeRange, groupBy string, limit int, filter string, timeout time.Duration) (usecaseevents.MapAggScanResult, error) {
+func (s *stubTraffic) ScanMapAggs(ctx context.Context, tr model.TimeRange, q usecaseevents.MapScanQuery, timeout time.Duration) (usecaseevents.MapAggScanResult, error) {
 	s.geoCalled = true
 	s.geoMode = tr.Mode
+	s.lastQuery = q
 	return usecaseevents.MapAggScanResult{
-		Source: "geo_" + groupBy,
+		Source: "geo_" + q.GroupBy,
 		GeoEdges: []model.GeoEdgeAgg{{
 			SrcKey: "Moscow, Россия", DstKey: "Berlin, Germany",
 			SrcLabel: "Moscow", DstLabel: "Berlin",
@@ -105,12 +107,12 @@ type stubTrafficNoGeo struct {
 	stubTraffic
 }
 
-func (s *stubTrafficNoGeo) ScanMapAggs(ctx context.Context, tr model.TimeRange, groupBy string, limit int, filter string, timeout time.Duration) (usecaseevents.MapAggScanResult, error) {
+func (s *stubTrafficNoGeo) ScanMapAggs(ctx context.Context, tr model.TimeRange, q usecaseevents.MapScanQuery, timeout time.Duration) (usecaseevents.MapAggScanResult, error) {
 	s.geoCalled = true
 	s.geoMode = tr.Mode
 	s.rawCalled = true
 	return usecaseevents.MapAggScanResult{
-		Source: "ip_live_" + groupBy,
+		Source: "ip_live_" + q.GroupBy,
 		Raws: []model.RawAgg{{
 			SrcIP: "1.1.1.1", DstIP: "8.8.8.8",
 			Count: 5, AllowedCnt: 5,
@@ -150,10 +152,10 @@ type stubTrafficIPLogGeo struct {
 	stubTraffic
 }
 
-func (s *stubTrafficIPLogGeo) ScanMapAggs(ctx context.Context, tr model.TimeRange, groupBy string, limit int, filter string, timeout time.Duration) (usecaseevents.MapAggScanResult, error) {
+func (s *stubTrafficIPLogGeo) ScanMapAggs(ctx context.Context, tr model.TimeRange, q usecaseevents.MapScanQuery, timeout time.Duration) (usecaseevents.MapAggScanResult, error) {
 	s.rawCalled = true
 	return usecaseevents.MapAggScanResult{
-		Source: "ip_live_" + groupBy,
+		Source: "ip_live_" + q.GroupBy,
 		Raws: []model.RawAgg{{
 			SrcIP: "10.0.0.1", DstIP: "10.0.0.2",
 			Count: 7, AllowedCnt: 7,
@@ -197,10 +199,10 @@ type stubTrafficIPCountryOnly struct {
 	stubTraffic
 }
 
-func (s *stubTrafficIPCountryOnly) ScanMapAggs(ctx context.Context, tr model.TimeRange, groupBy string, limit int, filter string, timeout time.Duration) (usecaseevents.MapAggScanResult, error) {
+func (s *stubTrafficIPCountryOnly) ScanMapAggs(ctx context.Context, tr model.TimeRange, q usecaseevents.MapScanQuery, timeout time.Duration) (usecaseevents.MapAggScanResult, error) {
 	s.rawCalled = true
 	return usecaseevents.MapAggScanResult{
-		Source: "ip_live_" + groupBy,
+		Source: "ip_live_" + q.GroupBy,
 		Raws: []model.RawAgg{{
 			SrcIP: "10.0.0.1", DstIP: "10.0.0.2",
 			Count: 7, AllowedCnt: 7,
@@ -228,5 +230,29 @@ func TestGetEventsSubnetUsesCountryFallback(t *testing.T) {
 	lines, _ := body["lines"].([]any)
 	if len(lines) == 0 {
 		t.Fatalf("expected subnet lines via country center, body=%s", rec.Body.String())
+	}
+}
+
+func TestGetEventsPassesFilterCountryAndQ(t *testing.T) {
+	stub := &stubTraffic{}
+	h := &EventsHandler{Deps: &Deps{
+		cfg:      config.Config{QueryTimeout: time.Minute},
+		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
+	}}
+	req := httptest.NewRequest(http.MethodGet, "/api/events?hours=6&group_by=city&filter=blocked&country=Russia&q=tcp&limit=5000", nil)
+	rec := httptest.NewRecorder()
+	h.GetEvents(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if stub.lastQuery.Filter != "blocked" || stub.lastQuery.Country != "Russia" || stub.lastQuery.Query != "tcp" || stub.lastQuery.Limit != 5000 {
+		t.Fatalf("query = %#v", stub.lastQuery)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body["filter"] != "blocked" || body["country"] != "Russia" || body["q"] != "tcp" {
+		t.Fatalf("echo body=%v", body)
 	}
 }

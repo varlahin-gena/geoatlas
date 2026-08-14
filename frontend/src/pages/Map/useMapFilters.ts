@@ -1,10 +1,11 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { compileSearchQuery, evaluateSearchAst } from '@/lib/search';
 import { mapRuCountry } from './mapConstants';
 import { lineMatchesFocusedCountry } from './mapHeatmap';
 import { hasCoords } from './mapLayers';
 import { lineMatchesReputation } from './mapReputation';
 import { classifyEmptyMap } from './geoWizard';
+import type { MapActionFilter } from './mapQuery';
 import type { MapLine, MapPoint, RepFilterSide } from './mapTypes';
 
 export function useMapFilters(opts: {
@@ -18,6 +19,10 @@ export function useMapFilters(opts: {
   repCategories: Set<string>;
   repLists: Set<string>;
   repSide: RepFilterSide;
+  filter: MapActionFilter;
+  search: string;
+  minCount: number;
+  focusedCountry: string | null;
 }) {
   const {
     lines,
@@ -30,25 +35,13 @@ export function useMapFilters(opts: {
     repCategories,
     repLists,
     repSide,
+    filter,
+    search,
+    minCount,
+    focusedCountry,
   } = opts;
 
-  const [filter, setFilter] = useState<'all' | 'allowed' | 'blocked'>('all');
-  const [search, setSearch] = useState('');
-  const [builderOpen, setBuilderOpen] = useState(false);
-  const [minCount, setMinCount] = useState(1);
-  const [maxArcs, setMaxArcs] = useState(5000);
-  const [focusedCountry, setFocusedCountry] = useState<string | null>(null);
-
   const compiled = useMemo(() => compileSearchQuery(search), [search]);
-
-  const clearFocusedCountry = useCallback(() => {
-    setFocusedCountry(null);
-  }, []);
-
-  const applySearchFilter = useCallback((value: string) => {
-    setFocusedCountry(null);
-    setSearch(value);
-  }, []);
 
   const visibleLines = useMemo(() => {
     return lines.filter((line) => {
@@ -183,20 +176,6 @@ export function useMapFilters(opts: {
   ]);
 
   return {
-    filter,
-    setFilter,
-    search,
-    setSearch,
-    builderOpen,
-    setBuilderOpen,
-    minCount,
-    setMinCount,
-    maxArcs,
-    setMaxArcs,
-    focusedCountry,
-    setFocusedCountry,
-    clearFocusedCountry,
-    applySearchFilter,
     compiled,
     visibleLines,
     stats,

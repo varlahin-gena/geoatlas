@@ -14,6 +14,7 @@ import { useGeoWizard } from './useGeoWizard';
 import { useMapDetail } from './useMapDetail';
 import { useMapEvents } from './useMapEvents';
 import { useMapFilters } from './useMapFilters';
+import { useMapViewQuery } from './mapQuery';
 import { useMapLibreController } from './useMapLibreController';
 import { useMapReputation } from './useMapReputation';
 import { useMapUploads } from './useMapUploads';
@@ -24,6 +25,7 @@ import './geoWizard.css';
 export default function MapPage() {
   const { isAdmin, reputationEnabled, uiAuthEnabled, theme, user, refresh } = useAuth();
   const { toast } = useToast();
+  const view = useMapViewQuery();
 
   const {
     period,
@@ -46,7 +48,12 @@ export default function MapPage() {
     backupAttached,
     periodQuery,
     fetchData,
-  } = useMapEvents(toast);
+  } = useMapEvents(toast, {
+    filter: view.filter,
+    maxArcs: view.debouncedMaxArcs,
+    focusedCountry: view.focusedCountry,
+    search: view.debouncedSearch,
+  });
 
   const {
     repMenuOpen,
@@ -65,6 +72,22 @@ export default function MapPage() {
     ipMode,
   } = useMapReputation(lines, groupBy);
 
+  const { visibleLines, stats, emptyOverlay } = useMapFilters({
+    lines,
+    points,
+    loading,
+    fetchError,
+    rawPairs: eventStats.rawPairs,
+    skippedNoGeo: eventStats.skippedNoGeo,
+    repActive,
+    repCategories,
+    repLists,
+    repSide,
+    filter: view.filter,
+    search: view.search,
+    minCount: view.minCount,
+    focusedCountry: view.focusedCountry,
+  });
   const {
     filter,
     setFilter,
@@ -80,21 +103,7 @@ export default function MapPage() {
     setFocusedCountry,
     clearFocusedCountry,
     applySearchFilter,
-    visibleLines,
-    stats,
-    emptyOverlay,
-  } = useMapFilters({
-    lines,
-    points,
-    loading,
-    fetchError,
-    rawPairs: eventStats.rawPairs,
-    skippedNoGeo: eventStats.skippedNoGeo,
-    repActive,
-    repCategories,
-    repLists,
-    repSide,
-  });
+  } = view;
 
   const geoWizard = useGeoWizard({
     isAdmin,

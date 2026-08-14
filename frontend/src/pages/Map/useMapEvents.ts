@@ -3,12 +3,23 @@ import { isAbortError } from '@/api/client';
 import { fetchMapEvents } from '@/api/events';
 import type { ToastKind } from '@/components/Toast';
 import { usePolling } from '@/lib/usePolling';
+import { compileSearchQuery } from '@/lib/search';
 import { buildPeriodQuery } from './mapConstants';
+import { mapFetchLimit, mapServerScope, type MapActionFilter } from './mapQuery';
 import type { MapLine, MapPoint } from './mapTypes';
 
 export type MapDataSource = 'live' | 'backup';
 
-export function useMapEvents(toast: (msg: string, kind?: ToastKind) => void) {
+export function useMapEvents(
+  toast: (msg: string, kind?: ToastKind) => void,
+  opts: {
+    filter: MapActionFilter;
+    maxArcs: number;
+    focusedCountry: string | null;
+    search: string;
+  },
+) {
+  const { filter, maxArcs, focusedCountry, search } = opts;
   const [period, setPeriod] = useState('1d');
   const [periodFrom, setPeriodFrom] = useState('');
   const [periodTo, setPeriodTo] = useState('');
@@ -42,10 +53,15 @@ export function useMapEvents(toast: (msg: string, kind?: ToastKind) => void) {
 
     setLoading(true);
     try {
-      const apiLimit = groupBy === 'ip' || groupBy === 'subnet' ? 50000 : 10000;
+      const searchMode = compileSearchQuery(search).mode;
+      const limit = mapFetchLimit(maxArcs, groupBy, searchMode);
+      const { country, q } = mapServerScope(search, focusedCountry);
       const data = await fetchMapEvents({
         groupBy,
-        limit: apiLimit,
+        limit,
+        filter,
+        country,
+        q,
         periodQuery,
         source: dataSource,
         signal: controller.signal,
@@ -76,7 +92,7 @@ export function useMapEvents(toast: (msg: string, kind?: ToastKind) => void) {
         setLoading(false);
       }
     }
-  }, [groupBy, periodQuery, dataSource, toast]);
+  }, [groupBy, periodQuery, dataSource, toast, filter, maxArcs, focusedCountry, search]);
 
   useEffect(() => {
     void fetchData();

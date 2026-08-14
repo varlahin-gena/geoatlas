@@ -77,7 +77,7 @@ func scanEdgesAgg(ctx context.Context, ch clickhouse.Conn, days, limit int, filt
 
 func scanRawLogs(ctx context.Context, ch clickhouse.Conn, days, limit int, filter string, timeout time.Duration) ([]model.RawAgg, error) {
 	// Один GROUP BY + LIMIT в CH — без загрузки всех пар дня в Go map.
-	return scanRawLogsRelative(ctx, ch, "days", days, limit, filter, timeout)
+	return scanRawLogsRelative(ctx, ch, "days", days, MapSelect{Limit: limit, Filter: filter}, timeout)
 }
 
 func scanRawAggRows(rows interface {

@@ -13,6 +13,18 @@ import (
 	"network_monitor/internal/model"
 )
 
+// MapSelect — LIMIT + action-фильтр + опциональный country/q (bind-args).
+type MapSelect struct {
+	Limit   int
+	Filter  string
+	Country string
+	Query   string
+}
+
+func (s MapSelect) scope() sqlclause.MapScope {
+	return sqlclause.MapScope{Country: s.Country, Query: s.Query}
+}
+
 // ScanGeoEdgesForTimeRange читает рёбра, свёрнутые по city|country|ip|subnet.
 // city/country + days → pre-agg таблицы при готовности, иначе GROUP BY geo из traffic_logs;
 // ip/subnet и minutes/hours/absolute → GROUP BY geo-колонок traffic_logs (без O(n) GeoIP в Go).
@@ -22,8 +34,7 @@ func ScanGeoEdgesForTimeRange(
 	ch clickhouse.Conn,
 	tr model.TimeRange,
 	groupBy string,
-	limit int,
-	filter string,
+	sel MapSelect,
 	timeout time.Duration,
 ) ([]model.GeoEdgeAgg, bool, error) {
 	switch groupBy {
@@ -39,7 +50,7 @@ func ScanGeoEdgesForTimeRange(
 		// У IP/subnet нет daily geo-агрегата; читаем traffic_logs.
 		// Иначе top-N из traffic_edges_daily забит LAN-парами без lat → пустая карта.
 		if groupBy == "ip" || groupBy == "subnet" {
-			rows, err := scanGeoFromLogsRelative(ctx, ch, groupBy, "days", tr.Amount, limit, filter, timeout)
+			rows, err := scanGeoFromLogsRelative(ctx, ch, groupBy, "days", tr.Amount, sel, timeout)
 			if err != nil {
 				return nil, false, err
 			}
@@ -53,7 +64,7 @@ func ScanGeoEdgesForTimeRange(
 		if tryEdges {
 			table := tables.GeoEdges(groupBy)
 			if table != "" {
-				rows, err := scanGeoEdgesDays(ctx, ch, table, tr.Amount, limit, filter, timeout)
+				rows, err := scanGeoEdgesDays(ctx, ch, table, tr.Amount, sel, timeout)
 				if err != nil {
 					slog.Warn("geo edges daily scan failed, falling back to traffic_logs",
 						"group_by", groupBy, "table", table, "err", err)
@@ -62,13 +73,13 @@ func ScanGeoEdgesForTimeRange(
 				}
 			}
 		}
-		rows, err := scanGeoFromLogsRelative(ctx, ch, groupBy, "days", tr.Amount, limit, filter, timeout)
+		rows, err := scanGeoFromLogsRelative(ctx, ch, groupBy, "days", tr.Amount, sel, timeout)
 		if err != nil {
 			return nil, false, err
 		}
 		return rows, true, nil
 	case "minutes", "hours":
-		rows, err := scanGeoFromLogsRelative(ctx, ch, groupBy, tr.Mode, tr.Amount, limit, filter, timeout)
+		rows, err := scanGeoFromLogsRelative(ctx, ch, groupBy, tr.Mode, tr.Amount, sel, timeout)
 		if err != nil {
 			return nil, false, err
 		}
@@ -77,7 +88,7 @@ func ScanGeoEdgesForTimeRange(
 		if !tr.To.After(tr.From) {
 			return nil, false, nil
 		}
-		rows, err := scanGeoFromLogsAbsolute(ctx, ch, groupBy, tr.From, tr.To, limit, filter, timeout)
+		rows, err := scanGeoFromLogsAbsolute(ctx, ch, groupBy, tr.From, tr.To, sel, timeout)
 		if err != nil {
 			return nil, false, err
 		}
@@ -150,8 +161,8 @@ func scanGeoFromLogsRelative(
 	ctx context.Context,
 	ch clickhouse.Conn,
 	groupBy, mode string,
-	amount, limit int,
-	filter string,
+	amount int,
+	sel MapSelect,
 	timeout time.Duration,
 ) ([]model.GeoEdgeAgg, error) {
 	var unit string
@@ -166,14 +177,16 @@ func scanGeoFromLogsRelative(
 		return nil, fmt.Errorf("unsupported geo relative mode %q", mode)
 	}
 	srcKey, dstKey, srcLabel, dstLabel := sqlclause.GeoGroupExprs(groupBy)
-	where := fmt.Sprintf("timestamp >= now() - INTERVAL ? %s%s", unit, sqlclause.ActionWhereSQL(filter))
+	scopeSQL, scopeArgs := sel.scope().LogsWhere()
+	where := fmt.Sprintf("timestamp >= now() - INTERVAL ? %s%s%s", unit, sqlclause.ActionWhereSQL(sel.Filter), scopeSQL)
 	// ClickHouse: ORDER BY → LIMIT → SETTINGS (SETTINGS must be last).
 	q := scanGeoFromLogsSelect(TablesOf(ctx).Logs, srcKey, dstKey, srcLabel, dstLabel, where) +
-		"\n\t\t" + limitClause(limit) + AggSettings()
+		"\n\t\t" + limitClause(sel.Limit) + AggSettings()
 
 	qctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	rows, err := ch.Query(qctx, q, amount)
+	args := append([]any{amount}, scopeArgs...)
+	rows, err := ch.Query(qctx, q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -186,18 +199,19 @@ func scanGeoFromLogsAbsolute(
 	ch clickhouse.Conn,
 	groupBy string,
 	from, to time.Time,
-	limit int,
-	filter string,
+	sel MapSelect,
 	timeout time.Duration,
 ) ([]model.GeoEdgeAgg, error) {
 	srcKey, dstKey, srcLabel, dstLabel := sqlclause.GeoGroupExprs(groupBy)
-	where := fmt.Sprintf("timestamp >= ? AND timestamp < ?%s", sqlclause.ActionWhereSQL(filter))
+	scopeSQL, scopeArgs := sel.scope().LogsWhere()
+	where := fmt.Sprintf("timestamp >= ? AND timestamp < ?%s%s", sqlclause.ActionWhereSQL(sel.Filter), scopeSQL)
 	q := scanGeoFromLogsSelect(TablesOf(ctx).Logs, srcKey, dstKey, srcLabel, dstLabel, where) +
-		"\n\t\t" + limitClause(limit) + AggSettings()
+		"\n\t\t" + limitClause(sel.Limit) + AggSettings()
 
 	qctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	rows, err := ch.Query(qctx, q, from, to)
+	args := append([]any{from, to}, scopeArgs...)
+	rows, err := ch.Query(qctx, q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -209,8 +223,8 @@ func scanGeoEdgesDays(
 	ctx context.Context,
 	ch clickhouse.Conn,
 	table string,
-	days, limit int,
-	filter string,
+	days int,
+	sel MapSelect,
 	timeout time.Duration,
 ) ([]model.GeoEdgeAgg, error) {
 	if days < 1 {
@@ -219,7 +233,8 @@ func scanGeoEdgesDays(
 	qctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	having := sqlclause.HavingAggFilterSQL(filter)
+	scopeHaving, scopeArgs := sel.scope().GeoAggHavingExpr()
+	having := sqlclause.JoinHaving(sqlclause.HavingAggFilterSQL(sel.Filter), scopeHaving)
 
 	q := fmt.Sprintf(`
 		SELECT
@@ -257,9 +272,10 @@ func scanGeoEdgesDays(
 		%s
 		%s
 		%s
-	`, table, having, sqlclause.OrderByGeoAggFilterSQL(filter), limitClause(limit), AggSettings())
+	`, table, having, sqlclause.OrderByGeoAggFilterSQL(sel.Filter), limitClause(sel.Limit), AggSettings())
 
-	rows, err := ch.Query(qctx, q, days)
+	args := append([]any{days}, scopeArgs...)
+	rows, err := ch.Query(qctx, q, args...)
 	if err != nil {
 		return nil, err
 	}

@@ -3,6 +3,7 @@ package events
 import (
 	"context"
 	"reflect"
+	"strings"
 	"time"
 
 	"network_monitor/internal/mapagg"
@@ -15,7 +16,18 @@ type GetMapInput struct {
 	Limit     int
 	GroupBy   string // ip|subnet|city|country
 	Filter    string // all|allowed|blocked
+	Country   string
+	Query     string
 	Timeout   time.Duration
+}
+
+// MapScanQuery — параметры скана агрегатов карты (LIMIT после action/country/q).
+type MapScanQuery struct {
+	GroupBy string
+	Limit   int
+	Filter  string
+	Country string
+	Query   string
 }
 
 // GetMapResult — результат для HTTP/API слоя.
@@ -27,6 +39,8 @@ type GetMapResult struct {
 	Source       string
 	GroupBy      string
 	Filter       string
+	Country      string
+	Query        string
 	Period       string
 	Amount       int
 	From         time.Time
@@ -48,9 +62,13 @@ func New(traffic TrafficRepository, geo GeoLookuper, reputation ReputationLookup
 func (s *Service) GetMap(ctx context.Context, in GetMapInput) (GetMapResult, error) {
 	groupBy := normalizeGroupBy(in.GroupBy)
 	filter := normalizeFilter(in.Filter)
+	country := clipRunes(in.Country, 80)
+	queryText := clipRunes(in.Query, 120)
 	out := GetMapResult{
 		GroupBy: groupBy,
 		Filter:  filter,
+		Country: country,
+		Query:   queryText,
 		Period:  in.TimeRange.Mode,
 		Amount:  in.TimeRange.Amount,
 		From:    in.TimeRange.From,
@@ -59,7 +77,13 @@ func (s *Service) GetMap(ctx context.Context, in GetMapInput) (GetMapResult, err
 		Source:  "ip",
 	}
 
-	scan, err := s.traffic.ScanMapAggs(ctx, in.TimeRange, groupBy, in.Limit, filter, in.Timeout)
+	scan, err := s.traffic.ScanMapAggs(ctx, in.TimeRange, MapScanQuery{
+		GroupBy: groupBy,
+		Limit:   in.Limit,
+		Filter:  filter,
+		Country: country,
+		Query:   queryText,
+	}, in.Timeout)
 	if err != nil {
 		return GetMapResult{}, err
 	}
@@ -142,6 +166,19 @@ func normalizeFilter(v string) string {
 	default:
 		return "all"
 	}
+}
+
+func clipRunes(s string, max int) string {
+	s = strings.TrimSpace(s)
+	if s == "" || max < 1 {
+		return ""
+	}
+	s = strings.ReplaceAll(s, "\x00", "")
+	r := []rune(s)
+	if len(r) <= max {
+		return s
+	}
+	return string(r[:max])
 }
 
 func buildMapFromIPRaws(raws []model.RawAgg, geo mapagg.GeoLookuper, groupBy string) ([]model.Line, map[string]model.Node, int) {

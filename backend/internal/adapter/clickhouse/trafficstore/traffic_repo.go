@@ -23,29 +23,30 @@ func NewTrafficRepository(apiCH ch.Conn) *TrafficRepository {
 
 var _ events.TrafficRepository = (*TrafficRepository)(nil)
 
-func (r *TrafficRepository) ScanMapAggs(ctx context.Context, tr model.TimeRange, groupBy string, limit int, filter string, timeout time.Duration) (events.MapAggScanResult, error) {
-	geoRows, ok, err := query.ScanGeoEdgesForTimeRange(ctx, r.apiCH, tr, groupBy, limit, filter, timeout)
+func (r *TrafficRepository) ScanMapAggs(ctx context.Context, tr model.TimeRange, q events.MapScanQuery, timeout time.Duration) (events.MapAggScanResult, error) {
+	sel := query.MapSelect{Limit: q.Limit, Filter: q.Filter, Country: q.Country, Query: q.Query}
+	geoRows, ok, err := query.ScanGeoEdgesForTimeRange(ctx, r.apiCH, tr, q.GroupBy, sel, timeout)
 	if err != nil {
 		// Не роняем /api/events: pre-agg/лог-geo могут быть ещё не готовы при старте.
 		slog.Warn("ScanMapAggs: geo edges scan failed, falling back to raw IP pairs",
-			"group_by", groupBy, "err", err)
+			"group_by", q.GroupBy, "err", err)
 		ok = false
 	}
 	if ok {
 		// Geo-путь уже отработал (pre-agg или GROUP BY geo из traffic_logs).
 		// Пустой/неdrawable результат не должен запускать второй тяжёлый raw scan.
 		return events.MapAggScanResult{
-			Source:   "geo_" + groupBy,
+			Source:   "geo_" + q.GroupBy,
 			GeoEdges: geoRows,
 		}, nil
 	}
 
-	raws, err := query.ScanRawAggsForTimeRange(ctx, r.apiCH, tr, limit, filter, timeout)
+	raws, err := query.ScanRawAggsForTimeRange(ctx, r.apiCH, tr, sel, timeout)
 	if err != nil {
 		return events.MapAggScanResult{}, err
 	}
 	return events.MapAggScanResult{
-		Source: "ip_live_" + groupBy,
+		Source: "ip_live_" + q.GroupBy,
 		Raws:   raws,
 	}, nil
 }
