@@ -12,7 +12,7 @@ RUN go mod download
 COPY stats-collector/ .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/stats-collector .
 
-FROM alpine:3.20
+FROM alpine:3.24
 RUN apk add --no-cache ca-certificates tzdata && \
     addgroup -g 10001 app && \
     adduser -D -u 10001 -G app app
