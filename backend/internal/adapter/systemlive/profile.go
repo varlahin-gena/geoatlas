@@ -42,6 +42,7 @@ func (ProfileAdapter) Load(path string) (*system.CapacityProfile, error) {
 				FifoSize: profile.Limits.SyslogNG.FifoSize, MemBufBytes: profile.Limits.SyslogNG.MemBufBytes,
 				DiskBufBytes: profile.Limits.SyslogNG.DiskBufBytes, UDPRcvbufBytes: profile.Limits.SyslogNG.UDPRcvbufBytes,
 				IWSize: profile.Limits.SyslogNG.IWSize,
+				TCPIWSize: profile.Limits.SyslogNG.TCPIWSize, TCPMaxConn: profile.Limits.SyslogNG.TCPMaxConn,
 			},
 		},
 		Capacity: system.ProfileCapacity{

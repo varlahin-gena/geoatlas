@@ -39,6 +39,8 @@ type SyslogLimits struct {
 	DiskBufBytes   int64 `json:"disk_buf_bytes,omitempty"`
 	UDPRcvbufBytes int64 `json:"udp_rcvbuf_bytes,omitempty"`
 	IWSize         int   `json:"iw_size,omitempty"`
+	TCPIWSize      int   `json:"tcp_iw_size,omitempty"`
+	TCPMaxConn     int   `json:"tcp_max_conn,omitempty"`
 }
 
 type Limits struct {

@@ -91,7 +91,7 @@ profile_params() {
             BE_MEM_GB=1; BE_CPUS=1
             BE_WORKERS=1; BE_QUEUE=50000; BE_BATCH=3000; BE_FLUSH=3
             BE_CH_CONNS=1
-            # 2×32 MiB mem-buf + ~80 MiB процесс; fifo больше не гигабайтный.
+            # 2×fifo сообщений в RAM (flow-control-window) + ~80 MiB процесс.
             SYSLOG_MEM_MB=512; SYSLOG_CPUS=1
             SYSLOG_FIFO=10000; SYSLOG_MEM_BUF=33554432; SYSLOG_DISK_BUF=268435456
             SYSLOG_UDP_RCVBUF=16777216; SYSLOG_IW_SIZE=1000
@@ -103,6 +103,7 @@ profile_params() {
             BE_MEM_GB=2; BE_CPUS=2
             BE_WORKERS=2; BE_QUEUE=200000; BE_BATCH=20000; BE_FLUSH=1
             BE_CH_CONNS=2
+            # 2×fifo сообщений в RAM (flow-control-window) + ~80 MiB процесс.
             SYSLOG_MEM_MB=768; SYSLOG_CPUS=1
             SYSLOG_FIFO=25000; SYSLOG_MEM_BUF=67108864; SYSLOG_DISK_BUF=536870912
             SYSLOG_UDP_RCVBUF=33554432; SYSLOG_IW_SIZE=2000
@@ -514,20 +515,38 @@ services:
 EOF
 }
 
+# 4.11 делит TCP log-iw-size на max-connections; минимум 100 на соединение.
+syslog_tcp_max_conn() { echo 64; }
+
+syslog_tcp_iw_size() {
+    local tcp_max min_tcp_iw tcp_iw
+    tcp_max="$(syslog_tcp_max_conn)"
+    min_tcp_iw=$((tcp_max * 100))
+    tcp_iw="${SYSLOG_IW_SIZE}"
+    if (( tcp_iw < min_tcp_iw )); then
+        tcp_iw=$min_tcp_iw
+    fi
+    echo "$tcp_iw"
+}
+
 write_syslog_profile() {
     local project_dir="$1" profile="$2"
     local conf_dir="${project_dir}/syslog-ng.d"
     local tcp_rcv=16777216
+    local tcp_max tcp_iw
+    tcp_max="$(syslog_tcp_max_conn)"
+    tcp_iw="$(syslog_tcp_iw_size)"
 
     mkdir -p "$conf_dir"
     cat >"${conf_dir}/zz_profile.conf" <<EOF
 # Сгенерировано detect_resources.sh — профиль: ${profile}
 @define fifo_size ${SYSLOG_FIFO}
-@define mem_buf ${SYSLOG_MEM_BUF}
 @define disk_buf ${SYSLOG_DISK_BUF}
 @define udp_rcvbuf ${SYSLOG_UDP_RCVBUF}
 @define tcp_rcvbuf ${tcp_rcv}
 @define iw_size ${SYSLOG_IW_SIZE}
+@define tcp_iw_size ${tcp_iw}
+@define tcp_max_conn ${tcp_max}
 EOF
 }
 
@@ -602,7 +621,9 @@ write_install_profile_json() {
       "mem_buf_bytes": ${SYSLOG_MEM_BUF},
       "disk_buf_bytes": ${SYSLOG_DISK_BUF},
       "udp_rcvbuf_bytes": ${SYSLOG_UDP_RCVBUF},
-      "iw_size": ${SYSLOG_IW_SIZE}
+      "iw_size": ${SYSLOG_IW_SIZE},
+      "tcp_iw_size": $(syslog_tcp_iw_size),
+      "tcp_max_conn": $(syslog_tcp_max_conn)
     }
   },
   "capacity": {
@@ -618,7 +639,7 @@ print_applied_config() {
     echo "Применён профиль: $(profile_label_ru "$profile") [$profile]"
     echo "  ClickHouse : ${CH_MEM_GB} GiB RAM, ${CH_CPUS} CPU"
     echo "  Backend    : ${BE_MEM_GB} GiB RAM, ${BE_CPUS} CPU, workers=${BE_WORKERS}, queue=${BE_QUEUE}, batch=${BE_BATCH}, flush=${BE_FLUSH}s, ch_conns=${BE_CH_CONNS}"
-    echo "  syslog-ng  : ${SYSLOG_MEM_MB} MiB RAM, ${SYSLOG_CPUS} CPU, fifo=${SYSLOG_FIFO}, mem-buf=$((SYSLOG_MEM_BUF / 1048576)) MiB, disk=$((SYSLOG_DISK_BUF / 1048576)) MiB"
+    echo "  syslog-ng  : ${SYSLOG_MEM_MB} MiB RAM, ${SYSLOG_CPUS} CPU, fifo=${SYSLOG_FIFO}, window=${SYSLOG_FIFO} msgs, disk=$((SYSLOG_DISK_BUF / 1048576)) MiB"
     echo "  Ёмкость    : ${EPS_MIN}–${EPS_MAX} eps"
     echo ""
     echo "Созданы файлы:"

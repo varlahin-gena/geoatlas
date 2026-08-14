@@ -114,7 +114,7 @@
 4. **frontend** отдаёт статику и проксирует API-запросы на backend.
 5. **stats-collector** каждые 30 секунд собирает метрики CPU/RAM контейнеров и состояние пайплайна (включая разбивку UDP/TCP).
 
-**Буфер syslog-ng (включён по умолчанию):** в `syslog-ng.conf` у назначений UDP/TCP стоят `disk-buffer` (`reliable(no)`), каталоги в volume `syslog-ng-buffer`. Размеры **fifo / mem-buf / disk** задаёт профиль установки (`syslog-ng.d/zz_profile.conf`, пишет `tune-resources.sh`). Без профиля действуют безопасные дефолты под compose 1 GiB (не гигабайтный FIFO). Это сглаживает краткие пики/рестарты backend; после буфера доставка в backend всё равно at-most-once. Потери **до** backend видны на стадии Syslog-NG (`/system`, `pipeline.syslogng.dropped_total` / `queued`); drops очереди ingest — `/api/ingest/stats`.
+**Буфер syslog-ng (включён по умолчанию):** в `syslog-ng.conf` у назначений UDP/TCP стоят `disk-buffer` (`reliable(no)`). Окно в RAM — `flow-control-window-size` (число сообщений, не байты: в 4.11 `mem-buf-size` с `reliable(no)` игнорируется), диск — `capacity-bytes`. Размеры **fifo / window / disk** задаёт профиль (`syslog-ng.d/zz_profile.conf`, пишет `start.sh` или `tune-resources.sh`). Без файла действуют безопасные дефолты под compose 1 GiB. Это сглаживает краткие пики/рестарты backend; после буфера доставка в backend всё равно at-most-once. Потери **до** backend видны на стадии Syslog-NG (`/system`, `pipeline.syslogng.dropped_total` / `queued`); drops очереди ingest — `/api/ingest/stats`.
 
 syslog-ng **4.11** (`balabit/syslog-ng:4.11.0`): healthcheck `syslog-ng-ctl stats`, внутренний stats-exporter `:9577` (не публикуется). Backend скрейпит live (`SYSLOG_STATS_URL`), stats-collector пишет историю в `system_metrics`.
 
@@ -491,18 +491,25 @@ docker compose restart clickhouse
 | `docker-compose.override.yml`              | Лимиты CPU/RAM контейнеров, параметры ingest, `CH_MAX_THREADS` |
 | `.env`                                     | Переменные для compose (`SYSLOG_STATS_URL` при модуле syslog) |
 | `clickhouse/users.d/zz_install_limits.xml` | Лимиты памяти и `max_threads` запросов ClickHouse       |
-| `syslog-ng.d/zz_profile.conf`              | `@define` буферов syslog-ng (fifo / mem-buf / disk)     |
+| `syslog-ng.d/zz_profile.conf`              | `@define` буферов syslog-ng (fifo / window / disk)      |
 | `install-profile.json`                     | Сводка профиля (отображается в UI «Система»)            |
 
-**Буферы syslog-ng по профилю** (на каждое из двух назначений UDP/TCP; `reliable(no)`):
+**Буферы syslog-ng по профилю** (на каждое из двух назначений UDP/TCP; `reliable(no)`; TCP `max-connections(64)`, `log-iw-size` ≥ 6400):
 
-| Профиль  | RAM контейнера | fifo (сообщений) | mem-buf | disk-buf | UDP rcvbuf |
-|----------|----------------|------------------|---------|----------|------------|
-| `tiny`   | 512 MiB        | 10 000           | 32 MiB  | 256 MiB  | 16 MiB     |
-| `small`  | 768 MiB        | 25 000           | 64 MiB  | 512 MiB  | 32 MiB     |
-| `medium` | 1 GiB          | 50 000           | 96 MiB  | 1 GiB    | 64 MiB     |
-| `large`  | 2 GiB          | 100 000          | 192 MiB | 2 GiB    | 128 MiB    |
-| `xlarge` | 4 GiB          | 200 000          | 384 MiB | 4 GiB    | 128 MiB    |
+| Профиль  | RAM контейнера | fifo / window (сообщений) | disk-buf | UDP rcvbuf |
+|----------|----------------|---------------------------|----------|------------|
+| `tiny`   | 512 MiB        | 10 000                    | 256 MiB  | 16 MiB     |
+| `small`  | 768 MiB        | 25 000                    | 512 MiB  | 32 MiB     |
+| `medium` | 1 GiB          | 50 000                    | 1 GiB    | 64 MiB     |
+| `large`  | 2 GiB          | 100 000                   | 2 GiB    | 128 MiB    |
+| `xlarge` | 4 GiB          | 200 000                   | 4 GiB    | 128 MiB    |
+
+Запрошенные `so-rcvbuf` / `so-sndbuf` применятся только если хост позволяет (`net.core.rmem_max` / `wmem_max`). Иначе в логе syslog-ng будет `The kernel refused to set the receive/send buffer` и останется ~416 KiB — на приём это не влияет, на пиках UDP возможны потери в сокете. Пример (не в compose по умолчанию):
+
+```bash
+sysctl -w net.core.rmem_max=134217728
+sysctl -w net.core.wmem_max=16777216
+```
 
 **Доступные профили:**
 
@@ -704,6 +711,7 @@ docker compose exec clickhouse clickhouse-client --query "
 | Превышена расчётная ёмкость      | `/system` → алёрты `capacity_high` / `capacity_exceeded`, пересчёт профиля |
 | Drops под нагрузкой / очередь полная | `/system` (плитка Drops, стадии Syslog-NG и Backend Ingest); `pipeline.syslogng.dropped_total` / `queued`; `/api/ingest/stats` → `dropped_total`, `buffer_drops_total`; алёрты `syslogng_dropping*`, `ingest_dropping*`; `./scripts/watch-ingest.sh` |
 | UDP/TCP EPS не разделяются       | Перезапустить `syslog-ng` (маркеры `@@nm/udp/@@` / `@@nm/tcp/@@`) |
+| syslog-ng: kernel refused SO_RCVBUF | `net.core.rmem_max` / `wmem_max` на хосте (см. буферы профиля) |
 | GeoIP upload → 502 / OOM, backend перезапускается | Не заливать большой CSV поверх уже загруженного индекса через браузер; `dmesg`/`oom-kill`; см. [GeoIP](#geoip) |
 | GeoIP: `Failed to fetch` при смене страницы | Уход со страницы во время POST обрывает `fetch`; дождитесь окончания или `curl` с сервера |
 | После рестарта backend страницы 500 (auth) | Обновить до ≥1.1.3 (индекс GeoIP грузится асинхронно); дождаться `geo index loaded` |

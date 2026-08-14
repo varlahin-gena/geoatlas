@@ -69,11 +69,47 @@ require_docker() {
     fi
 }
 
+# syslog-ng.d/zz_profile.conf — gitignored; без него 4.11 берёт medium-дефолты из syslog-ng.conf.
+# Пишем при отсутствии или старом формате (нет tcp_iw_size).
+ensure_syslog_profile() {
+    local dest="${SCRIPT_DIR}/syslog-ng.d/zz_profile.conf"
+    local example="${SCRIPT_DIR}/syslog-ng.d/zz_profile.conf.example"
+    local detect="${SCRIPT_DIR}/deploy/common/detect_resources.sh"
+    local profile=""
+
+    mkdir -p "${SCRIPT_DIR}/syslog-ng.d"
+    if [[ -f "$dest" ]] && grep -qE '@define[[:space:]]+tcp_iw_size' "$dest"; then
+        return 0
+    fi
+
+    if [[ -f install-profile.json ]]; then
+        profile="$(grep -oE '"profile"[[:space:]]*:[[:space:]]*"[^"]+"' install-profile.json 2>/dev/null \
+            | head -1 \
+            | sed -E 's/.*"([^"]+)"[[:space:]]*$/\1/' || true)"
+    fi
+
+    if [[ -f "$detect" && -n "$profile" ]]; then
+        # shellcheck source=deploy/common/detect_resources.sh
+        source "$detect"
+        if profile_params "$profile"; then
+            write_syslog_profile "$SCRIPT_DIR" "$profile"
+            log "syslog-ng буферы: syslog-ng.d/zz_profile.conf (профиль ${profile})"
+            return 0
+        fi
+    fi
+
+    if [[ -f "$example" ]]; then
+        cp "$example" "$dest"
+        log "syslog-ng буферы: скопирован zz_profile.conf.example (medium)"
+    fi
+}
+
 prepare_mounts() {
     mkdir -p frontend certs
     if [[ ! -f install-profile.json ]]; then
         echo '{}' > install-profile.json
     fi
+    ensure_syslog_profile
     if [[ -f "${SCRIPT_DIR}/deploy/common/install_meta.sh" ]]; then
         # shellcheck source=deploy/common/install_meta.sh
         source "${SCRIPT_DIR}/deploy/common/install_meta.sh"
