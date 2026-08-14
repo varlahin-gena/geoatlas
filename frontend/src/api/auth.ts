@@ -1,19 +1,17 @@
-import { apiFetch } from './client';
+import { ApiError, apiFetch, apiGet, apiPost } from './client';
 import type { AuthUser } from './types';
 
-export function fetchMe(): Promise<AuthUser | null> {
-  return fetch('/api/auth/me', { credentials: 'same-origin' }).then(async (res) => {
-    if (res.status === 401) return null;
-    if (!res.ok) throw new Error(`auth me: HTTP ${res.status}`);
-    return res.json() as Promise<AuthUser>;
-  });
+export async function fetchMe(): Promise<AuthUser | null> {
+  try {
+    return await apiGet('/api/auth/me');
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) return null;
+    throw e;
+  }
 }
 
 export function login(username: string, password: string): Promise<AuthUser> {
-  return apiFetch<AuthUser>('/api/auth/login', {
-    method: 'POST',
-    body: JSON.stringify({ username, password }),
-  });
+  return apiPost('/api/auth/login', { username, password });
 }
 
 export function logout(): Promise<void> {
@@ -36,8 +34,5 @@ export function changePassword(oldPassword: string, newPassword: string): Promis
 }
 
 export function setGeoWizardDismissed(dismissed: boolean): Promise<AuthUser> {
-  return apiFetch<AuthUser>('/api/auth/geo-wizard-dismiss', {
-    method: 'POST',
-    body: JSON.stringify({ dismissed }),
-  });
+  return apiPost('/api/auth/geo-wizard-dismiss', { dismissed });
 }

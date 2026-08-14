@@ -340,7 +340,7 @@ _nm_ensure_admin_auth() {
 write_env_file() {
     local project_dir="$1" profile="$2"
     local env_file="${project_dir}/.env"
-    local ch_max_mem spill existing_token="" existing_session="" token session
+    local ch_max_mem spill existing_token="" existing_session="" existing_ch="" token session ch_password
 
     ch_max_mem="$(calc_ch_max_query_bytes "$CH_MEM_GB")"
     spill="$(calc_external_spill_bytes "$CH_MEM_GB")"
@@ -348,6 +348,7 @@ write_env_file() {
     if [[ -f "$env_file" ]]; then
         existing_token="$(_nm_env_get "$env_file" API_AUTH_TOKEN)"
         existing_session="$(_nm_env_get "$env_file" SESSION_SECRET)"
+        existing_ch="$(_nm_env_get "$env_file" CLICKHOUSE_PASSWORD)"
     fi
     if [[ -n "$existing_token" ]]; then
         token="$existing_token"
@@ -362,6 +363,14 @@ write_env_file() {
         session="$(openssl rand -hex 32)"
     else
         session="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+    fi
+    ch_password="${CLICKHOUSE_PASSWORD:-$existing_ch}"
+    if [[ -z "$ch_password" ]]; then
+        if command -v openssl >/dev/null 2>&1; then
+            ch_password="$(openssl rand -hex 32)"
+        else
+            ch_password="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+        fi
     fi
 
     local admin_user="${AUTH_ADMIN_USER:-admin}"
@@ -508,6 +517,7 @@ CH_EXTERNAL_GROUP_BY_BYTES=${spill}
 CH_EXTERNAL_SORT_BYTES=${spill}
 API_AUTH_TOKEN=${token}
 SESSION_SECRET=${session}
+CLICKHOUSE_PASSWORD=${ch_password}
 AUTH_ADMIN_USER=${admin_user}
 AUTH_ADMIN_PASSWORD=${admin_pass}
 AUTH_ADMIN_MUST_RESET=${admin_must}

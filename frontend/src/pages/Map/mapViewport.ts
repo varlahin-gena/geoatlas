@@ -122,3 +122,10 @@ export function readViewStateFromMap(map: maplibregl.Map): ViewState {
     pitch: map.getPitch(),
   };
 }
+
+/** 0.25° grid — rebuild hemisphere culling only when the camera crosses a cell. */
+export function globeCullKey(longitude?: number, latitude?: number): string {
+  const lon = Math.round((longitude || 0) * 4) / 4;
+  const lat = Math.round((latitude || 0) * 4) / 4;
+  return `${lon}:${lat}`;
+}

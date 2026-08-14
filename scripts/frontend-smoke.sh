@@ -254,6 +254,40 @@ grep -q 'SESSION_EXPIRED_EVENT' frontend/src/api/client.ts || fail "client.ts: s
 grep -q 'rep_cat' frontend/src/api/events.ts || fail "events API: rep_cat"
 [[ -f frontend/e2e/map.spec.ts ]] || fail "missing e2e/map.spec.ts"
 [[ -f frontend/src/api/openapi.d.ts ]] || fail "missing generated openapi.d.ts"
-ok "api modules / CSP / e2e / polling / sparkline React"
+grep -q 'location = /api/ready' frontend/nginx-app.inc || fail "nginx-app: /api/ready public"
+grep -q 'location = /api/live' frontend/nginx-app.inc || fail "nginx-app: /api/live public"
+if grep -A6 'location = /health {' frontend/nginx-app.inc | grep -q 'proxy_pass http://backend'; then
+  fail "nginx-app: /health must not proxy to backend"
+fi
+grep -q "return 200 '{\"ok\":true,\"status\":\"live\"}'" frontend/nginx-app.inc || fail "nginx-app: /health local live stub"
+grep -q 'location = /health' frontend/docker-entrypoint.sh || fail "entrypoint: /health on HTTP :80 when HTTPS redirect"
+grep -q 'globeCullKey' frontend/src/pages/Map/mapViewport.ts || fail "mapViewport: globeCullKey"
+grep -q 'globeViewRef' frontend/src/pages/Map/MapPage.tsx || fail "MapPage: globeViewRef"
+if grep -q 'setGlobeView' frontend/src/pages/Map/useGlobeAutoRotate.ts; then
+  fail "useGlobeAutoRotate: must not setGlobeView every frame"
+fi
+grep -q 'abortableSleep' frontend/src/pages/Map/geoWizard.ts || fail "geoWizard: abortableSleep"
+grep -q 'apiFetchRaw' frontend/src/pages/Map/useGeoWizard.ts || fail "useGeoWizard: apiFetchRaw"
+grep -q 'Escape' frontend/src/pages/Map/GeoWizardModal.tsx || fail "GeoWizardModal: Escape"
+grep -q 'NM_SOURCEMAP' frontend/vite.config.ts || fail "vite: NM_SOURCEMAP gate"
+grep -q 'location ~\* \\.map\$' frontend/nginx-app.inc || fail "nginx-app: deny .map"
+if grep -qE 'geojson\|map\)\$' frontend/nginx-app.inc; then
+  fail "nginx-app: must not serve .map as static"
+fi
+ok "probes / globe cull / wizard a11y / no sourcemaps"
+
+grep -q 'AuthUser:' openapi.yaml || fail "openapi: AuthUser schema"
+grep -q 'geo_wizard_dismissed' openapi.yaml || fail "openapi: geo_wizard_dismissed"
+grep -q 'SystemAlert:' openapi.yaml || fail "openapi: SystemAlert"
+grep -q 'export function apiGet' frontend/src/api/client.ts || fail "client.ts: apiGet"
+grep -q "components\['schemas'\]\['AuthUser'\]" frontend/src/api/types.ts || fail "types.ts: AuthUser from OpenAPI"
+grep -q 'npm run preview' frontend/playwright.config.ts || fail "playwright: preview in CI"
+[[ -f frontend/e2e/wizard.spec.ts ]] || fail "missing wizard e2e"
+[[ -f .github/dependabot.yml ]] || fail "missing dependabot.yml"
+[[ -f .env.example ]] || fail "missing .env.example"
+if grep -qE 'API_AUTH_TOKEN=.+' .env.example; then
+  fail ".env.example must not contain secret values"
+fi
+ok "openapi auth/system + supply chain"
 
 echo "frontend-smoke: all checks passed"

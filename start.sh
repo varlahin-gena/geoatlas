@@ -45,14 +45,14 @@ fi
 if [[ -z "${HEALTH_URL:-}" ]]; then
     if (( HTTPS_ON == 1 )); then
         if [[ "${HTTPS_PORT}" == "443" ]]; then
-            HEALTH_URL="https://127.0.0.1/api/health"
+            HEALTH_URL="https://127.0.0.1/api/ready"
         else
-            HEALTH_URL="https://127.0.0.1:${HTTPS_PORT}/api/health"
+            HEALTH_URL="https://127.0.0.1:${HTTPS_PORT}/api/ready"
         fi
     elif [[ "${HTTP_PORT}" == "80" ]]; then
-        HEALTH_URL="http://127.0.0.1/api/health"
+        HEALTH_URL="http://127.0.0.1/api/ready"
     else
-        HEALTH_URL="http://127.0.0.1:${HTTP_PORT}/api/health"
+        HEALTH_URL="http://127.0.0.1:${HTTP_PORT}/api/ready"
     fi
 fi
 
@@ -149,20 +149,23 @@ ensure_compose_profiles() {
     log "Compose-профили (по умолчанию): ${COMPOSE_PROFILES}"
 }
 
-# Генерирует API_AUTH_TOKEN, SESSION_SECRET и пароль admin в .env, если ещё нет.
+# Генерирует API_AUTH_TOKEN, SESSION_SECRET, пароль admin и CLICKHOUSE_PASSWORD в .env, если ещё нет.
 # Operator не сеем — УЗ создают в UI после входа.
 ensure_api_auth_token() {
     local env_file=".env"
-    local need_token=1 need_session=1 need_admin=1
+    local need_token=1 need_session=1 need_admin=1 need_ch=1
     NM_ADMIN_PASSWORD_PRINT="${NM_ADMIN_PASSWORD_PRINT:-0}"
-    if [[ -f "$env_file" ]] && grep -qE '^[[:space:]]*API_AUTH_TOKEN=' "$env_file"; then
+    if [[ -f "$env_file" ]] && grep -qE '^[[:space:]]*API_AUTH_TOKEN=.+' "$env_file"; then
         need_token=0
     fi
-    if [[ -f "$env_file" ]] && grep -qE '^[[:space:]]*SESSION_SECRET=' "$env_file"; then
+    if [[ -f "$env_file" ]] && grep -qE '^[[:space:]]*SESSION_SECRET=.+' "$env_file"; then
         need_session=0
     fi
-    if [[ -f "$env_file" ]] && grep -qE '^[[:space:]]*AUTH_ADMIN_PASSWORD=' "$env_file"; then
+    if [[ -f "$env_file" ]] && grep -qE '^[[:space:]]*AUTH_ADMIN_PASSWORD=.+' "$env_file"; then
         need_admin=0
+    fi
+    if [[ -f "$env_file" ]] && grep -qE '^[[:space:]]*CLICKHOUSE_PASSWORD=.+' "$env_file"; then
+        need_ch=0
     fi
     if [[ -n "${AUTH_ADMIN_PASSWORD:-}" ]]; then
         need_admin=0
@@ -175,10 +178,10 @@ ensure_api_auth_token() {
             } >>"$env_file"
         fi
     fi
-    if (( need_token == 0 && need_session == 0 && need_admin == 0 )); then
+    if (( need_token == 0 && need_session == 0 && need_admin == 0 && need_ch == 0 )); then
         return 0
     fi
-    local rand admin_user admin_pass
+    local rand admin_user admin_pass ch_pass
     rand="$(nm_rand_hex 32)"
     admin_user="${AUTH_ADMIN_USER:-admin}"
     if (( need_admin == 1 )); then
@@ -188,6 +191,9 @@ ensure_api_auth_token() {
         AUTH_ADMIN_MUST_RESET=1
         NM_ADMIN_PASSWORD_PRINT=1
         export AUTH_ADMIN_USER AUTH_ADMIN_PASSWORD AUTH_ADMIN_MUST_RESET NM_ADMIN_PASSWORD_PRINT
+    fi
+    if (( need_ch == 1 )); then
+        ch_pass="$(nm_rand_hex 32)"
     fi
     {
         echo ""
@@ -206,8 +212,12 @@ ensure_api_auth_token() {
             echo "AUTH_ADMIN_PASSWORD=${admin_pass}"
             echo "AUTH_ADMIN_MUST_RESET=1"
         fi
+        if (( need_ch == 1 )); then
+            echo "# Сгенерировано start.sh — пароль ClickHouse (docker-сеть; порты не публикуются)"
+            echo "CLICKHOUSE_PASSWORD=${ch_pass}"
+        fi
     } >>"$env_file"
-    log "Сгенерированы секреты авторизации в .env (API_AUTH_TOKEN / SESSION_SECRET / пароль admin, если отсутствовали)"
+    log "Сгенерированы секреты в .env (API_AUTH_TOKEN / SESSION_SECRET / пароль admin / CLICKHOUSE_PASSWORD, если отсутствовали)"
 }
 
 # Не даём поднять стек без секретов / с legacy-плейсхолдерами.
@@ -339,20 +349,20 @@ main() {
         if [[ "${HTTPS_PORT}" == "443" ]]; then
             log "Веб-интерфейс: https://${IP_ADDR}"
             log "Страница входа: https://${IP_ADDR}/login.html"
-            log "Health check  : https://${IP_ADDR}/api/health"
+            log "Health check  : https://${IP_ADDR}/api/ready"
         else
             log "Веб-интерфейс: https://${IP_ADDR}:${HTTPS_PORT}"
             log "Страница входа: https://${IP_ADDR}:${HTTPS_PORT}/login.html"
-            log "Health check  : https://${IP_ADDR}:${HTTPS_PORT}/api/health"
+            log "Health check  : https://${IP_ADDR}:${HTTPS_PORT}/api/ready"
         fi
     elif [[ "${HTTP_PORT}" == "80" ]]; then
         log "Веб-интерфейс: http://${IP_ADDR}"
         log "Страница входа: http://${IP_ADDR}/login.html"
-        log "Health check  : http://${IP_ADDR}/api/health"
+        log "Health check  : http://${IP_ADDR}/api/ready"
     else
         log "Веб-интерфейс: http://${IP_ADDR}:${HTTP_PORT}"
         log "Страница входа: http://${IP_ADDR}:${HTTP_PORT}/login.html"
-        log "Health check  : http://${IP_ADDR}:${HTTP_PORT}/api/health"
+        log "Health check  : http://${IP_ADDR}:${HTTP_PORT}/api/ready"
     fi
     log "Первый вход: пользователь ${AUTH_ADMIN_USER:-admin}"
     if [[ "${NM_ADMIN_PASSWORD_PRINT:-0}" == "1" && -n "${AUTH_ADMIN_PASSWORD:-}" ]]; then

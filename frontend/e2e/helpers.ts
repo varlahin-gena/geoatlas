@@ -111,6 +111,18 @@ export async function installSessionMocks(
     await fulfillJson(route, 200, { count: 0, ranges: [], index_ready: true });
   });
 
+  await page.route('**/api/auth/geo-wizard-dismiss', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    const body = route.request().postDataJSON() as { dismissed?: boolean };
+    if (session) {
+      session = { ...session, geo_wizard_dismissed: Boolean(body.dismissed) };
+    }
+    await fulfillJson(route, 200, session || { username: 'anon', role: 'administrator', reputationEnabled: true });
+  });
+
   await page.route(/\/api\/me\/search-templates(\/|\?|$)/, async (route) => {
     await fulfillJson(route, 200, { templates: [] });
   });
@@ -128,7 +140,8 @@ export async function seedCsrf(page: Page) {
     {
       name: 'nm_csrf',
       value: CSRF,
-      url: 'http://127.0.0.1:5173',
+      domain: '127.0.0.1',
+      path: '/',
     },
   ]);
 }

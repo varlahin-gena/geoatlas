@@ -1,3 +1,5 @@
+import type { paths } from './openapi';
+
 export function csrfToken(): string {
   const m = document.cookie.match(/(?:^|;\s*)nm_csrf=([^;]*)/);
   return m ? decodeURIComponent(m[1]) : '';
@@ -93,4 +95,30 @@ export async function apiFetchRaw(path: string, init: RequestInit = {}): Promise
   });
   notifySessionExpired(path, res.status);
   return res;
+}
+
+/** JSON body of HTTP 200 for an OpenAPI path+method, if the spec declares application/json. */
+export type ApiJson<P extends keyof paths, M extends keyof paths[P]> = paths[P][M] extends {
+  responses: { 200: { content: { 'application/json': infer R } } };
+}
+  ? R
+  : never;
+
+export function apiGet<P extends keyof paths & string>(
+  path: P,
+  init?: RequestInit,
+): Promise<ApiJson<P, 'get'>> {
+  return apiFetch(path, init) as Promise<ApiJson<P, 'get'>>;
+}
+
+export function apiPost<P extends keyof paths & string>(
+  path: P,
+  body?: unknown,
+  init?: RequestInit,
+): Promise<ApiJson<P, 'post'>> {
+  return apiFetch(path, {
+    ...init,
+    method: 'POST',
+    body: body === undefined ? init?.body : JSON.stringify(body),
+  }) as Promise<ApiJson<P, 'post'>>;
 }

@@ -63,6 +63,31 @@ export function writeLocalDismissed(dismissed: boolean): void {
   }
 }
 
+function abortError(signal?: AbortSignal): DOMException {
+  const reason = signal?.reason;
+  if (reason instanceof DOMException) return reason;
+  return new DOMException('Aborted', 'AbortError');
+}
+
+/** Sleep that rejects with AbortError when `signal` is aborted (including already-aborted). */
+export function abortableSleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(abortError(signal));
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    function onAbort() {
+      clearTimeout(timer);
+      reject(abortError(signal));
+    }
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
 export function buildGeoCurlSnippet(origin: string, tokenPlaceholder = '$API_AUTH_TOKEN'): string {
   const base = origin.replace(/\/$/, '') || 'http://127.0.0.1';
   return [

@@ -11,14 +11,19 @@ cd "$PROJECT_DIR"
 
 log() { echo "[$(date +'%F %T')] $*"; }
 
+ch_client() {
+    docker compose exec -T clickhouse \
+      sh -c 'exec clickhouse-client --password "$CLICKHOUSE_PASSWORD" "$@"' sh "$@"
+}
+
 log "Truncating data tables..."
-docker compose exec -T clickhouse clickhouse-client --multiquery < "$SCRIPT_DIR/reset_data.sql"
+ch_client --multiquery < "$SCRIPT_DIR/reset_data.sql"
 
 log "Restarting backend (reload geo index + edges agg state)..."
 docker compose restart backend
 
 log "Done. Row counts:"
-docker compose exec -T clickhouse clickhouse-client --query "
+ch_client --query "
     SELECT 'traffic_logs' AS tbl, count() AS rows FROM traffic_logs
     UNION ALL SELECT 'traffic_edges_daily', count() FROM traffic_edges_daily
     UNION ALL SELECT 'geo_ranges', count() FROM geo_ranges

@@ -3,7 +3,7 @@ import { ROLE_ADMIN, ROLE_OPERATOR, type AuthUser } from '@/api/types';
 import { deriveIsAdmin, deriveReputationEnabled, deriveUiAuthEnabled } from './roles';
 
 function user(partial: Partial<AuthUser> & Pick<AuthUser, 'username' | 'role'>): AuthUser {
-  return partial;
+  return { reputationEnabled: true, ...partial };
 }
 
 describe('deriveIsAdmin', () => {

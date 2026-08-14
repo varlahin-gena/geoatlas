@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as authApi from '@/api/auth';
-import { authHeaders, isAbortError } from '@/api/client';
+import { apiFetchRaw, isAbortError } from '@/api/client';
 import { fetchGeoRanges } from '@/api/geo';
 import type { AuthUser } from '@/api/types';
 import type { ToastKind } from '@/components/Toast';
 import { fmtNumber } from '@/lib/format';
 import {
+  abortableSleep,
   buildGeoCurlSnippet,
   GEO_UPLOAD_LARGE_BYTES,
   readLocalDismissed,
@@ -38,6 +39,8 @@ export function useGeoWizard(opts: {
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [pollNote, setPollNote] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  const pollAbortRef = useRef<AbortController | null>(null);
+  const uploadAbortRef = useRef<AbortController | null>(null);
   const dismissedLocal = readLocalDismissed();
 
   const dismissed = Boolean(user?.geo_wizard_dismissed) || (!uiAuthEnabled && dismissedLocal);
@@ -108,41 +111,64 @@ export function useGeoWizard(opts: {
     [uiAuthEnabled, refreshUser, toast],
   );
 
+  const abortInFlight = useCallback(() => {
+    pollAbortRef.current?.abort();
+    pollAbortRef.current = null;
+    uploadAbortRef.current?.abort();
+    uploadAbortRef.current = null;
+  }, []);
+
+  useEffect(() => () => abortInFlight(), [abortInFlight]);
+
   const moreUpload = useCallback(() => {
+    abortInFlight();
     setStep('upload');
     setPreview(null);
     setPendingFile(null);
     setPollNote('');
-  }, []);
+  }, [abortInFlight]);
 
   const dismiss = useCallback(async () => {
+    abortInFlight();
     setHeldOpen(false);
     await persistDismiss(true);
-  }, [persistDismiss]);
+  }, [persistDismiss, abortInFlight]);
 
   const closeAfterSuccess = useCallback(async () => {
+    abortInFlight();
     setHeldOpen(false);
     await persistDismiss(true);
     if (onGeoReady) await onGeoReady();
-  }, [persistDismiss, onGeoReady]);
+  }, [persistDismiss, onGeoReady, abortInFlight]);
 
   const waitForGeo = useCallback(async () => {
+    pollAbortRef.current?.abort();
+    const controller = new AbortController();
+    pollAbortRef.current = controller;
+    const { signal } = controller;
     setPollNote('Ждём появления диапазонов в базе…');
-    for (let i = 0; i < POLL_MAX; i++) {
-      const st = await loadGeoStatus();
-      if (st && st.count > 0 && st.indexReady) {
-        setPollNote(`Готово: ${fmtNumber(st.count)} диапазонов`);
-        setStep('done');
-        return true;
+    try {
+      for (let i = 0; i < POLL_MAX; i++) {
+        if (signal.aborted) return false;
+        const st = await loadGeoStatus(signal);
+        if (signal.aborted) return false;
+        if (st && st.count > 0 && st.indexReady) {
+          setPollNote(`Готово: ${fmtNumber(st.count)} диапазонов`);
+          setStep('done');
+          return true;
+        }
+        if (st && st.count > 0 && !st.indexReady) {
+          setPollNote(`База есть (${fmtNumber(st.count)}), индекс ещё загружается…`);
+        }
+        await abortableSleep(POLL_MS, signal);
       }
-      if (st && st.count > 0 && !st.indexReady) {
-        setPollNote(`База есть (${fmtNumber(st.count)}), индекс ещё загружается…`);
-      }
-      await new Promise((r) => setTimeout(r, POLL_MS));
+      setPollNote('Таймаут ожидания. Обновите карту или откройте «База GeoIP».');
+      setStep('done');
+      return false;
+    } catch (e) {
+      if (isAbortError(e)) return false;
+      throw e;
     }
-    setPollNote('Таймаут ожидания. Обновите карту или откройте «База GeoIP».');
-    setStep('done');
-    return false;
   }, [loadGeoStatus]);
 
   const runDryRun = useCallback(
@@ -161,11 +187,14 @@ export function useGeoWizard(opts: {
             'warn',
           );
         }
-        const res = await fetch('/upload-geo?dry_run=1', {
+        uploadAbortRef.current?.abort();
+        const controller = new AbortController();
+        uploadAbortRef.current = controller;
+        const res = await apiFetchRaw('/upload-geo?dry_run=1', {
           method: 'POST',
-          credentials: 'same-origin',
-          headers: authHeaders({ 'Content-Type': 'text/csv' }),
+          headers: { 'Content-Type': 'text/csv' },
           body: file,
+          signal: controller.signal,
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -183,6 +212,7 @@ export function useGeoWizard(opts: {
         setPreview({ ranges, sample });
         toast(`Проверка OK: ${fmtNumber(ranges)} диапазонов`, 'success');
       } catch (e) {
+        if (isAbortError(e)) return;
         toast(e instanceof Error ? e.message : 'Ошибка dry-run', 'error');
       } finally {
         setBusy(false);
@@ -198,11 +228,14 @@ export function useGeoWizard(opts: {
     }
     setBusy(true);
     try {
-      const res = await fetch('/upload-geo', {
+      uploadAbortRef.current?.abort();
+      const controller = new AbortController();
+      uploadAbortRef.current = controller;
+      const res = await apiFetchRaw('/upload-geo', {
         method: 'POST',
-        credentials: 'same-origin',
-        headers: authHeaders({ 'Content-Type': 'text/csv' }),
+        headers: { 'Content-Type': 'text/csv' },
         body: pendingFile,
+        signal: controller.signal,
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -218,6 +251,10 @@ export function useGeoWizard(opts: {
       setBusy(false);
       await waitForGeo();
     } catch (e) {
+      if (isAbortError(e)) {
+        setBusy(false);
+        return;
+      }
       toast(e instanceof Error ? e.message : 'Ошибка загрузки', 'error');
       setBusy(false);
     }

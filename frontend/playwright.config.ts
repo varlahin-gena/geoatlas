@@ -1,22 +1,27 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const isCI = !!process.env.CI;
+const port = isCI ? 4173 : 5173;
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: process.env.CI ? 'github' : 'list',
+  forbidOnly: isCI,
+  retries: isCI ? 1 : 0,
+  workers: isCI ? 1 : undefined,
+  reporter: isCI ? 'github' : 'list',
   timeout: 60_000,
   use: {
-    baseURL: 'http://127.0.0.1:5173',
+    baseURL: `http://127.0.0.1:${port}`,
     trace: 'on-first-retry',
     ...devices['Desktop Chrome'],
   },
   webServer: {
-    command: 'npm run dev -- --host 127.0.0.1 --port 5173',
-    url: 'http://127.0.0.1:5173',
-    reuseExistingServer: !process.env.CI,
+    command: isCI
+      ? `npm run preview -- --host 127.0.0.1 --port ${port} --strictPort`
+      : `npm run dev -- --host 127.0.0.1 --port ${port}`,
+    url: `http://127.0.0.1:${port}`,
+    reuseExistingServer: !isCI,
     timeout: 120_000,
   },
 });

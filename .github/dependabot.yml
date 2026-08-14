@@ -1,0 +1,69 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      backend-go:
+        patterns: ["*"]
+
+  - package-ecosystem: gomod
+    directory: /stats-collector
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      stats-go:
+        patterns: ["*"]
+
+  - package-ecosystem: gomod
+    directory: /pkg/chconn
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      chconn-go:
+        patterns: ["*"]
+
+  - package-ecosystem: gomod
+    directory: /pkg/syslogngstats
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      syslogngstats-go:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      frontend-deps:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /backend
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /frontend
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /stats-collector
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]

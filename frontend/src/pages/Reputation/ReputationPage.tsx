@@ -1,6 +1,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { authHeaders } from '@/api/client';
+import { apiFetchRaw } from '@/api/client';
 import {
   createReputationFeed,
   deleteReputationList,
@@ -238,10 +238,9 @@ export default function ReputationPage() {
                   e.target.value = '';
                   if (!file) return;
                   try {
-                    const res = await fetch('/upload-reputation', {
+                    const res = await apiFetchRaw('/upload-reputation', {
                       method: 'POST',
-                      credentials: 'same-origin',
-                      headers: authHeaders({ 'Content-Type': 'text/csv' }),
+                      headers: { 'Content-Type': 'text/csv' },
                       body: await file.text(),
                     });
                     const data = (await res.json().catch(() => ({}))) as {

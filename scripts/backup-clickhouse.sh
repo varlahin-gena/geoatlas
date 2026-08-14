@@ -31,6 +31,12 @@ CLICKHOUSE_SERVICE="${CLICKHOUSE_SERVICE:-clickhouse}"
 BACKEND_SERVICE="${BACKEND_SERVICE:-backend}"
 BACKUP_ROOT="/var/lib/clickhouse-backups"
 
+# Пароль берётся из env контейнера (CLICKHOUSE_PASSWORD), не с хоста.
+ch_client() {
+  $COMPOSE exec -T "$CLICKHOUSE_SERVICE" \
+    sh -c 'exec clickhouse-client --password "$CLICKHOUSE_PASSWORD" "$@"' sh "$@"
+}
+
 if [[ "$BACKUP_ENABLED" == "0" || "$BACKUP_ENABLED" == "false" ]]; then
   echo "backup: disabled (BACKUP_ENABLED=$BACKUP_ENABLED)"
   exit 0
@@ -62,7 +68,7 @@ fi
 # Только существующие таблицы (reputation может отсутствовать при выключенном модуле).
 EXISTING=()
 for t in "${TABLES[@]}"; do
-  n="$($COMPOSE exec -T "$CLICKHOUSE_SERVICE" clickhouse-client -q \
+  n="$(ch_client -q \
     "SELECT count() FROM system.tables WHERE database = currentDatabase() AND name = '$t'")"
   if [[ "${n//$'\r'/}" == "1" ]]; then
     EXISTING+=("$t")
@@ -87,7 +93,7 @@ for t in "${EXISTING[@]}"; do
 done
 SQL="BACKUP ${TABLE_LIST} TO Disk('backups', '${NAME}')"
 echo "backup: $SQL"
-$COMPOSE exec -T "$CLICKHOUSE_SERVICE" clickhouse-client --receive_timeout 3600 --send_timeout 3600 -q "$SQL"
+ch_client --receive_timeout 3600 --send_timeout 3600 -q "$SQL"
 echo "backup: clickhouse ok → Disk('backups', '$NAME')"
 
 if [[ "$BACKUP_INCLUDE_AUTH" == "1" || "$BACKUP_INCLUDE_AUTH" == "true" ]]; then

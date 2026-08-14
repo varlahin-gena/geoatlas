@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type Dispatch,
+  type MutableRefObject,
   type RefObject,
   type SetStateAction,
 } from 'react';
@@ -22,6 +23,7 @@ import {
   applyGlobeFitZoom,
   applyMapFitZoom,
   applyMapProjection,
+  globeCullKey,
   readViewStateFromMap,
 } from './mapViewport';
 import type { ViewState } from './mapTypes';
@@ -54,9 +56,10 @@ export function useMapLibreController(opts: {
 
   const [heavyCountryLayers, setHeavyCountryLayers] = useState(false);
   const [mapTilesFailed, setMapTilesFailed] = useState(true);
-  const [globeView, setGlobeView] = useState<ViewState>({ ...DEFAULT_GLOBE_VIEW });
   const [mapReady, setMapReady] = useState(false);
   const [layersTick, setLayersTick] = useState(0);
+  const globeViewRef = useRef<ViewState>({ ...DEFAULT_GLOBE_VIEW });
+  const lastGlobeCullKeyRef = useRef('');
 
   const bumpLayersTick = useCallback(() => {
     setLayersTick((t) => t + 1);
@@ -66,18 +69,14 @@ export function useMapLibreController(opts: {
     startGlobeAutoRotate,
     stopGlobeAutoRotate,
     userInteractingRef,
-    lastGlobeCullKeyRef,
     viewModeRef,
     autoRotateRef,
-    globeViewRef,
   } = useGlobeAutoRotate({
     mapRef,
     viewMode,
     autoRotate,
     mapReady,
-    globeView,
-    setGlobeView,
-    bumpLayersTick,
+    globeViewRef,
   });
 
   heavyLayersRef.current = heavyCountryLayers;
@@ -220,8 +219,8 @@ export function useMapLibreController(opts: {
             latitude: DEFAULT_GLOBE_VIEW.latitude,
             bearing: DEFAULT_GLOBE_VIEW.bearing,
           });
-          setGlobeView(gvs);
           globeViewRef.current = gvs;
+          lastGlobeCullKeyRef.current = globeCullKey(gvs.longitude, gvs.latitude);
         }
       } else {
         applyMapProjection(map, 'map');
@@ -266,16 +265,12 @@ export function useMapLibreController(opts: {
 
     map.on('move', () => {
       const vsNow = readViewStateFromMap(map);
-      if (viewModeRef.current === 'globe') {
-        setGlobeView(vsNow);
-        globeViewRef.current = vsNow;
-        const lon = Math.round((vsNow.longitude || 0) * 4) / 4;
-        const lat = Math.round((vsNow.latitude || 0) * 4) / 4;
-        const key = `${lon}:${lat}`;
-        if (key !== lastGlobeCullKeyRef.current) {
-          lastGlobeCullKeyRef.current = key;
-          setLayersTick((tick) => tick + 1);
-        }
+      if (viewModeRef.current !== 'globe') return;
+      globeViewRef.current = vsNow;
+      const key = globeCullKey(vsNow.longitude, vsNow.latitude);
+      if (key !== lastGlobeCullKeyRef.current) {
+        lastGlobeCullKeyRef.current = key;
+        bumpLayersTick();
       }
     });
     map.on('zoomend', () => {
@@ -347,8 +342,8 @@ export function useMapLibreController(opts: {
         latitude: globeViewRef.current.latitude ?? DEFAULT_GLOBE_VIEW.latitude,
         bearing: globeViewRef.current.bearing ?? DEFAULT_GLOBE_VIEW.bearing,
       });
-      setGlobeView(gvs);
       globeViewRef.current = gvs;
+      lastGlobeCullKeyRef.current = globeCullKey(gvs.longitude, gvs.latitude);
       if (autoRotate) startGlobeAutoRotate();
     } else {
       applyMapProjection(map, 'map');
@@ -367,8 +362,8 @@ export function useMapLibreController(opts: {
       applyMapProjection(map, viewModeRef.current);
       if (viewModeRef.current === 'globe') {
         const gvs = applyGlobeFitZoom(map);
-        setGlobeView(gvs);
         globeViewRef.current = gvs;
+        lastGlobeCullKeyRef.current = globeCullKey(gvs.longitude, gvs.latitude);
       } else {
         applyMapFitZoom(map);
       }
@@ -388,7 +383,6 @@ export function useMapLibreController(opts: {
     toast,
     setViewMode,
     globeViewRef,
-    lastGlobeCullKeyRef,
     viewModeRef,
   ]);
 
@@ -401,8 +395,8 @@ export function useMapLibreController(opts: {
         latitude: DEFAULT_GLOBE_VIEW.latitude,
         bearing: DEFAULT_GLOBE_VIEW.bearing,
       });
-      setGlobeView(gvs);
       globeViewRef.current = gvs;
+      lastGlobeCullKeyRef.current = globeCullKey(gvs.longitude, gvs.latitude);
     } else {
       applyMapFitZoom(map, { ...DEFAULT_MAP_VIEW });
     }
@@ -428,7 +422,7 @@ export function useMapLibreController(opts: {
     layersRefreshBusy,
     heavyCountryLayers,
     mapTilesFailed,
-    globeView,
+    globeViewRef: globeViewRef as MutableRefObject<ViewState>,
     mapReady,
     layersTick,
     resetView,

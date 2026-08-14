@@ -20,8 +20,12 @@ const (
 
 func expectedAuthMatrix() map[string]authTier {
 	return map[string]authTier{
+		"GET /live":                                 tierPublic,
+		"GET /api/live":                             tierPublic,
 		"GET /health":                               tierPublic,
 		"GET /api/health":                           tierPublic,
+		"GET /ready":                                tierPublic,
+		"GET /api/ready":                            tierPublic,
 		"GET /metrics":                              tierOps,
 		"POST /api/auth/login":                      tierPublic,
 		"POST /api/auth/logout":                     tierPublic,

@@ -25,6 +25,7 @@ services:
     environment:
       # users.d смонтирован :ro — entrypoint не должен писать default-user.xml
       CLICKHOUSE_SKIP_USER_SETUP: "1"
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?set CLICKHOUSE_PASSWORD in .env}
     volumes:
       - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
       - ./clickhouse/config.d:/etc/clickhouse-server/config.d:ro
@@ -104,7 +105,7 @@ services:
       CLICKHOUSE_HOST: clickhouse
       CLICKHOUSE_PORT: "9000"
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?set CLICKHOUSE_PASSWORD in .env}
       CLICKHOUSE_DATABASE: ${CLICKHOUSE_DATABASE:-default}
       INGEST_LISTEN_ADDR: ":1514"
       INGEST_WORKERS: "4"
@@ -166,7 +167,7 @@ services:
       clickhouse:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/live"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -203,10 +204,10 @@ services:
       CLICKHOUSE_HOST: clickhouse
       CLICKHOUSE_PORT: "9000"
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?set CLICKHOUSE_PASSWORD in .env}
       CLICKHOUSE_DATABASE: ${CLICKHOUSE_DATABASE:-default}
       COLLECT_INTERVAL: "30"
-      BACKEND_HEALTH_URL: http://backend:8080/health
+      BACKEND_HEALTH_URL: http://backend:8080/live
       INGEST_STATS_URL: http://backend:8080/api/ingest/stats
       SYSLOG_STATS_URL: "${SYSLOG_STATS_URL-http://syslog-ng:9577/stats}"
       API_AUTH_TOKEN: ${API_AUTH_TOKEN:?set API_AUTH_TOKEN in .env}

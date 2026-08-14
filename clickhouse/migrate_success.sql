@@ -1,7 +1,9 @@
 -- Обновляет success MATERIALIZED до полного allow-list (SoT: model.AllowedInClause).
 -- Обычно применяется автоматически при старте backend (EnsureTrafficLogsSuccess).
 -- Ручной запуск:
---   docker compose exec -T clickhouse clickhouse-client --multiquery < clickhouse/migrate_success.sql
+--   docker compose exec -T clickhouse sh -c \
+--     'clickhouse-client --password "$CLICKHOUSE_PASSWORD" --multiquery' \
+--     < clickhouse/migrate_success.sql
 -- Regenerate lists: cd backend && go generate ./internal/model/...
 
 ALTER TABLE traffic_logs

@@ -48,7 +48,7 @@ func Load() Config {
 		ClickHouseDB:     envStr("CLICKHOUSE_DATABASE", "default"),
 		CollectInterval:  time.Duration(envInt("COLLECT_INTERVAL", 30)) * time.Second,
 		QueryTimeout:     time.Duration(envInt("QUERY_TIMEOUT", 10)) * time.Second,
-		BackendHealthURL: envStr("BACKEND_HEALTH_URL", "http://backend:8080/health"),
+		BackendHealthURL: envStr("BACKEND_HEALTH_URL", "http://backend:8080/live"),
 		IngestStatsURL:   envStr("INGEST_STATS_URL", "http://backend:8080/api/ingest/stats"),
 		SyslogStatsURL:   envStr("SYSLOG_STATS_URL", ""),
 		APIAuthToken:     envStr("API_AUTH_TOKEN", ""),

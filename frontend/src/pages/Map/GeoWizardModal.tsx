@@ -1,7 +1,55 @@
-import type { RefObject } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import { Link } from 'react-router-dom';
 import { fmtNumber } from '@/lib/format';
 import { formatNetworkHint, type DryRunPreview, type GeoStatus, type GeoWizardStep } from './geoWizard';
+
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function useDialogA11y(onDismiss: () => void) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
+
+  useEffect(() => {
+    const root = dialogRef.current;
+    if (!root) return;
+    const prev = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const nodes = () => Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE));
+    (nodes()[0] ?? root).focus();
+
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onDismissRef.current();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const list = nodes();
+      if (list.length === 0) {
+        e.preventDefault();
+        root?.focus();
+        return;
+      }
+      const first = list[0];
+      const last = list[list.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      prev?.focus();
+    };
+  }, []);
+
+  return dialogRef;
+}
 
 interface Props {
   step: GeoWizardStep;
@@ -46,6 +94,8 @@ export function GeoWizardModal(props: Props) {
     onWaitForCurl,
   } = props;
 
+  const dialogRef = useDialogA11y(onDismiss);
+
   async function copyCurl() {
     try {
       await navigator.clipboard.writeText(curlSnippet);
@@ -55,12 +105,21 @@ export function GeoWizardModal(props: Props) {
   }
 
   return (
-    <div className="modal-backdrop show geo-wizard-backdrop" role="presentation">
+    <div
+      className="modal-backdrop show geo-wizard-backdrop"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onDismiss();
+      }}
+    >
       <div
+        ref={dialogRef}
         className="modal geo-wizard"
         role="dialog"
         aria-modal="true"
         aria-labelledby="geo-wizard-title"
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="geo-wizard-header">
           <h3 id="geo-wizard-title">Мастер GeoIP</h3>
@@ -100,7 +159,7 @@ export function GeoWizardModal(props: Props) {
                 <li>Большие файлы надёжнее заливать с сервера через curl</li>
               </ul>
               <div className="modal-actions">
-                <button type="button" className="btn" onClick={onDismiss} disabled={busy}>
+                <button type="button" className="btn" onClick={onDismiss}>
                   Позже
                 </button>
                 <button
@@ -132,6 +191,7 @@ export function GeoWizardModal(props: Props) {
                     type="file"
                     accept=".csv,text/csv"
                     className="visually-hidden"
+                    tabIndex={-1}
                     onChange={(e) => {
                       const f = e.target.files?.[0];
                       if (f) void onDryRun(f);
@@ -228,7 +288,7 @@ export function GeoWizardModal(props: Props) {
                 <button type="button" className="btn" onClick={() => setStep('why')} disabled={busy}>
                   Назад
                 </button>
-                <button type="button" className="btn" onClick={onDismiss} disabled={busy}>
+                <button type="button" className="btn" onClick={onDismiss}>
                   Закрыть
                 </button>
               </div>

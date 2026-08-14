@@ -250,6 +250,31 @@ jobs:
       - name: SPA / nginx contract
         run: bash scripts/frontend-smoke.sh
 
+  trivy:
+    name: trivy (fs CRITICAL)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-fs.sarif
+          exit-code: "0"
+
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs
+
   frontend:
     name: frontend (build + test)
     runs-on: ubuntu-latest

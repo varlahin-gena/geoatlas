@@ -1,3 +1,5 @@
+import type { components } from '@/api/openapi';
+
 export type Tab = 'overview' | 'pipeline' | 'backup' | 'security' | 'charts';
 
 export const CONTAINERS = ['backend', 'clickhouse', 'syslog-ng', 'frontend'] as const;
@@ -8,52 +10,18 @@ export const PERIODS = [
   ['7d', '7д'],
 ] as const;
 
-export interface Alert {
-  level?: string;
-  code?: string;
-  target?: string;
-  message?: string;
-}
-
-export interface FailedLogin {
-  username?: string;
-  ip?: string;
-  count?: number;
-  first_at?: string;
-  last_at?: string;
-  locked?: boolean;
-  locked_until?: string;
-}
-
-export interface EdgesAgg {
-  state?: string;
-  phase?: string;
-  message?: string;
-  raw_rows?: number;
-  agg_rows?: number;
-  days_total?: number;
-  days_done?: number;
-  map_source?: string;
-  prefer_agg?: boolean;
-  geo_prefer_agg?: boolean;
-  started_at?: string;
-  updated_at?: string;
-}
+export type Alert = components['schemas']['SystemAlert'];
+export type FailedLogin = components['schemas']['SystemFailedLogin'];
+export type EdgesAgg = components['schemas']['SystemEdgesAgg'];
 
 /** Nested UI fields. Wire envelope: OpenAPI SystemStats (`src/api/openapi.d.ts`). */
 export interface SystemStats {
   alerts?: Alert[];
-  containers?: Record<string, { cpu_pct?: number; mem_bytes?: number }>;
+  containers?: Record<string, components['schemas']['SystemContainerStats']>;
   health?: Record<string, Record<string, unknown>>;
   pipeline?: Record<string, Record<string, number>>;
   storage?: Record<string, Record<string, number>>;
-  backend_info?: {
-    num_goroutine?: number;
-    heap_alloc_mb?: number;
-    go_version?: string;
-    geo_index_ranges?: number;
-    geo_index_mb?: number;
-  };
+  backend_info?: components['schemas']['SystemBackendInfo'];
   install_profile?: {
     profile?: string;
     profile_label?: string;

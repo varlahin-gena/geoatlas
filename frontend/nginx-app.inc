@@ -73,7 +73,29 @@
     }
 
     location = /health {
-        proxy_pass http://backend:8080/health;
+        access_log off;
+        default_type application/json;
+        add_header Cache-Control "no-store" always;
+        return 200 '{"ok":true,"status":"live"}';
+    }
+
+    location = /live {
+        proxy_pass http://backend:8080/live;
+        include /etc/nginx/includes/proxy-headers.inc;
+    }
+
+    location = /api/live {
+        proxy_pass http://backend:8080/api/live;
+        include /etc/nginx/includes/proxy-headers.inc;
+    }
+
+    location = /ready {
+        proxy_pass http://backend:8080/ready;
+        include /etc/nginx/includes/proxy-headers.inc;
+    }
+
+    location = /api/ready {
+        proxy_pass http://backend:8080/api/ready;
         include /etc/nginx/includes/proxy-headers.inc;
     }
 
@@ -243,15 +265,23 @@
     location = /api-tokens.html { return 302 /api-tokens$is_args$args; }
     location = /change-password.html { return 302 /change-password$is_args$args; }
 
-    # Hashed Vite assets
+    # Hashed Vite assets. Nested deny: ^~ /assets/ skips regex locations.
     location ^~ /assets/ {
+        location ~* \.map$ {
+            return 404;
+        }
         expires 7d;
         add_header Cache-Control "public, immutable";
         include /etc/nginx/includes/security-headers.inc;
         try_files $uri =404;
     }
 
-    location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|geojson|map)$ {
+    # Vite source maps are not published (build sourcemap off unless NM_SOURCEMAP=1).
+    location ~* \.map$ {
+        return 404;
+    }
+
+    location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|geojson)$ {
         expires 1h;
         add_header Cache-Control "public";
         include /etc/nginx/includes/security-headers.inc;

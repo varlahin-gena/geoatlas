@@ -15,7 +15,7 @@
 #   API_AUTH_TOKEN="$TOKEN" SOAK_LINES=500000 SOAK_CONCURRENCY=8 ./scripts/soak-queue-drops.sh
 #
 # Напрямую в backend из контейнера (с хоста :8080 обычно не проброшен — только nginx :80):
-#   docker compose exec backend wget -qO- http://127.0.0.1:8080/health
+#   docker compose exec backend wget -qO- http://127.0.0.1:8080/live
 # Soak с хоста всегда через nginx: SOAK_BASE_URL=http://127.0.0.1
 
 set -euo pipefail

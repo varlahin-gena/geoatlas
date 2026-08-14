@@ -2,6 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   ApiError,
   apiFetch,
+  apiFetchRaw,
+  apiGet,
+  apiPost,
   authHeaders,
   csrfToken,
   isAbortError,
@@ -133,5 +136,66 @@ describe('apiFetch', () => {
     });
     expect(spy).not.toHaveBeenCalled();
     window.removeEventListener('nm-session-expired', spy);
+  });
+});
+
+describe('apiFetchRaw', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('dispatches session-expired on /upload-geo 401', async () => {
+    const spy = vi.fn();
+    window.addEventListener('nm-session-expired', spy);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    );
+    const res = await apiFetchRaw('/upload-geo', { method: 'POST' });
+    expect(res.status).toBe(401);
+    expect(spy).toHaveBeenCalledOnce();
+    window.removeEventListener('nm-session-expired', spy);
+  });
+});
+
+describe('apiGet / apiPost', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('GET /api/auth/me does not dispatch session-expired on 401', async () => {
+    const spy = vi.fn();
+    window.addEventListener('nm-session-expired', spy);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    );
+    await expect(apiGet('/api/auth/me')).rejects.toMatchObject({ status: 401 });
+    expect(spy).not.toHaveBeenCalled();
+    window.removeEventListener('nm-session-expired', spy);
+  });
+
+  it('POST /api/auth/login sends JSON body', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ username: 'admin', role: 'administrator', reputationEnabled: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    await apiPost('/api/auth/login', { username: 'admin', password: 'x' });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.method).toBe('POST');
+    expect(init.body).toBe(JSON.stringify({ username: 'admin', password: 'x' }));
   });
 });

@@ -2,7 +2,9 @@
 -- Источник истины для IN-списков и MV при старте backend — storage.EnsureEdgesAgg
 -- (model.BlockedInClause). Этот файл — ручной fallback для существующих установок.
 -- Ручной запуск:
---   docker compose exec -T clickhouse clickhouse-client --multiquery < clickhouse/migrate_edges_agg.sql
+--   docker compose exec -T clickhouse sh -c \
+--     'clickhouse-client --password "$CLICKHOUSE_PASSWORD" --multiquery' \
+--     < clickhouse/migrate_edges_agg.sql
 --
 -- src_ip/dst_ip: IPv4. На старом томе лучше дать backend Ensure* (EXCHANGE).
 

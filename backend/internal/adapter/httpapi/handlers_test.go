@@ -28,14 +28,42 @@ func TestUsersListDisabledWhenAuthModuleOff(t *testing.T) {
 	}
 }
 
-func TestHealthWithoutClickHouse(t *testing.T) {
+func TestLiveDoesNotNeedClickHouse(t *testing.T) {
 	h := &HealthHandler{Deps: &Deps{
 		cfg: config.Config{QueryTimeout: time.Minute},
-		// systemUC nil → unavailable
 	}}
+	req := httptest.NewRequest(http.MethodGet, "/live", nil)
+	rec := httptest.NewRecorder()
+	h.Live(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("json: %v", err)
+	}
+	if body["ok"] != true || body["status"] != "live" {
+		t.Fatalf("body = %v", body)
+	}
+}
+
+func TestHealthAliasesLive(t *testing.T) {
+	h := &HealthHandler{Deps: &Deps{}}
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
 	h.Health(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+}
+
+func TestReadyWithoutClickHouse(t *testing.T) {
+	h := &HealthHandler{Deps: &Deps{
+		cfg: config.Config{QueryTimeout: time.Minute},
+	}}
+	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
+	rec := httptest.NewRecorder()
+	h.Ready(rec, req)
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d, want 503", rec.Code)
 	}

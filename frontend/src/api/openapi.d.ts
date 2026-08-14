@@ -35,7 +35,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["AuthUser"];
+                    };
                 };
                 /** @description Неверные учётные данные */
                 401: {
@@ -147,12 +149,14 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description OK (поля username, role, must_reset_password, geo_wizard_dismissed) */
+                /** @description OK */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["AuthUser"];
+                    };
                 };
                 /** @description Нет сессии */
                 401: {
@@ -250,7 +254,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["AuthUser"];
+                    };
                 };
                 /** @description Неверный JSON */
                 400: {
@@ -880,7 +886,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/health": {
+    "/live": {
         parameters: {
             query?: never;
             header?: never;
@@ -888,8 +894,85 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Liveness/readiness
-         * @description Публичный probe — только ok и ping ClickHouse.
+         * Liveness
+         * @description Процесс жив. Без ClickHouse и ingest. HTTP 200, если HTTP-сервер отвечает.
+         *     Docker healthcheck backend бьёт сюда.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["LiveResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Alias /live */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["LiveResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Readiness
+         * @description ClickHouse ping + краткий снимок ingest. HTTP 503 только если ClickHouse
+         *     недоступен. Перегрузка ingest — status при HTTP 200 (`degraded` / `overloaded`).
          */
         get: {
             parameters: {
@@ -915,6 +998,90 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Alias /ready */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HealthResponse"];
+                    };
+                };
+                /** @description ClickHouse недоступен */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Alias /live
+         * @description Исторический путь docker/k8s liveness. Эквивалент `/live`.
+         *     Готовность стека (ClickHouse) — `GET /ready`.
+         *     На frontend nginx `GET /health` отвечает локально (без прокси на backend).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["LiveResponse"];
+                    };
                 };
             };
         };
@@ -995,7 +1162,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Alias /health */
+        /** Alias /live */
         get: {
             parameters: {
                 query?: never;
@@ -1011,15 +1178,8 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["HealthResponse"];
+                        "application/json": components["schemas"]["LiveResponse"];
                     };
-                };
-                /** @description ClickHouse недоступен */
-                503: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
                 };
             };
         };
@@ -2225,7 +2385,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["SystemStatus"];
+                    };
                 };
                 /** @description unauthorized */
                 401: {
@@ -2271,14 +2433,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            ok?: boolean;
-                            version?: string;
-                            source?: string;
-                            ref?: string;
-                            commit?: string;
-                            display?: string;
-                        };
+                        "application/json": components["schemas"]["SystemVersion"];
                     };
                 };
                 /** @description unauthorized */
@@ -3131,7 +3286,13 @@ export interface components {
              */
             updated_at?: string;
         };
-        /** @description Публичный liveness. HTTP 503 только если ClickHouse недоступен. Перегрузка ingest отражается в status при HTTP 200 (чтобы docker healthcheck не рестартил backend под нагрузкой). Детали — /api/ingest/stats и /api/system/stats. */
+        /** @description Liveness. HTTP 200, если процесс отвечает. */
+        LiveResponse: {
+            ok: boolean;
+            /** @enum {string} */
+            status: "live";
+        };
+        /** @description Readiness (`GET /ready`). HTTP 503 только если ClickHouse недоступен. Перегрузка ingest отражается в status при HTTP 200. Детали — /api/ingest/stats и /api/system/stats. */
         HealthResponse: {
             ok?: boolean;
             /**
@@ -3185,16 +3346,91 @@ export interface components {
                 [key: string]: string[];
             };
         };
+        AuthUser: {
+            username: string;
+            full_name?: string;
+            /** @enum {string} */
+            role: "administrator" | "operator";
+            must_reset_password?: boolean;
+            geo_wizard_dismissed?: boolean;
+            authDisabled?: boolean;
+            reputationEnabled: boolean;
+        };
         ReputationHit: {
             list: string;
             category: string;
             network?: string;
         };
+        SystemAlert: {
+            level?: string;
+            code?: string;
+            target?: string;
+            message?: string;
+        } & {
+            [key: string]: unknown;
+        };
+        SystemFailedLogin: {
+            username?: string;
+            ip?: string;
+            count?: number;
+            first_at?: string;
+            last_at?: string;
+            locked?: boolean;
+            locked_until?: string;
+        } & {
+            [key: string]: unknown;
+        };
+        SystemEdgesAgg: {
+            state?: string;
+            phase?: string;
+            message?: string;
+            raw_rows?: number;
+            agg_rows?: number;
+            days_total?: number;
+            days_done?: number;
+            map_source?: string;
+            prefer_agg?: boolean;
+            geo_prefer_agg?: boolean;
+            started_at?: string;
+            updated_at?: string;
+        } & {
+            [key: string]: unknown;
+        };
+        SystemBackendInfo: {
+            num_goroutine?: number;
+            heap_alloc_mb?: number;
+            go_version?: string;
+            geo_index_ranges?: number;
+            geo_index_mb?: number;
+        } & {
+            [key: string]: unknown;
+        };
+        SystemContainerStats: {
+            cpu_pct?: number;
+            mem_bytes?: number;
+        } & {
+            [key: string]: unknown;
+        };
+        SystemStatus: {
+            level?: string;
+            alert_count?: number;
+            alerts?: components["schemas"]["SystemAlert"][];
+        } & {
+            [key: string]: unknown;
+        };
+        SystemVersion: {
+            ok?: boolean;
+            version?: string;
+            source?: string;
+            ref?: string;
+            commit?: string;
+            display?: string;
+        } & {
+            [key: string]: unknown;
+        };
         /** @description Сводка GET /api/system/stats. Дополнительные поля допустимы. */
         SystemStats: {
-            alerts?: {
-                [key: string]: unknown;
-            }[];
+            alerts?: components["schemas"]["SystemAlert"][];
             uptime_sec?: number;
             timestamp?: string;
             ingest_slo?: {
@@ -3204,7 +3440,7 @@ export interface components {
                 [key: string]: unknown;
             };
             containers?: {
-                [key: string]: unknown;
+                [key: string]: components["schemas"]["SystemContainerStats"];
             };
             health?: {
                 [key: string]: unknown;
@@ -3212,18 +3448,12 @@ export interface components {
             storage?: {
                 [key: string]: unknown;
             };
-            backend_info?: {
-                [key: string]: unknown;
-            };
+            backend_info?: components["schemas"]["SystemBackendInfo"];
             install_profile?: {
                 [key: string]: unknown;
             };
-            edges_agg?: {
-                [key: string]: unknown;
-            };
-            failed_logins?: {
-                [key: string]: unknown;
-            }[];
+            edges_agg?: components["schemas"]["SystemEdgesAgg"];
+            failed_logins?: components["schemas"]["SystemFailedLogin"][];
         } & {
             [key: string]: unknown;
         };

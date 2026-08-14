@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: ГеоАтлас API
-  version: "1.9.0"
+  version: "1.11.0"
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
@@ -20,7 +20,7 @@ info:
       (admin ⊃ ops ⊃ read).
 
     Уровни доступа (backend middleware):
-    - **public** — `/health`, `/api/health`, login/logout/logout-all/me/change-password/check*;
+    - **public** — `/live`, `/api/live`, `/ready`, `/api/ready`, `/health`, `/api/health`, login/logout/logout-all/me/change-password/check*;
     - **login** — любой залогиненный или Bearer≥read (`GET /api/events`);
     - **admin** — роль administrator ИЛИ Bearer scope=admin
       (system/*, parse-*, управление УЗ/токенами);
@@ -60,6 +60,10 @@ paths:
       responses:
         "200":
           description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
         "401":
           description: Неверные учётные данные
   /api/auth/logout:
@@ -86,7 +90,11 @@ paths:
       summary: Текущий пользователь
       responses:
         "200":
-          description: OK (поля username, role, must_reset_password, geo_wizard_dismissed)
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
         "401":
           description: Нет сессии
   /api/auth/change-password:
@@ -123,6 +131,10 @@ paths:
       responses:
         "200":
           description: OK (обновлённый пользователь)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
         "400":
           description: Неверный JSON
         "401":
@@ -308,11 +320,40 @@ paths:
         "200":
           description: OK
 
-  /health:
+  /live:
     get:
       tags: [health]
-      summary: Liveness/readiness
-      description: Публичный probe — только ok и ping ClickHouse.
+      summary: Liveness
+      description: |
+        Процесс жив. Без ClickHouse и ingest. HTTP 200, если HTTP-сервер отвечает.
+        Docker healthcheck backend бьёт сюда.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiveResponse"
+
+  /api/live:
+    get:
+      tags: [health]
+      summary: Alias /live
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiveResponse"
+
+  /ready:
+    get:
+      tags: [health]
+      summary: Readiness
+      description: |
+        ClickHouse ping + краткий снимок ingest. HTTP 503 только если ClickHouse
+        недоступен. Перегрузка ingest — status при HTTP 200 (`degraded` / `overloaded`).
       responses:
         "200":
           description: OK
@@ -322,6 +363,36 @@ paths:
                 $ref: "#/components/schemas/HealthResponse"
         "503":
           description: ClickHouse недоступен
+
+  /api/ready:
+    get:
+      tags: [health]
+      summary: Alias /ready
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: ClickHouse недоступен
+
+  /health:
+    get:
+      tags: [health]
+      summary: Alias /live
+      description: |
+        Исторический путь docker/k8s liveness. Эквивалент `/live`.
+        Готовность стека (ClickHouse) — `GET /ready`.
+        На frontend nginx `GET /health` отвечает локально (без прокси на backend).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiveResponse"
 
   /metrics:
     get:
@@ -351,16 +422,14 @@ paths:
   /api/health:
     get:
       tags: [health]
-      summary: Alias /health
+      summary: Alias /live
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/HealthResponse"
-        "503":
-          description: ClickHouse недоступен
+                $ref: "#/components/schemas/LiveResponse"
 
   /api/events:
     get:
@@ -991,6 +1060,10 @@ paths:
       responses:
         "200":
           description: System status summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemStatus"
         "401":
           description: unauthorized
 
@@ -1010,14 +1083,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  ok: { type: boolean }
-                  version: { type: string }
-                  source: { type: string }
-                  ref: { type: string }
-                  commit: { type: string }
-                  display: { type: string }
+                $ref: "#/components/schemas/SystemVersion"
         "401":
           description: unauthorized
         "503":
@@ -1456,6 +1522,16 @@ components:
           format: date-time
           description: Время последнего сохранения (UTC)
 
+    LiveResponse:
+      type: object
+      required: [ok, status]
+      properties:
+        ok: { type: boolean }
+        status:
+          type: string
+          enum: [live]
+      description: Liveness. HTTP 200, если процесс отвечает.
+
     HealthResponse:
       type: object
       properties:
@@ -1474,10 +1550,9 @@ components:
           additionalProperties: true
           description: Краткий снимок очереди/drops (если live ingest включён)
       description: >
-        Публичный liveness. HTTP 503 только если ClickHouse недоступен.
-        Перегрузка ingest отражается в status при HTTP 200 (чтобы docker
-        healthcheck не рестартил backend под нагрузкой). Детали —
-        /api/ingest/stats и /api/system/stats.
+        Readiness (`GET /ready`). HTTP 503 только если ClickHouse недоступен.
+        Перегрузка ingest отражается в status при HTTP 200.
+        Детали — /api/ingest/stats и /api/system/stats.
 
     EventsResponse:
       type: object
@@ -1524,6 +1599,20 @@ components:
             items: { type: string }
           description: Категория → списки (до фильтра репутации), для меню на карте.
 
+    AuthUser:
+      type: object
+      required: [username, role, reputationEnabled]
+      properties:
+        username: { type: string }
+        full_name: { type: string }
+        role:
+          type: string
+          enum: [administrator, operator]
+        must_reset_password: { type: boolean }
+        geo_wizard_dismissed: { type: boolean }
+        authDisabled: { type: boolean }
+        reputationEnabled: { type: boolean }
+
     ReputationHit:
       type: object
       required: [list, category]
@@ -1532,15 +1621,92 @@ components:
         category: { type: string }
         network: { type: string }
 
+    SystemAlert:
+      type: object
+      additionalProperties: true
+      properties:
+        level: { type: string }
+        code: { type: string }
+        target: { type: string }
+        message: { type: string }
+
+    SystemFailedLogin:
+      type: object
+      additionalProperties: true
+      properties:
+        username: { type: string }
+        ip: { type: string }
+        count: { type: integer }
+        first_at: { type: string }
+        last_at: { type: string }
+        locked: { type: boolean }
+        locked_until: { type: string }
+
+    SystemEdgesAgg:
+      type: object
+      additionalProperties: true
+      properties:
+        state: { type: string }
+        phase: { type: string }
+        message: { type: string }
+        raw_rows: { type: integer }
+        agg_rows: { type: integer }
+        days_total: { type: integer }
+        days_done: { type: integer }
+        map_source: { type: string }
+        prefer_agg: { type: boolean }
+        geo_prefer_agg: { type: boolean }
+        started_at: { type: string }
+        updated_at: { type: string }
+
+    SystemBackendInfo:
+      type: object
+      additionalProperties: true
+      properties:
+        num_goroutine: { type: integer }
+        heap_alloc_mb: { type: number }
+        go_version: { type: string }
+        geo_index_ranges: { type: integer }
+        geo_index_mb: { type: number }
+
+    SystemContainerStats:
+      type: object
+      additionalProperties: true
+      properties:
+        cpu_pct: { type: number }
+        mem_bytes: { type: number }
+
+    SystemStatus:
+      type: object
+      additionalProperties: true
+      properties:
+        level: { type: string }
+        alert_count: { type: integer }
+        alerts:
+          type: array
+          items:
+            $ref: "#/components/schemas/SystemAlert"
+
+    SystemVersion:
+      type: object
+      additionalProperties: true
+      properties:
+        ok: { type: boolean }
+        version: { type: string }
+        source: { type: string }
+        ref: { type: string }
+        commit: { type: string }
+        display: { type: string }
+
     SystemStats:
       type: object
       description: Сводка GET /api/system/stats. Дополнительные поля допустимы.
+      additionalProperties: true
       properties:
         alerts:
           type: array
           items:
-            type: object
-            additionalProperties: true
+            $ref: "#/components/schemas/SystemAlert"
         uptime_sec: { type: integer }
         timestamp: { type: string }
         ingest_slo:
@@ -1551,7 +1717,8 @@ components:
           additionalProperties: true
         containers:
           type: object
-          additionalProperties: true
+          additionalProperties:
+            $ref: "#/components/schemas/SystemContainerStats"
         health:
           type: object
           additionalProperties: true
@@ -1559,20 +1726,16 @@ components:
           type: object
           additionalProperties: true
         backend_info:
-          type: object
-          additionalProperties: true
+          $ref: "#/components/schemas/SystemBackendInfo"
         install_profile:
           type: object
           additionalProperties: true
         edges_agg:
-          type: object
-          additionalProperties: true
+          $ref: "#/components/schemas/SystemEdgesAgg"
         failed_logins:
           type: array
           items:
-            type: object
-            additionalProperties: true
-      additionalProperties: true
+            $ref: "#/components/schemas/SystemFailedLogin"
 
     MapPoint:
       type: object

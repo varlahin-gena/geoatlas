@@ -61,13 +61,14 @@ describe('RequireAuth', () => {
       username: 'u',
       role: ROLE_OPERATOR,
       must_reset_password: true,
+      reputationEnabled: true,
     };
     renderAt('/admin');
     expect(screen.getByText('reset-page')).toBeInTheDocument();
   });
 
   it('blocks non-admin from admin routes', () => {
-    authState.user = { username: 'op', role: ROLE_OPERATOR };
+    authState.user = { username: 'op', role: ROLE_OPERATOR, reputationEnabled: true };
     authState.isAdmin = false;
     renderAt('/admin', true);
     expect(screen.getByText('home')).toBeInTheDocument();
@@ -75,7 +76,7 @@ describe('RequireAuth', () => {
   });
 
   it('allows admin', () => {
-    authState.user = { username: 'a', role: ROLE_ADMIN };
+    authState.user = { username: 'a', role: ROLE_ADMIN, reputationEnabled: true };
     authState.isAdmin = true;
     renderAt('/admin', true);
     expect(screen.getByText('secret')).toBeInTheDocument();

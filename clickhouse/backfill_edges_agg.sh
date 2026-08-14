@@ -13,12 +13,17 @@ cd "$PROJECT_DIR"
 
 log() { echo "[$(date +'%F %T')] $*"; }
 
+ch_client() {
+    docker compose exec -T clickhouse \
+      sh -c 'exec clickhouse-client --password "$CLICKHOUSE_PASSWORD" "$@"' sh "$@"
+}
+
 ch_query() {
-    docker compose exec -T clickhouse clickhouse-client --query "$1"
+    ch_client --query "$1"
 }
 
 ch_multi() {
-    docker compose exec -T clickhouse clickhouse-client --multiquery < "$1"
+    ch_client --multiquery < "$1"
 }
 
 log "Applying schema (traffic_edges_daily + MV)..."

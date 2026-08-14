@@ -70,7 +70,8 @@ function Invoke-Smoke {
 }
 
 Write-Host "Smoke against $BaseUrl"
-Invoke-Smoke -Name "health" -Method GET -Path "/api/health" | Out-Null
+Invoke-Smoke -Name "live" -Method GET -Path "/api/live" | Out-Null
+Invoke-Smoke -Name "ready" -Method GET -Path "/api/ready" | Out-Null
 
 $loginBody = (@{ username = $User; password = $Password } | ConvertTo-Json -Compress)
 Invoke-Smoke -Name "login" -Method POST -Path "/api/auth/login" -Body $loginBody | Out-Null

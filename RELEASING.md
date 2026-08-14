@@ -31,7 +31,7 @@ OpenAPI: минор (`1.8` → `1.9`) — новый endpoint или новое 
 3. `VERSION` = `X.Y.Z`. Ссылка `[X.Y.Z]:` внизу CHANGELOG. Unreleased снова пустой (только заголовок).
 4. CI зелёный, в т.ч. **release-contract**.
 5. Локальный smoke после `./start.sh`:
-   - `/api/health`
+   - `/api/live`, `/api/ready`
    - логин, карта, `/system`
    - API-токен scope=ops, `curl -H "Authorization: Bearer …" /api/ingest/stats`
 6. (Опционально) `./scripts/watch-ingest.sh` без drops в покое.

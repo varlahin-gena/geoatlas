@@ -58,7 +58,15 @@ write_https_servers() {
 server {
     listen 80;
     server_name _;
-    return 301 https://\$host\$request_uri;
+    location = /health {
+        access_log off;
+        default_type application/json;
+        add_header Cache-Control "no-store" always;
+        return 200 '{"ok":true,"status":"live"}';
+    }
+    location / {
+        return 301 https://\$host\$request_uri;
+    }
 }
 EOF
     else

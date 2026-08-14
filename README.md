@@ -51,7 +51,7 @@
 - Веб-интерфейс — **React SPA** (Vite + TypeScript); clean paths, legacy `*.html` редиректятся
 - Опциональный **HTTPS** на nginx со своими PEM-сертификатами (редирект HTTP→HTTPS)
 - Загрузка и правка **GeoIP-базы** (CSV SIEM KUMA, `/geo-ranges`, IP без координат на `/geo-missing`); лимиты upload по профилю, очистка базы, большие CSV — с сервера через `curl` (см. [GeoIP](#geoip))
-- Установка **«Сделай мне хорошо»** (`NM_FULL_AUTO` / `--full-auto`): релиз, все модули, порт 8080, автопрофиль, firewall off
+- Установка **«Сделай мне хорошо»** (`NM_FULL_AUTO` / `--full-auto`): релиз, все модули, порт 8080, автопрофиль, firewall allowlist (UI + :514)
 - Toast-уведомления без автоскрытия (крестик), сохраняются при смене страниц до ручного закрытия
 - **Репутация IP** (модуль опционален при установке): offline-списки и URL-фиды (`/reputation`), каталог публичных источников, фильтр и подсветка дуг на карте; приватные IP не помечаются
 - Хранение и аналитика в **ClickHouse**; дневные geo-агрегаты для пресетов `1d+` (city/country)
@@ -67,7 +67,7 @@
 - Страница системного мониторинга (Обзор / Pipeline / Безопасность / Графики / **Резервное копирование**): метрики контейнеров, пайплайна (в т.ч. **UDP/TCP EPS**, drops, circuit breaker), **форма TTL**, неуспешные логины, хранилище, профиль установки, **индикатор ёмкости**, алёрты; ручной maintenance backfill агрегатов
 - Индикатор здоровья системы на главной странице (ссылка на `/system`); **версия установки** (`main` / тег) в меню пользователя
 - Docker: fail-closed секреты в compose, hardened контейнеры (`cap_drop: ALL`); запуск через `./start.sh`
-- Контракт HTTP API: [`openapi.yaml`](openapi.yaml) (OpenAPI **1.9.0**)
+- Контракт HTTP API: [`openapi.yaml`](openapi.yaml) (OpenAPI **1.11.0**)
 
 ---
 
@@ -246,8 +246,8 @@ http://<IP_сервера>/
 - `--full-auto` / нет TTY / голый `./start.sh` — берут `AUTH_ADMIN_PASSWORD` из окружения или генерируют одноразовый и печатают его один раз.
 
 Если пароль сгенерирован, при входе его нужно сменить (`must_reset_password`). Operator с завода не создаётся — заведите в UI `/users`.
-`./start.sh` при необходимости генерирует `API_AUTH_TOKEN`, `SESSION_SECRET` и пароль admin в `.env`.
-Голый `docker compose up` без `AUTH_ADMIN_PASSWORD` в `.env` не стартует (fail-closed).
+`./start.sh` при необходимости генерирует `API_AUTH_TOKEN`, `SESSION_SECRET`, пароль admin и `CLICKHOUSE_PASSWORD` в `.env` (ключи без значений — [`.env.example`](.env.example)).
+Голый `docker compose up` без `AUTH_ADMIN_PASSWORD` / `CLICKHOUSE_PASSWORD` в `.env` не стартует (fail-closed).
 
 ---
 
@@ -271,7 +271,7 @@ chmod +x install_ubuntu.sh
 sudo ./install_ubuntu.sh
 ```
 
-**«Сделай мне хорошо» (полный авто):** без вопросов ставит последний релиз, все модули, порт **8080**, автопрофиль по ресурсам, выключает host firewall (UFW/firewalld) и запускает стек. HTTPS при TTY спрашивается первым среди сетевых шагов (или задайте `NM_HTTPS_ENABLED` / сертификаты через env).
+**«Сделай мне хорошо» (полный авто):** без вопросов ставит последний релиз, все модули, порт **8080**, автопрофиль по ресурсам, **включает** host firewall с allowlist портов (UI и при syslog `:514/tcp+udp`) и запускает стек. `:514` без TLS/auth — ограничьте источником МСЭ или `NM_SYSLOG_ALLOW_FROM=CIDR`. Выключить firewall как раньше: `NM_DISABLE_HOST_FIREWALL=1`. HTTPS при TTY спрашивается первым среди сетевых шагов (или задайте `NM_HTTPS_ENABLED` / сертификаты через env).
 
 ```bash
 sudo NM_FULL_AUTO=1 ./install_ubuntu.sh
@@ -300,7 +300,9 @@ sudo ./install_ubuntu.sh --full-auto
 | Переменная | Назначение |
 |------------|------------|
 | `NM_UI=whiptail\|dialog\|text` | принудительный бэкенд диалогов |
-| `NM_FULL_AUTO=1` / `--full-auto` | «Сделай мне хорошо»: релиз, все модули, порт 8080, автопрофиль, firewall OFF, старт стека |
+| `NM_FULL_AUTO=1` / `--full-auto` | «Сделай мне хорошо»: релиз, все модули, порт 8080, автопрофиль, firewall allowlist, старт стека |
+| `NM_DISABLE_HOST_FIREWALL=1` | full-auto: выключить UFW/firewalld (как раньше; небезопасно на публичном IP) |
+| `NM_SYSLOG_ALLOW_FROM` | CIDR/IP: открыть `:514` только с этого источника (UFW/firewalld) |
 | `AUTH_ADMIN_PASSWORD` | пароль admin для full-auto / без TTY; иначе установщик спросит или сгенерирует |
 | `NM_AUTO_MODULES=1` | без вопросов: модули по умолчанию, порт 80, стабильный релиз |
 | нет TTY (CI/pipe) | то же, что авто-режим; gauge пишет прогресс в лог |
@@ -341,7 +343,7 @@ chmod +x install_oraclelinux.sh
 sudo ./install_oraclelinux.sh
 ```
 
-Полный авто (как на Ubuntu): `sudo NM_FULL_AUTO=1 ./install_oraclelinux.sh` или `sudo ./install_oraclelinux.sh --full-auto` → UI на порту **8080**, firewalld выключен.
+Полный авто (как на Ubuntu): `sudo NM_FULL_AUTO=1 ./install_oraclelinux.sh` или `sudo ./install_oraclelinux.sh --full-auto` → UI на порту **8080**, firewalld включён (порты UI + :514).
 
 **Что делает скрипт:**
 
@@ -454,7 +456,7 @@ DO_BUILD=0 ./start.sh
 **Прямые команды Docker Compose:**
 
 > Предпочтительно `./start.sh` (генерирует секреты в `.env`, подключает HTTPS-override).
-> Голый `docker compose up` без `.env` с `API_AUTH_TOKEN` / `SESSION_SECRET` / паролями — ошибка подстановки.
+> Голый `docker compose up` без `.env` с `API_AUTH_TOKEN` / `SESSION_SECRET` / `CLICKHOUSE_PASSWORD` / паролями — ошибка подстановки.
 > Без `-f docker-compose.https.yml` порт `:443` не публикуется.
 
 ```bash
@@ -686,17 +688,18 @@ docker compose logs -f stats-collector
 # Статус healthcheck
 docker compose ps
 
-# Проверка API (health — публичный; остальное — с Bearer из .env)
-curl -fsS http://127.0.0.1/api/health
+# Проверка API (live/ready — публичные; остальное — с Bearer из .env)
+curl -fsS http://127.0.0.1/api/live
+curl -fsS http://127.0.0.1/api/ready
 TOKEN="$(grep -E '^API_AUTH_TOKEN=' .env | cut -d= -f2-)"
 curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1/api/ingest/stats | jq .
 curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1/api/system/stats | jq .
 curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1/api/system/edges-agg | jq .
 
-# Запросы к ClickHouse
-docker compose exec clickhouse clickhouse-client --query "SELECT 1"
-docker compose exec clickhouse clickhouse-client --query "
-  SELECT vendor, count() AS cnt FROM traffic_logs GROUP BY vendor ORDER BY cnt DESC"
+# Запросы к ClickHouse (пароль — в контейнере, из .env)
+docker compose exec clickhouse sh -c 'clickhouse-client --password "$CLICKHOUSE_PASSWORD" --query "SELECT 1"'
+docker compose exec clickhouse sh -c 'clickhouse-client --password "$CLICKHOUSE_PASSWORD" --query "
+  SELECT vendor, count() AS cnt FROM traffic_logs GROUP BY vendor ORDER BY cnt DESC"'
 ```
 
 **Типичные проблемы и куда смотреть:**
@@ -852,7 +855,7 @@ curl -sS -w "\nHTTP %{http_code}\n" \
   "http://127.0.0.1/upload-geo"
 # если UI на 8080 (full-auto): http://127.0.0.1:8080/upload-geo
 
-docker compose exec clickhouse clickhouse-client -q "SELECT count() FROM geo_ranges"
+docker compose exec clickhouse sh -c 'clickhouse-client --password "$CLICKHOUSE_PASSWORD" -q "SELECT count() FROM geo_ranges"'
 docker compose logs backend --since=10m 2>&1 | grep -iE 'geo index loaded|geo csv|upload|overlap|error'
 ```
 
@@ -909,7 +912,7 @@ Unit-тесты карты (репутация / heatmap focus / coords helpers)
 
 ### HTTP API
 
-Контракт REST API (в т.ч. auth, events, geo, reputation, retention, tokens, search-templates, backups, `/metrics`): [`openapi.yaml`](openapi.yaml), версия документа OpenAPI **1.9.0**. Проверка живости: `GET /api/health` (публичный). Остальные эндпоинты — cookie-сессия и/или Bearer (`API_AUTH_TOKEN` / именованный токен со scope). Prometheus scrape: `GET /metrics` (Bearer≥ops / administrator).
+Контракт REST API (в т.ч. auth, events, geo, reputation, retention, tokens, search-templates, backups, `/metrics`): [`openapi.yaml`](openapi.yaml), версия документа OpenAPI **1.11.0**. Пробы: `GET /api/live` (процесс), `GET /api/ready` (ClickHouse + ingest); `GET /api/health` — alias live. Остальные эндпоинты — cookie-сессия и/или Bearer (`API_AUTH_TOKEN` / именованный токен со scope). Prometheus scrape: `GET /metrics` (Bearer≥ops / administrator).
 
 ## Лицензия
 
@@ -998,7 +1001,7 @@ network_monitor/
 │   └── internal/
 │       ├── config/
 │       └── collector/
-├── openapi.yaml                      # контракт HTTP API (OpenAPI 1.9.0)
+├── openapi.yaml                      # контракт HTTP API (OpenAPI 1.11.0)
 ├── LICENSE / NOTICE                  # Apache License 2.0
 ├── SECURITY.md                       # как сообщать об уязвимостях
 ├── VERSION / CHANGELOG.md / RELEASING.md

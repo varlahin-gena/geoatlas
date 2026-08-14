@@ -11,7 +11,7 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    sourcemap: process.env.NM_SOURCEMAP === '1',
     rollupOptions: {
       output: {
         manualChunks: {
@@ -29,6 +29,8 @@ export default defineConfig({
       '/upload-geo': { target: 'http://127.0.0.1:8080', changeOrigin: true },
       '/upload-reputation': { target: 'http://127.0.0.1:8080', changeOrigin: true },
       '/health': { target: 'http://127.0.0.1:8080', changeOrigin: true },
+      '/live': { target: 'http://127.0.0.1:8080', changeOrigin: true },
+      '/ready': { target: 'http://127.0.0.1:8080', changeOrigin: true },
     },
   },
   test: {

@@ -1,50 +1,29 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  type Dispatch,
-  type MutableRefObject,
-  type RefObject,
-  type SetStateAction,
-} from 'react';
+import { useCallback, useEffect, useRef, type MutableRefObject, type RefObject } from 'react';
 import type maplibregl from 'maplibre-gl';
 import { readViewStateFromMap } from './mapViewport';
 import type { ViewState } from './mapTypes';
 
+/**
+ * Auto-rotate mutates the MapLibre camera only. View state lives in a ref;
+ * hemisphere culling is refreshed from the map `move` handler via layersTick.
+ */
 export function useGlobeAutoRotate(opts: {
   mapRef: RefObject<maplibregl.Map | null>;
   viewMode: 'map' | 'globe';
   autoRotate: boolean;
   mapReady: boolean;
-  globeView: ViewState;
-  setGlobeView: Dispatch<SetStateAction<ViewState>>;
-  bumpLayersTick: () => void;
+  globeViewRef: MutableRefObject<ViewState>;
 }) {
-  const {
-    mapRef,
-    viewMode,
-    autoRotate,
-    mapReady,
-    globeView,
-    setGlobeView,
-    bumpLayersTick,
-  } = opts;
+  const { mapRef, viewMode, autoRotate, mapReady, globeViewRef } = opts;
 
   const rotateRafRef = useRef<number | null>(null);
   const rotateLastTsRef = useRef(0);
   const userInteractingRef = useRef(false);
-  const lastGlobeCullKeyRef = useRef('');
   const viewModeRef = useRef(viewMode);
   const autoRotateRef = useRef(autoRotate);
-  const globeViewRef = useRef(globeView);
-  const bumpLayersTickRef = useRef(bumpLayersTick);
-  const setGlobeViewRef = useRef(setGlobeView);
 
   viewModeRef.current = viewMode;
   autoRotateRef.current = autoRotate;
-  globeViewRef.current = globeView;
-  bumpLayersTickRef.current = bumpLayersTick;
-  setGlobeViewRef.current = setGlobeView;
 
   const stopGlobeAutoRotate = useCallback(() => {
     if (rotateRafRef.current) {
@@ -75,20 +54,11 @@ export function useGlobeAutoRotate(opts: {
       rotateLastTsRef.current = ts;
       const lng = map.getCenter().lng + dt * 0.008;
       map.jumpTo({ center: [lng, map.getCenter().lat] });
-      const vs = readViewStateFromMap(map);
-      setGlobeViewRef.current(vs);
-      globeViewRef.current = vs;
-      const lon = Math.round((vs.longitude || 0) * 4) / 4;
-      const lat = Math.round((vs.latitude || 0) * 4) / 4;
-      const key = `${lon}:${lat}`;
-      if (key !== lastGlobeCullKeyRef.current) {
-        lastGlobeCullKeyRef.current = key;
-        bumpLayersTickRef.current();
-      }
+      globeViewRef.current = readViewStateFromMap(map);
       rotateRafRef.current = requestAnimationFrame(tick);
     };
     rotateRafRef.current = requestAnimationFrame(tick);
-  }, [mapRef, stopGlobeAutoRotate]);
+  }, [mapRef, globeViewRef, stopGlobeAutoRotate]);
 
   useEffect(() => {
     if (!mapReady) return;
@@ -100,9 +70,7 @@ export function useGlobeAutoRotate(opts: {
     startGlobeAutoRotate,
     stopGlobeAutoRotate,
     userInteractingRef,
-    lastGlobeCullKeyRef,
     viewModeRef,
     autoRotateRef,
-    globeViewRef: globeViewRef as MutableRefObject<ViewState>,
   };
 }

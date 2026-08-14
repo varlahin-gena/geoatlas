@@ -7,8 +7,18 @@ import (
 	"time"
 )
 
-// Health — публичный liveness для docker/k8s.
+// Live — процесс жив. Без ClickHouse и ingest (docker/k8s liveness).
+func (h *HealthHandler) Live(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "status": "live"})
+}
+
+// Health — alias Live. Исторический путь docker healthcheck.
 func (h *HealthHandler) Health(w http.ResponseWriter, r *http.Request) {
+	h.Live(w, r)
+}
+
+// Ready — ClickHouse ping + снимок ingest. HTTP 503 только если CH недоступен.
+func (h *HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
 	if h.systemUC == nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
 			"ok": false, "status": "unavailable", "error": "system service unavailable",
@@ -20,14 +30,14 @@ func (h *HealthHandler) Health(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.systemUC.Health(ctx, h.systemPinger)
 	if err != nil {
-		slog.Error("health failed", "err", err)
+		slog.Error("ready failed", "err", err)
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
-			"ok": false, "status": "unavailable", "error": "health check failed",
+			"ok": false, "status": "unavailable", "error": "ready check failed",
 		})
 		return
 	}
 	if !result.OK {
-		slog.Error("health: clickhouse unavailable")
+		slog.Error("ready: clickhouse unavailable")
 	}
 	writeJSON(w, result.HTTPStatus, result.Body)
 }

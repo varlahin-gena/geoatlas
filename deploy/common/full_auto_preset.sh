@@ -4,12 +4,16 @@
 #   source deploy/common/full_auto_preset.sh
 #   nm_parse_full_auto_argv "$@"
 #   nm_apply_full_auto_preset
-#   nm_disable_host_firewall   # при NM_FULL_AUTO=1
+#   # firewall: configure_firewall в install_*.sh
+#   # выключить FW: NM_DISABLE_HOST_FIREWALL=1 → nm_disable_host_firewall
 #   nm_full_auto_finish /opt/network-monitor   # после start.sh
 #
 # Включение: NM_FULL_AUTO=1 или argv --full-auto
-# Даёт: релиз, все модули, HTTP 8080, автопрофиль, старт стека, firewall OFF.
+# Даёт: релиз, все модули, HTTP 8080, автопрофиль, старт стека,
+# host firewall ВКЛ с allowlist портов (HTTP/HTTPS/514).
+# Выключить firewall как раньше: NM_DISABLE_HOST_FIREWALL=1.
 # HTTPS не выключается: при TTY сначала select_https, затем HTTP-порт.
+# 514 можно сузить: NM_SYSLOG_ALLOW_FROM=10.0.0.0/8
 
 _nm_fa_log() { echo "[$(date +'%F %T')] [full-auto] $*" >&2; }
 
@@ -28,7 +32,7 @@ nm_parse_full_auto_argv() {
 }
 
 # Применяет пресет, если NM_FULL_AUTO=1.
-# Firewall всегда выключается. Остальные knobs — только если ещё не заданы.
+# Firewall по умолчанию остаётся включённым (allowlist портов). Остальные knobs — только если ещё не заданы.
 nm_apply_full_auto_preset() {
     if [[ "${NM_FULL_AUTO:-0}" != "1" ]]; then
         return 0
@@ -50,13 +54,20 @@ nm_apply_full_auto_preset() {
         fi
     fi
 
-    # Firewall: принудительно выкл. (даже если ENABLE_* задали снаружи).
-    export ENABLE_UFW=0
-    export ENABLE_FIREWALL=0
-    export NM_FIREWALL_FROM_ENV=1
+    if [[ "${NM_DISABLE_HOST_FIREWALL:-0}" == "1" ]]; then
+        export ENABLE_UFW=0
+        export ENABLE_FIREWALL=0
+        export NM_FIREWALL_FROM_ENV=1
+        _nm_fa_log "NM_DISABLE_HOST_FIREWALL=1 — host firewall будет ВЫКЛЮЧЕН (небезопасно на публичном IP)"
+    else
+        export ENABLE_UFW=1
+        export ENABLE_FIREWALL=1
+        export UFW_AUTO_ENABLE=1
+        export NM_FIREWALL_FROM_ENV=1
+    fi
 
     # HTTPS: не трогаем HTTPS_ENABLED — select_https спросит первым (при TTY), затем HTTP-порт.
-    _nm_fa_log "режим «Сделай мне хорошо»: release=${NM_INSTALL_SOURCE}, HTTP_PORT=${HTTP_PORT}, автопрофиль, все модули, файрвол ВЫКЛ, запуск стека"
+    _nm_fa_log "режим «Сделай мне хорошо»: release=${NM_INSTALL_SOURCE}, HTTP_PORT=${HTTP_PORT}, автопрофиль, все модули, файрвол allowlist, запуск стека"
     _nm_fa_log "Сначала HTTPS (select_https), затем HTTP-порт — если есть TTY и HTTPS_ENABLED / NM_HTTPS_ENABLED ещё не заданы"
 }
 
@@ -122,6 +133,33 @@ _nm_fa_firewalld_active() {
     firewall-cmd --state >/dev/null 2>&1
 }
 
+# Syslog :514. NM_SYSLOG_ALLOW_FROM=CIDR|IP — только этот источник; иначе any.
+nm_ufw_allow_syslog() {
+    local from="${NM_SYSLOG_ALLOW_FROM:-}"
+    if [[ -n "$from" ]]; then
+        _nm_fa_log "UFW: 514/tcp+udp только с ${from}"
+        ufw allow from "$from" to any port 514 proto tcp || true
+        ufw allow from "$from" to any port 514 proto udp || true
+    else
+        ufw allow 514/tcp || true
+        ufw allow 514/udp || true
+    fi
+}
+
+nm_firewalld_allow_syslog() {
+    local from="${NM_SYSLOG_ALLOW_FROM:-}"
+    local family="ipv4"
+    if [[ -n "$from" ]]; then
+        [[ "$from" == *:* ]] && family="ipv6"
+        _nm_fa_log "firewalld: 514/tcp+udp только с ${from} (${family})"
+        firewall-cmd --permanent --add-rich-rule="rule family=\"${family}\" source address=\"${from}\" port port=\"514\" protocol=\"tcp\" accept" || true
+        firewall-cmd --permanent --add-rich-rule="rule family=\"${family}\" source address=\"${from}\" port port=\"514\" protocol=\"udp\" accept" || true
+    else
+        firewall-cmd --permanent --add-port=514/tcp || true
+        firewall-cmd --permanent --add-port=514/udp || true
+    fi
+}
+
 # Если host firewall всё ещё активен — открываем HTTP(/HTTPS) и syslog.
 _nm_fa_open_ports_if_fw_active() {
     local port="$1"
@@ -136,8 +174,7 @@ _nm_fa_open_ports_if_fw_active() {
             ufw allow "${https_port}/tcp" >/dev/null 2>&1 || true
         fi
         if [[ "$open_syslog" == "1" ]]; then
-            ufw allow 514/tcp >/dev/null 2>&1 || true
-            ufw allow 514/udp >/dev/null 2>&1 || true
+            nm_ufw_allow_syslog
         fi
         ufw reload >/dev/null 2>&1 || true
     fi
@@ -150,15 +187,13 @@ _nm_fa_open_ports_if_fw_active() {
             firewall-cmd --permanent --add-port="${https_port}/tcp" >/dev/null 2>&1 || true
         fi
         if [[ "$open_syslog" == "1" ]]; then
-            firewall-cmd --permanent --add-port=514/tcp >/dev/null 2>&1 || true
-            firewall-cmd --permanent --add-port=514/udp >/dev/null 2>&1 || true
+            nm_firewalld_allow_syslog
         fi
         firewall-cmd --reload >/dev/null 2>&1 || true
     fi
 }
 
-# Активно выключает host firewall (UFW / firewalld). Ошибки не фатальны.
-# $1 — опционально PROJECT_DIR (чтобы взять HTTP_PORT из .env).
+# Активно выключает host firewall. Только при NM_DISABLE_HOST_FIREWALL=1.
 nm_disable_host_firewall() {
     local project_dir="${1:-}"
     local port https_port=""
@@ -246,7 +281,7 @@ nm_full_auto_finish() {
 
     base="$(_nm_fa_ui_url "$port" "$ip" "$scheme")"
     login_url="${base}/login.html"
-    health_url="${base}/api/health"
+    health_url="${base}/api/ready"
 
     _nm_fa_log "проверяем UI: ${login_url}"
     if command -v curl >/dev/null 2>&1; then
@@ -296,6 +331,17 @@ ${login_hint}
 Operator не создаётся — заведите в UI «Пользователи», если нужен.
 
 Health: ${health_url}"
+
+    if [[ "${NM_DISABLE_HOST_FIREWALL:-0}" == "1" ]]; then
+        msg="${msg}
+
+Файрвол хоста ВЫКЛЮЧЁН (NM_DISABLE_HOST_FIREWALL=1). На публичном IP это небезопасно."
+    else
+        msg="${msg}
+
+Файрвол хоста включён: открыты UI-порт и (если syslog) :514/tcp+udp без TLS/auth.
+Ограничьте :514 источником МСЭ (Security Group или NM_SYSLOG_ALLOW_FROM=CIDR)."
+    fi
 
     if [[ "$ok" != "1" ]]; then
         msg="${msg}

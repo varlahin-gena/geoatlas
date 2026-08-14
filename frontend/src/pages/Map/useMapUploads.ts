@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { authHeaders, isAbortError } from '@/api/client';
+import { apiFetchRaw, isAbortError } from '@/api/client';
 import { fetchGeoRanges } from '@/api/geo';
 import type { ToastKind } from '@/components/Toast';
 import { fmtNumber } from '@/lib/format';
@@ -57,12 +57,11 @@ export function useMapUploads(opts: {
             if (!ok) return;
           }
         }
-        const res = await fetch(kind === 'logs' ? '/upload-logs' : '/upload-geo', {
+        const res = await apiFetchRaw(kind === 'logs' ? '/upload-logs' : '/upload-geo', {
           method: 'POST',
-          credentials: 'same-origin',
-          headers: authHeaders({
+          headers: {
             'Content-Type': kind === 'logs' ? 'text/plain' : 'text/csv',
-          }),
+          },
           body: file,
         });
         const ct = res.headers.get('content-type') || '';

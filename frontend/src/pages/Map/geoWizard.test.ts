@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  abortableSleep,
   buildGeoCurlSnippet,
   classifyEmptyMap,
   formatNetworkHint,
@@ -111,5 +112,32 @@ describe('formatNetworkHint', () => {
   it('formats single and range', () => {
     expect(formatNetworkHint(0x0a000001, 0x0a000001)).toBe('10.0.0.1');
     expect(formatNetworkHint(0x0a000000, 0x0a0000ff)).toBe('10.0.0.0-10.0.0.255');
+  });
+});
+
+describe('abortableSleep', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('resolves after the delay', async () => {
+    vi.useFakeTimers();
+    const p = abortableSleep(1000);
+    await vi.advanceTimersByTimeAsync(1000);
+    await expect(p).resolves.toBeUndefined();
+  });
+
+  it('rejects when aborted during wait', async () => {
+    vi.useFakeTimers();
+    const c = new AbortController();
+    const p = abortableSleep(5000, c.signal);
+    c.abort();
+    await expect(p).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
+  it('rejects immediately if already aborted', async () => {
+    const c = new AbortController();
+    c.abort();
+    await expect(abortableSleep(10, c.signal)).rejects.toMatchObject({ name: 'AbortError' });
   });
 });

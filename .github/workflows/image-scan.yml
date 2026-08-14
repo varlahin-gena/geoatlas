@@ -1,0 +1,69 @@
+name: Image scan
+
+on:
+  schedule:
+    - cron: "20 4 * * 1"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "docker-compose.yml"
+      - "**/Dockerfile"
+      - ".github/workflows/image-scan.yml"
+
+jobs:
+  trivy-images:
+    name: trivy (compose images)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: nginx:1.27-alpine
+          severity: CRITICAL
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-nginx.sarif
+          exit-code: "0"
+
+      - uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: alpine:3.20
+          severity: CRITICAL
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-alpine.sarif
+          exit-code: "0"
+
+      - uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: clickhouse/clickhouse-server:25.8.28.1
+          severity: CRITICAL
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-clickhouse.sarif
+          exit-code: "0"
+
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-nginx.sarif
+          category: trivy-nginx
+
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-alpine.sarif
+          category: trivy-alpine
+
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-clickhouse.sarif
+          category: trivy-clickhouse

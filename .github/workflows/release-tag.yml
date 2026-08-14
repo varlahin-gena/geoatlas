@@ -12,3 +12,34 @@ jobs:
       - uses: actions/checkout@v5
       - name: check release contract
         run: bash scripts/check-release-contract.sh
+
+  github-release:
+    name: GitHub Release from CHANGELOG
+    needs: release-contract
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          VER="${TAG#v}"
+          notes="$(mktemp)"
+          awk -v v="$VER" '
+            $0 ~ "^## \\[" v "\\]" { p = 1; next }
+            p && /^## \[/ { exit }
+            p { print }
+          ' CHANGELOG.md >"$notes"
+          if [[ ! -s "$notes" ]]; then
+            echo "empty CHANGELOG notes for ${VER}" >&2
+            exit 1
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "release ${TAG} already exists"
+            exit 0
+          fi
+          gh release create "$TAG" --title "$TAG" --notes-file "$notes"

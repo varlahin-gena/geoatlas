@@ -35,6 +35,11 @@ CLICKHOUSE_SERVICE="${CLICKHOUSE_SERVICE:-clickhouse}"
 BACKEND_SERVICE="${BACKEND_SERVICE:-backend}"
 BACKUP_ROOT="/var/lib/clickhouse-backups"
 
+ch_client() {
+  $COMPOSE exec -T "$CLICKHOUSE_SERVICE" \
+    sh -c 'exec clickhouse-client --password "$CLICKHOUSE_PASSWORD" "$@"' sh "$@"
+}
+
 if ! $COMPOSE ps --status running --services 2>/dev/null | grep -qx "$CLICKHOUSE_SERVICE"; then
   echo "restore: service '$CLICKHOUSE_SERVICE' is not running" >&2
   exit 1
@@ -81,7 +86,7 @@ RESTORED=0
 for t in "${CANDIDATES[@]}"; do
   SQL="RESTORE TABLE ${t} FROM Disk('backups', '${NAME}')${SETTINGS}"
   set +e
-  err="$($COMPOSE exec -T "$CLICKHOUSE_SERVICE" clickhouse-client \
+  err="$(ch_client \
     --receive_timeout 3600 --send_timeout 3600 -q "$SQL" 2>&1)"
   rc=$?
   set -e

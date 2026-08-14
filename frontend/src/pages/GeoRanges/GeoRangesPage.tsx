@@ -1,6 +1,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { authHeaders } from '@/api/client';
+import { apiFetchRaw } from '@/api/client';
 import {
   clearGeoRanges,
   exportGeoRanges,
@@ -196,10 +196,9 @@ export default function GeoRangesPage() {
     }
     setBusy(true);
     try {
-      const res = await fetch('/upload-geo', {
+      const res = await apiFetchRaw('/upload-geo', {
         method: 'POST',
-        credentials: 'same-origin',
-        headers: authHeaders({ 'Content-Type': 'text/csv' }),
+        headers: { 'Content-Type': 'text/csv' },
         body: file,
       });
       const ct = res.headers.get('content-type') || '';

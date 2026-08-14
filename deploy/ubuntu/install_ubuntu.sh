@@ -196,7 +196,7 @@ _welcome_dialog() {
     if ! mode="$(nm_ui_radiolist "Установка ГеоАтлас" \
 "Режим установки
 
-auto — релиз, модули, :8080, firewall off
+auto — релиз, модули, :8080, UFW ports
 step — спросить каждый шаг
 
 ${PROJECT_DIR}" \
@@ -330,8 +330,12 @@ configure_firewall() {
             ;;
     esac
     if [[ "${NM_MODULE_SYSLOG:-1}" == "1" ]]; then
-        ufw allow 514/tcp || true
-        ufw allow 514/udp || true
+        if declare -F nm_ufw_allow_syslog >/dev/null 2>&1; then
+            nm_ufw_allow_syslog
+        else
+            ufw allow 514/tcp || true
+            ufw allow 514/udp || true
+        fi
     else
         log "Порт 514 пропущен (модуль syslog отключён)."
     fi
@@ -651,10 +655,11 @@ main() {
     fi
     prepare_project
     if [[ "${NM_FULL_AUTO:-0}" == "1" ]]; then
-        if declare -F nm_disable_host_firewall >/dev/null 2>&1; then
+        if [[ "${NM_DISABLE_HOST_FIREWALL:-0}" == "1" ]] && declare -F nm_disable_host_firewall >/dev/null 2>&1; then
             nm_disable_host_firewall "$PROJECT_DIR"
         else
-            ENABLE_UFW=0
+            ENABLE_UFW=1
+            UFW_AUTO_ENABLE=1
             configure_firewall
         fi
     else

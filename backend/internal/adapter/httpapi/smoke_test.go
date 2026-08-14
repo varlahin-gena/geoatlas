@@ -106,6 +106,22 @@ func TestPostCASmoke(t *testing.T) {
 		}
 	}
 
+	t.Run("live", func(t *testing.T) {
+		resp, err := client.Get(base + "/api/live")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		mustStatus(t, "live", resp, http.StatusOK)
+		var body map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body["ok"] != true || body["status"] != "live" {
+			t.Fatalf("live body: %#v", body)
+		}
+	})
+
 	t.Run("health", func(t *testing.T) {
 		resp, err := client.Get(base + "/api/health")
 		if err != nil {
@@ -119,6 +135,22 @@ func TestPostCASmoke(t *testing.T) {
 		}
 		if body["ok"] != true {
 			t.Fatalf("health body: %#v", body)
+		}
+	})
+
+	t.Run("ready", func(t *testing.T) {
+		resp, err := client.Get(base + "/api/ready")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		mustStatus(t, "ready", resp, http.StatusOK)
+		var body map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body["ok"] != true || body["clickhouse"] != "ok" {
+			t.Fatalf("ready body: %#v", body)
 		}
 	})
 

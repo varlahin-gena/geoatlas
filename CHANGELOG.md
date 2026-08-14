@@ -13,21 +13,36 @@
 - CI: `scripts/shellcheck.sh` (`-S error`) на `start.sh` / `stop.sh` / `scripts/` / `deploy/`
 - Карта: period / group / filter / q / country в query string; 401 вне `/api/auth` → `/login?next=`
 - Playwright: фикстура карты + URL-параметры + редирект по 401
+- `bootstrap.RunStartup` unit-тесты; `trafficstore` — geo-path не падает в raw scan
+- Playwright GeoIP wizard (Escape) + в CI `vite preview`, не только `vite dev`
 
 ### Changed
-- HTTP API doc **1.5.0 → 1.9.0** (после v1.3.1, ещё не в продуктовом теге):
+- HTTP API doc **1.5.0 → 1.11.0** (после v1.3.1, ещё не в продуктовом теге):
   - **1.7.0**: `GET /metrics` (Prometheus, Bearer≥ops), `POST /api/auth/logout-all` в спецификации, ingest SLO в `/api/system/stats`
   - **1.8.0**: `/api/events` — серверные `filter` / `limit` / `country` / `q`; live `pipeline.syslogng` в `/api/system/stats`
   - **1.9.0**: `/api/events` — AST-поиск `q` и фильтр репутации `rep_cat`/`rep_list`/`rep_side` до LIMIT; `reputation_facets`; схема `SystemStats`; SPA-типы из `openapi-typescript`
+  - **1.10.0**: `GET /live` и `GET /ready` (+ `/api/*`); `/health` и `/api/health` — liveness без ClickHouse (503 по CH только на `/ready`)
+  - **1.11.0**: схема `AuthUser` на login/me/geo-wizard-dismiss; nested `SystemStats` / `SystemStatus` / `SystemVersion`; SPA `apiGet`/`apiPost` по generated paths
 
 ### Security
 - Seed только **admin**: установщик спрашивает пароль; full-auto / `./start.sh` без TTY берут `AUTH_ADMIN_PASSWORD` или генерируют одноразовый. Operator с завода не создаётся (UI `/users`). Нет литерала `admin`/`admin`.
 - nginx: CSP/XFO/HSTS на HTML-шелл (include security-headers в location с Cache-Control)
+- Full-auto больше не выключает host firewall: allowlist UI + `:514`; `NM_DISABLE_HOST_FIREWALL=1` — старое поведение; `NM_SYSLOG_ALLOW_FROM` сужает syslog
+- `CLICKHOUSE_PASSWORD` генерируется в `./start.sh` / `detect_resources.sh`; compose fail-closed; default user `from_env`
+- Мастер GeoIP: abort polling при закрытии, `apiFetchRaw` (401 → session expired), Escape / focus trap / клик по backdrop
+- nginx не отдаёт `*.map` (в т.ч. `/assets/`); Vite sourcemap только при `NM_SOURCEMAP=1`
+- Dependabot (Go / npm / Docker / Actions); Trivy fs в CI + weekly scan образов; GitHub Release из CHANGELOG на тег `v*`
 
 ### Fixed
 - Integration map-path: `stubGeoJobs` больше не паникует на нулевом счётчике при `POST /upload-geo`
 - SPA: 401 вне `/api/auth/*` сбрасывает сессию и ведёт на `/login?next=`
 - Карта: period/group/filter/q/country в query string
+- Глобус: camera в ref, deck-слои только при смене cull-ячейки 0.25° (не каждый кадр auto-rotate)
+- Frontend `GET /health` — локальный 200 без прокси на backend; при HTTPS `:80` `/health` не уходит в 301
+
+### Notes
+- После обновления: `./start.sh` — в `.env` появится `CLICKHOUSE_PASSWORD`, ClickHouse перезапустится с паролем (данные на месте). `clickhouse-client` внутри контейнера: `sh -c 'clickhouse-client --password "$CLICKHOUSE_PASSWORD" -q "SELECT 1"'`.
+- Пример ключей `.env` без секретов: [`.env.example`](.env.example)
 
 ## [1.3.1] — 2026-08-12
 

@@ -1,5 +1,6 @@
-import { apiFetch } from './client';
+import { apiFetch, apiGet } from './client';
 import type { SystemVersion } from './types';
+import type { components } from './openapi';
 import type {
   BackupCatalog,
   BackupSchedule,
@@ -10,21 +11,18 @@ import type {
 
 export type { SystemVersion };
 
-export interface SystemStatus {
-  level?: string;
-  alerts?: Array<{ level?: string; target?: string; message?: string }>;
-}
+export type SystemStatus = components['schemas']['SystemStatus'];
 
 export function fetchSystemVersion(init?: RequestInit): Promise<SystemVersion> {
-  return apiFetch<SystemVersion>('/api/system/version', init);
+  return apiGet('/api/system/version', init);
 }
 
 export function fetchSystemStatus(init?: RequestInit): Promise<SystemStatus> {
-  return apiFetch<SystemStatus>('/api/system/status', { cache: 'no-store', ...init });
+  return apiGet('/api/system/status', { cache: 'no-store', ...init });
 }
 
 export function fetchSystemStats(init?: RequestInit): Promise<SystemStats> {
-  return apiFetch<SystemStats>('/api/system/stats', init);
+  return apiGet('/api/system/stats', init) as Promise<SystemStats>;
 }
 
 export function fetchRetention(): Promise<{ retention?: Retention } & Retention> {

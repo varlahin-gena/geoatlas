@@ -164,9 +164,13 @@ func NewServer(
 		chain(http.HandlerFunc(tokensH.Revoke), adminMW, csrf),
 	)
 
-	// --- Health открыт (docker/k8s probes). Pipeline stats — opsMW. ---
-	rr.Handle("GET", "/health", withTimeout(http.HandlerFunc(health.Health), healthTimeout))
-	rr.Handle("GET", "/api/health", withTimeout(http.HandlerFunc(health.Health), healthTimeout))
+	// --- Probes открыты (docker/k8s). /live и /health — процесс; /ready — CH+ingest. ---
+	rr.Handle("GET", "/live", withTimeout(http.HandlerFunc(health.Live), healthTimeout))
+	rr.Handle("GET", "/api/live", withTimeout(http.HandlerFunc(health.Live), healthTimeout))
+	rr.Handle("GET", "/health", withTimeout(http.HandlerFunc(health.Live), healthTimeout))
+	rr.Handle("GET", "/api/health", withTimeout(http.HandlerFunc(health.Live), healthTimeout))
+	rr.Handle("GET", "/ready", withTimeout(http.HandlerFunc(health.Ready), healthTimeout))
+	rr.Handle("GET", "/api/ready", withTimeout(http.HandlerFunc(health.Ready), healthTimeout))
 	rr.Handle("GET", "/api/ingest/stats",
 		withTimeout(chain(http.HandlerFunc(ingestH.GetIngestStats), opsMW), healthTimeout),
 	)
