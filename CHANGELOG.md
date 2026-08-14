@@ -17,6 +17,9 @@
   - **1.7.0**: `GET /metrics` (Prometheus, Bearer≥ops), `POST /api/auth/logout-all` в спецификации, ingest SLO в `/api/system/stats`
   - **1.8.0**: `/api/events` — серверные `filter` / `limit` / `country` / `q`; live `pipeline.syslogng` в `/api/system/stats`
 
+### Fixed
+- Integration map-path: `stubGeoJobs` больше не паникует на нулевом счётчике при `POST /upload-geo`
+
 ## [1.3.1] — 2026-08-12
 
 Патч-релиз: экономнее память GeoIP, лучше наблюдаемость индекса и чище empty-state карты.

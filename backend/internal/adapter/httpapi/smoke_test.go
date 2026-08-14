@@ -336,13 +336,17 @@ func (stubPinger) Ping(context.Context) error { return nil }
 type stubMaintenance struct{ n *atomic.Int32 }
 
 func (s *stubMaintenance) ScheduleMaintenanceBackfill(context.Context, time.Duration) {
-	s.n.Add(1)
+	if s != nil && s.n != nil {
+		s.n.Add(1)
+	}
 }
 
 type stubGeoJobs struct{ reload *atomic.Int32 }
 
 func (s *stubGeoJobs) ScheduleReloadAndEnrich(context.Context, time.Duration) {
-	s.reload.Add(1)
+	if s != nil && s.reload != nil {
+		s.reload.Add(1)
+	}
 }
 
 type stubTraffic struct{}
