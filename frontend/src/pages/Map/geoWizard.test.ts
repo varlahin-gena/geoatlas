@@ -4,6 +4,7 @@ import {
   classifyEmptyMap,
   formatNetworkHint,
   shouldShowGeoWizard,
+  shouldSkipToGeoWizardDone,
 } from './geoWizard';
 
 describe('shouldShowGeoWizard', () => {
@@ -37,6 +38,22 @@ describe('shouldShowGeoWizard', () => {
         forceOpen: true,
       }),
     ).toBe(true);
+  });
+});
+
+describe('shouldSkipToGeoWizardDone', () => {
+  const ready = { count: 12, indexReady: true };
+
+  it('advances only from the intro when geo is already loaded', () => {
+    expect(shouldSkipToGeoWizardDone('why', ready)).toBe(true);
+    expect(shouldSkipToGeoWizardDone('upload', ready)).toBe(false);
+    expect(shouldSkipToGeoWizardDone('done', ready)).toBe(false);
+  });
+
+  it('stays on intro while geo is empty or unknown', () => {
+    expect(shouldSkipToGeoWizardDone('why', null)).toBe(false);
+    expect(shouldSkipToGeoWizardDone('why', { count: 0, indexReady: true })).toBe(false);
+    expect(shouldSkipToGeoWizardDone('why', { count: 12, indexReady: false })).toBe(false);
   });
 });
 

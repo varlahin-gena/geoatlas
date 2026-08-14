@@ -38,6 +38,14 @@ export function shouldShowGeoWizard(opts: {
   return opts.geoCount === 0;
 }
 
+/** Curl/install filled the table while the intro is open. Do not steal the upload step. */
+export function shouldSkipToGeoWizardDone(
+  step: GeoWizardStep,
+  geo: Pick<GeoStatus, 'count' | 'indexReady'> | null,
+): boolean {
+  return step === 'why' && geo != null && geo.count > 0 && geo.indexReady;
+}
+
 export function readLocalDismissed(): boolean {
   try {
     return localStorage.getItem(GEO_WIZARD_LS_KEY) === '1';

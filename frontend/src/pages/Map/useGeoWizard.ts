@@ -10,6 +10,7 @@ import {
   GEO_UPLOAD_LARGE_BYTES,
   readLocalDismissed,
   shouldShowGeoWizard,
+  shouldSkipToGeoWizardDone,
   writeLocalDismissed,
   type DryRunPreview,
   type GeoStatus,
@@ -106,6 +107,13 @@ export function useGeoWizard(opts: {
     },
     [uiAuthEnabled, refreshUser, toast],
   );
+
+  const moreUpload = useCallback(() => {
+    setStep('upload');
+    setPreview(null);
+    setPendingFile(null);
+    setPollNote('');
+  }, []);
 
   const dismiss = useCallback(async () => {
     setHeldOpen(false);
@@ -217,13 +225,12 @@ export function useGeoWizard(opts: {
 
   const visible = heldOpen;
 
-  // If geo appears while wizard open (curl path), advance to done.
+  // Curl/install filled geo while the intro is still open — skip to done.
+  // Do not run on `upload`: that is "Ещё загрузка" / a second file.
   useEffect(() => {
-    if (!visible || !geo) return;
-    if (geo.count > 0 && geo.indexReady && step !== 'done') {
-      setStep('done');
-      setPollNote(`База уже на месте: ${fmtNumber(geo.count)} диапазонов`);
-    }
+    if (!visible || !geo || !shouldSkipToGeoWizardDone(step, geo)) return;
+    setStep('done');
+    setPollNote(`База уже на месте: ${fmtNumber(geo.count)} диапазонов`);
   }, [visible, geo, step]);
 
   return {
@@ -238,6 +245,7 @@ export function useGeoWizard(opts: {
     curlSnippet,
     fileRef,
     open,
+    moreUpload,
     dismiss,
     closeAfterSuccess,
     runDryRun,

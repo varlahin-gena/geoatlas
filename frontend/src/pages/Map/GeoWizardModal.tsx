@@ -15,6 +15,7 @@ interface Props {
   fileRef: RefObject<HTMLInputElement | null>;
   onDismiss: () => void;
   onCloseSuccess: () => void;
+  onMoreUpload: () => void;
   onDryRun: (file: File) => void;
   onCommit: () => void;
   onWaitForCurl: () => void;
@@ -39,6 +40,7 @@ export function GeoWizardModal(props: Props) {
     fileRef,
     onDismiss,
     onCloseSuccess,
+    onMoreUpload,
     onDryRun,
     onCommit,
     onWaitForCurl,
@@ -259,7 +261,7 @@ export function GeoWizardModal(props: Props) {
                   type="button"
                   className="btn"
                   disabled={busy}
-                  onClick={() => setStep('upload')}
+                  onClick={onMoreUpload}
                 >
                   Ещё загрузка
                 </button>

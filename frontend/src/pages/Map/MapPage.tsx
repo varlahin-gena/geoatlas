@@ -321,7 +321,7 @@ export default function MapPage() {
         adminLinks={adminLinks}
         geoWizard={{
           open: geoWizard.open,
-          empty: geoWizard.geo != null && geoWizard.geo.count === 0,
+          empty: geoWizard.geo == null ? null : geoWizard.geo.count === 0,
         }}
         viz={{
           minCount,
@@ -422,6 +422,7 @@ export default function MapPage() {
           fileRef={geoWizard.fileRef}
           onDismiss={() => void geoWizard.dismiss()}
           onCloseSuccess={() => void geoWizard.closeAfterSuccess()}
+          onMoreUpload={geoWizard.moreUpload}
           onDryRun={(file) => void geoWizard.runDryRun(file)}
           onCommit={() => void geoWizard.commitUpload()}
           onWaitForCurl={() => void geoWizard.waitForGeo()}

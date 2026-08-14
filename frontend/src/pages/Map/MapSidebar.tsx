@@ -20,7 +20,7 @@ export type MapSidebarProps = {
   };
   geoWizard?: {
     open: () => void;
-    empty: boolean;
+    empty: boolean | null;
   };
   actions: {
     fetchData: () => void | Promise<void>;
@@ -177,19 +177,7 @@ export function MapSidebar({
             <Icon d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
             <span className="label">Загрузить логи</span>
           </button>
-          <button
-            type="button"
-            className="side-btn"
-            title="Обновить GeoIP"
-            onClick={() => geoFileRef.current?.click()}
-          >
-            <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20" />
-            </svg>
-            <span className="label">Обновить GeoIP</span>
-          </button>
-          {geoWizard ? (
+          {geoWizard?.empty === true ? (
             <button
               type="button"
               className="side-btn"
@@ -197,11 +185,22 @@ export function MapSidebar({
               onClick={geoWizard.open}
             >
               <Icon d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-              <span className="label">
-                {geoWizard.empty ? 'Мастер GeoIP' : 'Мастер GeoIP'}
-              </span>
+              <span className="label">Мастер GeoIP</span>
             </button>
-          ) : null}
+          ) : (
+            <button
+              type="button"
+              className="side-btn"
+              title="Обновить GeoIP"
+              onClick={() => geoFileRef.current?.click()}
+            >
+              <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20" />
+              </svg>
+              <span className="label">Обновить GeoIP</span>
+            </button>
+          )}
         </div>
       ) : null}
 
