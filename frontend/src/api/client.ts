@@ -36,6 +36,25 @@ export function isAbortError(e: unknown): boolean {
   return name === 'AbortError';
 }
 
+export const SESSION_EXPIRED_EVENT = 'nm-session-expired';
+
+/** Auth endpoints where 401 means "bad credentials" / "not logged in", not an expired SPA session. */
+export function isAuthApiPath(path: string): boolean {
+  try {
+    const p = path.startsWith('http') ? new URL(path).pathname : path.split('?')[0];
+    return p === '/api/auth' || p.startsWith('/api/auth/');
+  } catch {
+    return path.includes('/api/auth/');
+  }
+}
+
+export function notifySessionExpired(path: string, status: number): void {
+  if (status !== 401 || isAuthApiPath(path)) return;
+  if (typeof window === 'undefined') return;
+  if (window.location.pathname === '/login') return;
+  window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+}
+
 export async function apiFetch<T = unknown>(
   path: string,
   init: RequestInit = {},
@@ -55,6 +74,7 @@ export async function apiFetch<T = unknown>(
     ? await res.json().catch(() => ({}))
     : await res.text();
   if (!res.ok) {
+    notifySessionExpired(path, res.status);
     const msg =
       typeof data === 'object' && data && 'error' in data
         ? String((data as { error: unknown }).error)
@@ -66,9 +86,11 @@ export async function apiFetch<T = unknown>(
 
 export async function apiFetchRaw(path: string, init: RequestInit = {}): Promise<Response> {
   const headers = authHeaders(init.headers);
-  return fetch(path, {
+  const res = await fetch(path, {
     ...init,
     credentials: 'same-origin',
     headers,
   });
+  notifySessionExpired(path, res.status);
+  return res;
 }

@@ -40,6 +40,7 @@ export interface EdgesAgg {
   updated_at?: string;
 }
 
+/** Nested UI fields. Wire envelope: OpenAPI SystemStats (`src/api/openapi.d.ts`). */
 export interface SystemStats {
   alerts?: Alert[];
   containers?: Record<string, { cpu_pct?: number; mem_bytes?: number }>;

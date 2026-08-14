@@ -150,6 +150,42 @@ func normalizeFilter(v string) string {
 	}
 }
 
+func normalizeRepSide(v string) string {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "src", "dst", "both":
+		return strings.ToLower(strings.TrimSpace(v))
+	default:
+		return "any"
+	}
+}
+
+func parseCSVParam(v string, max int) []string {
+	if v == "" || max < 1 {
+		return nil
+	}
+	parts := strings.Split(v, ",")
+	out := make([]string, 0, len(parts))
+	seen := map[string]struct{}{}
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if len([]rune(p)) > 64 {
+			p = string([]rune(p)[:64])
+		}
+		if _, ok := seen[p]; ok {
+			continue
+		}
+		seen[p] = struct{}{}
+		out = append(out, p)
+		if len(out) >= max {
+			break
+		}
+	}
+	return out
+}
+
 func normalizeDataSource(v string) string {
 	v = strings.ToLower(strings.TrimSpace(v))
 	if v == "backup" {
@@ -187,13 +223,16 @@ func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := h.eventsUC.GetMap(ctx, usecaseevents.GetMapInput{
-		TimeRange: model.TimeRange{Mode: tr.Mode, Amount: tr.Amount, From: tr.From, To: tr.To},
-		Limit:     parseOptionalLimit(q.Get("limit")),
-		GroupBy:   normalizeGroupBy(q.Get("group_by")),
-		Filter:    normalizeFilter(q.Get("filter")),
-		Country:   q.Get("country"),
-		Query:     q.Get("q"),
-		Timeout:   h.cfg.QueryTimeout,
+		TimeRange:     model.TimeRange{Mode: tr.Mode, Amount: tr.Amount, From: tr.From, To: tr.To},
+		Limit:         parseOptionalLimit(q.Get("limit")),
+		GroupBy:       normalizeGroupBy(q.Get("group_by")),
+		Filter:        normalizeFilter(q.Get("filter")),
+		Country:       q.Get("country"),
+		Query:         q.Get("q"),
+		RepCategories: parseCSVParam(q.Get("rep_cat"), 32),
+		RepLists:      parseCSVParam(q.Get("rep_list"), 32),
+		RepSide:       normalizeRepSide(q.Get("rep_side")),
+		Timeout:       h.cfg.QueryTimeout,
 	})
 	if err != nil {
 		writeInternalError(w, "events: get map failed", err)
@@ -201,15 +240,16 @@ func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := map[string]any{
-		"group_by":        result.GroupBy,
-		"filter":          result.Filter,
-		"country":         result.Country,
-		"q":               result.Query,
-		"period":          result.Period,
-		"data_source":     dataSource,
-		"backup_attached": attached,
-		"lines":           result.Lines,
-		"points":          result.Points,
+		"group_by":          result.GroupBy,
+		"filter":            result.Filter,
+		"country":           result.Country,
+		"q":                 result.Query,
+		"period":            result.Period,
+		"data_source":       dataSource,
+		"backup_attached":   attached,
+		"lines":             result.Lines,
+		"points":            result.Points,
+		"reputation_facets": result.ReputationFacets,
 		"stats": map[string]any{
 			"raw_pairs":      result.RawPairs,
 			"edges":          len(result.Lines),

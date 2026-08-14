@@ -133,3 +133,48 @@ func TestGetMapIPModeWithTypedNilReputation(t *testing.T) {
 		}
 	}
 }
+
+type stubRep map[string][]model.ReputationHit
+
+func (s stubRep) Lookup(ipStr string) []model.ReputationHit {
+	return s[ipStr]
+}
+
+func TestGetMapFiltersReputationBeforeLimit(t *testing.T) {
+	repo := &stubRepo{
+		raws: []model.RawAgg{
+			{SrcIP: "1.1.1.1", DstIP: "8.8.8.8", Count: 50, AllowedCnt: 50},
+			{SrcIP: "2.2.2.2", DstIP: "9.9.9.9", Count: 5, AllowedCnt: 5},
+		},
+	}
+	geo := stubGeo{
+		"1.1.1.1": {Found: true, Lat: 1, Lon: 1, City: "S", Country: "AU"},
+		"8.8.8.8": {Found: true, Lat: 2, Lon: 2, City: "M", Country: "US"},
+		"2.2.2.2": {Found: true, Lat: 3, Lon: 3, City: "A", Country: "DE"},
+		"9.9.9.9": {Found: true, Lat: 4, Lon: 4, City: "B", Country: "FR"},
+	}
+	rep := stubRep{
+		"2.2.2.2": {{List: "spamhaus", Category: "malware"}},
+	}
+	uc := New(repo, geo, rep)
+	out, err := uc.GetMap(context.Background(), GetMapInput{
+		TimeRange:     model.TimeRange{Mode: "hours", Amount: 6},
+		GroupBy:       "ip",
+		Filter:        "all",
+		Limit:         1,
+		RepCategories: []string{"malware"},
+		Timeout:       time.Minute,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Lines) != 1 {
+		t.Fatalf("lines=%d", len(out.Lines))
+	}
+	if out.Lines[0].Src != "2.2.2.2" {
+		t.Fatalf("filtered line src=%s", out.Lines[0].Src)
+	}
+	if _, ok := out.ReputationFacets["malware"]; !ok {
+		t.Fatalf("facets=%v", out.ReputationFacets)
+	}
+}

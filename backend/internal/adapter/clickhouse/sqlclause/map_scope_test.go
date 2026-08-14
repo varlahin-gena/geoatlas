@@ -28,6 +28,16 @@ func TestLogsWhereBindsCountryAndQuery(t *testing.T) {
 	}
 }
 
+func TestLogsWhereAdvancedQueryBinds(t *testing.T) {
+	clause, args := MapScope{Query: "country:Germany AND rule:block"}.LogsWhere()
+	if !strings.Contains(clause, "AND") || len(args) < 2 {
+		t.Fatalf("clause=%s args=%d", clause, len(args))
+	}
+	if strings.Contains(clause, "Germany") || strings.Contains(clause, "block") {
+		t.Fatal("values must not be interpolated")
+	}
+}
+
 func TestGeoAggHavingIncludesKeys(t *testing.T) {
 	expr, args := MapScope{Country: "Germany"}.GeoAggHavingExpr()
 	if !strings.Contains(expr, "src_key") || len(args) != 4 {

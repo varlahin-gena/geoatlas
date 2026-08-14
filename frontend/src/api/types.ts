@@ -1,3 +1,5 @@
+import type { components } from './openapi';
+
 export const ROLE_ADMIN = 'administrator';
 export const ROLE_OPERATOR = 'operator';
 
@@ -21,8 +23,4 @@ export interface SystemVersion {
   commit?: string;
 }
 
-export interface ReputationHit {
-  list: string;
-  category: string;
-  network?: string;
-}
+export type ReputationHit = components['schemas']['ReputationHit'];

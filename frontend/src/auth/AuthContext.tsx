@@ -7,9 +7,11 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { SESSION_EXPIRED_EVENT } from '@/api/client';
 import * as authApi from '@/api/auth';
 import type { AuthUser } from '@/api/types';
+import { safeNext } from '@/lib/format';
 import { applyTheme, getTheme, toggleTheme, type Theme } from './theme';
 import { deriveIsAdmin, deriveReputationEnabled, deriveUiAuthEnabled } from './roles';
 
@@ -36,6 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [theme, setThemeState] = useState<Theme>(getTheme());
   const navigate = useNavigate();
+  const location = useLocation();
 
   const refresh = useCallback(async () => {
     try {
@@ -47,6 +50,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return null;
     }
   }, []);
+
+  useEffect(() => {
+    const onExpired = () => {
+      setUser(null);
+      if (location.pathname === '/login') return;
+      const next = safeNext(location.pathname + location.search);
+      navigate(`/login?next=${encodeURIComponent(next)}`, { replace: true });
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
+  }, [location.pathname, location.search, navigate]);
 
   useEffect(() => {
     let cancelled = false;

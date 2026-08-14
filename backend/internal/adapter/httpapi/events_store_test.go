@@ -256,3 +256,23 @@ func TestGetEventsPassesFilterCountryAndQ(t *testing.T) {
 		t.Fatalf("echo body=%v", body)
 	}
 }
+
+func TestGetEventsPassesAdvancedQAndReputation(t *testing.T) {
+	stub := &stubTraffic{}
+	h := &EventsHandler{Deps: &Deps{
+		cfg:      config.Config{QueryTimeout: time.Minute},
+		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
+	}}
+	req := httptest.NewRequest(http.MethodGet, "/api/events?hours=6&group_by=ip&q=country:Germany+AND+rule:block&rep_cat=malware&rep_list=spamhaus&rep_side=src&limit=100", nil)
+	rec := httptest.NewRecorder()
+	h.GetEvents(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if stub.lastQuery.Query != "country:Germany AND rule:block" {
+		t.Fatalf("q = %q", stub.lastQuery.Query)
+	}
+	if stub.lastQuery.Limit != 50000 {
+		t.Fatalf("scan limit = %d, want hard max when reputation filter is on", stub.lastQuery.Limit)
+	}
+}

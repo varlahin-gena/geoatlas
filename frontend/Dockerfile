@@ -12,6 +12,9 @@ FROM nginx:1.27-alpine
 RUN mkdir -p /etc/nginx/includes
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx-app.inc /etc/nginx/includes/app.inc
+COPY nginx-security-headers.inc /etc/nginx/includes/security-headers.inc
+COPY nginx-proxy-headers.inc /etc/nginx/includes/proxy-headers.inc
+COPY nginx-auth-subrequest.inc /etc/nginx/includes/auth-subrequest.inc
 COPY docker-entrypoint.sh /docker-entrypoint-nm.sh
 RUN chmod +x /docker-entrypoint-nm.sh \
   && rm -f /etc/nginx/conf.d/default.conf

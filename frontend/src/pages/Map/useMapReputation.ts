@@ -1,11 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  collectReputationMenuTree,
-  reputationFilterActiveCount,
-} from './mapReputation';
-import type { MapLine, RepFilterSide } from './mapTypes';
+import { reputationFilterActiveCount } from './mapReputation';
+import type { RepFilterSide } from './mapTypes';
 
-export function useMapReputation(lines: MapLine[], groupBy: string) {
+export function useMapReputation(groupBy: string) {
   const [repMenuOpen, setRepMenuOpen] = useState(false);
   const [repCategories, setRepCategories] = useState<Set<string>>(() => new Set());
   const [repLists, setRepLists] = useState<Set<string>>(() => new Set());
@@ -26,8 +23,9 @@ export function useMapReputation(lines: MapLine[], groupBy: string) {
 
   const repFilterCount = reputationFilterActiveCount(repCategories, repLists);
   const repActive = groupBy === 'ip' && repFilterCount > 0;
-  const repTree = useMemo(() => collectReputationMenuTree(lines), [lines]);
   const ipMode = groupBy === 'ip';
+  const repCategoryList = useMemo(() => [...repCategories].sort(), [repCategories]);
+  const repListList = useMemo(() => [...repLists].sort(), [repLists]);
 
   return {
     repMenuOpen,
@@ -42,7 +40,8 @@ export function useMapReputation(lines: MapLine[], groupBy: string) {
     setRepColorArcs,
     repActive,
     repFilterCount,
-    repTree,
     ipMode,
+    repCategoryList,
+    repListList,
   };
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/auth/AuthContext';
 import { filterNav, PAGE_NAV } from '@/components/nav';
 import { useToast } from '@/components/Toast';
@@ -6,6 +6,7 @@ import { fmtNumber } from '@/lib/format';
 import { loadCountriesGeoJSON, type GeoFeatureCollection } from './mapHeatmap';
 import { MapDetailPanel } from './mapDetail';
 import { buildDeckLayers } from './mapLayers';
+import { collectReputationMenuTree } from './mapReputation';
 import { MapSidebar } from './MapSidebar';
 import { MapTopbar } from './MapTopbar';
 import { MapVizOverlays } from './MapVizOverlays';
@@ -26,7 +27,6 @@ export default function MapPage() {
   const { isAdmin, reputationEnabled, uiAuthEnabled, theme, user, refresh } = useAuth();
   const { toast } = useToast();
   const view = useMapViewQuery();
-
   const {
     period,
     setPeriod,
@@ -36,59 +36,6 @@ export default function MapPage() {
     setPeriodTo,
     groupBy,
     setGroupBy,
-    points,
-    lines,
-    loading,
-    fetchError,
-    eventStats,
-    autoRefresh,
-    setAutoRefresh,
-    dataSource,
-    selectDataSource,
-    backupAttached,
-    periodQuery,
-    fetchData,
-  } = useMapEvents(toast, {
-    filter: view.filter,
-    maxArcs: view.debouncedMaxArcs,
-    focusedCountry: view.focusedCountry,
-    search: view.debouncedSearch,
-  });
-
-  const {
-    repMenuOpen,
-    setRepMenuOpen,
-    repCategories,
-    setRepCategories,
-    repLists,
-    setRepLists,
-    repSide,
-    setRepSide,
-    repColorArcs,
-    setRepColorArcs,
-    repActive,
-    repFilterCount,
-    repTree,
-    ipMode,
-  } = useMapReputation(lines, groupBy);
-
-  const { visibleLines, stats, emptyOverlay } = useMapFilters({
-    lines,
-    points,
-    loading,
-    fetchError,
-    rawPairs: eventStats.rawPairs,
-    skippedNoGeo: eventStats.skippedNoGeo,
-    repActive,
-    repCategories,
-    repLists,
-    repSide,
-    filter: view.filter,
-    search: view.search,
-    minCount: view.minCount,
-    focusedCountry: view.focusedCountry,
-  });
-  const {
     filter,
     setFilter,
     search,
@@ -104,6 +51,82 @@ export default function MapPage() {
     clearFocusedCountry,
     applySearchFilter,
   } = view;
+
+  const {
+    repMenuOpen,
+    setRepMenuOpen,
+    repCategories,
+    setRepCategories,
+    repLists,
+    setRepLists,
+    repSide,
+    setRepSide,
+    repColorArcs,
+    setRepColorArcs,
+    repActive,
+    repFilterCount,
+    ipMode,
+    repCategoryList,
+    repListList,
+  } = useMapReputation(groupBy);
+
+  const {
+    points,
+    lines,
+    loading,
+    fetchError,
+    eventStats,
+    repFacets,
+    autoRefresh,
+    setAutoRefresh,
+    dataSource,
+    selectDataSource,
+    backupAttached,
+    periodQuery,
+    fetchData,
+  } = useMapEvents(toast, {
+    period,
+    periodFrom,
+    periodTo,
+    groupBy,
+    filter,
+    maxArcs: view.debouncedMaxArcs,
+    focusedCountry,
+    search: view.debouncedSearch,
+    repCategories: repCategoryList,
+    repLists: repListList,
+    repSide,
+    repActive,
+  });
+
+  const repTree = useMemo(() => {
+    const keys = Object.keys(repFacets || {});
+    if (keys.length) {
+      const tree: Record<string, Set<string>> = {};
+      for (const cat of keys) {
+        tree[cat] = new Set(repFacets[cat]);
+      }
+      return tree;
+    }
+    return collectReputationMenuTree(lines);
+  }, [repFacets, lines]);
+
+  const { visibleLines, stats, emptyOverlay } = useMapFilters({
+    lines,
+    points,
+    loading,
+    fetchError,
+    rawPairs: eventStats.rawPairs,
+    skippedNoGeo: eventStats.skippedNoGeo,
+    repActive,
+    repCategories,
+    repLists,
+    repSide,
+    filter: view.filter,
+    search: view.search,
+    minCount: view.minCount,
+    focusedCountry,
+  });
 
   const geoWizard = useGeoWizard({
     isAdmin,

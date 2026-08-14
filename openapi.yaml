@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: ГеоАтлас API
-  version: "1.8.0"
+  version: "1.9.0"
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
@@ -412,9 +412,26 @@ paths:
         - name: q
           in: query
           description: |
-            Простой substring (без AST) по IP, странам, городам, rule, device, proto, zone.
-            Сложный query builder остаётся на клиенте.
-          schema: { type: string, maxLength: 120 }
+            Поисковая строка карты (простой substring или query-builder AST:
+            field:value, AND/OR/NOT, скобки). Применяется в SQL до LIMIT.
+            Невалидный AST игнорируется (как в UI).
+          schema: { type: string, maxLength: 400 }
+        - name: rep_cat
+          in: query
+          description: |
+            Фильтр репутации по категориям (CSV). Только group_by=ip; LIMIT
+            применяется после обогащения. Меню фасетов — reputation_facets.
+          schema: { type: string }
+        - name: rep_list
+          in: query
+          description: Фильтр репутации по именам списков (CSV). Только group_by=ip.
+          schema: { type: string }
+        - name: rep_side
+          in: query
+          schema:
+            type: string
+            enum: [any, src, dst, both]
+            default: any
       responses:
         "200":
           description: lines + points
@@ -1023,6 +1040,10 @@ paths:
       responses:
         "200":
           description: System stats (includes ingest_slo + alerts)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemStats"
         "401":
           description: unauthorized
         "403":
@@ -1461,8 +1482,8 @@ components:
     EventsResponse:
       type: object
       description: |
-        Payload карты (/api/events). Поля lines/points синхронизировать с
-        frontend/src/pages/Map/mapTypes.ts (MapLine / MapPoint) и
+        Payload карты (/api/events). Схемы MapLine / MapPoint / ReputationHit —
+        источник frontend/src/api/openapi.d.ts (mapTypes.ts алиасит их) и
         backend/internal/model Line / Node.
       properties:
         group_by: { type: string }
@@ -1496,13 +1517,62 @@ components:
               type: string
               description: "ip | geo_city | geo_country"
               example: geo_city
+        reputation_facets:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
+          description: Категория → списки (до фильтра репутации), для меню на карте.
 
     ReputationHit:
       type: object
+      required: [list, category]
       properties:
         list: { type: string }
         category: { type: string }
         network: { type: string }
+
+    SystemStats:
+      type: object
+      description: Сводка GET /api/system/stats. Дополнительные поля допустимы.
+      properties:
+        alerts:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        uptime_sec: { type: integer }
+        timestamp: { type: string }
+        ingest_slo:
+          type: object
+          additionalProperties: true
+        pipeline:
+          type: object
+          additionalProperties: true
+        containers:
+          type: object
+          additionalProperties: true
+        health:
+          type: object
+          additionalProperties: true
+        storage:
+          type: object
+          additionalProperties: true
+        backend_info:
+          type: object
+          additionalProperties: true
+        install_profile:
+          type: object
+          additionalProperties: true
+        edges_agg:
+          type: object
+          additionalProperties: true
+        failed_logins:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+      additionalProperties: true
 
     MapPoint:
       type: object

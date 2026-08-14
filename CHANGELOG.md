@@ -11,17 +11,23 @@
 - Контракт релизов: `scripts/check-release-contract.sh` (CI) — VERSION, CHANGELOG Notes и OpenAPI не разъезжаются
 - CI: путь «лог → карта» (`TestIntegrationMapPathLogToEvents`: upload-geo + parser samples → `/api/events`)
 - CI: `scripts/shellcheck.sh` (`-S error`) на `start.sh` / `stop.sh` / `scripts/` / `deploy/`
+- Карта: period / group / filter / q / country в query string; 401 вне `/api/auth` → `/login?next=`
+- Playwright: фикстура карты + URL-параметры + редирект по 401
 
 ### Changed
-- HTTP API doc **1.5.0 → 1.8.0** (после v1.3.1, ещё не в продуктовом теге):
+- HTTP API doc **1.5.0 → 1.9.0** (после v1.3.1, ещё не в продуктовом теге):
   - **1.7.0**: `GET /metrics` (Prometheus, Bearer≥ops), `POST /api/auth/logout-all` в спецификации, ingest SLO в `/api/system/stats`
   - **1.8.0**: `/api/events` — серверные `filter` / `limit` / `country` / `q`; live `pipeline.syslogng` в `/api/system/stats`
+  - **1.9.0**: `/api/events` — AST-поиск `q` и фильтр репутации `rep_cat`/`rep_list`/`rep_side` до LIMIT; `reputation_facets`; схема `SystemStats`; SPA-типы из `openapi-typescript`
 
 ### Security
 - Seed только **admin**: установщик спрашивает пароль; full-auto / `./start.sh` без TTY берут `AUTH_ADMIN_PASSWORD` или генерируют одноразовый. Operator с завода не создаётся (UI `/users`). Нет литерала `admin`/`admin`.
+- nginx: CSP/XFO/HSTS на HTML-шелл (include security-headers в location с Cache-Control)
 
 ### Fixed
 - Integration map-path: `stubGeoJobs` больше не паникует на нулевом счётчике при `POST /upload-geo`
+- SPA: 401 вне `/api/auth/*` сбрасывает сессию и ведёт на `/login?next=`
+- Карта: period/group/filter/q/country в query string
 
 ## [1.3.1] — 2026-08-12
 

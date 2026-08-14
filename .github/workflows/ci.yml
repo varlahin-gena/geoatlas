@@ -277,6 +277,9 @@ jobs:
       - name: typecheck
         run: npm run typecheck
 
+      - name: OpenAPI types in sync
+        run: npx openapi-typescript ../openapi.yaml -o src/api/openapi.d.ts && git diff --exit-code -- src/api/openapi.d.ts
+
       - name: vite build
         run: npm run build
 

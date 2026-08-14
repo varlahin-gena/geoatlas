@@ -24,11 +24,7 @@
         application/geo+json
         image/svg+xml;
 
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    # Baseline CSP: MapLibre/CARTO tiles + blob workers; inline styles for React/uPlot.
-    add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.cartocdn.com; font-src 'self' data:; connect-src 'self' https://basemaps.cartocdn.com https://*.basemaps.cartocdn.com https://*.cartocdn.com; worker-src 'self' blob:; child-src 'self' blob:;" always;
+    include /etc/nginx/includes/security-headers.inc;
 
     location ~ /\. {
         deny all;
@@ -41,6 +37,7 @@
         alias /tmp/nm-config.js;
         default_type application/javascript;
         add_header Cache-Control "no-store" always;
+        include /etc/nginx/includes/security-headers.inc;
     }
 
     location ~* \.(sql|zip|tar|tar\.gz|tgz|bak|backup|env|ini|conf|inc|sh)$ {
@@ -53,49 +50,18 @@
     # client_max_body_size 0 обязателен: лимит проверяется и на subrequest,
     # иначе upload > server max (32m) даёт 413 в auth → клиенту 500.
     location = /auth-check {
-        internal;
-        client_max_body_size 0;
+        include /etc/nginx/includes/auth-subrequest.inc;
         proxy_pass http://backend:8080/api/auth/check;
-        proxy_pass_request_body off;
-        proxy_set_header Content-Length "";
-        proxy_set_header Cookie $http_cookie;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Host $http_host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
     }
 
     location = /auth-check-admin {
-        internal;
-        client_max_body_size 0;
+        include /etc/nginx/includes/auth-subrequest.inc;
         proxy_pass http://backend:8080/api/auth/check-admin;
-        proxy_pass_request_body off;
-        proxy_set_header Content-Length "";
-        proxy_set_header Cookie $http_cookie;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Host $http_host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    # Bearer≥ops / administrator (pipeline ingest, uploads)
     location = /auth-check-ops {
-        internal;
-        client_max_body_size 0;
+        include /etc/nginx/includes/auth-subrequest.inc;
         proxy_pass http://backend:8080/api/auth/check-ops;
-        proxy_pass_request_body off;
-        proxy_set_header Content-Length "";
-        proxy_set_header Cookie $http_cookie;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Host $http_host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
     }
 
     location @login_redirect {
@@ -108,89 +74,43 @@
 
     location = /health {
         proxy_pass http://backend:8080/health;
-        proxy_http_version 1.1;
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Host $http_host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        include /etc/nginx/includes/proxy-headers.inc;
     }
 
-    # Публичные API (без auth_request)
     location = /api/health {
         proxy_pass http://backend:8080/api/health;
-        proxy_http_version 1.1;
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Host $http_host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        include /etc/nginx/includes/proxy-headers.inc;
     }
 
     location ^~ /api/auth/ {
         proxy_pass http://backend:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Host $http_host;
-        proxy_set_header Cookie $http_cookie;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        include /etc/nginx/includes/proxy-headers.inc;
     }
 
     # Карта / статус индикатора: любой залогиненный (или Bearer)
     location = /api/events {
         auth_request /auth-check;
         proxy_pass http://backend:8080/api/events;
-        proxy_http_version 1.1;
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Host $http_host;
-        proxy_set_header Cookie $http_cookie;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        include /etc/nginx/includes/proxy-headers.inc;
     }
 
     location = /api/events/series {
         auth_request /auth-check;
         proxy_pass http://backend:8080/api/events/series;
-        proxy_http_version 1.1;
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Host $http_host;
-        proxy_set_header Cookie $http_cookie;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        include /etc/nginx/includes/proxy-headers.inc;
     }
 
     location = /api/system/status {
         auth_request /auth-check;
         proxy_pass http://backend:8080/api/system/status;
-        proxy_http_version 1.1;
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Host $http_host;
-        proxy_set_header Cookie $http_cookie;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        include /etc/nginx/includes/proxy-headers.inc;
     }
 
     # Личные шаблоны поиска: любой залогиненный (operator / administrator)
     location ^~ /api/me/search-templates {
         auth_request /auth-check;
         proxy_pass http://backend:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Host $http_host;
-        proxy_set_header Cookie $http_cookie;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        include /etc/nginx/includes/proxy-headers.inc;
     }
 
     # Пакетный ingest: до 1 GiB (как backend MaxLogUploadSize)
@@ -198,152 +118,75 @@
         client_max_body_size 0;
         client_body_timeout 1800s;
         client_body_buffer_size 1m;
-
         auth_request /auth-check-ops;
-
         proxy_pass http://backend:8080/api/ingest;
-        proxy_http_version 1.1;
         proxy_request_buffering off;
         proxy_buffering off;
         proxy_read_timeout 1800s;
         proxy_send_timeout 1800s;
-
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Host $http_host;
-        proxy_set_header Cookie $http_cookie;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        include /etc/nginx/includes/proxy-headers.inc;
     }
 
     location = /api/ingest/stats {
         auth_request /auth-check-ops;
         proxy_pass http://backend:8080/api/ingest/stats;
-        proxy_http_version 1.1;
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Host $http_host;
-        proxy_set_header Cookie $http_cookie;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        include /etc/nginx/includes/proxy-headers.inc;
     }
 
-    # Prometheus scrape (Bearer≥ops / administrator) — как ingest/stats.
     location = /metrics {
         auth_request /auth-check-ops;
         proxy_pass http://backend:8080/metrics;
-        proxy_http_version 1.1;
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Host $http_host;
-        proxy_set_header Cookie $http_cookie;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        include /etc/nginx/includes/proxy-headers.inc;
     }
 
     location = /api/geo-ranges/export {
         auth_request /auth-check-ops;
         proxy_pass http://backend:8080/api/geo-ranges/export;
-        proxy_http_version 1.1;
         proxy_read_timeout 600s;
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Host $http_host;
-        proxy_set_header Cookie $http_cookie;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        include /etc/nginx/includes/proxy-headers.inc;
     }
 
     # GET list — admin на backend; POST/PUT — ops. Nginx пропускает ≥ops.
     location = /api/geo-ranges {
         auth_request /auth-check-ops;
         proxy_pass http://backend:8080/api/geo-ranges;
-        proxy_http_version 1.1;
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Host $http_host;
-        proxy_set_header Cookie $http_cookie;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        include /etc/nginx/includes/proxy-headers.inc;
     }
 
     # Reputation mutations: ops на backend (auth_matrix). GET lists/feeds/catalog —
     # admin; nginx пропускает ≥ops, backend режет GET для чистого ops Bearer.
-    # Долгое обновление фидов (backend до 10 мин).
     location = /api/reputation/refresh {
         auth_request /auth-check-ops;
-
         proxy_pass http://backend:8080;
-        proxy_http_version 1.1;
         proxy_read_timeout 1800s;
         proxy_send_timeout 1800s;
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Host $http_host;
-        proxy_set_header Cookie $http_cookie;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        include /etc/nginx/includes/proxy-headers.inc;
     }
 
     location = /api/reputation/feeds {
         auth_request /auth-check-ops;
         proxy_pass http://backend:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Host $http_host;
-        proxy_set_header Cookie $http_cookie;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        include /etc/nginx/includes/proxy-headers.inc;
     }
 
     location ~ ^/api/reputation/(feeds|lists)/[^/]+$ {
         auth_request /auth-check-ops;
         proxy_pass http://backend:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Host $http_host;
-        proxy_set_header Cookie $http_cookie;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        include /etc/nginx/includes/proxy-headers.inc;
     }
 
     # Lookup на карте: любой залогиненный (tierLogin в auth_matrix)
     location = /api/reputation/lookup {
         auth_request /auth-check;
         proxy_pass http://backend:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Host $http_host;
-        proxy_set_header Cookie $http_cookie;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        include /etc/nginx/includes/proxy-headers.inc;
     }
 
     # Остальной /api/*: administrator или Bearer admin
     location /api/ {
         auth_request /auth-check-admin;
-
         proxy_pass http://backend:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Host $http_host;
-        proxy_set_header Cookie $http_cookie;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        include /etc/nginx/includes/proxy-headers.inc;
     }
 
     # Streaming-upload: лимит ≈ MaxLogUploadSize (дефолт 1 GiB); 0 = без лимита nginx
@@ -351,69 +194,39 @@
         client_max_body_size 0;
         client_body_timeout 1800s;
         client_body_buffer_size 1m;
-
         auth_request /auth-check-ops;
-
         proxy_pass http://backend:8080/upload-logs;
-        proxy_http_version 1.1;
         proxy_request_buffering off;
         proxy_buffering off;
         proxy_read_timeout 1800s;
         proxy_send_timeout 1800s;
-
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Host $http_host;
-        proxy_set_header Cookie $http_cookie;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        include /etc/nginx/includes/proxy-headers.inc;
     }
 
     location = /upload-geo {
         client_max_body_size 0;
         client_body_timeout 1800s;
         client_body_buffer_size 1m;
-
         auth_request /auth-check-ops;
-
         proxy_pass http://backend:8080/upload-geo;
-        proxy_http_version 1.1;
         proxy_request_buffering off;
         proxy_buffering off;
         proxy_read_timeout 1800s;
         proxy_send_timeout 1800s;
-
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Host $http_host;
-        proxy_set_header Cookie $http_cookie;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        include /etc/nginx/includes/proxy-headers.inc;
     }
 
     location = /upload-reputation {
         client_max_body_size 0;
         client_body_timeout 1800s;
         client_body_buffer_size 1m;
-
         auth_request /auth-check-ops;
-
         proxy_pass http://backend:8080/upload-reputation;
-        proxy_http_version 1.1;
         proxy_request_buffering off;
         proxy_buffering off;
         proxy_read_timeout 1800s;
         proxy_send_timeout 1800s;
-
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Host $http_host;
-        proxy_set_header Cookie $http_cookie;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        include /etc/nginx/includes/proxy-headers.inc;
     }
 
     # Legacy HTML bookmarks → SPA routes.
@@ -434,12 +247,14 @@
     location ^~ /assets/ {
         expires 7d;
         add_header Cache-Control "public, immutable";
+        include /etc/nginx/includes/security-headers.inc;
         try_files $uri =404;
     }
 
     location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|geojson|map)$ {
         expires 1h;
         add_header Cache-Control "public";
+        include /etc/nginx/includes/security-headers.inc;
         try_files $uri =404;
     }
 
@@ -447,10 +262,12 @@
     # Named fallback avoids matching any exact-location redirects on /index.html.
     location / {
         add_header Cache-Control "no-store" always;
+        include /etc/nginx/includes/security-headers.inc;
         try_files $uri @spa;
     }
 
     location @spa {
         add_header Cache-Control "no-store" always;
+        include /etc/nginx/includes/security-headers.inc;
         rewrite ^ /index.html last;
     }

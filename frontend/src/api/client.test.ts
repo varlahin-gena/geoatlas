@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, apiFetch, authHeaders, csrfToken, isAbortError } from './client';
+import {
+  ApiError,
+  apiFetch,
+  authHeaders,
+  csrfToken,
+  isAbortError,
+  isAuthApiPath,
+} from './client';
 
 describe('isAbortError', () => {
   it('detects DOMException AbortError', () => {
@@ -17,6 +24,15 @@ describe('isAbortError', () => {
     expect(isAbortError(new DOMException('Denied', 'NotAllowedError'))).toBe(false);
     expect(isAbortError(null)).toBe(false);
     expect(isAbortError('AbortError')).toBe(false);
+  });
+});
+
+describe('isAuthApiPath', () => {
+  it('matches auth routes only', () => {
+    expect(isAuthApiPath('/api/auth/login')).toBe(true);
+    expect(isAuthApiPath('/api/auth/me?x=1')).toBe(true);
+    expect(isAuthApiPath('/api/events')).toBe(false);
+    expect(isAuthApiPath('/api/events?days=1')).toBe(false);
   });
 });
 
@@ -81,5 +97,41 @@ describe('apiFetch', () => {
       status: 403,
       message: 'nope',
     } satisfies Partial<ApiError>);
+  });
+
+  it('dispatches session-expired on 401 outside /api/auth', async () => {
+    const spy = vi.fn();
+    window.addEventListener('nm-session-expired', spy);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    );
+    await expect(apiFetch('/api/events')).rejects.toMatchObject({ status: 401 });
+    expect(spy).toHaveBeenCalledOnce();
+    window.removeEventListener('nm-session-expired', spy);
+  });
+
+  it('does not dispatch session-expired on /api/auth/login 401', async () => {
+    const spy = vi.fn();
+    window.addEventListener('nm-session-expired', spy);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ error: 'invalid credentials' }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    );
+    await expect(apiFetch('/api/auth/login', { method: 'POST', body: '{}' })).rejects.toMatchObject({
+      status: 401,
+    });
+    expect(spy).not.toHaveBeenCalled();
+    window.removeEventListener('nm-session-expired', spy);
   });
 });

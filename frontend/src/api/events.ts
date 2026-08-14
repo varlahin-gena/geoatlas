@@ -9,6 +9,9 @@ export function fetchMapEvents(opts: {
   q?: string;
   periodQuery: string;
   source: 'live' | 'backup';
+  repCategories?: string[];
+  repLists?: string[];
+  repSide?: string;
   signal?: AbortSignal;
 }): Promise<EventsPayload> {
   let url =
@@ -22,6 +25,15 @@ export function fetchMapEvents(opts: {
   }
   if (opts.q) {
     url += `&q=${encodeURIComponent(opts.q)}`;
+  }
+  if (opts.repCategories?.length) {
+    url += `&rep_cat=${encodeURIComponent(opts.repCategories.join(','))}`;
+  }
+  if (opts.repLists?.length) {
+    url += `&rep_list=${encodeURIComponent(opts.repLists.join(','))}`;
+  }
+  if (opts.repSide && opts.repSide !== 'any') {
+    url += `&rep_side=${encodeURIComponent(opts.repSide)}`;
   }
   return apiFetch<EventsPayload>(url, {
     signal: opts.signal,

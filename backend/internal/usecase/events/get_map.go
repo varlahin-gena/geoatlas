@@ -3,6 +3,7 @@ package events
 import (
 	"context"
 	"reflect"
+	"sort"
 	"strings"
 	"time"
 
@@ -12,13 +13,16 @@ import (
 
 // GetMapInput — параметры построения карты.
 type GetMapInput struct {
-	TimeRange model.TimeRange
-	Limit     int
-	GroupBy   string // ip|subnet|city|country
-	Filter    string // all|allowed|blocked
-	Country   string
-	Query     string
-	Timeout   time.Duration
+	TimeRange     model.TimeRange
+	Limit         int
+	GroupBy       string // ip|subnet|city|country
+	Filter        string // all|allowed|blocked
+	Country       string
+	Query         string
+	RepCategories []string
+	RepLists      []string
+	RepSide       string // any|src|dst|both
+	Timeout       time.Duration
 }
 
 // MapScanQuery — параметры скана агрегатов карты (LIMIT после action/country/q).
@@ -30,21 +34,24 @@ type MapScanQuery struct {
 	Query   string
 }
 
+const mapScanHardMax = 50000
+
 // GetMapResult — результат для HTTP/API слоя.
 type GetMapResult struct {
-	Lines        []model.Line
-	Points       map[string]model.Node
-	RawPairs     int
-	SkippedNoGeo int
-	Source       string
-	GroupBy      string
-	Filter       string
-	Country      string
-	Query        string
-	Period       string
-	Amount       int
-	From         time.Time
-	To           time.Time
+	Lines            []model.Line
+	Points           map[string]model.Node
+	RawPairs         int
+	SkippedNoGeo     int
+	Source           string
+	GroupBy          string
+	Filter           string
+	Country          string
+	Query            string
+	ReputationFacets map[string][]string
+	Period           string
+	Amount           int
+	From             time.Time
+	To               time.Time
 }
 
 // Service — application use cases для карты/events.
@@ -63,7 +70,7 @@ func (s *Service) GetMap(ctx context.Context, in GetMapInput) (GetMapResult, err
 	groupBy := normalizeGroupBy(in.GroupBy)
 	filter := normalizeFilter(in.Filter)
 	country := clipRunes(in.Country, 80)
-	queryText := clipRunes(in.Query, 120)
+	queryText := clipRunes(in.Query, 400)
 	out := GetMapResult{
 		GroupBy: groupBy,
 		Filter:  filter,
@@ -77,9 +84,15 @@ func (s *Service) GetMap(ctx context.Context, in GetMapInput) (GetMapResult, err
 		Source:  "ip",
 	}
 
+	scanLimit := in.Limit
+	repActive := groupBy == "ip" && (len(in.RepCategories) > 0 || len(in.RepLists) > 0)
+	if repActive && scanLimit < mapScanHardMax {
+		scanLimit = mapScanHardMax
+	}
+
 	scan, err := s.traffic.ScanMapAggs(ctx, in.TimeRange, MapScanQuery{
 		GroupBy: groupBy,
-		Limit:   in.Limit,
+		Limit:   scanLimit,
 		Filter:  filter,
 		Country: country,
 		Query:   queryText,
@@ -105,6 +118,15 @@ func (s *Service) GetMap(ctx context.Context, in GetMapInput) (GetMapResult, err
 	}
 	if groupBy == "ip" {
 		enrichMapReputation(out.Lines, out.Points, s.reputation)
+		out.ReputationFacets = collectReputationFacets(out.Lines)
+		if repActive {
+			out.Lines = filterLinesByReputation(out.Lines, in.RepCategories, in.RepLists, in.RepSide)
+			out.Points = prunePoints(out.Points, out.Lines)
+			if in.Limit > 0 && len(out.Lines) > in.Limit {
+				out.Lines = trimLinesByCount(out.Lines, in.Limit)
+				out.Points = prunePoints(out.Points, out.Lines)
+			}
+		}
 	}
 	return out, nil
 }
@@ -148,6 +170,126 @@ func enrichMapReputation(lines []model.Line, points map[string]model.Node, rep R
 		n.Reputation = lookup(k)
 		points[k] = n
 	}
+}
+
+func collectReputationFacets(lines []model.Line) map[string][]string {
+	sets := map[string]map[string]struct{}{}
+	add := func(hits []model.ReputationHit) {
+		for _, h := range hits {
+			if h.Category == "" {
+				continue
+			}
+			if sets[h.Category] == nil {
+				sets[h.Category] = map[string]struct{}{}
+			}
+			if h.List != "" {
+				sets[h.Category][h.List] = struct{}{}
+			}
+		}
+	}
+	for _, ln := range lines {
+		add(ln.SrcReputation)
+		add(ln.DstReputation)
+	}
+	out := make(map[string][]string, len(sets))
+	for cat, lists := range sets {
+		arr := make([]string, 0, len(lists))
+		for l := range lists {
+			arr = append(arr, l)
+		}
+		sort.Strings(arr)
+		out[cat] = arr
+	}
+	return out
+}
+
+func hitsMatch(hits []model.ReputationHit, cats, lists map[string]struct{}) bool {
+	if len(hits) == 0 {
+		return false
+	}
+	if len(cats) == 0 && len(lists) == 0 {
+		return true
+	}
+	for _, h := range hits {
+		if _, ok := lists[h.List]; ok && h.List != "" {
+			return true
+		}
+		if _, ok := cats[h.Category]; ok && h.Category != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func filterLinesByReputation(lines []model.Line, categories, lists []string, side string) []model.Line {
+	cats := toSet(categories)
+	listSet := toSet(lists)
+	if len(cats) == 0 && len(listSet) == 0 {
+		return lines
+	}
+	out := make([]model.Line, 0, len(lines))
+	for _, ln := range lines {
+		srcOK := hitsMatch(ln.SrcReputation, cats, listSet)
+		dstOK := hitsMatch(ln.DstReputation, cats, listSet)
+		ok := false
+		switch strings.ToLower(strings.TrimSpace(side)) {
+		case "src":
+			ok = srcOK
+		case "dst":
+			ok = dstOK
+		case "both":
+			ok = srcOK && dstOK
+		default:
+			ok = srcOK || dstOK
+		}
+		if ok {
+			out = append(out, ln)
+		}
+	}
+	return out
+}
+
+func toSet(vals []string) map[string]struct{} {
+	out := map[string]struct{}{}
+	for _, v := range vals {
+		v = strings.TrimSpace(v)
+		if v != "" {
+			out[v] = struct{}{}
+		}
+	}
+	return out
+}
+
+func prunePoints(points map[string]model.Node, lines []model.Line) map[string]model.Node {
+	keep := map[string]struct{}{}
+	for _, ln := range lines {
+		keep[ln.Src] = struct{}{}
+		keep[ln.Dst] = struct{}{}
+	}
+	out := make(map[string]model.Node, len(keep))
+	for k := range keep {
+		if n, ok := points[k]; ok {
+			out[k] = n
+		}
+	}
+	return out
+}
+
+func trimLinesByCount(lines []model.Line, limit int) []model.Line {
+	if limit <= 0 || len(lines) <= limit {
+		return lines
+	}
+	sorted := append([]model.Line(nil), lines...)
+	sort.Slice(sorted, func(i, j int) bool {
+		if sorted[i].Count == sorted[j].Count {
+			if sorted[i].Src == sorted[j].Src {
+				return sorted[i].Dst < sorted[j].Dst
+			}
+			return sorted[i].Src < sorted[j].Src
+		}
+		return sorted[i].Count > sorted[j].Count
+	})
+	return sorted[:limit]
 }
 
 func normalizeGroupBy(v string) string {

@@ -16,6 +16,9 @@ ok() { echo "ok: $*"; }
 [[ -f .dockerignore ]] || fail "missing root .dockerignore"
 [[ -f frontend/nginx.conf ]] || fail "missing frontend/nginx.conf"
 [[ -f frontend/nginx-app.inc ]] || fail "missing frontend/nginx-app.inc"
+[[ -f frontend/nginx-security-headers.inc ]] || fail "missing frontend/nginx-security-headers.inc"
+[[ -f frontend/nginx-proxy-headers.inc ]] || fail "missing frontend/nginx-proxy-headers.inc"
+[[ -f frontend/nginx-auth-subrequest.inc ]] || fail "missing frontend/nginx-auth-subrequest.inc"
 [[ -f frontend/docker-entrypoint.sh ]] || fail "missing frontend/docker-entrypoint.sh"
 [[ -f frontend/src/main.tsx ]] || fail "missing frontend/src/main.tsx"
 [[ -f frontend/src/App.tsx ]] || fail "missing frontend/src/App.tsx"
@@ -181,28 +184,28 @@ for loc, want in checks.items():
         raise SystemExit(f"{loc}: want {want}, got {got}")
 print("reputation auth matrix ok")
 PY
-# EventsResponse schema ↔ mapTypes field lock (OpenAPI MapLine / MapPoint)
+# EventsResponse schema ↔ generated types ↔ mapTypes aliases
 "$PYTHON_BIN" - <<'PY' || fail "openapi EventsResponse ↔ mapTypes drift"
 from pathlib import Path
 import re
 oa = Path("openapi.yaml").read_text(encoding="utf-8")
 mt = Path("frontend/src/pages/Map/mapTypes.ts").read_text(encoding="utf-8")
+gen = Path("frontend/src/api/openapi.d.ts").read_text(encoding="utf-8")
 for name in ("MapLine:", "MapPoint:", "ReputationHit:"):
     if name not in oa:
         raise SystemExit(f"openapi missing schema {name}")
-# Core wire fields must appear in both OpenAPI MapLine and TS MapLine
-need = ["src", "dst", "src_lat", "dst_lon", "src_reputation", "blocked_count", "last_action"]
-for f in need:
-    if f"{f}:" not in oa and f"{f}:" not in oa.replace(" ", ""):
-        # openapi uses "src: { type:"
-        if f"{f}:" not in oa:
-            raise SystemExit(f"openapi MapLine missing {f}")
-    if f"{f}" not in mt and f"{f}?" not in mt:
-        # TS: src: string; or src_lat?: number;
-        if not re.search(rf"\b{re.escape(f)}\??:", mt):
-            raise SystemExit(f"mapTypes.ts missing {f}")
 if "Keep in sync with openapi.yaml" not in mt:
     raise SystemExit("mapTypes.ts missing sync comment")
+if "components['schemas']['MapLine']" not in mt:
+    raise SystemExit("mapTypes.ts must alias generated MapLine")
+if "components['schemas']['MapPoint']" not in mt:
+    raise SystemExit("mapTypes.ts must alias generated MapPoint")
+need = ["src", "dst", "src_lat", "dst_lon", "src_reputation", "blocked_count", "last_action"]
+for f in need:
+    if f"{f}:" not in oa:
+        raise SystemExit(f"openapi MapLine missing {f}")
+    if not re.search(rf"\b{re.escape(f)}\??:", gen):
+        raise SystemExit(f"openapi.d.ts missing {f}")
 print("events schema lock ok")
 PY
 grep -q 'include /etc/nginx/includes/app.inc' frontend/nginx.conf || fail "nginx.conf: app.inc include"
@@ -210,7 +213,28 @@ grep -q 'HTTPS_ENABLED' frontend/docker-entrypoint.sh || fail "entrypoint: HTTPS
 grep -q 'listen 443 ssl' frontend/docker-entrypoint.sh || fail "entrypoint: listen 443 ssl"
 ok "nginx SPA / HTTPS"
 
-grep -q 'Content-Security-Policy' frontend/nginx-app.inc || fail "nginx-app: CSP"
+grep -q 'Content-Security-Policy' frontend/nginx-security-headers.inc || fail "nginx-security-headers: CSP"
+grep -q 'include /etc/nginx/includes/security-headers.inc' frontend/nginx-app.inc || fail "nginx-app: security-headers include"
+grep -q 'include /etc/nginx/includes/proxy-headers.inc' frontend/nginx-app.inc || fail "nginx-app: proxy-headers include"
+grep -q 'include /etc/nginx/includes/auth-subrequest.inc' frontend/nginx-app.inc || fail "nginx-app: auth-subrequest include"
+"$PYTHON_BIN" - <<'PY' || fail "nginx-app: HTML location missing security-headers (add_header inheritance)"
+from pathlib import Path
+text = Path("frontend/nginx-app.inc").read_text(encoding="utf-8")
+
+def block(loc: str) -> str:
+    i = text.find(loc)
+    if i < 0:
+        raise SystemExit(f"missing {loc!r}")
+    j = text.find("\n    location ", i + len(loc))
+    return text[i : j if j >= 0 else None]
+
+for loc in ("location / {", "location @spa {", "location ^~ /assets/ {", "location = /config.js {"):
+    b = block(loc)
+    if "add_header Cache-Control" in b or loc.startswith("location = /config.js"):
+        if "includes/security-headers.inc" not in b:
+            raise SystemExit(f"{loc}: Cache-Control without security-headers include")
+print("security-headers on HTML/assets ok")
+PY
 grep -q 'theme-boot.js' frontend/index.html || fail "index.html: theme-boot.js"
 [[ -f frontend/public/theme-boot.js ]] || fail "missing theme-boot.js"
 [[ -f frontend/src/api/users.ts ]] || fail "missing api/users.ts"
@@ -224,6 +248,12 @@ grep -q 'pauseWhenHidden\|runImmediately' frontend/src/lib/usePolling.ts || fail
 if grep -q 'dangerouslySetInnerHTML' frontend/src/pages/Map/mapDetail.tsx; then
   fail "mapDetail: dangerouslySetInnerHTML must be gone"
 fi
+grep -q 'nginx-security-headers.inc' frontend/Dockerfile || fail "Dockerfile: security-headers copy"
+grep -q 'parseMapViewSearch' frontend/src/pages/Map/mapQuery.ts || fail "mapQuery: parseMapViewSearch"
+grep -q 'SESSION_EXPIRED_EVENT' frontend/src/api/client.ts || fail "client.ts: session expired event"
+grep -q 'rep_cat' frontend/src/api/events.ts || fail "events API: rep_cat"
+[[ -f frontend/e2e/map.spec.ts ]] || fail "missing e2e/map.spec.ts"
+[[ -f frontend/src/api/openapi.d.ts ]] || fail "missing generated openapi.d.ts"
 ok "api modules / CSP / e2e / polling / sparkline React"
 
 echo "frontend-smoke: all checks passed"

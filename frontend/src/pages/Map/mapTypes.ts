@@ -1,74 +1,24 @@
-export interface ReputationHit {
-  list: string;
-  category: string;
-  network?: string;
-}
+import type { components } from '@/api/openapi';
+import type { ReputationHit } from '@/api/types';
+
+export type { ReputationHit };
 
 /** Keep in sync with openapi.yaml MapPoint / MapLine (+ backend model.Node / model.Line). */
-export interface MapPoint {
-  lat: number;
-  lon: number;
-  country?: string;
-  city?: string;
-  region?: string;
-  label?: string;
-  count?: number;
-  reputation?: ReputationHit[];
-}
-
-export interface MapLine {
-  src: string;
-  dst: string;
-  src_label?: string;
-  dst_label?: string;
-  src_lat?: number;
-  src_lon?: number;
-  dst_lat?: number;
-  dst_lon?: number;
-  status?: string;
-  blocked?: boolean;
-  count?: number;
-  allowed_count?: number;
-  blocked_count?: number;
-  bytes_sent?: number;
-  bytes_recv?: number;
-  rule?: string;
-  proto?: string;
-  src_port?: number;
-  dst_port?: number;
-  src_zone?: string;
-  dst_zone?: string;
-  src_country?: string;
-  dst_country?: string;
-  device?: string;
-  last_action?: string;
-  src_reputation?: ReputationHit[];
-  dst_reputation?: ReputationHit[];
+export type MapPoint = components['schemas']['MapPoint'];
+export type MapLine = components['schemas']['MapLine'] & {
   _flowAlpha?: number;
   _flowTilt?: number;
   _flowRank?: number;
-}
+};
 
 export interface MapPointEntry extends MapPoint {
   key: string;
 }
 
-export interface EventsPayload {
+export type EventsPayload = Omit<components['schemas']['EventsResponse'], 'lines' | 'points'> & {
   points?: Record<string, MapPoint>;
   lines?: MapLine[];
-  period?: string;
-  source?: string;
-  data_source?: string;
-  backup_attached?: string;
-  stats?: {
-    raw_pairs?: number;
-    edges?: number;
-    nodes?: number;
-    skipped_no_geo?: number;
-    source?: string;
-    [key: string]: unknown;
-  };
-}
+};
 
 export interface SeriesPoint {
   t?: string;
