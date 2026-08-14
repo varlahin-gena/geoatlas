@@ -38,3 +38,16 @@ func TestPreferGeoEdgesAggFlag(t *testing.T) {
 		t.Fatal("expected true after ready")
 	}
 }
+
+func TestPreferHourlyEdgesAggFlag(t *testing.T) {
+	t.Cleanup(func() { SetHourlyEdgesAggReady(false) })
+
+	SetHourlyEdgesAggReady(false)
+	if PreferHourlyEdgesAgg() {
+		t.Fatal("expected false before ready")
+	}
+	SetHourlyEdgesAggReady(true)
+	if !PreferHourlyEdgesAgg() {
+		t.Fatal("expected true after ready")
+	}
+}

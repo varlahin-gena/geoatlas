@@ -40,24 +40,24 @@ func TestGeoEdgesAggSelectBodyNoAliasShadowing(t *testing.T) {
 }
 
 func TestGeoEdgesEnrichedFromSQLJoinsLookup(t *testing.T) {
-	from := geoEdgesEnrichedFromSQL("?")
+	pred := sqlclause.DayTimestampRangeSQL("traffic_logs.timestamp")
+	from := geoEdgesEnrichedFromSQL(pred)
 	for _, want := range []string{
 		sqlclause.GeoEnrichIPTable,
 		"LEFT JOIN",
 		"AS sg ON",
 		"AS dg ON",
 		"AS traffic_logs",
-		"toDate(traffic_logs.timestamp) = ?",
-		"ALTER TABLE", // must NOT mutate logs
+		pred,
 	} {
-		if want == "ALTER TABLE" {
-			if strings.Contains(from, want) {
-				t.Fatalf("enriched FROM must not contain %q:\n%s", want, from)
-			}
-			continue
-		}
 		if !strings.Contains(from, want) {
 			t.Fatalf("enriched FROM missing %q:\n%s", want, from)
 		}
+	}
+	if strings.Contains(from, "ALTER TABLE") {
+		t.Fatalf("enriched FROM must not contain ALTER TABLE:\n%s", from)
+	}
+	if strings.Contains(from, "toDate(traffic_logs.timestamp) =") {
+		t.Fatalf("enriched FROM must use timestamp range prune, not toDate()=:\n%s", from)
 	}
 }

@@ -37,6 +37,7 @@ func (a *RetentionApplier) ApplyEdges(ctx context.Context, days int) error {
 	expr := fmt.Sprintf("day + INTERVAL %d DAY DELETE", days)
 	tables := []string{
 		"traffic_edges_daily",
+		"traffic_edges_hourly",
 		"traffic_edges_city_daily",
 		"traffic_edges_country_daily",
 	}
@@ -49,7 +50,15 @@ func (a *RetentionApplier) ApplyEdges(ctx context.Context, days int) error {
 			slog.Info("retention: skip missing table", "table", table)
 			continue
 		}
-		if err := a.modifyTTL(ctx, table, expr); err != nil {
+		ttl := expr
+		if table == "traffic_edges_hourly" {
+			hdays := days
+			if hdays > 7 {
+				hdays = 7
+			}
+			ttl = fmt.Sprintf("toDateTime(hour) + INTERVAL %d DAY DELETE", hdays)
+		}
+		if err := a.modifyTTL(ctx, table, ttl); err != nil {
 			return err
 		}
 	}

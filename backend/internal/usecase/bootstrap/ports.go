@@ -12,6 +12,7 @@ type SchemaEnsurer interface {
 	EnsureTrafficLogsSuccess(ctx context.Context) error
 	EnsureEdgesAggSchema(ctx context.Context) error
 	EnsureGeoEdgesAggSchema(ctx context.Context) error
+	EnsureHourlyEdgesAggSchema(ctx context.Context) error
 	EnsureReputationRanges(ctx context.Context) error
 }
 
@@ -19,12 +20,14 @@ type SchemaEnsurer interface {
 type AggBackfiller interface {
 	BackfillEdgesAgg(ctx context.Context) error
 	BackfillGeoEdgesAgg(ctx context.Context) error
+	BackfillHourlyEdgesAgg(ctx context.Context) error
 }
 
 // AggReadyRefresher — проверка готовности без полного backfill.
 type AggReadyRefresher interface {
 	RefreshEdgesAggReady(ctx context.Context) error
 	RefreshGeoEdgesAggReady(ctx context.Context) error
+	RefreshHourlyEdgesAggReady(ctx context.Context) error
 }
 
 // EnrichScheduler — фоновый geo enrich после Ensure*.

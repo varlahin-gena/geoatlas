@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
@@ -107,7 +106,7 @@ func geoEdgesAggReady(ctx context.Context, ch clickhouse.Conn, groupBy string) (
 	if rawRows == 0 {
 		return true, nil
 	}
-	missing, err := missingGeoDays(ctx, ch, table)
+	missing, err := missingClosedPartitionDays(ctx, ch, "traffic_logs", table)
 	if err != nil {
 		return false, err
 	}
@@ -176,7 +175,7 @@ func ensureGeoEnrichIPTable(ctx context.Context, ch clickhouse.Conn) error {
 // Исторические дыры закрываются на чтении при INSERT SELECT, без ALTER UPDATE.
 // Пустая lookup-таблица → поведение как FROM traffic_logs.
 // dayFilterPlaceholder — "?" для параметра дня (toDate(timestamp) = ?).
-func geoEdgesEnrichedFromSQL(dayFilterPlaceholder string) string {
+func geoEdgesEnrichedFromSQL(wherePred string) string {
 	sgCountryNeed := sqlclause.CountryNeedsSQL("traffic_logs.src_country")
 	dgCountryNeed := sqlclause.CountryNeedsSQL("traffic_logs.dst_country")
 	return fmt.Sprintf(`
@@ -216,9 +215,9 @@ func geoEdgesEnrichedFromSQL(dayFilterPlaceholder string) string {
 			FROM traffic_logs
 			LEFT JOIN %[1]s AS sg ON traffic_logs.src_ip = sg.ip
 			LEFT JOIN %[1]s AS dg ON traffic_logs.dst_ip = dg.ip
-			WHERE toDate(traffic_logs.timestamp) = %[4]s
+			WHERE %[4]s
 		) AS traffic_logs
-	`, sqlclause.GeoEnrichIPTable, sgCountryNeed, dgCountryNeed, dayFilterPlaceholder)
+	`, sqlclause.GeoEnrichIPTable, sgCountryNeed, dgCountryNeed, wherePred)
 }
 
 func ensureGeoEdgesTable(ctx context.Context, ch clickhouse.Conn, groupBy string) error {
@@ -373,76 +372,23 @@ func backfillGeoEdgesAgg(ctx context.Context, ch clickhouse.Conn, groupBy string
 	if err != nil {
 		return err
 	}
-	if aggRows > 0 {
-		// Частичный backfill как у IP-edges: missing days.
-		missing, err := missingGeoDays(ctx, ch, table)
-		if err != nil || len(missing) == 0 {
-			slog.Info("geo edges agg: up to date", "group_by", groupBy, "rows", aggRows)
-			return err
-		}
-		return insertGeoEdgesDays(ctx, ch, groupBy, missing)
-	}
-	days, err := listAllRawLogDays(ctx, ch)
+	missing, err := missingClosedPartitionDays(ctx, ch, "traffic_logs", table)
 	if err != nil {
 		return err
 	}
-	slog.Info("geo edges agg: backfill started", "group_by", groupBy, "days", len(days))
-	return insertGeoEdgesDays(ctx, ch, groupBy, days)
-}
-
-func listAllRawLogDays(ctx context.Context, ch clickhouse.Conn) ([]time.Time, error) {
-	qctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	defer cancel()
-	rows, err := ch.Query(qctx, `
-		SELECT DISTINCT toDate(timestamp) AS d FROM traffic_logs ORDER BY d DESC
-	`)
-	if err != nil {
-		return nil, err
+	if len(missing) == 0 {
+		slog.Info("geo edges agg: up to date", "group_by", groupBy, "rows", aggRows)
+		return nil
 	}
-	defer rows.Close()
-	var days []time.Time
-	for rows.Next() {
-		var d time.Time
-		if err := rows.Scan(&d); err != nil {
-			return nil, err
-		}
-		days = append(days, d)
-	}
-	return days, rows.Err()
-}
-
-func missingGeoDays(ctx context.Context, ch clickhouse.Conn, table string) ([]time.Time, error) {
-	qctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	defer cancel()
-	rows, err := ch.Query(qctx, fmt.Sprintf(`
-		SELECT d FROM (
-			SELECT DISTINCT toDate(timestamp) AS d FROM traffic_logs
-		) AS raw
-		LEFT ANTI JOIN (
-			SELECT DISTINCT day AS d FROM %s
-		) AS agg USING (d)
-		ORDER BY d DESC
-	`, table))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var days []time.Time
-	for rows.Next() {
-		var d time.Time
-		if err := rows.Scan(&d); err != nil {
-			return nil, err
-		}
-		days = append(days, d)
-	}
-	return days, rows.Err()
+	slog.Info("geo edges agg: backfill started", "group_by", groupBy, "days", len(missing))
+	return insertGeoEdgesDays(ctx, ch, groupBy, missing)
 }
 
 func insertGeoEdgesDays(ctx context.Context, ch clickhouse.Conn, groupBy string, days []time.Time) error {
 	table := sqlclause.GeoEdgesTable(groupBy)
 	srcKey, dstKey, srcLabel, dstLabel := sqlclause.GeoGroupExprsPrefixed("traffic_logs", groupBy)
 	selectBody := geoEdgesAggSelectBody(srcKey, dstKey, srcLabel, dstLabel, sqlclause.GeoCoordOK)
-	fromSQL := geoEdgesEnrichedFromSQL("?")
+	fromSQL := geoEdgesEnrichedFromSQL(sqlclause.DayTimestampRangeSQL("traffic_logs.timestamp"))
 
 	insertTpl := fmt.Sprintf(`
 		INSERT INTO %s
@@ -457,7 +403,7 @@ func insertGeoEdgesDays(ctx context.Context, ch clickhouse.Conn, groupBy string,
 			return err
 		}
 		ictx, icancel := context.WithTimeout(ctx, 30*time.Minute)
-		err := ch.Exec(ictx, insertTpl, day)
+		err := ch.Exec(ictx, insertTpl, day, day)
 		icancel()
 		if err != nil {
 			return fmt.Errorf("geo edges backfill %s day %s: %w", groupBy, day.Format("2006-01-02"), err)
@@ -467,20 +413,19 @@ func insertGeoEdgesDays(ctx context.Context, ch clickhouse.Conn, groupBy string,
 	return nil
 }
 
-// RebuildGeoEdgesLookback пересобирает traffic_edges_{city,country}_daily за окно
-// lookback после EnrichLogsMissingGeo: MV пишет только на INSERT в traffic_logs,
-// а lookup nm_geo_enrich_ip подмешивается в INSERT SELECT (без UPDATE логов).
-// lookbackDays <= 0 — все дни из traffic_logs.
+// RebuildGeoEdgesLookback пересобирает daily/hourly агрегаты за закрытые дни lookback
+// после EnrichLogsMissingGeo. Сегодня пишет только MV (ingest geo).
+// lookbackDays <= 0 — все закрытые дни из system.parts.
 func RebuildGeoEdgesLookback(ctx context.Context, ch clickhouse.Conn, lookbackDays int) error {
 	if ch == nil {
 		return nil
 	}
-	days, err := listLookbackRawLogDays(ctx, ch, lookbackDays)
+	days, err := listLookbackClosedDays(ctx, ch, lookbackDays)
 	if err != nil {
 		return err
 	}
 	if len(days) == 0 {
-		slog.Info("geo edges agg: rebuild skipped, no days")
+		slog.Info("geo edges agg: rebuild skipped, no closed days")
 		return nil
 	}
 	for _, groupBy := range []string{"city", "country"} {
@@ -488,35 +433,37 @@ func RebuildGeoEdgesLookback(ctx context.Context, ch clickhouse.Conn, lookbackDa
 			return err
 		}
 	}
+	if err := rebuildIPEdgesDays(ctx, ch, sqlclause.IPEdgesDailyTable, days); err != nil {
+		return err
+	}
+	if err := rebuildIPEdgesDays(ctx, ch, sqlclause.IPEdgesHourlyTable, days); err != nil {
+		return err
+	}
 	slog.Info("geo edges agg: rebuild done", "days", len(days), "lookback_days", lookbackDays)
 	return nil
 }
 
-func listLookbackRawLogDays(ctx context.Context, ch clickhouse.Conn, lookbackDays int) ([]time.Time, error) {
-	if lookbackDays <= 0 {
-		return listAllRawLogDays(ctx, ch)
-	}
+func listLookbackClosedDays(ctx context.Context, ch clickhouse.Conn, lookbackDays int) ([]time.Time, error) {
 	qctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
+	lookbackPred := ""
+	if lookbackDays > 0 {
+		lookbackPred = fmt.Sprintf("AND d >= today() - INTERVAL %d DAY", lookbackDays)
+	}
 	rows, err := ch.Query(qctx, fmt.Sprintf(`
-		SELECT DISTINCT toDate(timestamp) AS d
-		FROM traffic_logs
-		WHERE timestamp >= now64(3) - INTERVAL %d DAY
+		SELECT d FROM (
+			SELECT DISTINCT %s AS d
+			FROM system.parts
+			WHERE database = currentDatabase() AND table = 'traffic_logs' AND active
+		)
+		WHERE d < today() AND d > toDate('2000-01-01') %s
 		ORDER BY d DESC
-	`, lookbackDays))
+	`, partitionDayExpr(), lookbackPred))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var days []time.Time
-	for rows.Next() {
-		var d time.Time
-		if err := rows.Scan(&d); err != nil {
-			return nil, err
-		}
-		days = append(days, d)
-	}
-	return days, rows.Err()
+	return scanDays(rows)
 }
 
 func rebuildGeoEdgesDays(ctx context.Context, ch clickhouse.Conn, groupBy string, days []time.Time) error {
@@ -524,19 +471,13 @@ func rebuildGeoEdgesDays(ctx context.Context, ch clickhouse.Conn, groupBy string
 		return nil
 	}
 	table := sqlclause.GeoEdgesTable(groupBy)
-	literals := make([]string, 0, len(days))
-	for _, d := range days {
-		literals = append(literals, fmt.Sprintf("toDate('%s')", d.UTC().Format("2006-01-02")))
+	if table == "" {
+		return fmt.Errorf("geo edges rebuild: invalid groupBy %q", groupBy)
 	}
-	del := fmt.Sprintf(`
-		ALTER TABLE %s DELETE WHERE day IN (%s)
-		SETTINGS mutations_sync = 1
-	`, table, strings.Join(literals, ","))
-	dctx, dcancel := context.WithTimeout(ctx, 30*time.Minute)
-	err := ch.Exec(dctx, del)
-	dcancel()
-	if err != nil {
-		return fmt.Errorf("geo edges rebuild delete %s: %w", groupBy, err)
+	for _, day := range days {
+		if err := dropDatePartition(ctx, ch, table, day); err != nil {
+			return fmt.Errorf("geo edges rebuild drop %s: %w", groupBy, err)
+		}
 	}
 	return insertGeoEdgesDays(ctx, ch, groupBy, days)
 }

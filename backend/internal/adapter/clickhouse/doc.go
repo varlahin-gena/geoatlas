@@ -8,9 +8,9 @@
 //	clickhouse/repstore      — ReputationRepository, ReloadableReputationIndex, ranges
 //	clickhouse/sysstore      — SystemRepository, metrics, CountTableRows
 //	clickhouse/backupstore   — BackupRunner (BACKUP/RESTORE)
-//	clickhouse/aggstate      — EdgesAggStatus, PreferDailyEdgesAgg, PreferGeoEdgesAgg
+//	clickhouse/aggstate      — EdgesAggStatus, PreferDailyEdgesAgg, PreferGeoEdgesAgg, PreferHourlyEdgesAgg
 //	clickhouse/sqlclause     — actionWhere / sumBlocked / geo key exprs
-//	clickhouse/migrate       — schema_version, Ensure*, DDL, backfill edges/geo
+//	clickhouse/migrate       — schema_version, Ensure*, DDL, backfill edges/geo/hourly
 //	clickhouse/query         — ScanRawAggs*, ScanGeoEdges*, TimeRange, ConfigureQuerySettings
 //
 // Правила импорта:
@@ -26,6 +26,7 @@
 //
 // Источник правды по схеме агрегатов: Go Ensure* (не clickhouse/init.sql).
 // init.sql — только cold bootstrap базовых таблиц на пустом томе.
-// IP: traffic_logs / traffic_edges_daily / nm_geo_enrich_ip — IPv4;
+// IP: traffic_logs / traffic_edges_daily / traffic_edges_hourly / nm_geo_enrich_ip — IPv4;
+// traffic_logs ORDER BY (toStartOfHour(timestamp), src_ip, dst_ip); raw column dropped.
 // geo_ranges / reputation_ranges — UInt32 (без изменений).
 package clickhouse

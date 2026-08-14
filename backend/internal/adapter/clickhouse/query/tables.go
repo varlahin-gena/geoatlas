@@ -6,14 +6,18 @@ type tablesCtxKey struct{}
 
 // Tables — набор имён таблиц для map/events SQL (live или shadow бэкапа).
 type Tables struct {
-	Logs        string
-	EdgesCity   string
+	Logs         string
+	EdgesDaily   string
+	EdgesHourly  string
+	EdgesCity    string
 	EdgesCountry string
 }
 
 func LiveTables() Tables {
 	return Tables{
 		Logs:         "traffic_logs",
+		EdgesDaily:   "traffic_edges_daily",
+		EdgesHourly:  "traffic_edges_hourly",
 		EdgesCity:    "traffic_edges_city_daily",
 		EdgesCountry: "traffic_edges_country_daily",
 	}
@@ -23,6 +27,8 @@ func LiveTables() Tables {
 func BackupTables() Tables {
 	return Tables{
 		Logs:         "nm_bak_traffic_logs",
+		EdgesDaily:   "nm_bak_traffic_edges_daily",
+		EdgesHourly:  "nm_bak_traffic_edges_hourly",
 		EdgesCity:    "nm_bak_traffic_edges_city_daily",
 		EdgesCountry: "nm_bak_traffic_edges_country_daily",
 	}
@@ -63,6 +69,8 @@ func MapShadowPairs() [][2]string {
 	bak := BackupTables()
 	return [][2]string{
 		{live.Logs, bak.Logs},
+		{live.EdgesDaily, bak.EdgesDaily},
+		{live.EdgesHourly, bak.EdgesHourly},
 		{live.EdgesCity, bak.EdgesCity},
 		{live.EdgesCountry, bak.EdgesCountry},
 	}

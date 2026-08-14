@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS traffic_logs
     ingest_time   DateTime64(3) DEFAULT now64(3),
 
     vendor        LowCardinality(String) DEFAULT '',
-    device        String,
+    device        LowCardinality(String),
 
     src_ip        IPv4,
     dst_ip        IPv4,
@@ -32,14 +32,14 @@ CREATE TABLE IF NOT EXISTS traffic_logs
 
     rule          String,
     proto         LowCardinality(String),
-    src_zone      String,
-    dst_zone      String,
-    src_country   String,
-    dst_country   String,
-    src_city      String DEFAULT '',
-    dst_city      String DEFAULT '',
-    src_region    String DEFAULT '',
-    dst_region    String DEFAULT '',
+    src_zone      LowCardinality(String),
+    dst_zone      LowCardinality(String),
+    src_country   LowCardinality(String),
+    dst_country   LowCardinality(String),
+    src_city      LowCardinality(String) DEFAULT '',
+    dst_city      LowCardinality(String) DEFAULT '',
+    src_region    LowCardinality(String) DEFAULT '',
+    dst_region    LowCardinality(String) DEFAULT '',
     src_lat       Float64 DEFAULT 0,
     src_lon       Float64 DEFAULT 0,
     dst_lat       Float64 DEFAULT 0,
@@ -48,13 +48,11 @@ CREATE TABLE IF NOT EXISTS traffic_logs
     bytes_sent    UInt64,
     bytes_recv    UInt64,
     packets_sent  UInt64,
-    packets_recv  UInt64,
-
-    raw           String CODEC(ZSTD(3))
+    packets_recv  UInt64
 )
 ENGINE = MergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
-ORDER BY (timestamp, src_ip, dst_ip, action)
+ORDER BY (toStartOfHour(timestamp), src_ip, dst_ip)
 TTL toDateTime(timestamp) + INTERVAL 30 DAY DELETE
 -- ttl_only_drop_parts: удаляем целые дневные партиции вместо дорогих TTL-мерджей по строкам.
 SETTINGS index_granularity = 8192, ttl_only_drop_parts = 1;
@@ -64,7 +62,6 @@ ALTER TABLE traffic_logs ADD INDEX IF NOT EXISTS idx_src_ip      src_ip      TYP
 ALTER TABLE traffic_logs ADD INDEX IF NOT EXISTS idx_dst_ip      dst_ip      TYPE bloom_filter(0.01) GRANULARITY 4;
 ALTER TABLE traffic_logs ADD INDEX IF NOT EXISTS idx_dst_port    dst_port    TYPE minmax              GRANULARITY 4;
 ALTER TABLE traffic_logs ADD INDEX IF NOT EXISTS idx_action      action      TYPE set(0)              GRANULARITY 4;
-ALTER TABLE traffic_logs ADD INDEX IF NOT EXISTS idx_dst_country dst_country TYPE bloom_filter(0.01) GRANULARITY 4;
 
 
 -- ============================================================
@@ -119,36 +116,6 @@ SETTINGS index_granularity = 8192, ttl_only_drop_parts = 1;
 
 
 -- ============================================================
--- Удобные представления для аналитики
--- ============================================================
-
--- Сводка по дням
-CREATE VIEW IF NOT EXISTS v_traffic_daily AS
-SELECT
-    toDate(timestamp)                 AS day,
-    vendor,
-    count()                           AS events,
-    countIf(success = 1)              AS allowed,
-    countIf(success = 0)              AS blocked,
-    uniqExact(src_ip)                 AS unique_src,
-    uniqExact(dst_ip)                 AS unique_dst,
-    sum(bytes_sent + bytes_recv)      AS bytes_total
-FROM traffic_logs
-GROUP BY day, vendor;
-
--- Топ заблокированных назначений
-CREATE VIEW IF NOT EXISTS v_top_blocked_dst AS
-SELECT
-    dst_ip,
-    dst_country,
-    dst_port,
-    count() AS attempts
-FROM traffic_logs
-WHERE success = 0
-GROUP BY dst_ip, dst_country, dst_port
-ORDER BY attempts DESC;
-
--- ============================================================
 -- system_metrics: метрики самой системы (CPU, mem, pipeline rate, etc.)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS system_metrics
@@ -177,4 +144,4 @@ FROM system_metrics
 WHERE timestamp >= now() - INTERVAL 5 MINUTE
 GROUP BY metric_type, target, metric_name;
 
--- Map aggregates (traffic_edges_daily, geo edges, MVs) are created by storage.Ensure*.
+-- Map aggregates (traffic_edges_daily, geo edges, hourly, MVs) are created by storage.Ensure*.

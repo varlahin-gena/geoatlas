@@ -57,15 +57,16 @@ func HavingAggFilterSQL(filter string) string {
 }
 
 // OrderByAggFilterSQL — ORDER BY для top-N в ClickHouse (совпадает с rawAggSortKey).
-// Для traffic_edges_daily (колонки src_ip/dst_ip).
+// Для traffic_edges_daily / hourly (колонки src_ip/dst_ip).
+// coord_weight первым: иначе LAN без geo забивает LIMIT.
 func OrderByAggFilterSQL(filter string) string {
 	switch filter {
 	case "blocked":
-		return "ORDER BY blocked_cnt DESC, cnt DESC, src_ip, dst_ip"
+		return "ORDER BY coord_weight DESC, blocked_cnt DESC, cnt DESC, src_ip, dst_ip"
 	case "allowed":
-		return "ORDER BY allowed_cnt DESC, cnt DESC, src_ip, dst_ip"
+		return "ORDER BY coord_weight DESC, allowed_cnt DESC, cnt DESC, src_ip, dst_ip"
 	default:
-		return "ORDER BY cnt DESC, src_ip, dst_ip"
+		return "ORDER BY coord_weight DESC, cnt DESC, src_ip, dst_ip"
 	}
 }
 

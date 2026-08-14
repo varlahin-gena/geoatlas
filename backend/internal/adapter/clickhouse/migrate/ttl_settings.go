@@ -11,7 +11,7 @@ import (
 
 const (
 	schemaComponentTTLDropParts        = "ttl_only_drop_parts"
-	schemaVersionTTLDropParts   uint32 = 2 // + traffic_edges_* daily partitions
+	schemaVersionTTLDropParts   uint32 = 3 // + traffic_edges_hourly
 )
 
 // EnsureTTLOnlyDropParts включает ttl_only_drop_parts на таблицах с дневными
@@ -30,6 +30,7 @@ func EnsureTTLOnlyDropParts(ctx context.Context, ch clickhouse.Conn) error {
 		"parse_errors",
 		"system_metrics",
 		"traffic_edges_daily",
+		"traffic_edges_hourly",
 		"traffic_edges_city_daily",
 		"traffic_edges_country_daily",
 	}

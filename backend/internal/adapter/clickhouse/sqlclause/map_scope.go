@@ -71,6 +71,21 @@ func (s MapScope) GeoAggHavingExpr() (expr string, args []any) {
 	return strings.Join(parts, " AND "), args
 }
 
+// IPAggHavingExpr — HAVING для traffic_edges_daily/hourly (GROUP BY src_ip, dst_ip).
+func (s MapScope) IPAggHavingExpr() (expr string, args []any) {
+	c := s.sanitized()
+	var parts []string
+	if c.Country != "" {
+		parts = append(parts, "(lowerUTF8(src_country) = lowerUTF8(?) OR lowerUTF8(dst_country) = lowerUTF8(?))")
+		args = append(args, c.Country, c.Country)
+	}
+	if c.Query != "" {
+		parts = append(parts, `positionCaseInsensitiveUTF8(concat_ws(' ', toString(src_ip), toString(dst_ip), src_country, dst_country, src_city, dst_city, rule, device, proto), ?) > 0`)
+		args = append(args, c.Query)
+	}
+	return strings.Join(parts, " AND "), args
+}
+
 // JoinHaving склеивает HAVING-фрагменты (` HAVING x` или голое выражение).
 func JoinHaving(parts ...string) string {
 	var exprs []string

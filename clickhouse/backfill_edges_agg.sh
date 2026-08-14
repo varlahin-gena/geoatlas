@@ -33,14 +33,19 @@ if [[ "$RAW_ROWS" == "0" ]]; then
 fi
 
 DAYS="$(ch_query "
-    SELECT toString(days.d) AS day
+    SELECT toString(d)
     FROM (
-        SELECT DISTINCT toDate(timestamp) AS d FROM traffic_logs
-    ) AS days
-    LEFT ANTI JOIN (
-        SELECT DISTINCT day AS d FROM traffic_edges_daily
-    ) AS agg USING (d)
-    ORDER BY day DESC
+        SELECT DISTINCT toDate(parseDateTimeBestEffort(partition)) AS d
+        FROM system.parts
+        WHERE database = currentDatabase() AND table = 'traffic_logs' AND active
+    )
+    WHERE d < today() AND d > toDate('2000-01-01')
+      AND d NOT IN (
+        SELECT DISTINCT toDate(parseDateTimeBestEffort(partition)) AS d
+        FROM system.parts
+        WHERE database = currentDatabase() AND table = 'traffic_edges_daily' AND active
+      )
+    ORDER BY d DESC
     FORMAT TSV
 ")"
 
@@ -77,6 +82,11 @@ for day in "${DAY_LIST[@]}"; do
             sum(bytes_recv) AS bytes_recv,
             sum(packets_sent) AS packets_sent,
             sum(packets_recv) AS packets_recv,
+            sumIf(src_lat, (src_lat != 0 OR src_lon != 0) AND (dst_lat != 0 OR dst_lon != 0)) AS src_lat_sum,
+            sumIf(src_lon, (src_lat != 0 OR src_lon != 0) AND (dst_lat != 0 OR dst_lon != 0)) AS src_lon_sum,
+            sumIf(dst_lat, (src_lat != 0 OR src_lon != 0) AND (dst_lat != 0 OR dst_lon != 0)) AS dst_lat_sum,
+            sumIf(dst_lon, (src_lat != 0 OR src_lon != 0) AND (dst_lat != 0 OR dst_lon != 0)) AS dst_lon_sum,
+            sum(if((src_lat != 0 OR src_lon != 0) AND (dst_lat != 0 OR dst_lon != 0), toUInt64(1), toUInt64(0))) AS coord_weight,
             argMaxState(action, timestamp) AS last_action,
             anyState(rule)          AS rule,
             anyState(proto)         AS proto,
@@ -86,9 +96,11 @@ for day in "${DAY_LIST[@]}"; do
             anyState(src_zone)      AS src_zone,
             anyState(dst_zone)      AS dst_zone,
             anyState(src_country)   AS src_country,
-            anyState(dst_country)   AS dst_country
+            anyState(dst_country)   AS dst_country,
+            anyState(src_city)      AS src_city,
+            anyState(dst_city)      AS dst_city
         FROM traffic_logs
-        WHERE toDate(timestamp) = toDate('$day')
+        WHERE timestamp >= toDateTime(toDate('$day')) AND timestamp < toDateTime(toDate('$day')) + INTERVAL 1 DAY
         GROUP BY day, src_ip, dst_ip
         SETTINGS max_bytes_before_external_group_by = 536870912
     "

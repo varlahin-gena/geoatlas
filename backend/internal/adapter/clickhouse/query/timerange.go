@@ -3,10 +3,12 @@ package query
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
+	"network_monitor/internal/adapter/clickhouse/aggstate"
 	"network_monitor/internal/adapter/clickhouse/sqlclause"
 	"network_monitor/internal/model"
 )
@@ -25,8 +27,15 @@ func ScanRawAggsForTimeRange(
 	case "minutes", "hours":
 		return scanRawLogsRelative(ctx, ch, tr.Mode, tr.Amount, sel, timeout)
 	case "days":
-		// traffic_edges_daily без lat/lon — для карты IP/subnet нужны координаты из traffic_logs.
-		// (PreferDailyEdgesAgg оставляем для ScanRawAggs / прочих счётчиков.)
+		tables := TablesOf(ctx)
+		if tables.IsBackup() || aggstate.PreferDailyEdgesAgg() {
+			rows, err := scanEdgesDailyAsRaw(ctx, ch, tables.EdgesDaily, tr.Amount, sel, timeout)
+			if err != nil {
+				slog.Warn("edges daily scan failed, falling back to traffic_logs", "err", err)
+			} else {
+				return rows, nil
+			}
+		}
 		return scanRawLogsRelative(ctx, ch, "days", tr.Amount, sel, timeout)
 	case "absolute":
 		if !tr.To.After(tr.From) {

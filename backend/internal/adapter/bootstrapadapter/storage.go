@@ -40,6 +40,10 @@ func (s *Storage) EnsureGeoEdgesAggSchema(ctx context.Context) error {
 	return migrate.EnsureGeoEdgesAggSchema(ctx, s.CH)
 }
 
+func (s *Storage) EnsureHourlyEdgesAggSchema(ctx context.Context) error {
+	return migrate.EnsureHourlyEdgesAggSchema(ctx, s.CH)
+}
+
 func (s *Storage) EnsureReputationRanges(ctx context.Context) error {
 	return migrate.EnsureReputationRanges(ctx, s.CH)
 }
@@ -52,10 +56,18 @@ func (s *Storage) BackfillGeoEdgesAgg(ctx context.Context) error {
 	return migrate.BackfillGeoEdgesAgg(ctx, s.CH)
 }
 
+func (s *Storage) BackfillHourlyEdgesAgg(ctx context.Context) error {
+	return migrate.BackfillHourlyEdgesAgg(ctx, s.CH)
+}
+
 func (s *Storage) RefreshEdgesAggReady(ctx context.Context) error {
 	return migrate.RefreshEdgesAggReady(ctx, s.CH)
 }
 
 func (s *Storage) RefreshGeoEdgesAggReady(ctx context.Context) error {
 	return migrate.RefreshGeoEdgesAggReady(ctx, s.CH)
+}
+
+func (s *Storage) RefreshHourlyEdgesAggReady(ctx context.Context) error {
+	return migrate.RefreshHourlyEdgesAggReady(ctx, s.CH)
 }

@@ -1,0 +1,64 @@
+package migrate
+
+import (
+	"strings"
+	"testing"
+
+	"network_monitor/internal/adapter/clickhouse/sqlclause"
+)
+
+func TestNormalizeSortingKey(t *testing.T) {
+	got := normalizeSortingKey("toStartOfHour(timestamp), src_ip, dst_ip")
+	if got != trafficLogsDesiredOrder {
+		t.Fatalf("got %q want %q", got, trafficLogsDesiredOrder)
+	}
+	if normalizeSortingKey("timestamp, src_ip, dst_ip, action") == trafficLogsDesiredOrder {
+		t.Fatal("old key must not match")
+	}
+}
+
+func TestIsSafeTableIdent(t *testing.T) {
+	if !isSafeTableIdent("traffic_logs") || !isSafeTableIdent("traffic_edges_daily") {
+		t.Fatal("valid idents")
+	}
+	for _, bad := range []string{"", "a; DROP", "x y", "t-1", "traffic_logs`"} {
+		if isSafeTableIdent(bad) {
+			t.Fatalf("accepted %q", bad)
+		}
+	}
+}
+
+func TestIPEdgesCreateSQLHasCoords(t *testing.T) {
+	ddl := ipEdgesCreateTableSQL("traffic_edges_daily", "day", "Date", "day", ipEdgesDailyTTL)
+	for _, want := range []string{"coord_weight", "src_lat_sum", "src_city", "PARTITION BY day", "ttl_only_drop_parts"} {
+		if !strings.Contains(ddl, want) {
+			t.Fatalf("missing %q in:\n%s", want, ddl)
+		}
+	}
+	mv := ipEdgesCreateMVSQL(sqlclause.IPEdgesDailyMV, sqlclause.IPEdgesDailyTable, "toDate(traffic_logs.timestamp)", "day")
+	for _, want := range []string{"coord_weight", "anyState(traffic_logs.src_city)", "GROUP BY day, src_ip, dst_ip"} {
+		if !strings.Contains(mv, want) {
+			t.Fatalf("missing %q in:\n%s", want, mv)
+		}
+	}
+}
+
+func TestTrafficLogsCreateSQLLayout(t *testing.T) {
+	ddl := trafficLogsIPv4CreateSQL("traffic_logs")
+	if strings.Contains(ddl, "raw") {
+		t.Fatal("raw column must be dropped")
+	}
+	if !strings.Contains(ddl, "ORDER BY (toStartOfHour(timestamp), src_ip, dst_ip)") {
+		t.Fatalf("unexpected ORDER BY:\n%s", ddl)
+	}
+	if !strings.Contains(ddl, "LowCardinality(String)") || !strings.Contains(ddl, "src_country") {
+		t.Fatal("expected LC geo columns")
+	}
+}
+
+func TestDayTimestampRangeSQL(t *testing.T) {
+	got := sqlclause.DayTimestampRangeSQL("traffic_logs.timestamp")
+	if !strings.Contains(got, "toDateTime(?)") || !strings.Contains(got, "INTERVAL 1 DAY") {
+		t.Fatal(got)
+	}
+}

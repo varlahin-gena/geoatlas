@@ -12,17 +12,16 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2"
 )
 
-// Схема версий: при изменении DDL MV/колонок бампим константу —
-// Ensure* пересоздаст объекты, если stored < desired.
-const (
-	schemaComponentEdgesAgg      = "edges_agg"
-	schemaComponentGeoEdges      = "geo_edges_agg"
-	schemaComponentTrafficLogsIP = "traffic_logs_ip"
+// Schema version table: bump the constant when Ensure* DDL/MV changes.
+const schemaComponentEdgesAgg = "edges_agg"
+const schemaComponentGeoEdges = "geo_edges_agg"
+const schemaComponentTrafficLogsIP = "traffic_logs_ip"
+const schemaComponentHourlyEdges = "hourly_edges_agg"
 
-	schemaVersionEdgesAgg      uint32 = 3 // PARTITION BY day + ttl_only_drop_parts
-	schemaVersionGeoEdges      uint32 = 4 // PARTITION BY day + ttl_only_drop_parts
-	schemaVersionTrafficLogsIP uint32 = 1 // traffic_logs.src_ip/dst_ip IPv4
-)
+const schemaVersionEdgesAgg uint32 = 4      // IP daily + coords
+const schemaVersionGeoEdges uint32 = 4      // PARTITION BY day
+const schemaVersionTrafficLogsIP uint32 = 2 // ORDER BY hour bucket, drop raw, LC geo
+const schemaVersionHourlyEdges uint32 = 1
 
 func ensureSchemaVersionTable(ctx context.Context, ch clickhouse.Conn) error {
 	return execDDL(ctx, ch, `
@@ -50,16 +49,13 @@ func schemaVersion(ctx context.Context, ch clickhouse.Conn, component string) (u
 	`, component).Scan(&v)
 	if err != nil {
 		if isNoSchemaVersionRow(err) {
-			// Компонент ещё не зарегистрирован — версия 0.
 			return 0, nil
 		}
-		// Реальная ошибка CH/сети: не притворяемся, что DDL нужен.
 		return 0, fmt.Errorf("read schema version %q: %w", component, err)
 	}
 	return v, nil
 }
 
-// isNoSchemaVersionRow — true только для «строки нет», не для timeout/сети.
 func isNoSchemaVersionRow(err error) bool {
 	if err == nil {
 		return false
@@ -67,7 +63,6 @@ func isNoSchemaVersionRow(err error) bool {
 	if errors.Is(err, sql.ErrNoRows) {
 		return true
 	}
-	// clickhouse-go иногда оборачивает отсутствие строк без sql.ErrNoRows.
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "no rows in result set") ||
 		strings.Contains(msg, "empty result")
@@ -82,11 +77,8 @@ func setSchemaVersion(ctx context.Context, ch clickhouse.Conn, component string,
 	`, component, version)
 }
 
-// needsSchemaDDLFn — injectable для тестов (DROP MV не должен вызываться при ошибке).
 var needsSchemaDDLFn = needsSchemaDDL
 
-// needsSchemaDDL — true, если stored < desired (нужно применить CREATE/ALTER).
-// При ошибке чтения версии возвращает (false, err): вызывающий НЕ должен DROP MV.
 func needsSchemaDDL(ctx context.Context, ch clickhouse.Conn, component string, desired uint32) (bool, error) {
 	if err := ensureSchemaVersionTable(ctx, ch); err != nil {
 		return false, fmt.Errorf("ensure schema version table: %w", err)

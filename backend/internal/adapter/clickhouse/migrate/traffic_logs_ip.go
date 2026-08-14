@@ -12,11 +12,14 @@ import (
 	"network_monitor/internal/model"
 )
 
-const trafficLogsIPv4Next = "traffic_logs__ipv4_next"
+const (
+	trafficLogsIPv4Next     = "traffic_logs__ipv4_next"
+	trafficLogsDesiredOrder = "tostartofhour(timestamp),src_ip,dst_ip"
+)
 
-// EnsureTrafficLogsIPv4 мигрирует src_ip/dst_ip String → IPv4 (ORDER BY keys —
-// через recreate + EXCHANGE, не MODIFY COLUMN). Пустой/уже IPv4 том — no-op
-// с записью версии. Go model остаётся string; toString() на чтении API.
+// EnsureTrafficLogsIPv4 мигрирует layout traffic_logs: IPv4, ORDER BY
+// (toStartOfHour(timestamp), src_ip, dst_ip), без raw, LC geo/zone.
+// Ключи сортировки — через recreate + EXCHANGE, не MODIFY COLUMN.
 func EnsureTrafficLogsIPv4(ctx context.Context, ch clickhouse.Conn) error {
 	needDDL, err := needsSchemaDDLFn(ctx, ch, schemaComponentTrafficLogsIP, schemaVersionTrafficLogsIP)
 	if err != nil {
@@ -31,26 +34,24 @@ func EnsureTrafficLogsIPv4(ctx context.Context, ch clickhouse.Conn) error {
 		return err
 	}
 	if !exists {
-		// Cold bootstrap ещё не создал таблицу (init.sql) — версию не ставим.
-		slog.Info("traffic_logs ipv4: table missing, skip")
+		slog.Info("traffic_logs layout: table missing, skip")
 		return nil
 	}
 
-	// Geo-колонки могут отсутствовать на старых томах — DDL next их включает.
 	if err := ensureTrafficLogGeoColumns(ctx, ch); err != nil {
 		return err
 	}
 
-	typ, err := columnType(ctx, ch, "traffic_logs", "src_ip")
+	needRebuild, reason, err := trafficLogsNeedsRebuild(ctx, ch)
 	if err != nil {
 		return err
 	}
-	if isIPv4Type(typ) {
-		slog.Info("traffic_logs ipv4: already IPv4", "type", typ)
+	if !needRebuild {
+		slog.Info("traffic_logs layout: already current", "version", schemaVersionTrafficLogsIP)
 		return setSchemaVersion(ctx, ch, schemaComponentTrafficLogsIP, schemaVersionTrafficLogsIP)
 	}
 
-	slog.Info("traffic_logs ipv4: migrating String → IPv4 via EXCHANGE")
+	slog.Info("traffic_logs layout: migrating via EXCHANGE", "reason", reason)
 	_ = execDDL(ctx, ch, "DROP TABLE IF EXISTS "+trafficLogsIPv4Next)
 
 	if err := execDDL(ctx, ch, trafficLogsIPv4CreateSQL(trafficLogsIPv4Next)); err != nil {
@@ -62,6 +63,17 @@ func EnsureTrafficLogsIPv4(ctx context.Context, ch clickhouse.Conn) error {
 		_ = ch.Exec(dctx, "DROP TABLE IF EXISTS "+trafficLogsIPv4Next)
 	}
 
+	srcIP, dstIP := "src_ip", "dst_ip"
+	typ, err := columnType(ctx, ch, "traffic_logs", "src_ip")
+	if err != nil {
+		dropNext()
+		return err
+	}
+	if !isIPv4Type(typ) {
+		srcIP = "toIPv4OrZero(src_ip)"
+		dstIP = "toIPv4OrZero(dst_ip)"
+	}
+
 	copySQL := fmt.Sprintf(`
 		INSERT INTO %s (
 			timestamp, parsed_at, ingest_time, vendor, device,
@@ -69,24 +81,24 @@ func EnsureTrafficLogsIPv4(ctx context.Context, ch clickhouse.Conn) error {
 			rule, proto, src_zone, dst_zone, src_country, dst_country,
 			src_city, dst_city, src_region, dst_region,
 			src_lat, src_lon, dst_lat, dst_lon,
-			bytes_sent, bytes_recv, packets_sent, packets_recv, raw
+			bytes_sent, bytes_recv, packets_sent, packets_recv
 		)
 		SELECT
 			timestamp, parsed_at, ingest_time, vendor, device,
-			toIPv4OrZero(src_ip), toIPv4OrZero(dst_ip), src_port, dst_port, action,
+			%s, %s, src_port, dst_port, action,
 			rule, proto, src_zone, dst_zone, src_country, dst_country,
 			src_city, dst_city, src_region, dst_region,
 			src_lat, src_lon, dst_lat, dst_lon,
-			bytes_sent, bytes_recv, packets_sent, packets_recv, raw
+			bytes_sent, bytes_recv, packets_sent, packets_recv
 		FROM traffic_logs
-	`, trafficLogsIPv4Next)
+	`, trafficLogsIPv4Next, srcIP, dstIP)
 
 	ictx, icancel := context.WithTimeout(ctx, 6*time.Hour)
 	err = ch.Exec(ictx, copySQL)
 	icancel()
 	if err != nil {
 		dropNext()
-		return fmt.Errorf("copy traffic_logs → ipv4: %w", err)
+		return fmt.Errorf("copy traffic_logs → layout: %w", err)
 	}
 
 	if err := execDDL(ctx, ch, fmt.Sprintf("EXCHANGE TABLES traffic_logs AND %s", trafficLogsIPv4Next)); err != nil {
@@ -98,7 +110,7 @@ func EnsureTrafficLogsIPv4(ctx context.Context, ch clickhouse.Conn) error {
 	if err := setSchemaVersion(ctx, ch, schemaComponentTrafficLogsIP, schemaVersionTrafficLogsIP); err != nil {
 		return fmt.Errorf("set traffic_logs_ip schema version: %w", err)
 	}
-	slog.Info("traffic_logs ipv4: migration done", "version", schemaVersionTrafficLogsIP)
+	slog.Info("traffic_logs layout: migration done", "version", schemaVersionTrafficLogsIP, "reason", reason)
 	return nil
 }
 
@@ -110,7 +122,7 @@ func trafficLogsIPv4CreateSQL(table string) string {
 			parsed_at     DateTime64(3) DEFAULT now64(3),
 			ingest_time   DateTime64(3) DEFAULT now64(3),
 			vendor        LowCardinality(String) DEFAULT '',
-			device        String,
+			device        LowCardinality(String),
 			src_ip        IPv4,
 			dst_ip        IPv4,
 			src_port      UInt32,
@@ -120,14 +132,14 @@ func trafficLogsIPv4CreateSQL(table string) string {
 			              if(lower(action) IN (%s), 1, 0),
 			rule          String,
 			proto         LowCardinality(String),
-			src_zone      String,
-			dst_zone      String,
-			src_country   String,
-			dst_country   String,
-			src_city      String DEFAULT '',
-			dst_city      String DEFAULT '',
-			src_region    String DEFAULT '',
-			dst_region    String DEFAULT '',
+			src_zone      LowCardinality(String),
+			dst_zone      LowCardinality(String),
+			src_country   LowCardinality(String),
+			dst_country   LowCardinality(String),
+			src_city      LowCardinality(String) DEFAULT '',
+			dst_city      LowCardinality(String) DEFAULT '',
+			src_region    LowCardinality(String) DEFAULT '',
+			dst_region    LowCardinality(String) DEFAULT '',
 			src_lat       Float64 DEFAULT 0,
 			src_lon       Float64 DEFAULT 0,
 			dst_lat       Float64 DEFAULT 0,
@@ -136,19 +148,49 @@ func trafficLogsIPv4CreateSQL(table string) string {
 			bytes_recv    UInt64,
 			packets_sent  UInt64,
 			packets_recv  UInt64,
-			raw           String CODEC(ZSTD(3)),
 			INDEX idx_src_ip      src_ip      TYPE bloom_filter(0.01) GRANULARITY 4,
 			INDEX idx_dst_ip      dst_ip      TYPE bloom_filter(0.01) GRANULARITY 4,
 			INDEX idx_dst_port    dst_port    TYPE minmax              GRANULARITY 4,
-			INDEX idx_action      action      TYPE set(0)              GRANULARITY 4,
-			INDEX idx_dst_country dst_country TYPE bloom_filter(0.01) GRANULARITY 4
+			INDEX idx_action      action      TYPE set(0)              GRANULARITY 4
 		)
 		ENGINE = MergeTree()
 		PARTITION BY toYYYYMMDD(timestamp)
-		ORDER BY (timestamp, src_ip, dst_ip, action)
+		ORDER BY (toStartOfHour(timestamp), src_ip, dst_ip)
 		TTL toDateTime(timestamp) + INTERVAL 30 DAY DELETE
 		SETTINGS index_granularity = 8192, ttl_only_drop_parts = 1
 	`, table, model.AllowedInClause())
+}
+
+func trafficLogsNeedsRebuild(ctx context.Context, ch clickhouse.Conn) (bool, string, error) {
+	typ, err := columnType(ctx, ch, "traffic_logs", "src_ip")
+	if err != nil {
+		return false, "", err
+	}
+	if !isIPv4Type(typ) {
+		return true, "src_ip type " + typ, nil
+	}
+	key, err := tableSortingKey(ctx, ch, "traffic_logs")
+	if err != nil {
+		return false, "", err
+	}
+	if normalizeSortingKey(key) != trafficLogsDesiredOrder {
+		return true, "sorting_key " + key, nil
+	}
+	hasRaw, err := columnExists(ctx, ch, "traffic_logs", "raw")
+	if err != nil {
+		return false, "", err
+	}
+	if hasRaw {
+		return true, "raw column present", nil
+	}
+	ct, err := columnType(ctx, ch, "traffic_logs", "src_country")
+	if err != nil {
+		return false, "", err
+	}
+	if !strings.Contains(ct, "LowCardinality") {
+		return true, "src_country type " + ct, nil
+	}
+	return false, "", nil
 }
 
 func columnType(ctx context.Context, ch clickhouse.Conn, table, column string) (string, error) {

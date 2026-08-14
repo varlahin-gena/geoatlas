@@ -18,7 +18,7 @@ func InsertTrafficLogs(ctx context.Context, ch clickhouse.Conn, logs []model.Tra
 		(timestamp, parsed_at, vendor, device, src_ip, dst_ip, src_port, dst_port, action, rule, proto,
 		 src_zone, dst_zone, src_country, dst_country, src_city, dst_city, src_region, dst_region,
 		 src_lat, src_lon, dst_lat, dst_lon, bytes_sent, bytes_recv,
-		 packets_sent, packets_recv, raw)
+		 packets_sent, packets_recv)
 	`)
 	if err != nil {
 		return err
@@ -52,8 +52,6 @@ func InsertTrafficLogs(ctx context.Context, ch clickhouse.Conn, logs []model.Tra
 	bytesRecv := make([]uint64, n)
 	packetsSent := make([]uint64, n)
 	packetsRecv := make([]uint64, n)
-	// raw в traffic_logs не храним: нормализация уже в колонках; исходник ошибок — в parse_errors.
-	raws := make([]string, n)
 
 	now := time.Now()
 	for i, l := range logs {
@@ -94,7 +92,7 @@ func InsertTrafficLogs(ctx context.Context, ch clickhouse.Conn, logs []model.Tra
 		actions, rules, protos, srcZones, dstZones,
 		srcCountries, dstCountries, srcCities, dstCities, srcRegions, dstRegions,
 		srcLats, srcLons, dstLats, dstLons,
-		bytesSent, bytesRecv, packetsSent, packetsRecv, raws,
+		bytesSent, bytesRecv, packetsSent, packetsRecv,
 	}
 	for i, col := range cols {
 		if err := batch.Column(i).Append(col); err != nil {

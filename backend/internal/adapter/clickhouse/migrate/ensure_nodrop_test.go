@@ -91,6 +91,25 @@ func TestEnsureTrafficLogsSuccessNoDDLWhenSchemaVersionErrors(t *testing.T) {
 	}
 }
 
+func TestEnsureHourlyEdgesAggNoDropWhenSchemaVersionErrors(t *testing.T) {
+	old := needsSchemaDDLFn
+	t.Cleanup(func() {
+		needsSchemaDDLFn = old
+		aggstate.SetHourlyEdgesAggReady(false)
+	})
+
+	needsSchemaDDLFn = func(context.Context, clickhouse.Conn, string, uint32) (bool, error) {
+		return true, errors.New("clickhouse blip")
+	}
+	aggstate.SetHourlyEdgesAggReady(true)
+	if err := EnsureHourlyEdgesAgg(context.Background(), nil); err == nil {
+		t.Fatal("expected error")
+	}
+	if aggstate.PreferHourlyEdgesAgg() {
+		t.Fatal("hourly must not stay ready after ensure failure")
+	}
+}
+
 func TestEnsureTrafficLogsIPv4NoDDLWhenSchemaVersionErrors(t *testing.T) {
 	old := needsSchemaDDLFn
 	t.Cleanup(func() { needsSchemaDDLFn = old })

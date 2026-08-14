@@ -43,13 +43,29 @@ func ScanGeoEdgesForTimeRange(
 		return nil, false, nil
 	}
 
-	tr = promoteHoursToGeoDays(tr, groupBy, TablesOf(ctx).IsBackup() || aggstate.PreferGeoEdgesAgg())
+	tables := TablesOf(ctx)
+	switch groupBy {
+	case "ip", "subnet":
+		tr = promoteHoursToDays(tr, tables.IsBackup() || aggstate.PreferDailyEdgesAgg())
+		tr = promoteMinutesToHours(tr, tables.IsBackup() || aggstate.PreferHourlyEdgesAgg())
+	case "city", "country":
+		tr = promoteHoursToDays(tr, tables.IsBackup() || aggstate.PreferGeoEdgesAgg())
+		tr = promoteMinutesToHours(tr, tables.IsBackup() || aggstate.PreferHourlyEdgesAgg())
+	}
 
 	switch tr.Mode {
 	case "days":
-		// У IP/subnet нет daily geo-агрегата; читаем traffic_logs.
-		// Иначе top-N из traffic_edges_daily забит LAN-парами без lat → пустая карта.
 		if groupBy == "ip" || groupBy == "subnet" {
+			tryDaily := tables.IsBackup() || aggstate.PreferDailyEdgesAgg()
+			if tryDaily && tables.EdgesDaily != "" {
+				rows, err := scanIPEdgesRelative(ctx, ch, tables.EdgesDaily, "day", "DAY", tr.Amount, groupBy, sel, timeout)
+				if err != nil {
+					slog.Warn("ip edges daily scan failed, falling back to traffic_logs",
+						"group_by", groupBy, "err", err)
+				} else {
+					return rows, true, nil
+				}
+			}
 			rows, err := scanGeoFromLogsRelative(ctx, ch, groupBy, "days", tr.Amount, sel, timeout)
 			if err != nil {
 				return nil, false, err
@@ -57,9 +73,6 @@ func ScanGeoEdgesForTimeRange(
 			return rows, true, nil
 		}
 		// city|country: pre-agg если готов — даже пустой ответ (нет данных за период).
-		// Не падаем обратно на traffic_logs: иначе каждый «пустой» день = cold GROUP BY на миллионы строк.
-		// Для shadow бэкапа pre-agg всегда пробуем (независимо от live MV readiness).
-		tables := TablesOf(ctx)
 		tryEdges := tables.IsBackup() || aggstate.PreferGeoEdgesAgg()
 		if tryEdges {
 			table := tables.GeoEdges(groupBy)
@@ -79,6 +92,16 @@ func ScanGeoEdgesForTimeRange(
 		}
 		return rows, true, nil
 	case "minutes", "hours":
+		tryHourly := (tables.IsBackup() || aggstate.PreferHourlyEdgesAgg()) && tr.Mode == "hours"
+		if tryHourly && tables.EdgesHourly != "" {
+			rows, err := scanIPEdgesRelative(ctx, ch, tables.EdgesHourly, "hour", "HOUR", tr.Amount, groupBy, sel, timeout)
+			if err != nil {
+				slog.Warn("ip edges hourly scan failed, falling back to traffic_logs",
+					"group_by", groupBy, "err", err)
+			} else {
+				return rows, true, nil
+			}
+		}
 		rows, err := scanGeoFromLogsRelative(ctx, ch, groupBy, tr.Mode, tr.Amount, sel, timeout)
 		if err != nil {
 			return nil, false, err
@@ -87,6 +110,16 @@ func ScanGeoEdgesForTimeRange(
 	case "absolute":
 		if !tr.To.After(tr.From) {
 			return nil, false, nil
+		}
+		tryHourly := tables.IsBackup() || aggstate.PreferHourlyEdgesAgg()
+		if tryHourly && tables.EdgesHourly != "" && tr.To.Sub(tr.From) <= 7*24*time.Hour {
+			rows, err := scanIPEdgesAbsolute(ctx, ch, tables.EdgesHourly, "hour", tr.From, tr.To, groupBy, sel, timeout)
+			if err != nil {
+				slog.Warn("ip edges hourly absolute scan failed, falling back to traffic_logs",
+					"group_by", groupBy, "err", err)
+			} else {
+				return rows, true, nil
+			}
 		}
 		rows, err := scanGeoFromLogsAbsolute(ctx, ch, groupBy, tr.From, tr.To, sel, timeout)
 		if err != nil {
@@ -98,19 +131,28 @@ func ScanGeoEdgesForTimeRange(
 	}
 }
 
-// promoteHoursToGeoDays: city/country + hours кратные суткам → days, если pre-agg готов.
-// Иначе UI «1 день» как hours=24 всегда cold-сканит traffic_logs.
-func promoteHoursToGeoDays(tr model.TimeRange, groupBy string, preferEdges bool) model.TimeRange {
-	if groupBy != "city" && groupBy != "country" {
-		return tr
-	}
-	if tr.Mode != "hours" || tr.Amount < 24 || tr.Amount%24 != 0 {
-		return tr
-	}
-	if !preferEdges {
+func promoteHoursToDays(tr model.TimeRange, prefer bool) model.TimeRange {
+	if tr.Mode != "hours" || tr.Amount < 24 || tr.Amount%24 != 0 || !prefer {
 		return tr
 	}
 	return model.TimeRange{Mode: "days", Amount: tr.Amount / 24}
+}
+
+func promoteMinutesToHours(tr model.TimeRange, prefer bool) model.TimeRange {
+	if tr.Mode != "minutes" || tr.Amount < 60 || tr.Amount%60 != 0 || !prefer {
+		return tr
+	}
+	return model.TimeRange{Mode: "hours", Amount: tr.Amount / 60}
+}
+
+// promoteHoursToGeoDays: hours кратные суткам → days, если preferEdges.
+func promoteHoursToGeoDays(tr model.TimeRange, groupBy string, preferEdges bool) model.TimeRange {
+	switch groupBy {
+	case "city", "country", "ip", "subnet":
+		return promoteHoursToDays(tr, preferEdges)
+	default:
+		return tr
+	}
 }
 
 func scanGeoFromLogsSelect(logsTable, srcKey, dstKey, srcLabel, dstLabel, whereExtra string) string {

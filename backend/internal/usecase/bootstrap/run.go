@@ -26,9 +26,6 @@ func RunStartup(ctx context.Context, deps Dependencies, opts Options, warn WarnF
 		"skip_startup_backfill", opts.SkipStartupBackfill)
 
 	if deps.Schema != nil {
-		if err := deps.Schema.EnsureTTLOnlyDropParts(bctx); err != nil {
-			warn("ttl_only_drop_parts ensure failed", err)
-		}
 		if err := deps.Schema.EnsureTrafficLogsIPv4(bctx); err != nil {
 			warn("traffic_logs ipv4 ensure failed", err)
 		}
@@ -41,10 +38,16 @@ func RunStartup(ctx context.Context, deps Dependencies, opts Options, warn WarnF
 		if err := deps.Schema.EnsureGeoEdgesAggSchema(bctx); err != nil {
 			warn("geo edges agg schema ensure failed", err)
 		}
+		if err := deps.Schema.EnsureHourlyEdgesAggSchema(bctx); err != nil {
+			warn("hourly edges agg schema ensure failed", err)
+		}
 		if opts.ReputationEnabled {
 			if err := deps.Schema.EnsureReputationRanges(bctx); err != nil {
 				warn("reputation_ranges ensure failed", err)
 			}
+		}
+		if err := deps.Schema.EnsureTTLOnlyDropParts(bctx); err != nil {
+			warn("ttl_only_drop_parts ensure failed", err)
 		}
 	}
 
@@ -68,6 +71,9 @@ func RunStartup(ctx context.Context, deps Dependencies, opts Options, warn WarnF
 			if err := deps.Ready.RefreshGeoEdgesAggReady(bctx); err != nil {
 				warn("geo edges ready check failed", err)
 			}
+			if err := deps.Ready.RefreshHourlyEdgesAggReady(bctx); err != nil {
+				warn("hourly edges ready check failed", err)
+			}
 		}
 		info("startup backfill skipped — use POST /api/system/maintenance/backfill")
 		return
@@ -79,6 +85,9 @@ func RunStartup(ctx context.Context, deps Dependencies, opts Options, warn WarnF
 		}
 		if err := deps.Backfill.BackfillGeoEdgesAgg(bctx); err != nil {
 			warn("geo edges agg backfill failed", err)
+		}
+		if err := deps.Backfill.BackfillHourlyEdgesAgg(bctx); err != nil {
+			warn("hourly edges agg backfill failed", err)
 		}
 	}
 

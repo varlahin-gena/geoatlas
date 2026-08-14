@@ -24,10 +24,18 @@ func ScanRawAggs(ctx context.Context, ch clickhouse.Conn, days, limit int, filte
 }
 
 func scanEdgesAgg(ctx context.Context, ch clickhouse.Conn, days, limit int, filter string, timeout time.Duration) ([]model.RawAgg, error) {
+	return scanEdgesDailyAsRaw(ctx, ch, TablesOf(ctx).EdgesDaily, days, MapSelect{Limit: limit, Filter: filter}, timeout)
+}
+
+func scanEdgesDailyAsRaw(ctx context.Context, ch clickhouse.Conn, table string, days int, sel MapSelect, timeout time.Duration) ([]model.RawAgg, error) {
 	if days < 1 {
 		days = 1
 	}
-	havingClause := sqlclause.HavingAggFilterSQL(filter)
+	if table == "" {
+		table = "traffic_edges_daily"
+	}
+	scopeHaving, scopeArgs := sel.scope().IPAggHavingExpr()
+	havingClause := sqlclause.JoinHaving(sqlclause.HavingAggFilterSQL(sel.Filter), scopeHaving)
 	query := fmt.Sprintf(`
 		SELECT
 			toString(src_ip) AS src_ip,
@@ -45,29 +53,30 @@ func scanEdgesAgg(ctx context.Context, ch clickhouse.Conn, days, limit int, filt
 			anyMerge(dst_zone) AS dst_zone,
 			anyMerge(src_country) AS src_country,
 			anyMerge(dst_country) AS dst_country,
-			'' AS src_city,
-			'' AS dst_city,
-			0. AS src_lat,
-			0. AS src_lon,
-			0. AS dst_lat,
-			0. AS dst_lon,
+			anyMerge(src_city) AS src_city,
+			anyMerge(dst_city) AS dst_city,
+			if(sum(coord_weight) = 0, 0., sum(src_lat_sum) / sum(coord_weight)) AS out_src_lat,
+			if(sum(coord_weight) = 0, 0., sum(src_lon_sum) / sum(coord_weight)) AS out_src_lon,
+			if(sum(coord_weight) = 0, 0., sum(dst_lat_sum) / sum(coord_weight)) AS out_dst_lat,
+			if(sum(coord_weight) = 0, 0., sum(dst_lon_sum) / sum(coord_weight)) AS out_dst_lon,
 			sum(bytes_sent) AS bytes_sent,
 			sum(bytes_recv) AS bytes_recv,
 			sum(packets_sent) AS packets_sent,
 			sum(packets_recv) AS packets_recv
-		FROM traffic_edges_daily
-		WHERE day >= today() - INTERVAL ? DAY
+		FROM %s
+		WHERE day >= today() - ?
 		GROUP BY src_ip, dst_ip
 		%s
 		%s
 		%s
 		%s
-	`, havingClause, sqlclause.OrderByAggFilterSQL(filter), limitClause(limit), AggSettings())
+	`, table, havingClause, sqlclause.OrderByAggFilterSQL(sel.Filter), limitClause(sel.Limit), AggSettings())
 
 	qctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	rows, err := ch.Query(qctx, query, days)
+	args := append([]any{days}, scopeArgs...)
+	rows, err := ch.Query(qctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

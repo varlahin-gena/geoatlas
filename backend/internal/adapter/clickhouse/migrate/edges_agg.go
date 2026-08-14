@@ -56,81 +56,49 @@ func EnsureEdgesAgg(ctx context.Context, ch clickhouse.Conn) error {
 	return BackfillEdgesAgg(ctx, ch)
 }
 
-// RefreshEdgesAggReady помечает агрегаты ready без INSERT, если дни уже догнаны.
-// Иначе оставляет State=pending (карта читает traffic_logs).
+// RefreshEdgesAggReady помечает агрегаты ready без INSERT, если закрытые дни догнаны.
+// Сегодня пишет только MV. Иначе State=pending (карта читает traffic_logs).
 func RefreshEdgesAggReady(ctx context.Context, ch clickhouse.Conn) error {
-	rawRows, err := countTableRows(ctx, ch, "traffic_logs")
-	if err != nil {
-		return err
-	}
-	aggRows, _ := countTableRows(ctx, ch, "traffic_edges_daily")
+	logRows, _ := countTableRows(ctx, ch, "traffic_logs")
+	aggRows, _ := countTableRows(ctx, ch, sqlclause.IPEdgesDailyTable)
 	ready, err := edgesAggReady(ctx, ch)
 	if err != nil {
 		return err
 	}
 	if ready {
 		msg := "up to date"
-		if rawRows == 0 {
+		if logRows == 0 {
 			msg = "traffic_logs empty"
 		}
 		aggstate.SetEdgesAggStatus(aggstate.EdgesAggStatus{
-			State: "ready", Message: msg, RawRows: rawRows, AggRows: aggRows,
+			State: "ready", Message: msg, RawRows: logRows, AggRows: aggRows,
 		})
 		return nil
 	}
 	aggstate.SetEdgesAggStatus(aggstate.EdgesAggStatus{
 		State: "pending", Message: "backfill needed (SKIP_STARTUP_BACKFILL or incomplete)",
-		RawRows: rawRows, AggRows: aggRows,
+		RawRows: logRows, AggRows: aggRows,
 	})
 	return nil
 }
 
 func applyEdgesAggSchema(ctx context.Context, ch clickhouse.Conn) error {
-	// Ключ сортировки / партиции — через recreate + EXCHANGE, не MODIFY.
+	const table = sqlclause.IPEdgesDailyTable
 	const next = "traffic_edges_daily__next"
 	createTable := func(name string) string {
-		return fmt.Sprintf(`
-		CREATE TABLE %s
-		(
-			day           Date,
-			src_ip        IPv4,
-			dst_ip        IPv4,
-			cnt           SimpleAggregateFunction(sum, UInt64),
-			blocked_cnt   SimpleAggregateFunction(sum, UInt64),
-			allowed_cnt   SimpleAggregateFunction(sum, UInt64),
-			bytes_sent    SimpleAggregateFunction(sum, UInt64),
-			bytes_recv    SimpleAggregateFunction(sum, UInt64),
-			packets_sent  SimpleAggregateFunction(sum, UInt64),
-			packets_recv  SimpleAggregateFunction(sum, UInt64),
-			last_action   AggregateFunction(argMax, String, DateTime64(3)),
-			rule          AggregateFunction(any, String),
-			proto         AggregateFunction(any, String),
-			src_port      AggregateFunction(any, UInt32),
-			dst_port      AggregateFunction(any, UInt32),
-			device        AggregateFunction(any, String),
-			src_zone      AggregateFunction(any, String),
-			dst_zone      AggregateFunction(any, String),
-			src_country   AggregateFunction(any, String),
-			dst_country   AggregateFunction(any, String)
-		)
-		ENGINE = AggregatingMergeTree()
-		PARTITION BY day
-		ORDER BY (day, src_ip, dst_ip)
-		TTL day + INTERVAL 30 DAY DELETE
-		SETTINGS ttl_only_drop_parts = 1
-	`, name)
+		return ipEdgesCreateTableSQL(name, "day", "Date", "day", ipEdgesDailyTTL)
 	}
 
-	exists, err := tableExists(ctx, ch, "traffic_edges_daily")
+	exists, err := tableExists(ctx, ch, table)
 	if err != nil {
 		return err
 	}
 	if !exists {
-		if err := execDDL(ctx, ch, createTable("traffic_edges_daily")); err != nil {
-			return fmt.Errorf("create traffic_edges_daily: %w", err)
+		if err := execDDL(ctx, ch, createTable(table)); err != nil {
+			return fmt.Errorf("create %s: %w", table, err)
 		}
 	} else {
-		needRebuild, reason, err := edgesDailyNeedsRebuild(ctx, ch, "traffic_edges_daily")
+		needRebuild, reason, err := edgesDailyNeedsRebuild(ctx, ch, table)
 		if err != nil {
 			return err
 		}
@@ -139,53 +107,27 @@ func applyEdgesAggSchema(ctx context.Context, ch clickhouse.Conn) error {
 			if err := execDDL(ctx, ch, createTable(next)); err != nil {
 				return fmt.Errorf("create %s: %w", next, err)
 			}
-			if err := execDDL(ctx, ch, fmt.Sprintf("EXCHANGE TABLES traffic_edges_daily AND %s", next)); err != nil {
+			if err := execDDL(ctx, ch, fmt.Sprintf("EXCHANGE TABLES %s AND %s", table, next)); err != nil {
 				_ = execDDL(ctx, ch, "DROP TABLE IF EXISTS "+next)
-				return fmt.Errorf("exchange traffic_edges_daily: %w", err)
+				return fmt.Errorf("exchange %s: %w", table, err)
 			}
 			_ = execDDL(ctx, ch, "DROP TABLE IF EXISTS "+next)
 			slog.Info("edges agg: traffic_edges_daily rebuilt", "reason", reason, "note", "backfill required")
-		} else if err := ensureTTLOnlyDropPartsSetting(ctx, ch, "traffic_edges_daily"); err != nil {
+		} else if err := ensureTTLOnlyDropPartsSetting(ctx, ch, table); err != nil {
 			return err
 		}
 	}
 
 	createMV := func(viewName string) string {
-		return fmt.Sprintf(`
-		CREATE MATERIALIZED VIEW %s
-		TO traffic_edges_daily AS
-		SELECT
-			toDate(timestamp) AS day,
-			src_ip,
-			dst_ip,
-			count() AS cnt,
-			%s AS blocked_cnt,
-			%s AS allowed_cnt,
-			sum(bytes_sent) AS bytes_sent,
-			sum(bytes_recv) AS bytes_recv,
-			sum(packets_sent) AS packets_sent,
-			sum(packets_recv) AS packets_recv,
-			argMaxState(action, timestamp) AS last_action,
-			anyState(rule)          AS rule,
-			anyState(proto)         AS proto,
-			anyState(src_port)      AS src_port,
-			anyState(dst_port)      AS dst_port,
-			anyState(device)        AS device,
-			anyState(src_zone)      AS src_zone,
-			anyState(dst_zone)      AS dst_zone,
-			anyState(src_country)   AS src_country,
-			anyState(dst_country)   AS dst_country
-		FROM traffic_logs
-		GROUP BY day, src_ip, dst_ip
-	`, viewName, sqlclause.SumBlockedSQL(), sqlclause.SumAllowedSQL())
+		return ipEdgesCreateMVSQL(viewName, table, "toDate(traffic_logs.timestamp)", "day")
 	}
-	if err := replaceMaterializedView(ctx, ch, "traffic_edges_daily_mv", createMV); err != nil {
+	if err := replaceMaterializedView(ctx, ch, sqlclause.IPEdgesDailyMV, createMV); err != nil {
 		return err
 	}
 	return nil
 }
 
-// edgesDailyNeedsRebuild — true, если тип IP или зерно партиции не совпадают с SoT.
+// edgesDailyNeedsRebuild — true, если тип IP, зерно партиции или geo-колонки не совпадают с SoT.
 func edgesDailyNeedsRebuild(ctx context.Context, ch clickhouse.Conn, table string) (bool, string, error) {
 	typ, err := columnType(ctx, ch, table, "src_ip")
 	if err != nil {
@@ -200,6 +142,13 @@ func edgesDailyNeedsRebuild(ctx context.Context, ch clickhouse.Conn, table strin
 	}
 	if !isDayPartitionKey(pk) {
 		return true, "partition_key " + pk, nil
+	}
+	ok, err := columnExists(ctx, ch, table, "coord_weight")
+	if err != nil {
+		return false, "", err
+	}
+	if !ok {
+		return true, "missing coord_weight", nil
 	}
 	return false, "", nil
 }
@@ -233,36 +182,23 @@ func ensureTTLOnlyDropPartsSetting(ctx context.Context, ch clickhouse.Conn, tabl
 	return nil
 }
 
-// edgesAggReady — true, когда для каждого дня в traffic_logs есть агрегат.
+// edgesAggReady — true, когда для каждого закрытого дня в traffic_logs есть агрегат.
 func edgesAggReady(ctx context.Context, ch clickhouse.Conn) (bool, error) {
-	qctx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-
-	var rawRows uint64
-	if err := ch.QueryRow(qctx, `SELECT count() FROM traffic_logs`).Scan(&rawRows); err != nil {
+	rawRows, err := countTableRows(ctx, ch, "traffic_logs")
+	if err != nil {
 		return false, err
 	}
 	if rawRows == 0 {
 		return true, nil
 	}
-
-	var missing uint64
-	err := ch.QueryRow(qctx, `
-		SELECT count()
-		FROM (
-			SELECT DISTINCT toDate(timestamp) AS d FROM traffic_logs
-		) AS days
-		LEFT ANTI JOIN (
-			SELECT DISTINCT day AS d FROM traffic_edges_daily
-		) AS agg USING (d)
-	`).Scan(&missing)
+	missing, err := missingClosedPartitionDays(ctx, ch, "traffic_logs", sqlclause.IPEdgesDailyTable)
 	if err != nil {
 		return false, err
 	}
-	return missing == 0, nil
+	return len(missing) == 0, nil
 }
 
-// BackfillEdgesAgg дозаполняет traffic_edges_daily по недостающим дням.
+// BackfillEdgesAgg дозаполняет traffic_edges_daily по недостающим закрытым дням.
 func BackfillEdgesAgg(ctx context.Context, ch clickhouse.Conn) error {
 	rawRows, err := countTableRows(ctx, ch, "traffic_logs")
 	if err != nil {
@@ -275,14 +211,14 @@ func BackfillEdgesAgg(ctx context.Context, ch clickhouse.Conn) error {
 		return nil
 	}
 
-	aggRows, _ := countTableRows(ctx, ch, "traffic_edges_daily")
+	aggRows, _ := countTableRows(ctx, ch, sqlclause.IPEdgesDailyTable)
 
-	ready, err := edgesAggReady(ctx, ch)
+	days, err := missingClosedPartitionDays(ctx, ch, "traffic_logs", sqlclause.IPEdgesDailyTable)
 	if err != nil {
 		aggstate.SetEdgesAggStatus(aggstate.EdgesAggStatus{State: "error", Message: err.Error(), RawRows: rawRows, AggRows: aggRows})
 		return err
 	}
-	if ready {
+	if len(days) == 0 {
 		slog.Info("edges agg: already up to date", "raw", rawRows, "agg", aggRows)
 		aggstate.SetEdgesAggStatus(aggstate.EdgesAggStatus{
 			State: "ready", Message: "up to date",
@@ -291,111 +227,18 @@ func BackfillEdgesAgg(ctx context.Context, ch clickhouse.Conn) error {
 		return nil
 	}
 
-	slog.Info("edges agg: backfill started", "raw", rawRows, "agg", aggRows)
-	aggstate.SetEdgesAggStatus(aggstate.EdgesAggStatus{
-		State: "running", Phase: aggstate.PhaseBackfill, Message: "backfill started",
-		RawRows: rawRows, AggRows: aggRows, StartedAt: time.Now().UTC(),
-	})
-
-	// Список дней, для которых ещё нет агрегатов.
-	dctx, dcancel := context.WithTimeout(ctx, 2*time.Minute)
-	defer dcancel()
-
-	rows, err := ch.Query(dctx, `
-		SELECT days.d AS day
-		FROM (
-			SELECT DISTINCT toDate(timestamp) AS d FROM traffic_logs
-		) AS days
-		LEFT ANTI JOIN (
-			SELECT DISTINCT day AS d FROM traffic_edges_daily
-		) AS agg USING (d)
-		ORDER BY day DESC
-	`)
-	if err != nil {
-		aggstate.SetEdgesAggStatus(aggstate.EdgesAggStatus{State: "error", Message: err.Error(), RawRows: rawRows, AggRows: aggRows})
-		return fmt.Errorf("list days for backfill: %w", err)
-	}
-	defer rows.Close()
-
-	var days []time.Time
-	for rows.Next() {
-		var day time.Time
-		if err := rows.Scan(&day); err != nil {
-			return err
-		}
-		days = append(days, day)
-	}
-	if err := rows.Err(); err != nil {
-		return err
-	}
-	if len(days) == 0 {
-		slog.Warn("edges agg: missing days reported but list is empty", "raw", rawRows)
-		aggstate.SetEdgesAggStatus(aggstate.EdgesAggStatus{
-			State: "error", Message: "missing days list empty",
-			RawRows: rawRows, AggRows: aggRows,
-		})
-		return fmt.Errorf("edges agg: inconsistent state: backfill needed but no days found")
-	}
-
+	slog.Info("edges agg: backfill started", "raw", rawRows, "agg", aggRows, "days", len(days))
 	aggstate.SetEdgesAggStatus(aggstate.EdgesAggStatus{
 		State: "running", Phase: aggstate.PhaseBackfill, Message: "backfill in progress",
 		RawRows: rawRows, AggRows: aggRows,
 		DaysTotal: len(days), StartedAt: time.Now().UTC(),
 	})
 
-	insertTpl := fmt.Sprintf(`
-		INSERT INTO traffic_edges_daily
-		SELECT
-			toDate(timestamp) AS day,
-			src_ip,
-			dst_ip,
-			count() AS cnt,
-			%s AS blocked_cnt,
-			%s AS allowed_cnt,
-			sum(bytes_sent) AS bytes_sent,
-			sum(bytes_recv) AS bytes_recv,
-			sum(packets_sent) AS packets_sent,
-			sum(packets_recv) AS packets_recv,
-			argMaxState(action, timestamp) AS last_action,
-			anyState(rule)          AS rule,
-			anyState(proto)         AS proto,
-			anyState(src_port)      AS src_port,
-			anyState(dst_port)      AS dst_port,
-			anyState(device)        AS device,
-			anyState(src_zone)      AS src_zone,
-			anyState(dst_zone)      AS dst_zone,
-			anyState(src_country)   AS src_country,
-			anyState(dst_country)   AS dst_country
-		FROM traffic_logs
-		WHERE toDate(timestamp) = ?
-		GROUP BY day, src_ip, dst_ip
-		%s
-	`, sqlclause.SumBlockedSQL(), sqlclause.SumAllowedSQL(), query.AggSettings())
-
-	for i, day := range days {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		ictx, icancel := context.WithTimeout(ctx, 30*time.Minute)
-		err := ch.Exec(ictx, insertTpl, day)
-		icancel()
-		if err != nil {
-			aggstate.SetEdgesAggStatus(aggstate.EdgesAggStatus{
-				State: "error", Message: err.Error(),
-				RawRows: rawRows, DaysTotal: len(days), DaysDone: i,
-			})
-			return fmt.Errorf("backfill day %s: %w", day.Format("2006-01-02"), err)
-		}
-		slog.Info("edges agg: backfill day", "done", i+1, "total", len(days), "day", day.Format("2006-01-02"))
-		aggstate.SetEdgesAggStatus(aggstate.EdgesAggStatus{
-			State: "running", Phase: aggstate.PhaseBackfill,
-			Message: fmt.Sprintf("backfill %d/%d", i+1, len(days)),
-			RawRows: rawRows, DaysTotal: len(days), DaysDone: i + 1,
-			StartedAt: aggstate.GetEdgesAggStatus().StartedAt,
-		})
+	if err := insertIPEdgesDays(ctx, ch, sqlclause.IPEdgesDailyTable, days, updateEdgesBackfillStatus(rawRows, len(days))); err != nil {
+		return err
 	}
 
-	aggRows, _ = countTableRows(ctx, ch, "traffic_edges_daily")
+	aggRows, _ = countTableRows(ctx, ch, sqlclause.IPEdgesDailyTable)
 	slog.Info("edges agg: backfill complete", "days", len(days), "agg_rows", aggRows)
 	aggstate.SetEdgesAggStatus(aggstate.EdgesAggStatus{
 		State: "ready", Message: "backfill complete",
@@ -404,4 +247,77 @@ func BackfillEdgesAgg(ctx context.Context, ch clickhouse.Conn) error {
 		StartedAt: aggstate.GetEdgesAggStatus().StartedAt,
 	})
 	return nil
+}
+
+func updateEdgesBackfillStatus(rawRows uint64, total int) func(int) {
+	started := time.Now().UTC()
+	return func(done int) {
+		aggstate.SetEdgesAggStatus(aggstate.EdgesAggStatus{
+			State: "running", Phase: aggstate.PhaseBackfill,
+			Message: fmt.Sprintf("backfill %d/%d", done, total),
+			RawRows: rawRows, DaysTotal: total, DaysDone: done,
+			StartedAt: started,
+		})
+	}
+}
+
+func insertIPEdgesDays(ctx context.Context, ch clickhouse.Conn, table string, days []time.Time, onDay func(int)) error {
+	if table != sqlclause.IPEdgesDailyTable && table != sqlclause.IPEdgesHourlyTable {
+		return fmt.Errorf("insert IP edges: invalid table %q", table)
+	}
+	var (
+		timeExpr, timeAlias, groupExtra string
+	)
+	switch table {
+	case sqlclause.IPEdgesHourlyTable:
+		timeExpr, timeAlias = "toStartOfHour(traffic_logs.timestamp)", "hour"
+		groupExtra = "hour, src_ip, dst_ip"
+	default:
+		timeExpr, timeAlias = "toDate(traffic_logs.timestamp)", "day"
+		groupExtra = "day, src_ip, dst_ip"
+	}
+	fromSQL := geoEdgesEnrichedFromSQL(sqlclause.DayTimestampRangeSQL("traffic_logs.timestamp"))
+	insertTpl := fmt.Sprintf(`
+		INSERT INTO %s
+		%s
+		%s
+		GROUP BY %s
+		%s
+	`, table, ipEdgesSelectBody(timeExpr, timeAlias), fromSQL, groupExtra, query.AggSettings())
+
+	for i, day := range days {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		ictx, icancel := context.WithTimeout(ctx, 30*time.Minute)
+		err := ch.Exec(ictx, insertTpl, day, day)
+		icancel()
+		if err != nil {
+			aggstate.SetEdgesAggStatus(aggstate.EdgesAggStatus{
+				State: "error", Message: err.Error(), DaysTotal: len(days), DaysDone: i,
+			})
+			return fmt.Errorf("backfill %s day %s: %w", table, day.Format("2006-01-02"), err)
+		}
+		slog.Info("ip edges: backfill day", "table", table, "done", i+1, "total", len(days), "day", day.Format("2006-01-02"))
+		if onDay != nil {
+			onDay(i + 1)
+		}
+	}
+	return nil
+}
+
+func rebuildIPEdgesDays(ctx context.Context, ch clickhouse.Conn, table string, days []time.Time) error {
+	if !isSafeTableIdent(table) {
+		return fmt.Errorf("rebuild IP edges: invalid table %q", table)
+	}
+	exists, err := tableExists(ctx, ch, table)
+	if err != nil || !exists {
+		return err
+	}
+	for _, day := range days {
+		if err := dropDatePartition(ctx, ch, table, day); err != nil {
+			return err
+		}
+	}
+	return insertIPEdgesDays(ctx, ch, table, days, nil)
 }

@@ -44,6 +44,9 @@ func TestOrderByAggFilterSQL(t *testing.T) {
 	if !strings.Contains(OrderByAggFilterSQL("all"), "src_ip") {
 		t.Fatal("IP edges order must use src_ip:", OrderByAggFilterSQL("all"))
 	}
+	if !strings.Contains(OrderByAggFilterSQL("all"), "coord_weight DESC") {
+		t.Fatal("IP edges order must prefer coord_weight:", OrderByAggFilterSQL("all"))
+	}
 }
 
 func TestOrderByGeoAggFilterSQL(t *testing.T) {

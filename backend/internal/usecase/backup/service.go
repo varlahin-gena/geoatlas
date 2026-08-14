@@ -512,6 +512,8 @@ func (s *Service) runAttach(ctx context.Context, name string) {
 
 	pairs := [][2]string{
 		{"traffic_logs", "nm_bak_traffic_logs"},
+		{"traffic_edges_daily", "nm_bak_traffic_edges_daily"},
+		{"traffic_edges_hourly", "nm_bak_traffic_edges_hourly"},
 		{"traffic_edges_city_daily", "nm_bak_traffic_edges_city_daily"},
 		{"traffic_edges_country_daily", "nm_bak_traffic_edges_country_daily"},
 	}
@@ -520,6 +522,8 @@ func (s *Service) runAttach(ctx context.Context, name string) {
 		dropCtx, dropCancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
 		_ = s.runner.DropTables(dropCtx, []string{
 			"nm_bak_traffic_logs",
+			"nm_bak_traffic_edges_daily",
+			"nm_bak_traffic_edges_hourly",
 			"nm_bak_traffic_edges_city_daily",
 			"nm_bak_traffic_edges_country_daily",
 		})
@@ -545,6 +549,8 @@ func (s *Service) runDetach(ctx context.Context, name string) {
 
 	shadows := []string{
 		"nm_bak_traffic_logs",
+		"nm_bak_traffic_edges_daily",
+		"nm_bak_traffic_edges_hourly",
 		"nm_bak_traffic_edges_city_daily",
 		"nm_bak_traffic_edges_country_daily",
 	}
@@ -570,6 +576,7 @@ func (s *Service) resolveTables(ctx context.Context, includeEdges bool) ([]strin
 	if includeEdges {
 		base = append(base,
 			"traffic_edges_daily",
+			"traffic_edges_hourly",
 			"traffic_edges_city_daily",
 			"traffic_edges_country_daily",
 		)

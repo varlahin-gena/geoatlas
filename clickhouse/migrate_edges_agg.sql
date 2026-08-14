@@ -1,11 +1,10 @@
--- Миграция: предварительная агрегация рёбер для карты.
+-- Миграция: предварительная агрегация рёбер для карты (IP daily + coords).
 -- Источник истины для IN-списков и MV при старте backend — storage.EnsureEdgesAgg
 -- (model.BlockedInClause). Этот файл — ручной fallback для существующих установок.
 -- Ручной запуск:
 --   docker compose exec -T clickhouse clickhouse-client --multiquery < clickhouse/migrate_edges_agg.sql
 --
--- src_ip/dst_ip: IPv4 (как Ensure* schemaVersionEdgesAgg >= 2). На старом томе с String
--- лучше дать backend Ensure* (EXCHANGE), а не этот IF NOT EXISTS.
+-- src_ip/dst_ip: IPv4. На старом томе лучше дать backend Ensure* (EXCHANGE).
 
 CREATE TABLE IF NOT EXISTS traffic_edges_daily
 (
@@ -19,6 +18,11 @@ CREATE TABLE IF NOT EXISTS traffic_edges_daily
     bytes_recv    SimpleAggregateFunction(sum, UInt64),
     packets_sent  SimpleAggregateFunction(sum, UInt64),
     packets_recv  SimpleAggregateFunction(sum, UInt64),
+    src_lat_sum   SimpleAggregateFunction(sum, Float64),
+    src_lon_sum   SimpleAggregateFunction(sum, Float64),
+    dst_lat_sum   SimpleAggregateFunction(sum, Float64),
+    dst_lon_sum   SimpleAggregateFunction(sum, Float64),
+    coord_weight  SimpleAggregateFunction(sum, UInt64),
     last_action   AggregateFunction(argMax, String, DateTime64(3)),
     rule          AggregateFunction(any, String),
     proto         AggregateFunction(any, String),
@@ -28,7 +32,9 @@ CREATE TABLE IF NOT EXISTS traffic_edges_daily
     src_zone      AggregateFunction(any, String),
     dst_zone      AggregateFunction(any, String),
     src_country   AggregateFunction(any, String),
-    dst_country   AggregateFunction(any, String)
+    dst_country   AggregateFunction(any, String),
+    src_city      AggregateFunction(any, String),
+    dst_city      AggregateFunction(any, String)
 )
 ENGINE = AggregatingMergeTree()
 PARTITION BY day
@@ -58,6 +64,11 @@ SELECT
     sum(bytes_recv) AS bytes_recv,
     sum(packets_sent) AS packets_sent,
     sum(packets_recv) AS packets_recv,
+    sumIf(src_lat, (src_lat != 0 OR src_lon != 0) AND (dst_lat != 0 OR dst_lon != 0)) AS src_lat_sum,
+    sumIf(src_lon, (src_lat != 0 OR src_lon != 0) AND (dst_lat != 0 OR dst_lon != 0)) AS src_lon_sum,
+    sumIf(dst_lat, (src_lat != 0 OR src_lon != 0) AND (dst_lat != 0 OR dst_lon != 0)) AS dst_lat_sum,
+    sumIf(dst_lon, (src_lat != 0 OR src_lon != 0) AND (dst_lat != 0 OR dst_lon != 0)) AS dst_lon_sum,
+    sum(if((src_lat != 0 OR src_lon != 0) AND (dst_lat != 0 OR dst_lon != 0), toUInt64(1), toUInt64(0))) AS coord_weight,
     argMaxState(action, timestamp) AS last_action,
     anyState(rule)          AS rule,
     anyState(proto)         AS proto,
@@ -67,6 +78,8 @@ SELECT
     anyState(src_zone)      AS src_zone,
     anyState(dst_zone)      AS dst_zone,
     anyState(src_country)   AS src_country,
-    anyState(dst_country)   AS dst_country
+    anyState(dst_country)   AS dst_country,
+    anyState(src_city)      AS src_city,
+    anyState(dst_city)      AS dst_city
 FROM traffic_logs
 GROUP BY day, src_ip, dst_ip;
