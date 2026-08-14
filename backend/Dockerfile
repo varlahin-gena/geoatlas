@@ -16,7 +16,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
     -o /out/network-monitor ./cmd/network-monitor
 
 # ---------- runtime stage ----------
-FROM alpine:3.20
+FROM alpine:3.24
 # uid/gid 101 = clickhouse/clickhouse-server — общий том clickhouse-backups
 # (иначе auth *.tgz и prune падают с permission denied).
 RUN apk add --no-cache ca-certificates tzdata && \
