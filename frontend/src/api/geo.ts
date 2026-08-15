@@ -1,4 +1,4 @@
-import { apiFetch, apiFetchRaw } from './client';
+import { apiFetchRaw, apiGetQuery, apiPost, apiPut } from './client';
 
 export interface GeoRange {
   network?: string;
@@ -55,25 +55,19 @@ export function fetchGeoRanges(
   params?: { ip?: string; limit?: number },
   init?: RequestInit,
 ): Promise<GeoRangesResponse> {
-  const qs = new URLSearchParams();
-  if (params?.ip) qs.set('ip', params.ip);
-  if (params?.limit != null) qs.set('limit', String(params.limit));
-  const q = qs.toString();
-  return apiFetch<GeoRangesResponse>(`/api/geo-ranges${q ? `?${q}` : ''}`, init);
+  return apiGetQuery(
+    '/api/geo-ranges',
+    { ip: params?.ip, limit: params?.limit },
+    init,
+  ) as Promise<GeoRangesResponse>;
 }
 
 export function updateGeoRange(body: Record<string, unknown>): Promise<{ updated?: string }> {
-  return apiFetch<{ updated?: string }>('/api/geo-ranges', {
-    method: 'PUT',
-    body: JSON.stringify(body),
-  });
+  return apiPut('/api/geo-ranges', body) as Promise<{ updated?: string }>;
 }
 
 export function clearGeoRanges(): Promise<{ index_before?: number }> {
-  return apiFetch<{ index_before?: number }>('/api/geo-ranges/clear', {
-    method: 'POST',
-    body: '{}',
-  });
+  return apiPost('/api/geo-ranges/clear', {}) as Promise<{ index_before?: number }>;
 }
 
 export function exportGeoRanges(): Promise<Response> {
@@ -82,7 +76,7 @@ export function exportGeoRanges(): Promise<Response> {
 
 export function fetchGeoMissing(query: string): Promise<GeoMissingResponse> {
   // query already includes period params + limit (caller builds SoT query string).
-  return apiFetch<GeoMissingResponse>(`/api/geo-missing?${query}`);
+  return apiGetQuery('/api/geo-missing', query) as Promise<GeoMissingResponse>;
 }
 
 export function createGeoRange(body: Record<string, unknown>): Promise<{
@@ -90,11 +84,9 @@ export function createGeoRange(body: Record<string, unknown>): Promise<{
   added?: string;
   entry?: { network?: string };
 }> {
-  return apiFetch<{ ranges?: number; added?: string; entry?: { network?: string } }>(
-    '/api/geo-ranges',
-    {
-      method: 'POST',
-      body: JSON.stringify(body),
-    },
-  );
+  return apiPost('/api/geo-ranges', body) as Promise<{
+    ranges?: number;
+    added?: string;
+    entry?: { network?: string };
+  }>;
 }

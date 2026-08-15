@@ -1,4 +1,4 @@
-import { apiFetch } from './client';
+import { apiDelete, apiFetch, apiGet, apiPath, apiPost } from './client';
 import type { UserRole } from './types';
 
 export interface UserRow {
@@ -10,7 +10,7 @@ export interface UserRow {
 }
 
 export function listUsers(): Promise<{ users: UserRow[] }> {
-  return apiFetch<{ users: UserRow[] }>('/api/users');
+  return apiGet('/api/users') as Promise<{ users: UserRow[] }>;
 }
 
 export function createUser(body: {
@@ -20,32 +20,32 @@ export function createUser(body: {
   full_name?: string;
   must_reset_password?: boolean;
 }): Promise<unknown> {
-  return apiFetch('/api/users', { method: 'POST', body: JSON.stringify(body) });
+  return apiPost('/api/users', body);
 }
 
 export function updateUserFullName(username: string, full_name: string): Promise<unknown> {
-  return apiFetch(`/api/users/${encodeURIComponent(username)}/full-name`, {
+  return apiFetch(apiPath('/api/users/{username}/full-name', { username }), {
     method: 'POST',
     body: JSON.stringify({ full_name }),
   });
 }
 
 export function updateUserRole(username: string, role: UserRole | string): Promise<unknown> {
-  return apiFetch(`/api/users/${encodeURIComponent(username)}/role`, {
+  return apiFetch(apiPath('/api/users/{username}/role', { username }), {
     method: 'POST',
     body: JSON.stringify({ role }),
   });
 }
 
 export function deleteUser(username: string): Promise<unknown> {
-  return apiFetch(`/api/users/${encodeURIComponent(username)}`, { method: 'DELETE' });
+  return apiDelete(apiPath('/api/users/{username}', { username }));
 }
 
 export function resetUserPassword(
   username: string,
   body: { password: string; must_reset_password?: boolean },
 ): Promise<unknown> {
-  return apiFetch(`/api/users/${encodeURIComponent(username)}/reset-password`, {
+  return apiFetch(apiPath('/api/users/{username}/reset-password', { username }), {
     method: 'POST',
     body: JSON.stringify(body),
   });
