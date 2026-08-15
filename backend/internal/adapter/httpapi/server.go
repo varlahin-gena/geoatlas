@@ -71,12 +71,12 @@ func NewServer(
 			opt(deps)
 		}
 	}
-	health := &HealthHandler{deps}
+	health := &HealthHandler{deps.Health()}
 	events := &EventsHandler{deps}
 	ingestH := &IngestHandler{deps}
 	geoH := &GeoHandler{deps}
 	repH := &ReputationHandler{deps}
-	system := &SystemHandler{deps}
+	system := &SystemHandler{deps.System()}
 	parse := &ParseHandler{deps}
 	authDeps := deps.Auth()
 	authH := &AuthHandler{authDeps}

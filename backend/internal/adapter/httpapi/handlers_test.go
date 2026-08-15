@@ -29,9 +29,7 @@ func TestUsersListDisabledWhenAuthModuleOff(t *testing.T) {
 }
 
 func TestLiveDoesNotNeedClickHouse(t *testing.T) {
-	h := &HealthHandler{Deps: &Deps{
-		cfg: config.Config{QueryTimeout: time.Minute},
-	}}
+	h := &HealthHandler{HealthDeps: &HealthDeps{}}
 	req := httptest.NewRequest(http.MethodGet, "/live", nil)
 	rec := httptest.NewRecorder()
 	h.Live(rec, req)
@@ -48,7 +46,7 @@ func TestLiveDoesNotNeedClickHouse(t *testing.T) {
 }
 
 func TestHealthAliasesLive(t *testing.T) {
-	h := &HealthHandler{Deps: &Deps{}}
+	h := &HealthHandler{HealthDeps: &HealthDeps{}}
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
 	h.Health(rec, req)
@@ -58,9 +56,7 @@ func TestHealthAliasesLive(t *testing.T) {
 }
 
 func TestReadyWithoutClickHouse(t *testing.T) {
-	h := &HealthHandler{Deps: &Deps{
-		cfg: config.Config{QueryTimeout: time.Minute},
-	}}
+	h := &HealthHandler{HealthDeps: &HealthDeps{}}
 	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
 	rec := httptest.NewRecorder()
 	h.Ready(rec, req)
