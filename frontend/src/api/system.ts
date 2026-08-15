@@ -7,8 +7,15 @@ import type {
   HistoryPayload,
   Retention,
   SystemStats,
-} from '@/pages/System/systemTypes';
+} from './systemTypes';
 
+export type {
+  BackupCatalog,
+  BackupSchedule,
+  HistoryPayload,
+  Retention,
+  SystemStats,
+};
 export type { SystemVersion };
 
 export type SystemStatus = components['schemas']['SystemStatus'];

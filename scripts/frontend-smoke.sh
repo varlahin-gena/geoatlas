@@ -184,22 +184,25 @@ for loc, want in checks.items():
         raise SystemExit(f"{loc}: want {want}, got {got}")
 print("reputation auth matrix ok")
 PY
-# EventsResponse schema ↔ generated types ↔ mapTypes aliases
-"$PYTHON_BIN" - <<'PY' || fail "openapi EventsResponse ↔ mapTypes drift"
+# EventsResponse schema ↔ generated types ↔ api/eventsTypes aliases (pages/Map re-exports)
+"$PYTHON_BIN" - <<'PY' || fail "openapi EventsResponse ↔ eventsTypes drift"
 from pathlib import Path
 import re
 oa = Path("openapi.yaml").read_text(encoding="utf-8")
+et = Path("frontend/src/api/eventsTypes.ts").read_text(encoding="utf-8")
 mt = Path("frontend/src/pages/Map/mapTypes.ts").read_text(encoding="utf-8")
 gen = Path("frontend/src/api/openapi.d.ts").read_text(encoding="utf-8")
 for name in ("MapLine:", "MapPoint:", "ReputationHit:"):
     if name not in oa:
         raise SystemExit(f"openapi missing schema {name}")
-if "Keep in sync with openapi.yaml" not in mt:
-    raise SystemExit("mapTypes.ts missing sync comment")
-if "components['schemas']['MapLine']" not in mt:
-    raise SystemExit("mapTypes.ts must alias generated MapLine")
-if "components['schemas']['MapPoint']" not in mt:
-    raise SystemExit("mapTypes.ts must alias generated MapPoint")
+if "Keep in sync with openapi.yaml" not in et:
+    raise SystemExit("eventsTypes.ts missing sync comment")
+if "components['schemas']['MapLine']" not in et:
+    raise SystemExit("eventsTypes.ts must alias generated MapLine")
+if "components['schemas']['MapPoint']" not in et:
+    raise SystemExit("eventsTypes.ts must alias generated MapPoint")
+if "from '@/api/eventsTypes'" not in mt and 'from "@/api/eventsTypes"' not in mt:
+    raise SystemExit("mapTypes.ts must re-export wire types from api/eventsTypes")
 need = ["src", "dst", "src_lat", "dst_lon", "src_reputation", "blocked_count", "last_action"]
 for f in need:
     if f"{f}:" not in oa:

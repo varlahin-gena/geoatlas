@@ -1,5 +1,7 @@
 import { apiFetch } from './client';
-import type { EventsPayload, SeriesPayload } from '@/pages/Map/mapTypes';
+import type { EventsPayload, SeriesPayload } from './eventsTypes';
+
+export type { EventsPayload, SeriesPayload };
 
 export function fetchMapEvents(opts: {
   groupBy: string;
