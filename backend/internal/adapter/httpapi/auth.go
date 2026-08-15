@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"network_monitor/internal/adapter/httpapi/loginthrottle"
 	"network_monitor/internal/auth"
 	usecaseauth "network_monitor/internal/usecase/auth"
 )
@@ -114,16 +115,20 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ip := clientIP(r)
-	if !defaultLoginLimiter.allow(ip) {
-		defaultLoginLimiter.recordFailure(ip, req.Username)
+	ip := loginthrottle.ClientIP(r)
+	lim := h.loginLimiter
+	if lim == nil {
+		lim = loginthrottle.New(10, time.Minute, 5*time.Minute)
+	}
+	if !lim.Allow(ip) {
+		lim.RecordFailure(ip, req.Username)
 		writeJSON(w, http.StatusTooManyRequests, map[string]any{"error": "too many attempts"})
 		return
 	}
 
 	out, err := h.authUC.Login(req.Username, req.Password)
 	if errors.Is(err, usecaseauth.ErrInvalidCredentials) {
-		defaultLoginLimiter.recordFailure(ip, req.Username)
+		lim.RecordFailure(ip, req.Username)
 		time.Sleep(200 * time.Millisecond)
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "invalid credentials"})
 		return
@@ -136,7 +141,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "session error"})
 		return
 	}
-	defaultLoginLimiter.recordSuccess(ip)
+	lim.RecordSuccess(ip)
 
 	if h.sessions != nil {
 		SetCookie(w, r, out.Token, h.sessions.TTL())
