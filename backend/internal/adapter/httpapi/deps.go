@@ -29,7 +29,7 @@ type AuthDeps struct {
 	loginLimiter *loginthrottle.Limiter
 }
 
-// NewAuthDeps собирает auth bag; lim=nil → тот же default, что NewDeps.
+// NewAuthDeps собирает auth bag; lim=nil → default limiter.
 func NewAuthDeps(
 	cfg config.Config,
 	authUC *usecaseauth.Service,
@@ -52,7 +52,7 @@ func NewAuthDeps(
 }
 
 // Deps — общие зависимости HTTP-слоя (без clickhouse.Conn — только usecase/ports).
-// Auth-поля пока дублируются с AuthDeps (shared pointers); удаление — follow-up W4.2.
+// Auth живёт в auth *AuthDeps (единственный источник limiter/sessions/UC).
 type Deps struct {
 	cfg             config.Config
 	ingest          Ingester
@@ -65,28 +65,17 @@ type Deps struct {
 	systemPinger    usecasesystem.ClickHousePinger
 	retentionUC     *usecaseretention.Service
 	backupUC        *usecasebackup.Service
-	authUC          *usecaseauth.Service
-	users           UserDirectory // middleware / LiveSession
-	sessions        SessionParser
-	apiTokens       APITokenStore
+	auth            *AuthDeps
 	searchTemplates SearchTemplatesStore
 	prom            MetricsRecorder // optional Prometheus
-	loginLimiter    *loginthrottle.Limiter
 }
 
-// AuthSnapshot копирует auth-поля в AuthDeps (те же указатели, что на Deps).
-func (d *Deps) AuthSnapshot() *AuthDeps {
+// Auth возвращает owned AuthDeps (nil-safe).
+func (d *Deps) Auth() *AuthDeps {
 	if d == nil {
 		return nil
 	}
-	return &AuthDeps{
-		cfg:          d.cfg,
-		authUC:       d.authUC,
-		users:        d.users,
-		sessions:     d.sessions,
-		apiTokens:    d.apiTokens,
-		loginLimiter: d.loginLimiter,
-	}
+	return d.auth
 }
 
 // MetricsRecorder — HTTP + scrape handler (реализация: *metrics.Registry).
@@ -121,7 +110,7 @@ func NewDeps(
 		systemPinger:  systemPinger,
 		retentionUC:   retentionUC,
 		backupUC:      backupUC,
-		loginLimiter:  loginthrottle.New(10, time.Minute, 5*time.Minute),
+		auth:          NewAuthDeps(cfg, nil, nil, nil, nil, nil),
 	}
 	if ingestSvc != nil {
 		d.ingest = ingestSvc
@@ -129,14 +118,26 @@ func NewDeps(
 	return d
 }
 
+func (d *Deps) ensureAuth() *AuthDeps {
+	if d == nil {
+		return nil
+	}
+	if d.auth == nil {
+		d.auth = NewAuthDeps(d.cfg, nil, nil, nil, nil, nil)
+	}
+	return d.auth
+}
+
 func (d *Deps) WithAuth(authUC *usecaseauth.Service, users UserDirectory, sessions SessionParser, apiTokens APITokenStore) *Deps {
 	if d == nil {
 		return nil
 	}
-	d.authUC = authUC
-	d.users = users
-	d.sessions = sessions
-	d.apiTokens = apiTokens
+	a := d.ensureAuth()
+	a.cfg = d.cfg
+	a.authUC = authUC
+	a.users = users
+	a.sessions = sessions
+	a.apiTokens = apiTokens
 	return d
 }
 
@@ -152,7 +153,10 @@ func (d *Deps) WithLoginLimiter(lim *loginthrottle.Limiter) *Deps {
 	if d == nil {
 		return nil
 	}
-	d.loginLimiter = lim
+	a := d.ensureAuth()
+	if lim != nil {
+		a.loginLimiter = lim
+	}
 	return d
 }
 
