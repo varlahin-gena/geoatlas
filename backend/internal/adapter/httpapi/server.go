@@ -72,7 +72,7 @@ func NewServer(
 		}
 	}
 	health := &HealthHandler{deps.Health()}
-	events := &EventsHandler{deps}
+	events := &EventsHandler{deps.Events()}
 	ingestH := &IngestHandler{deps}
 	geoH := &GeoHandler{deps}
 	repH := &ReputationHandler{deps}

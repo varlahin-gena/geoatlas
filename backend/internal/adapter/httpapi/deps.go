@@ -135,6 +135,26 @@ func (d *Deps) Health() *HealthDeps {
 	return NewHealthDeps(d.systemUC, d.systemPinger)
 }
 
+// EventsDeps — зависимости EventsHandler (map/series + attached backup name).
+type EventsDeps struct {
+	cfg       config.Config
+	eventsUC  *usecaseevents.Service
+	backupUC  *usecasebackup.Service
+}
+
+// NewEventsDeps собирает events bag.
+func NewEventsDeps(cfg config.Config, eventsUC *usecaseevents.Service, backupUC *usecasebackup.Service) *EventsDeps {
+	return &EventsDeps{cfg: cfg, eventsUC: eventsUC, backupUC: backupUC}
+}
+
+// Events копирует events/backup/cfg с Deps.
+func (d *Deps) Events() *EventsDeps {
+	if d == nil {
+		return nil
+	}
+	return NewEventsDeps(d.cfg, d.eventsUC, d.backupUC)
+}
+
 // MetricsRecorder — HTTP + scrape handler (реализация: *metrics.Registry).
 type MetricsRecorder interface {
 	Handler() http.Handler
@@ -226,7 +246,7 @@ func (d *Deps) WithMetrics(m MetricsRecorder) *Deps {
 }
 
 type HealthHandler struct{ *HealthDeps }
-type EventsHandler struct{ *Deps }
+type EventsHandler struct{ *EventsDeps }
 type IngestHandler struct{ *Deps }
 type GeoHandler struct{ *Deps }
 type SystemHandler struct{ *SystemDeps }
