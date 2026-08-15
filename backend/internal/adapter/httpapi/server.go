@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"network_monitor/internal/adapter/httpapi/loginthrottle"
 	"network_monitor/internal/adapter/searchtemplatesfile"
 	"network_monitor/internal/config"
 	usecaseauth "network_monitor/internal/usecase/auth"
@@ -313,7 +314,7 @@ func NewServer(
 	h = recoverMW(h)
 	h = requestIDMW(h) // outermost
 
-	ConfigureTrustedProxies(strings.Split(cfg.TrustedProxies, ","))
+	loginthrottle.ConfigureTrustedProxies(strings.Split(cfg.TrustedProxies, ","))
 
 	return &Server{
 		deps:   deps,

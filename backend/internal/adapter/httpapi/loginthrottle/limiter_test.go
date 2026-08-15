@@ -1,4 +1,4 @@
-package httpapi
+package loginthrottle
 
 import (
 	"net/http"
@@ -9,19 +9,19 @@ import (
 )
 
 func TestLoginLimiterLockout(t *testing.T) {
-	lim := newLoginLimiter(3, time.Minute, time.Minute)
+	lim := New(3, time.Minute, time.Minute)
 	ip := "203.0.113.10"
-	if !lim.allow(ip) {
+	if !lim.Allow(ip) {
 		t.Fatal("should allow initially")
 	}
 	for i := 0; i < 3; i++ {
-		lim.recordFailure(ip, "admin")
+		lim.RecordFailure(ip, "admin")
 	}
-	if lim.allow(ip) {
+	if lim.Allow(ip) {
 		t.Fatal("should be locked after max fails")
 	}
-	lim.recordSuccess(ip)
-	if !lim.allow(ip) {
+	lim.RecordSuccess(ip)
+	if !lim.Allow(ip) {
 		t.Fatal("success should clear lockout")
 	}
 }
@@ -34,7 +34,7 @@ func TestClientIPPrefersXRealIP(t *testing.T) {
 	req.RemoteAddr = "10.0.0.1:1234"
 	req.Header.Set("X-Real-IP", "198.51.100.7")
 	req.Header.Set("X-Forwarded-For", "203.0.113.9, 10.0.0.1")
-	if got := clientIP(req); got != "198.51.100.7" {
+	if got := ClientIP(req); got != "198.51.100.7" {
 		t.Fatalf("got %q, want X-Real-IP", got)
 	}
 }
@@ -44,7 +44,7 @@ func TestClientIPIgnoresXRealIPFromUntrusted(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", nil)
 	req.RemoteAddr = "203.0.113.50:9999"
 	req.Header.Set("X-Real-IP", "198.51.100.7")
-	if got := clientIP(req); got != "203.0.113.50" {
+	if got := ClientIP(req); got != "203.0.113.50" {
 		t.Fatalf("got %q, want RemoteAddr (untrusted must not spoof via X-Real-IP)", got)
 	}
 }
@@ -56,7 +56,7 @@ func TestClientIPIgnoresClientXFF(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", nil)
 	req.RemoteAddr = "10.0.0.1:1234"
 	req.Header.Set("X-Forwarded-For", "198.51.100.7, 10.0.0.1")
-	if got := clientIP(req); got != "10.0.0.1" {
+	if got := ClientIP(req); got != "10.0.0.1" {
 		t.Fatalf("got %q, want RemoteAddr host (XFF must not spoof throttle)", got)
 	}
 }
@@ -68,33 +68,33 @@ func TestClientIPIgnoresInvalidXRealIP(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", nil)
 	req.RemoteAddr = "10.0.0.1:1234"
 	req.Header.Set("X-Real-IP", "not-an-ip")
-	if got := clientIP(req); got != "10.0.0.1" {
+	if got := ClientIP(req); got != "10.0.0.1" {
 		t.Fatalf("got %q, want RemoteAddr fallback", got)
 	}
 }
 
 func TestLoginThrottleWindowReset(t *testing.T) {
-	lim := newLoginLimiter(2, 20*time.Millisecond, 30*time.Millisecond)
+	lim := New(2, 20*time.Millisecond, 30*time.Millisecond)
 	ip := "198.51.100.1"
-	lim.recordFailure(ip, "op")
-	lim.recordFailure(ip, "op")
-	if lim.allow(ip) {
+	lim.RecordFailure(ip, "op")
+	lim.RecordFailure(ip, "op")
+	if lim.Allow(ip) {
 		t.Fatal("expected lockout")
 	}
 	time.Sleep(40 * time.Millisecond)
-	if !lim.allow(ip) {
+	if !lim.Allow(ip) {
 		t.Fatal("expected unlock after lockout")
 	}
 }
 
 func TestFailedLoginSnapshotAggregatesByUserAndIP(t *testing.T) {
-	lim := newLoginLimiter(10, time.Minute, time.Minute)
-	lim.recordFailure("10.0.0.1", "Admin")
-	lim.recordFailure("10.0.0.1", "admin")
-	lim.recordFailure("10.0.0.2", "admin")
-	lim.recordFailure("10.0.0.1", "operator")
+	lim := New(10, time.Minute, time.Minute)
+	lim.RecordFailure("10.0.0.1", "Admin")
+	lim.RecordFailure("10.0.0.1", "admin")
+	lim.RecordFailure("10.0.0.2", "admin")
+	lim.RecordFailure("10.0.0.1", "operator")
 
-	snap := lim.snapshotFailures()
+	snap := lim.SnapshotFailures()
 	if len(snap) != 3 {
 		t.Fatalf("len=%d want 3: %+v", len(snap), snap)
 	}

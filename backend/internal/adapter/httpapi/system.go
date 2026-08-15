@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"network_monitor/internal/adapter/httpapi/loginthrottle"
 	usecasebackup "network_monitor/internal/usecase/backup"
 	usecaseretention "network_monitor/internal/usecase/retention"
 	"network_monitor/internal/usecase/system"
@@ -14,7 +15,7 @@ import (
 
 type systemStatsPayload struct {
 	system.SystemStatsResponse
-	FailedLogins []FailedLoginEvent `json:"failed_logins"`
+	FailedLogins []loginthrottle.FailedLoginEvent `json:"failed_logins"`
 }
 
 func (h *SystemHandler) GetSystemStats(w http.ResponseWriter, r *http.Request) {
@@ -32,7 +33,7 @@ func (h *SystemHandler) GetSystemStats(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, systemStatsPayload{
 		SystemStatsResponse: resp,
-		FailedLogins:        failedLoginsSnapshot(),
+		FailedLogins:        h.failedLoginsSnapshot(),
 	})
 }
 
@@ -298,10 +299,13 @@ func (h *SystemHandler) PutBackupSchedule(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "schedule": out})
 }
 
-func failedLoginsSnapshot() []FailedLoginEvent {
-	out := defaultLoginLimiter.snapshotFailures()
+func (h *SystemHandler) failedLoginsSnapshot() []loginthrottle.FailedLoginEvent {
+	if h == nil || h.loginLimiter == nil {
+		return []loginthrottle.FailedLoginEvent{}
+	}
+	out := h.loginLimiter.SnapshotFailures()
 	if out == nil {
-		return []FailedLoginEvent{}
+		return []loginthrottle.FailedLoginEvent{}
 	}
 	return out
 }

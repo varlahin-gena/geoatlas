@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"network_monitor/internal/adapter/httpapi/loginthrottle"
 	"network_monitor/internal/config"
 	usecaseauth "network_monitor/internal/usecase/auth"
 	usecasebackup "network_monitor/internal/usecase/backup"
@@ -37,6 +38,7 @@ type Deps struct {
 	apiTokens       APITokenStore
 	searchTemplates SearchTemplatesStore
 	prom            MetricsRecorder // optional Prometheus
+	loginLimiter    *loginthrottle.Limiter
 }
 
 // MetricsRecorder — HTTP + scrape handler (реализация: *metrics.Registry).
@@ -71,6 +73,7 @@ func NewDeps(
 		systemPinger:  systemPinger,
 		retentionUC:   retentionUC,
 		backupUC:      backupUC,
+		loginLimiter:  loginthrottle.New(10, time.Minute, 5*time.Minute),
 	}
 	if ingestSvc != nil {
 		d.ingest = ingestSvc
@@ -94,6 +97,14 @@ func (d *Deps) WithSearchTemplates(store SearchTemplatesStore) *Deps {
 		return nil
 	}
 	d.searchTemplates = store
+	return d
+}
+
+func (d *Deps) WithLoginLimiter(lim *loginthrottle.Limiter) *Deps {
+	if d == nil {
+		return nil
+	}
+	d.loginLimiter = lim
 	return d
 }
 

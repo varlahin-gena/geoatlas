@@ -1,4 +1,5 @@
-package httpapi
+// Package loginthrottle — per-IP login lockout + failed-login audit + trusted-proxy client IP.
+package loginthrottle
 
 import (
 	"net"
@@ -9,8 +10,8 @@ import (
 	"time"
 )
 
-// loginLimiter — per-IP throttle + аудит неуспешных попыток по паре username+IP.
-type loginLimiter struct {
+// Limiter — per-IP throttle + аудит неуспешных попыток по паре username+IP.
+type Limiter struct {
 	mu       sync.Mutex
 	attempts map[string]*loginBucket
 	failures map[string]*FailedLoginEvent // key: lower(username)|ip
@@ -38,7 +39,8 @@ type FailedLoginEvent struct {
 	LockedUntil time.Time `json:"locked_until,omitempty"`
 }
 
-func newLoginLimiter(maxFails int, window, lockout time.Duration) *loginLimiter {
+// New — limiter with defaults when params are non-positive.
+func New(maxFails int, window, lockout time.Duration) *Limiter {
 	if maxFails <= 0 {
 		maxFails = 10
 	}
@@ -48,7 +50,7 @@ func newLoginLimiter(maxFails int, window, lockout time.Duration) *loginLimiter 
 	if lockout <= 0 {
 		lockout = 5 * time.Minute
 	}
-	return &loginLimiter{
+	return &Limiter{
 		attempts: make(map[string]*loginBucket),
 		failures: make(map[string]*FailedLoginEvent),
 		maxFails: maxFails,
@@ -58,8 +60,6 @@ func newLoginLimiter(maxFails int, window, lockout time.Duration) *loginLimiter 
 		maxAudit: 200,
 	}
 }
-
-var defaultLoginLimiter = newLoginLimiter(10, time.Minute, 5*time.Minute)
 
 var (
 	trustedProxyMu   sync.RWMutex
@@ -149,10 +149,10 @@ func isTrustedProxy(ipStr string) bool {
 	return false
 }
 
-// clientIP — IP для throttle/аудита.
+// ClientIP — IP для throttle/аудита.
 // X-Real-IP только если RemoteAddr — trusted proxy (nginx/frontend).
 // X-Forwarded-For клиент может подделать — не используем.
-func clientIP(r *http.Request) string {
+func ClientIP(r *http.Request) string {
 	if r == nil {
 		return ""
 	}
@@ -171,7 +171,7 @@ func failureKey(username, ip string) string {
 	return strings.ToLower(strings.TrimSpace(username)) + "\x00" + strings.TrimSpace(ip)
 }
 
-func (l *loginLimiter) allow(ip string) bool {
+func (l *Limiter) Allow(ip string) bool {
 	if l == nil || ip == "" {
 		return true
 	}
@@ -194,7 +194,7 @@ func (l *loginLimiter) allow(ip string) bool {
 	return b.fails < l.maxFails
 }
 
-func (l *loginLimiter) recordFailure(ip, username string) {
+func (l *Limiter) RecordFailure(ip, username string) {
 	if l == nil {
 		return
 	}
@@ -217,7 +217,7 @@ func (l *loginLimiter) recordFailure(ip, username string) {
 	l.recordAuditLocked(now, ip, username)
 }
 
-func (l *loginLimiter) recordAuditLocked(now time.Time, ip, username string) {
+func (l *Limiter) recordAuditLocked(now time.Time, ip, username string) {
 	username = strings.TrimSpace(username)
 	ip = strings.TrimSpace(ip)
 	if username == "" && ip == "" {
@@ -253,7 +253,7 @@ func (l *loginLimiter) recordAuditLocked(now time.Time, ip, username string) {
 	l.trimAuditLocked(now)
 }
 
-func (l *loginLimiter) recordSuccess(ip string) {
+func (l *Limiter) RecordSuccess(ip string) {
 	if l == nil || ip == "" {
 		return
 	}
@@ -262,7 +262,7 @@ func (l *loginLimiter) recordSuccess(ip string) {
 	delete(l.attempts, ip)
 }
 
-func (l *loginLimiter) snapshotFailures() []FailedLoginEvent {
+func (l *Limiter) SnapshotFailures() []FailedLoginEvent {
 	if l == nil {
 		return nil
 	}
@@ -295,7 +295,7 @@ func (l *loginLimiter) snapshotFailures() []FailedLoginEvent {
 	return out
 }
 
-func (l *loginLimiter) trimAuditLocked(now time.Time) {
+func (l *Limiter) trimAuditLocked(now time.Time) {
 	for k, ev := range l.failures {
 		if now.Sub(ev.LastAt) > l.retain {
 			delete(l.failures, k)
@@ -319,7 +319,7 @@ func (l *loginLimiter) trimAuditLocked(now time.Time) {
 	}
 }
 
-func (l *loginLimiter) gcLocked(now time.Time) {
+func (l *Limiter) gcLocked(now time.Time) {
 	if len(l.attempts) < 1024 {
 		return
 	}
