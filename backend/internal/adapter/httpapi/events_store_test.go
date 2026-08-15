@@ -42,7 +42,7 @@ func (s *stubTraffic) ScanCountrySeries(ctx context.Context, tr model.TimeRange,
 
 func TestGetEventsUsesTrafficStoreForHoursGeo(t *testing.T) {
 	stub := &stubTraffic{}
-	h := &EventsHandler{Deps: &Deps{
+	h := &EventsHandler{EventsDeps: &EventsDeps{
 		cfg:      config.Config{QueryTimeout: time.Minute},
 		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
 	}}
@@ -73,7 +73,7 @@ func TestGetEventsUsesTrafficStoreForHoursGeo(t *testing.T) {
 
 func TestGetEventsIPUsesGeoEdgesPath(t *testing.T) {
 	stub := &stubTraffic{}
-	h := &EventsHandler{Deps: &Deps{
+	h := &EventsHandler{EventsDeps: &EventsDeps{
 		cfg:      config.Config{QueryTimeout: time.Minute},
 		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
 	}}
@@ -122,7 +122,7 @@ func (s *stubTrafficNoGeo) ScanMapAggs(ctx context.Context, tr model.TimeRange, 
 
 func TestGetEventsFallsBackToLiveGeoWhenStoredCoordsEmpty(t *testing.T) {
 	stub := &stubTrafficNoGeo{}
-	h := &EventsHandler{Deps: &Deps{
+	h := &EventsHandler{EventsDeps: &EventsDeps{
 		cfg:      config.Config{QueryTimeout: time.Minute},
 		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
 	}}
@@ -168,7 +168,7 @@ func (s *stubTrafficIPLogGeo) ScanMapAggs(ctx context.Context, tr model.TimeRang
 
 func TestGetEventsIPUsesStoredLogGeoWhenLiveMisses(t *testing.T) {
 	stub := &stubTrafficIPLogGeo{}
-	h := &EventsHandler{Deps: &Deps{
+	h := &EventsHandler{EventsDeps: &EventsDeps{
 		cfg:      config.Config{QueryTimeout: time.Minute},
 		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
 	}}
@@ -213,7 +213,7 @@ func (s *stubTrafficIPCountryOnly) ScanMapAggs(ctx context.Context, tr model.Tim
 
 func TestGetEventsSubnetUsesCountryFallback(t *testing.T) {
 	stub := &stubTrafficIPCountryOnly{}
-	h := &EventsHandler{Deps: &Deps{
+	h := &EventsHandler{EventsDeps: &EventsDeps{
 		cfg:      config.Config{QueryTimeout: time.Minute},
 		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
 	}}
@@ -235,7 +235,7 @@ func TestGetEventsSubnetUsesCountryFallback(t *testing.T) {
 
 func TestGetEventsPassesFilterCountryAndQ(t *testing.T) {
 	stub := &stubTraffic{}
-	h := &EventsHandler{Deps: &Deps{
+	h := &EventsHandler{EventsDeps: &EventsDeps{
 		cfg:      config.Config{QueryTimeout: time.Minute},
 		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
 	}}
@@ -259,7 +259,7 @@ func TestGetEventsPassesFilterCountryAndQ(t *testing.T) {
 
 func TestGetEventsPassesAdvancedQAndReputation(t *testing.T) {
 	stub := &stubTraffic{}
-	h := &EventsHandler{Deps: &Deps{
+	h := &EventsHandler{EventsDeps: &EventsDeps{
 		cfg:      config.Config{QueryTimeout: time.Minute},
 		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
 	}}
