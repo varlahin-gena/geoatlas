@@ -51,3 +51,23 @@ func TestPreferHourlyEdgesAggFlag(t *testing.T) {
 		t.Fatal("expected true after ready")
 	}
 }
+
+func TestIsolatedStoreDoesNotAffectDefault(t *testing.T) {
+	t.Cleanup(func() {
+		SetEdgesAggStatus(EdgesAggStatus{State: "idle", Message: "not started"})
+		SetGeoEdgesAggReady(false)
+		SetHourlyEdgesAggReady(false)
+	})
+	SetEdgesAggStatus(EdgesAggStatus{State: "idle", Message: "not started"})
+	SetGeoEdgesAggReady(false)
+
+	s := NewStore()
+	s.SetEdgesAggStatus(EdgesAggStatus{State: "ready"})
+	s.SetGeoEdgesAggReady(true)
+	if PreferDailyEdgesAgg() || PreferGeoEdgesAgg() {
+		t.Fatal("isolated Store must not flip Default")
+	}
+	if !s.PreferDailyEdgesAgg() || !s.PreferGeoEdgesAgg() {
+		t.Fatal("isolated Store must report its own state")
+	}
+}
