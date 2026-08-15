@@ -26,6 +26,10 @@
 - SPA: `uplot` 1.6.30 → 1.6.32
 
 ### Security
+- Reputation feeds: SSRF dial pin — `SecureHTTPClient` connects only via `tcp4` to public IPv4 resolved at dial time (DNS rebinding / AAAA residual)
+- Ingest: `INGEST_SHARED_SECRET` applies to `:1514` markers only; HTTP upload (`transport=http`) exempt after API auth
+- ClickHouse `default` user networks: loopback + RFC1918 (not `::/0`) — defense if 8123/9000 ever published
+- Bootstrap admin password: written to `.admin_password_once` (mode 600), not printed to stdout / full-auto dialog
 - Password policy: минимум 10 символов, буква+цифра, blocklist common; UI + `admin_auth.sh` синхронизированы
 - CSP: `style-src-elem 'self'` + `style-src-attr 'unsafe-inline'` (React style={}), без inline `<style>` injection
 - Reputation feeds: IPv4-only SSRF guards (block private/metadata; safe redirects) on AddFeed и fetch
@@ -52,6 +56,7 @@
 
 ### Notes
 - После обновления: `./start.sh` — в `.env` появится `CLICKHOUSE_PASSWORD`, ClickHouse перезапустится с паролем (данные на месте). `clickhouse-client` внутри контейнера: `sh -c 'clickhouse-client --password "$CLICKHOUSE_PASSWORD" -q "SELECT 1"'`.
+- Сгенерированный admin-пароль: файл `.admin_password_once` (не stdout); удалите после входа.
 - Пример ключей `.env` без секретов: [`.env.example`](.env.example)
 
 ## [1.3.1] — 2026-08-12

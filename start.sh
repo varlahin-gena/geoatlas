@@ -233,6 +233,19 @@ ensure_api_auth_token() {
     write_ingest_auth_conf
 }
 
+# Пишет одноразовый пароль admin в файл 0600 (не в stdout/логи).
+write_admin_password_once_file() {
+    local pass="${1:-}"
+    local f=".admin_password_once"
+    if [[ -z "$pass" ]]; then
+        return 0
+    fi
+    umask 077
+    printf '%s\n' "$pass" >"$f"
+    chmod 600 "$f" 2>/dev/null || true
+    log "Одноразовый пароль admin записан в ${f} (права 600). Удалите файл после первого входа."
+}
+
 # Пишет syslog-ng.d/zz_ingest_auth.conf из INGEST_SHARED_SECRET (.env).
 write_ingest_auth_conf() {
     local env_file=".env"
@@ -408,7 +421,7 @@ main() {
     fi
     log "Первый вход: пользователь ${AUTH_ADMIN_USER:-admin}"
     if [[ "${NM_ADMIN_PASSWORD_PRINT:-0}" == "1" && -n "${AUTH_ADMIN_PASSWORD:-}" ]]; then
-        log "Пароль (покажется только сейчас): ${AUTH_ADMIN_PASSWORD}"
+        write_admin_password_once_file "${AUTH_ADMIN_PASSWORD}"
         log "При входе система попросит сменить пароль."
     else
         log "Пароль задан при установке или лежит в .env (AUTH_ADMIN_PASSWORD)."

@@ -17,6 +17,8 @@ const (
 //	@@nm/tcp/<token>/@@payload
 //	@@nm/udp/@@payload          — legacy (только если expectedToken пуст / insecure)
 //	@@nm/tcp/@@payload
+//
+// Plain lines with fallback "http" skip the shared secret (API already auth'd).
 func ResolveTransport(line, fallback string) (transport, payload string) {
 	transport, payload, _ = ResolveTransportAuth(line, fallback, "")
 	return transport, payload
@@ -26,8 +28,13 @@ func ResolveTransport(line, fallback string) (transport, payload string) {
 // ok=false — строку нужно дропнуть (неверный/отсутствующий секрет).
 // Если expectedToken пуст — принимаем legacy @@nm/{udp|tcp}/@@ и новый формат с любым token
 // (dev / NM_ALLOW_INSECURE); иначе требуется точное совпадение token.
+// Plain (no marker) lines with fallback "http" always ok — secret is for :1514 only.
 func ResolveTransportAuth(line, fallback, expectedToken string) (transport, payload string, ok bool) {
 	if !strings.HasPrefix(line, markerPrefix) {
+		// HTTP upload already passed Bearer/session+CSRF; marker secret is for :1514 only.
+		if fallback == "http" {
+			return "http", line, true
+		}
 		return fallback, line, expectedToken == ""
 	}
 	rest := strings.TrimPrefix(line, markerPrefix)

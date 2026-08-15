@@ -3,15 +3,19 @@
     <!--
       ClickHouse 25.x entrypoint пытается записать default-user.xml при старте.
       users.d смонтирован read-only → нужен явный файл + CLICKHOUSE_SKIP_USER_SETUP=1.
-      Порт 8123/9000 НЕ публиковать на хост (только docker bridge). networks ::/0
-      допустим лишь внутри compose-сети; при публикации наружу пароль — единственная защита.
+      Порт 8123/9000 НЕ публиковать на хост (только docker bridge).
+      networks — только loopback + RFC1918: даже при ошибочном publish с интернета
+      клиенты с публичных IP не проходят (пароль — второй барьер внутри LAN/compose).
       Пароль — CLICKHOUSE_PASSWORD из .env (генерирует ./start.sh).
     -->
     <users>
         <default>
             <password from_env="CLICKHOUSE_PASSWORD"/>
             <networks>
-                <ip>::/0</ip>
+                <ip>127.0.0.1</ip>
+                <ip>10.0.0.0/8</ip>
+                <ip>172.16.0.0/12</ip>
+                <ip>192.168.0.0/16</ip>
             </networks>
         </default>
     </users>

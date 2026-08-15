@@ -243,7 +243,7 @@ http://<IP_сервера>/
 По умолчанию включена UI-авторизация. Первый вход — учётка **admin** (роль administrator). Пароля по умолчанию нет:
 
 - пошаговая установка спрашивает пароль (дважды, мин. 8 символов);
-- `--full-auto` / нет TTY / голый `./start.sh` — берут `AUTH_ADMIN_PASSWORD` из окружения или генерируют одноразовый и печатают его один раз.
+- `--full-auto` / нет TTY / голый `./start.sh` — берут `AUTH_ADMIN_PASSWORD` из окружения или генерируют одноразовый и пишут его в `.admin_password_once` (права 600; удалите после входа).
 
 Если пароль сгенерирован, при входе его нужно сменить (`must_reset_password`). Operator с завода не создаётся — заведите в UI `/users`.
 `./start.sh` при необходимости генерирует `API_AUTH_TOKEN`, `SESSION_SECRET`, пароль admin и `CLICKHOUSE_PASSWORD` в `.env` (ключи без значений — [`.env.example`](.env.example)).
@@ -928,9 +928,11 @@ Unit-тесты карты (репутация / heatmap focus / coords helpers)
 
 - Секреты только через `./start.sh` (`API_AUTH_TOKEN`, `SESSION_SECRET`, `INGEST_SHARED_SECRET`, `CLICKHOUSE_PASSWORD`)
 - Пароли УЗ: минимум 10 символов, буква и цифра, не из common-list
+- Одноразовый пароль admin: `.admin_password_once` (600), не stdout
 - UI за HTTPS при доступе из сети; не публиковать ClickHouse `8123`/`9000` и backend `1514`
+- ClickHouse `default`: networks loopback+RFC1918 (не `::/0`)
 - Syslog `:514` **без TLS/auth** — ограничьте источником МСЭ (`NM_SYSLOG_ALLOW_FROM` / Security Group / firewall)
-- Ingest внутри docker: маркер с `INGEST_SHARED_SECRET` + `INGEST_ALLOW_FROM=syslog-ng`
+- Ingest внутри docker: маркер с `INGEST_SHARED_SECRET` + `INGEST_ALLOW_FROM=syslog-ng` (HTTP upload API — без маркера)
 - Reputation URL-фиды: только публичные IPv4-хосты (private/metadata блокируются)
 
 ## Структура репозитория

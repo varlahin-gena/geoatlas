@@ -315,10 +315,11 @@ nm_full_auto_finish() {
     local msg login_hint
     login_hint="Пароль: тот, что задали в установщике (или AUTH_ADMIN_PASSWORD в .env)."
     if [[ "${NM_ADMIN_PASSWORD_PRINT:-0}" == "1" && -n "${AUTH_ADMIN_PASSWORD:-}" ]]; then
-        login_hint="Пароль (покажется только сейчас): ${AUTH_ADMIN_PASSWORD}
-При входе система попросит сменить пароль."
+        # Не светим пароль в TUI/логах — только путь к файлу 0600 (пишет start.sh).
+        login_hint="Одноразовый пароль: файл .admin_password_once в каталоге установки (права 600).
+Удалите файл после входа. При входе система попросит сменить пароль."
     elif [[ "${AUTH_ADMIN_MUST_RESET:-}" == "1" ]]; then
-        login_hint="Пароль: см. вывод ./start.sh или AUTH_ADMIN_PASSWORD в .env.
+        login_hint="Пароль: см. .admin_password_once (если создавался) или AUTH_ADMIN_PASSWORD в .env.
 При входе система попросит сменить пароль."
     fi
     msg="Установка завершена.

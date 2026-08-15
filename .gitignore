@@ -3,6 +3,7 @@ docker-compose.override.yml
 .env
 .env.*
 !.env.example
+.admin_password_once
 install-profile.json
 install-modules.json
 install-meta.json

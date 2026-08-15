@@ -47,4 +47,8 @@ func TestResolveTransportAuth(t *testing.T) {
 	if ok {
 		t.Fatal("plain line must fail when secret required")
 	}
+	tr, payload, ok = ResolveTransportAuth("plain http body", "http", secret)
+	if !ok || tr != "http" || payload != "plain http body" {
+		t.Fatalf("http fallback must skip marker secret: tr=%q payload=%q ok=%v", tr, payload, ok)
+	}
 }

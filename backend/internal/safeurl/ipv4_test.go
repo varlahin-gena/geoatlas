@@ -102,3 +102,31 @@ func TestSecureHTTPClientAllowsPublicRedirect(t *testing.T) {
 		t.Fatalf("public redirect: %v", err)
 	}
 }
+
+func TestResolvePublicIPv4RejectsPrivateAtDialTime(t *testing.T) {
+	orig := LookupIPv4
+	t.Cleanup(func() { LookupIPv4 = orig })
+
+	LookupIPv4 = func(host string) ([]net.IP, error) {
+		if host == "rebind.example" {
+			return []net.IP{net.ParseIP("169.254.169.254")}, nil
+		}
+		return []net.IP{net.ParseIP("93.184.216.34")}, nil
+	}
+
+	if _, err := resolvePublicIPv4("rebind.example"); err == nil {
+		t.Fatal("expected metadata IP reject at dial resolve")
+	}
+	ips, err := resolvePublicIPv4("ok.example")
+	if err != nil || len(ips) != 1 || ips[0].String() != "93.184.216.34" {
+		t.Fatalf("got ips=%v err=%v", ips, err)
+	}
+}
+
+func TestSecureHTTPClientPinsDialContext(t *testing.T) {
+	client := SecureHTTPClient(&http.Client{Timeout: time.Second})
+	tr, ok := client.Transport.(*http.Transport)
+	if !ok || tr.DialContext == nil {
+		t.Fatal("expected Transport with DialContext")
+	}
+}
