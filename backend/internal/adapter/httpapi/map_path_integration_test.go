@@ -24,7 +24,7 @@ import (
 	"network_monitor/internal/adapter/parseradapter"
 	"network_monitor/internal/config"
 	"network_monitor/internal/geoip"
-	"network_monitor/internal/ingest"
+	"network_monitor/internal/adapter/ingestnet"
 	"network_monitor/internal/parser"
 	usecaseevents "network_monitor/internal/usecase/events"
 	usecasegeo "network_monitor/internal/usecase/geo"
@@ -55,13 +55,13 @@ func TestIntegrationMapPathLogToEvents(t *testing.T) {
 		&parser.GenericKV{},
 	)
 	ingestRepo := ingeststore.NewIngestRepository(conn)
-	ingestSvc := ingest.NewService(ingest.Config{
+	ingestSvc := ingestnet.NewService(ingestnet.Config{
 		QueueSize:     10_000,
 		Workers:       1,
 		BatchSize:     32,
 		FlushInterval: 50 * time.Millisecond,
 		QueryTimeout:  15 * time.Second,
-	}, ingest.ProcessorDeps{
+	}, ingestnet.ProcessorDeps{
 		Logs: ingestRepo, Errors: ingestRepo,
 		Parser: parseradapter.New(parsers), Geo: geoIdx, EnrichCountry: true,
 	})
@@ -181,7 +181,7 @@ func TestIntegrationMapPathLogToEvents(t *testing.T) {
 	}
 }
 
-func waitIngestRunning(t *testing.T, svc *ingest.Service) {
+func waitIngestRunning(t *testing.T, svc *ingestnet.Service) {
 	t.Helper()
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {

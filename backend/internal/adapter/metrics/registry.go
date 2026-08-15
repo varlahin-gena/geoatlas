@@ -1,4 +1,4 @@
-// Package metrics — Prometheus registry для backend (HTTP + ingest).
+// Package metrics вЂ” Prometheus registry РґР»СЏ backend (HTTP + ingest).
 package metrics
 
 import (
@@ -10,17 +10,17 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"network_monitor/internal/ingest"
+	"network_monitor/internal/adapter/ingestnet"
 )
 
 const namespace = "nm"
 
-// IngestStats — снимок live-ingest (реализация: *ingest.Service).
+// IngestStats вЂ” СЃРЅРёРјРѕРє live-ingest (СЂРµР°Р»РёР·Р°С†РёСЏ: *ingestnet.Service).
 type IngestStats interface {
-	Stats() ingest.StatsSnapshot
+	Stats() ingestnet.StatsSnapshot
 }
 
-// Registry — метрики процесса + handler /metrics.
+// Registry вЂ” РјРµС‚СЂРёРєРё РїСЂРѕС†РµСЃСЃР° + handler /metrics.
 type Registry struct {
 	reg *prometheus.Registry
 
@@ -33,7 +33,7 @@ type Registry struct {
 	ingest *ingestCollector
 }
 
-// New создаёт registry. ingestSrc может быть nil (тогда ingest gauges = 0).
+// New СЃРѕР·РґР°С‘С‚ registry. ingestSrc РјРѕР¶РµС‚ Р±С‹С‚СЊ nil (С‚РѕРіРґР° ingest gauges = 0).
 func New(ingestSrc IngestStats) *Registry {
 	reg := prometheus.NewRegistry()
 	_ = reg.Register(collectors.NewGoCollector())
@@ -76,7 +76,7 @@ func (r *Registry) SetIngest(src IngestStats) {
 	}
 }
 
-// Handler — promhttp scrape endpoint (без встроенного auth).
+// Handler вЂ” promhttp scrape endpoint (Р±РµР· РІСЃС‚СЂРѕРµРЅРЅРѕРіРѕ auth).
 func (r *Registry) Handler() http.Handler {
 	if r == nil {
 		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

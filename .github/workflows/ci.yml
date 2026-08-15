@@ -62,11 +62,11 @@ jobs:
       - name: coverage smoke (critical packages)
         run: |
           set -euo pipefail
-          pkgs=(./internal/ingest/ ./internal/usecase/ingest/ ./internal/config/ ./internal/adapter/geojob/)
+          pkgs=(./internal/adapter/ingestnet/ ./internal/usecase/ingest/ ./internal/config/ ./internal/adapter/geojob/)
           fail=0
           for pkg in "${pkgs[@]}"; do
             line=$(go test -count=1 -cover "$pkg" 2>&1 | tee /dev/stderr | tail -n1)
-            # ok   network_monitor/internal/ingest  0.123s  coverage: 67.8% of statements
+            # ok   network_monitor/internal/adapter/ingestnet  0.123s  coverage: 67.8% of statements
             pct=$(echo "$line" | sed -n 's/.*coverage: \([0-9.]*\)% of statements.*/\1/p')
             if [[ -z "$pct" ]]; then
               echo "ERROR: no coverage for $pkg ($line)" >&2
@@ -82,7 +82,7 @@ jobs:
       - name: go fuzz (smoke)
         run: |
           go test ./internal/parser/ -run=^$ -fuzz=FuzzParseVerbose -fuzztime=10s
-          go test ./internal/ingest/ -run=^$ -fuzz=FuzzFrameReader -fuzztime=10s
+          go test ./internal/adapter/ingestnet/ -run=^$ -fuzz=FuzzFrameReader -fuzztime=10s
 
       - uses: golangci/golangci-lint-action@v9
         with:

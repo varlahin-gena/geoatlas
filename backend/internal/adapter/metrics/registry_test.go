@@ -9,17 +9,17 @@ import (
 	"time"
 
 	"network_monitor/internal/adapter/metrics"
-	"network_monitor/internal/ingest"
+	"network_monitor/internal/adapter/ingestnet"
 )
 
 type stubIngest struct {
-	snap ingest.StatsSnapshot
+	snap ingestnet.StatsSnapshot
 }
 
-func (s stubIngest) Stats() ingest.StatsSnapshot { return s.snap }
+func (s stubIngest) Stats() ingestnet.StatsSnapshot { return s.snap }
 
 func TestMetricsHandlerExposesIngestAndHTTP(t *testing.T) {
-	reg := metrics.New(stubIngest{snap: ingest.StatsSnapshot{
+	reg := metrics.New(stubIngest{snap: ingestnet.StatsSnapshot{
 		QueueDepth: 7, QueueCapacity: 100, DroppedTotal: 3, CircuitOpen: true,
 	}})
 	reg.ObserveHTTP(http.MethodGet, "/api/events", 200, 12*time.Millisecond)
@@ -54,7 +54,7 @@ func TestMetricsHandlerExposesIngestAndHTTP(t *testing.T) {
 
 func TestSetIngestUpdatesScrape(t *testing.T) {
 	reg := metrics.New(nil)
-	reg.SetIngest(stubIngest{snap: ingest.StatsSnapshot{DroppedTotal: 42}})
+	reg.SetIngest(stubIngest{snap: ingestnet.StatsSnapshot{DroppedTotal: 42}})
 	rec := httptest.NewRecorder()
 	reg.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
 	if !strings.Contains(rec.Body.String(), "nm_ingest_dropped_total 42") {

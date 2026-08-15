@@ -19,7 +19,7 @@ import (
 	"network_monitor/internal/auth"
 	"network_monitor/internal/config"
 	"network_monitor/internal/geoip"
-	"network_monitor/internal/ingest"
+	"network_monitor/internal/adapter/ingestnet"
 	"network_monitor/internal/model"
 	"network_monitor/internal/parser"
 	usecaseauth "network_monitor/internal/usecase/auth"
@@ -29,8 +29,8 @@ import (
 	usecasesystem "network_monitor/internal/usecase/system"
 )
 
-// In-process smoke после Clean Architecture: auth, map, geo dry-run/upload,
-// ingest FeedReader, maintenance backfill. Без Docker/ClickHouse.
+// In-process smoke РїРѕСЃР»Рµ Clean Architecture: auth, map, geo dry-run/upload,
+// ingest FeedReader, maintenance backfill. Р‘РµР· Docker/ClickHouse.
 func TestPostCASmoke(t *testing.T) {
 	hash, err := auth.HashPassword("adminpass1")
 	if err != nil {
@@ -73,9 +73,9 @@ func TestPostCASmoke(t *testing.T) {
 	pta := parseradapter.NewParseTest(parsers)
 	parseTestUC := parsetest.New(pta, geoIdx, pta)
 
-	ingestSvc := ingest.NewService(ingest.Config{
+	ingestSvc := ingestnet.NewService(ingestnet.Config{
 		QueueSize: 1000, Workers: 1, BatchSize: 100, FlushInterval: time.Second,
-	}, ingest.ProcessorDeps{})
+	}, ingestnet.ProcessorDeps{})
 
 	cfg := config.Config{
 		ListenAddr:              ":0",

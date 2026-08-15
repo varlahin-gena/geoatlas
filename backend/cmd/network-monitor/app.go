@@ -6,20 +6,20 @@ import (
 	"path/filepath"
 	"sync"
 
-	chadapter "network_monitor/internal/adapter/clickhouse"
 	"network_monitor/internal/adapter/backupjob"
+	chadapter "network_monitor/internal/adapter/clickhouse"
 	"network_monitor/internal/adapter/datalock"
 	"network_monitor/internal/adapter/geojob"
 	httpapi "network_monitor/internal/adapter/httpapi"
+	"network_monitor/internal/adapter/ingestnet"
 	appmetrics "network_monitor/internal/adapter/metrics"
 	"network_monitor/internal/adapter/reputationjob"
 	"network_monitor/internal/config"
-	"network_monitor/internal/ingest"
 )
 
 type app struct {
 	pools      *chadapter.Pools
-	ingestSvc  *ingest.Service
+	ingestSvc  *ingestnet.Service
 	prom       *appmetrics.Registry
 	srv        *httpapi.Server
 	geoJobs    *geojob.Scheduler
@@ -48,7 +48,7 @@ func buildApp(ctx context.Context, cfg config.Config) (*app, error) {
 		dataLock = lock
 		slog.Info("control-plane lock acquired", "dir", dataDir, "file", ".nm_backend.lock")
 	} else {
-		slog.Warn("NM_ALLOW_MULTI_INSTANCE=1 — control-plane file lock disabled (unsafe for shared /app/data)")
+		slog.Warn("NM_ALLOW_MULTI_INSTANCE=1 вЂ” control-plane file lock disabled (unsafe for shared /app/data)")
 	}
 
 	authParts, err := buildAuth(cfg)
@@ -68,8 +68,8 @@ func buildApp(ctx context.Context, cfg config.Config) (*app, error) {
 	}
 
 	aCtx, cancel := context.WithCancel(ctx)
-	// WithoutCancel: bootstrap/jobs живут до явного bgCancel на shutdown,
-	// а не обрываются вместе с signal ctx (пока идёт HTTP/ingest drain).
+	// WithoutCancel: bootstrap/jobs Р¶РёРІСѓС‚ РґРѕ СЏРІРЅРѕРіРѕ bgCancel РЅР° shutdown,
+	// Р° РЅРµ РѕР±СЂС‹РІР°СЋС‚СЃСЏ РІРјРµСЃС‚Рµ СЃ signal ctx (РїРѕРєР° РёРґС‘С‚ HTTP/ingest drain).
 	bgCtx, bgCancel := context.WithCancel(context.WithoutCancel(ctx))
 	a := &app{
 		pools:      pools,
