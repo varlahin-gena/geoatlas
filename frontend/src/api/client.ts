@@ -122,3 +122,59 @@ export function apiPost<P extends keyof paths & string>(
     body: body === undefined ? init?.body : JSON.stringify(body),
   }) as Promise<ApiJson<P, 'post'>>;
 }
+
+export type ApiQueryInput =
+  | string
+  | URLSearchParams
+  | Record<string, string | number | boolean | undefined | null>;
+
+function buildQuery(query?: ApiQueryInput): string {
+  if (query == null || query === '') return '';
+  if (typeof query === 'string') return query.replace(/^\?/, '');
+  if (query instanceof URLSearchParams) return query.toString();
+  const u = new URLSearchParams();
+  for (const [k, v] of Object.entries(query)) {
+    if (v === undefined || v === null || v === '') continue;
+    u.set(k, String(v));
+  }
+  return u.toString();
+}
+
+/**
+ * GET with query string; response typed from OpenAPI path when schema declares JSON.
+ * Callers may cast when the spec omits `content` (users/tokens/geo lists).
+ */
+export function apiGetQuery<P extends keyof paths & string>(
+  path: P,
+  query?: ApiQueryInput,
+  init?: RequestInit,
+): Promise<ApiJson<P, 'get'> extends never ? unknown : ApiJson<P, 'get'>> {
+  const qs = buildQuery(query);
+  const url = qs ? `${path}?${qs}` : path;
+  return apiFetch(url, init) as Promise<
+    ApiJson<P, 'get'> extends never ? unknown : ApiJson<P, 'get'>
+  >;
+}
+
+/** Substitute `{param}` segments; values are encodeURIComponent'd. */
+export function apiPath(template: string, params: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (_, key: string) => {
+    const v = params[key];
+    if (v == null || v === '') {
+      throw new Error(`apiPath: missing {${key}}`);
+    }
+    return encodeURIComponent(v);
+  });
+}
+
+export function apiDelete(path: string, init?: RequestInit): Promise<unknown> {
+  return apiFetch(path, { ...init, method: 'DELETE' });
+}
+
+export function apiPut(path: string, body?: unknown, init?: RequestInit): Promise<unknown> {
+  return apiFetch(path, {
+    ...init,
+    method: 'PUT',
+    body: body === undefined ? init?.body : JSON.stringify(body),
+  });
+}

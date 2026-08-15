@@ -1,4 +1,4 @@
-import { apiFetch } from './client';
+import { apiDelete, apiFetch, apiGet, apiPath, apiPost } from './client';
 
 export interface ReputationFeed {
   name: string;
@@ -27,15 +27,15 @@ export interface ReputationRefreshResult {
 }
 
 export function listReputationFeeds(): Promise<{ feeds?: ReputationFeed[] }> {
-  return apiFetch<{ feeds?: ReputationFeed[] }>('/api/reputation/feeds');
+  return apiGet('/api/reputation/feeds') as Promise<{ feeds?: ReputationFeed[] }>;
 }
 
 export function listReputationLists(): Promise<{ lists?: ReputationList[] }> {
-  return apiFetch<{ lists?: ReputationList[] }>('/api/reputation/lists');
+  return apiGet('/api/reputation/lists') as Promise<{ lists?: ReputationList[] }>;
 }
 
 export function listReputationCatalog(): Promise<{ feeds?: ReputationFeed[] }> {
-  return apiFetch<{ feeds?: ReputationFeed[] }>('/api/reputation/catalog');
+  return apiGet('/api/reputation/catalog') as Promise<{ feeds?: ReputationFeed[] }>;
 }
 
 export function createReputationFeed(body: {
@@ -45,20 +45,14 @@ export function createReputationFeed(body: {
   format: string;
   enabled?: boolean;
 }): Promise<unknown> {
-  return apiFetch('/api/reputation/feeds', {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
+  return apiPost('/api/reputation/feeds', body);
 }
 
 export function refreshReputation(force = true): Promise<ReputationRefreshResult> {
-  const q = force ? '?force=1' : '';
-  return apiFetch<ReputationRefreshResult>(`/api/reputation/refresh${q}`, {
-    method: 'POST',
-    body: '{}',
-  });
+  const path = force ? '/api/reputation/refresh?force=1' : '/api/reputation/refresh';
+  return apiFetch(path, { method: 'POST', body: '{}' }) as Promise<ReputationRefreshResult>;
 }
 
 export function deleteReputationList(name: string): Promise<unknown> {
-  return apiFetch(`/api/reputation/lists/${encodeURIComponent(name)}`, { method: 'DELETE' });
+  return apiDelete(apiPath('/api/reputation/lists/{name}', { name }));
 }

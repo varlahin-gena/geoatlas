@@ -1,4 +1,4 @@
-import { apiFetch, apiGet } from './client';
+import { apiDelete, apiFetch, apiGet, apiGetQuery, apiPath, apiPost, apiPut } from './client';
 import type { SystemVersion } from './types';
 import type { components } from './openapi';
 import type {
@@ -33,52 +33,49 @@ export function fetchSystemStats(init?: RequestInit): Promise<SystemStats> {
 }
 
 export function fetchRetention(): Promise<{ retention?: Retention } & Retention> {
-  return apiFetch<{ retention?: Retention } & Retention>('/api/system/retention');
+  return apiGet('/api/system/retention') as Promise<{ retention?: Retention } & Retention>;
 }
 
 export function putRetention(body: Retention): Promise<{ retention?: Retention }> {
-  return apiFetch<{ retention?: Retention }>('/api/system/retention', {
-    method: 'PUT',
-    body: JSON.stringify(body),
-  });
+  return apiPut('/api/system/retention', body) as Promise<{ retention?: Retention }>;
 }
 
 export function fetchSystemHistory(period: string): Promise<HistoryPayload> {
-  return apiFetch<HistoryPayload>(`/api/system/history?period=${encodeURIComponent(period)}`);
+  return apiGetQuery('/api/system/history', { period }) as Promise<HistoryPayload>;
 }
 
 export function fetchBackups(): Promise<BackupCatalog> {
-  return apiFetch<BackupCatalog>('/api/system/backups');
+  return apiGet('/api/system/backups') as Promise<BackupCatalog>;
 }
 
 export function createBackup(): Promise<unknown> {
-  return apiFetch('/api/system/backups', { method: 'POST', body: '{}' });
+  return apiPost('/api/system/backups', {});
 }
 
 export function putBackupSchedule(schedule: BackupSchedule): Promise<{
   ok?: boolean;
   schedule?: BackupSchedule;
 }> {
-  return apiFetch<{ ok?: boolean; schedule?: BackupSchedule }>('/api/system/backup-schedule', {
-    method: 'PUT',
-    body: JSON.stringify(schedule),
-  });
+  return apiPut('/api/system/backup-schedule', schedule) as Promise<{
+    ok?: boolean;
+    schedule?: BackupSchedule;
+  }>;
 }
 
 export function attachBackup(name: string): Promise<unknown> {
-  return apiFetch(`/api/system/backups/${encodeURIComponent(name)}/attach`, {
+  return apiFetch(apiPath('/api/system/backups/{name}/attach', { name }), {
     method: 'POST',
     body: '{}',
   });
 }
 
 export function detachBackup(name: string): Promise<unknown> {
-  return apiFetch(`/api/system/backups/${encodeURIComponent(name)}/detach`, {
+  return apiFetch(apiPath('/api/system/backups/{name}/detach', { name }), {
     method: 'POST',
     body: '{}',
   });
 }
 
 export function deleteBackup(name: string): Promise<unknown> {
-  return apiFetch(`/api/system/backups/${encodeURIComponent(name)}`, { method: 'DELETE' });
+  return apiDelete(apiPath('/api/system/backups/{name}', { name }));
 }

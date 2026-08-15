@@ -1,4 +1,4 @@
-import { apiFetch } from './client';
+import { apiGetQuery } from './client';
 import type { EventsPayload, SeriesPayload } from './eventsTypes';
 
 export type { EventsPayload, SeriesPayload };
@@ -16,31 +16,26 @@ export function fetchMapEvents(opts: {
   repSide?: string;
   signal?: AbortSignal;
 }): Promise<EventsPayload> {
-  let url =
-    `/api/events?group_by=${encodeURIComponent(opts.groupBy)}&limit=${opts.limit}` +
-    `${opts.periodQuery}&source=${encodeURIComponent(opts.source)}`;
-  if (opts.filter && opts.filter !== 'all') {
-    url += `&filter=${encodeURIComponent(opts.filter)}`;
+  const params = new URLSearchParams();
+  params.set('group_by', opts.groupBy);
+  params.set('limit', String(opts.limit));
+  params.set('source', opts.source);
+  // periodQuery is "&hours=6" / "&from=...&to=..." from mapConstants.
+  const period = opts.periodQuery.replace(/^\?/, '').replace(/^&/, '');
+  if (period) {
+    new URLSearchParams(period).forEach((v, k) => params.set(k, v));
   }
-  if (opts.country) {
-    url += `&country=${encodeURIComponent(opts.country)}`;
-  }
-  if (opts.q) {
-    url += `&q=${encodeURIComponent(opts.q)}`;
-  }
-  if (opts.repCategories?.length) {
-    url += `&rep_cat=${encodeURIComponent(opts.repCategories.join(','))}`;
-  }
-  if (opts.repLists?.length) {
-    url += `&rep_list=${encodeURIComponent(opts.repLists.join(','))}`;
-  }
-  if (opts.repSide && opts.repSide !== 'any') {
-    url += `&rep_side=${encodeURIComponent(opts.repSide)}`;
-  }
-  return apiFetch<EventsPayload>(url, {
+  if (opts.filter && opts.filter !== 'all') params.set('filter', opts.filter);
+  if (opts.country) params.set('country', opts.country);
+  if (opts.q) params.set('q', opts.q);
+  if (opts.repCategories?.length) params.set('rep_cat', opts.repCategories.join(','));
+  if (opts.repLists?.length) params.set('rep_list', opts.repLists.join(','));
+  if (opts.repSide && opts.repSide !== 'any') params.set('rep_side', opts.repSide);
+
+  return apiGetQuery('/api/events', params, {
     signal: opts.signal,
     cache: 'no-store',
-  });
+  }) as Promise<EventsPayload>;
 }
 
 export function fetchCountrySeries(
@@ -49,8 +44,15 @@ export function fetchCountrySeries(
   source: 'live' | 'backup' = 'live',
   signal?: AbortSignal,
 ): Promise<SeriesPayload> {
-  const url =
-    `/api/events/series?country=${encodeURIComponent(country)}` +
-    `${periodQuery}&source=${encodeURIComponent(source)}`;
-  return apiFetch<SeriesPayload>(url, { signal, cache: 'no-store' });
+  const params = new URLSearchParams();
+  params.set('country', country);
+  params.set('source', source);
+  const period = periodQuery.replace(/^\?/, '').replace(/^&/, '');
+  if (period) {
+    new URLSearchParams(period).forEach((v, k) => params.set(k, v));
+  }
+  return apiGetQuery('/api/events/series', params, {
+    signal,
+    cache: 'no-store',
+  }) as Promise<SeriesPayload>;
 }

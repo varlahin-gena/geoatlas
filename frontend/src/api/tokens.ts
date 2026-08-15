@@ -1,4 +1,4 @@
-import { apiFetch } from './client';
+import { apiDelete, apiGet, apiPath, apiPost } from './client';
 
 export interface TokenRow {
   id: string;
@@ -8,16 +8,13 @@ export interface TokenRow {
 }
 
 export function listTokens(): Promise<{ tokens: TokenRow[] }> {
-  return apiFetch<{ tokens: TokenRow[] }>('/api/tokens');
+  return apiGet('/api/tokens') as Promise<{ tokens: TokenRow[] }>;
 }
 
 export function createToken(body: { name: string; scope: string }): Promise<{ secret?: string }> {
-  return apiFetch<{ secret?: string }>('/api/tokens', {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
+  return apiPost('/api/tokens', body) as Promise<{ secret?: string }>;
 }
 
 export function deleteToken(id: string): Promise<unknown> {
-  return apiFetch(`/api/tokens/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  return apiDelete(apiPath('/api/tokens/{id}', { id }));
 }
