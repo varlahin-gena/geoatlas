@@ -71,7 +71,7 @@ func NewServer(
 			opt(deps)
 		}
 	}
-	health := &HealthHandler{deps}
+	health := &HealthHandler{deps.Health()}
 	events := &EventsHandler{deps}
 	ingestH := &IngestHandler{deps}
 	geoH := &GeoHandler{deps}

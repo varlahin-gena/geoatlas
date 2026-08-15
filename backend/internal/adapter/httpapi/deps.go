@@ -116,6 +116,25 @@ func (d *Deps) System() *SystemDeps {
 	return NewSystemDeps(d.cfg, d.systemUC, d.retentionUC, d.backupUC, lim)
 }
 
+// HealthDeps — зависимости HealthHandler (Ready: systemUC + CH pinger).
+type HealthDeps struct {
+	systemUC     *usecasesystem.Service
+	systemPinger usecasesystem.ClickHousePinger
+}
+
+// NewHealthDeps собирает health bag.
+func NewHealthDeps(systemUC *usecasesystem.Service, systemPinger usecasesystem.ClickHousePinger) *HealthDeps {
+	return &HealthDeps{systemUC: systemUC, systemPinger: systemPinger}
+}
+
+// Health копирует systemUC/pinger с Deps.
+func (d *Deps) Health() *HealthDeps {
+	if d == nil {
+		return nil
+	}
+	return NewHealthDeps(d.systemUC, d.systemPinger)
+}
+
 // MetricsRecorder — HTTP + scrape handler (реализация: *metrics.Registry).
 type MetricsRecorder interface {
 	Handler() http.Handler
@@ -206,7 +225,7 @@ func (d *Deps) WithMetrics(m MetricsRecorder) *Deps {
 	return d
 }
 
-type HealthHandler struct{ *Deps }
+type HealthHandler struct{ *HealthDeps }
 type EventsHandler struct{ *Deps }
 type IngestHandler struct{ *Deps }
 type GeoHandler struct{ *Deps }
