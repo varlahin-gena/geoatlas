@@ -135,9 +135,9 @@ type HistoryResponse struct {
 	Series  map[string][]model.HistoryPoint `json:"series"`
 }
 
-// HealthResult is an HTTP-ready health result.
+// HealthResult — готовность процесса (ClickHouse ping + ingest status).
+// HTTP-код выставляет только httpapi по полю OK.
 type HealthResult struct {
-	OK         bool
-	HTTPStatus int
-	Body       map[string]any
+	OK   bool
+	Body map[string]any
 }

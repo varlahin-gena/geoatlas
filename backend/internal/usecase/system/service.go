@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"net/http"
 	"os"
 	"runtime"
 	"strings"
@@ -289,13 +288,13 @@ func (s *Service) InstallMeta() InstallMeta {
 func (s *Service) Health(ctx context.Context, pinger ClickHousePinger) (HealthResult, error) {
 	if pinger == nil {
 		return HealthResult{
-			OK: false, HTTPStatus: http.StatusServiceUnavailable,
+			OK: false,
 			Body: map[string]any{"ok": false, "status": "unavailable", "error": "clickhouse not initialized"},
 		}, nil
 	}
 	if err := pinger.Ping(ctx); err != nil {
 		return HealthResult{
-			OK: false, HTTPStatus: http.StatusServiceUnavailable,
+			OK: false,
 			Body: map[string]any{"ok": false, "status": "unavailable", "error": "clickhouse unavailable"},
 		}, nil
 	}
@@ -307,7 +306,7 @@ func (s *Service) Health(ctx context.Context, pinger ClickHousePinger) (HealthRe
 			// Public /ready: no queue/drops/last_error (reconnaissance). Details: /api/ingest/stats.
 		}
 	}
-	return HealthResult{OK: true, HTTPStatus: http.StatusOK, Body: body}, nil
+	return HealthResult{OK: true, Body: body}, nil
 }
 
 func memHeapAlloc() uint64 {

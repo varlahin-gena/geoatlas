@@ -7,7 +7,6 @@ import (
 	"io"
 	"log/slog"
 	"net"
-	"net/http"
 	"sort"
 	"strings"
 	"time"
@@ -104,8 +103,7 @@ func (s *Service) UploadCSV(ctx context.Context, r io.Reader, dryRun bool) (Uplo
 	}
 	parseDur := time.Since(started)
 	if err != nil {
-		var maxBytes *http.MaxBytesError
-		if errors.As(err, &maxBytes) {
+		if isHTTPRequestBodyTooLarge(err) {
 			return UploadResult{}, apperr.TooLarge(err.Error())
 		}
 		return UploadResult{}, apperr.InvalidCSV(err)
@@ -132,6 +130,17 @@ func (s *Service) UploadCSV(ctx context.Context, r io.Reader, dryRun bool) (Uplo
 		return UploadResult{}, err
 	}
 	return UploadResult{Count: count, Reload: "applied", Backfill: "scheduled"}, nil
+}
+
+// isHTTPRequestBodyTooLarge detects http.MaxBytesError without importing net/http.
+// MaxBytesError.Error() is the fixed string "http: request body too large".
+func isHTTPRequestBodyTooLarge(err error) bool {
+	for e := err; e != nil; e = errors.Unwrap(e) {
+		if e.Error() == "http: request body too large" {
+			return true
+		}
+	}
+	return false
 }
 
 // rejectIfIndexTooLargeForReplace — early 409 до ReadCSV, чтобы не удваивать пик RAM.
