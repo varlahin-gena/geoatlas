@@ -20,7 +20,7 @@ func TestCheckOpsAllowsOpsBearer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := &AuthHandler{Deps: &Deps{
+	h := &AuthHandler{AuthDeps: &AuthDeps{
 		cfg:       config.Config{APIAuthToken: "env-admin-token"},
 		apiTokens: store,
 	}}

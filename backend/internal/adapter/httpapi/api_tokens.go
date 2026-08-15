@@ -9,7 +9,7 @@ import (
 )
 
 // APITokensHandler — CRUD именованных Bearer-токенов со scope.
-type APITokensHandler struct{ *Deps }
+type APITokensHandler struct{ *AuthDeps }
 
 func (h *APITokensHandler) List(w http.ResponseWriter, r *http.Request) {
 	if h == nil || h.apiTokens == nil {
