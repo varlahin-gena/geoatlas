@@ -300,10 +300,10 @@ func (h *SystemHandler) PutBackupSchedule(w http.ResponseWriter, r *http.Request
 }
 
 func (h *SystemHandler) failedLoginsSnapshot() []loginthrottle.FailedLoginEvent {
-	if h == nil || h.loginLimiter == nil {
+	if h == nil || h.auth == nil || h.auth.loginLimiter == nil {
 		return []loginthrottle.FailedLoginEvent{}
 	}
-	out := h.loginLimiter.SnapshotFailures()
+	out := h.auth.loginLimiter.SnapshotFailures()
 	if out == nil {
 		return []loginthrottle.FailedLoginEvent{}
 	}

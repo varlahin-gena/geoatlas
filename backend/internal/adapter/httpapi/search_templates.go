@@ -137,10 +137,10 @@ func (h *SearchTemplatesHandler) currentUsername(r *http.Request) (string, bool)
 	if sess, ok := SessionFromContext(r.Context()); ok && strings.TrimSpace(sess.Username) != "" {
 		return sess.Username, true
 	}
-	if h == nil || h.sessions == nil {
+	if h == nil || h.auth == nil || h.auth.sessions == nil {
 		return "", false
 	}
-	sess, err := SessionFromRequest(r, h.sessions)
+	sess, err := SessionFromRequest(r, h.auth.sessions)
 	if err != nil || strings.TrimSpace(sess.Username) == "" {
 		return "", false
 	}
