@@ -38,6 +38,8 @@ func (h *HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
 	}
 	if !result.OK {
 		slog.Error("ready: clickhouse unavailable")
+		writeJSON(w, http.StatusServiceUnavailable, result.Body)
+		return
 	}
-	writeJSON(w, result.HTTPStatus, result.Body)
+	writeJSON(w, http.StatusOK, result.Body)
 }
