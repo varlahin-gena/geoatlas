@@ -12,8 +12,8 @@ import (
 	usecaseauth "network_monitor/internal/usecase/auth"
 )
 
-type AuthHandler struct{ *Deps }
-type UsersHandler struct{ *Deps }
+type AuthHandler struct{ *AuthDeps }
+type UsersHandler struct{ *AuthDeps }
 
 type loginRequest struct {
 	Username string `json:"username"`
@@ -81,7 +81,7 @@ func userPublicResponse(u auth.UserPublic) authUserResponse {
 }
 
 func (h *AuthHandler) withModuleFlags(resp authUserResponse) authUserResponse {
-	if h != nil && h.Deps != nil {
+	if h != nil && h.AuthDeps != nil {
 		resp.ReputationEnabled = h.cfg.ReputationFetchEnabled
 	}
 	return resp
@@ -394,11 +394,11 @@ func (h *AuthHandler) CheckAdmin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) authDisabled() bool {
-	return h == nil || h.Deps == nil || h.cfg.AuthDisabled
+	return h == nil || h.AuthDeps == nil || h.cfg.AuthDisabled
 }
 
 func (h *AuthHandler) bearerScopeOK(r *http.Request, need string) bool {
-	if h == nil || h.Deps == nil || h.cfg.APIAuthDisabled {
+	if h == nil || h.AuthDeps == nil || h.cfg.APIAuthDisabled {
 		return false
 	}
 	env := h.cfg.APIAuthTokens()
@@ -409,7 +409,7 @@ func (h *AuthHandler) bearerScopeOK(r *http.Request, need string) bool {
 // --- Users CRUD (admin) ---
 
 func (h *UsersHandler) authModuleDisabled(w http.ResponseWriter) bool {
-	if h != nil && h.Deps != nil && h.cfg.AuthDisabled {
+	if h != nil && h.AuthDeps != nil && h.cfg.AuthDisabled {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "auth module disabled"})
 		return true
 	}

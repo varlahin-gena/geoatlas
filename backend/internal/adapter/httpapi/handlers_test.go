@@ -12,7 +12,7 @@ import (
 )
 
 func TestUsersListDisabledWhenAuthModuleOff(t *testing.T) {
-	h := &UsersHandler{Deps: &Deps{cfg: config.Config{AuthDisabled: true}}}
+	h := &UsersHandler{AuthDeps: &AuthDeps{cfg: config.Config{AuthDisabled: true}}}
 	req := httptest.NewRequest(http.MethodGet, "/api/users", nil)
 	rec := httptest.NewRecorder()
 	h.List(rec, req)
@@ -80,7 +80,7 @@ func TestReadyWithoutClickHouse(t *testing.T) {
 }
 
 func TestAuthCheckAllowsBearer(t *testing.T) {
-	h := &AuthHandler{Deps: &Deps{cfg: config.Config{APIAuthToken: "secret"}}}
+	h := &AuthHandler{AuthDeps: &AuthDeps{cfg: config.Config{APIAuthToken: "secret"}}}
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/check", nil)
 	req.Header.Set("Authorization", "Bearer secret")
 	rec := httptest.NewRecorder()
@@ -91,7 +91,7 @@ func TestAuthCheckAllowsBearer(t *testing.T) {
 }
 
 func TestAuthCheckAdminAllowsBearer(t *testing.T) {
-	h := &AuthHandler{Deps: &Deps{cfg: config.Config{APIAuthToken: "secret"}}}
+	h := &AuthHandler{AuthDeps: &AuthDeps{cfg: config.Config{APIAuthToken: "secret"}}}
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/check-admin", nil)
 	req.Header.Set("Authorization", "Bearer secret")
 	rec := httptest.NewRecorder()
@@ -102,7 +102,7 @@ func TestAuthCheckAdminAllowsBearer(t *testing.T) {
 }
 
 func TestAuthCheckAdminOpenWhenAPIAuthDisabled(t *testing.T) {
-	h := &AuthHandler{Deps: &Deps{cfg: config.Config{APIAuthDisabled: true}}}
+	h := &AuthHandler{AuthDeps: &AuthDeps{cfg: config.Config{APIAuthDisabled: true}}}
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/check-admin", nil)
 	rec := httptest.NewRecorder()
 	h.CheckAdmin(rec, req)

@@ -19,7 +19,40 @@ import (
 	usecasesystem "network_monitor/internal/usecase/system"
 )
 
+// AuthDeps — зависимости auth/users/api-tokens handlers (без domain UC).
+type AuthDeps struct {
+	cfg          config.Config
+	authUC       *usecaseauth.Service
+	users        UserDirectory
+	sessions     SessionParser
+	apiTokens    APITokenStore
+	loginLimiter *loginthrottle.Limiter
+}
+
+// NewAuthDeps собирает auth bag; lim=nil → тот же default, что NewDeps.
+func NewAuthDeps(
+	cfg config.Config,
+	authUC *usecaseauth.Service,
+	users UserDirectory,
+	sessions SessionParser,
+	apiTokens APITokenStore,
+	lim *loginthrottle.Limiter,
+) *AuthDeps {
+	if lim == nil {
+		lim = loginthrottle.New(10, time.Minute, 5*time.Minute)
+	}
+	return &AuthDeps{
+		cfg:          cfg,
+		authUC:       authUC,
+		users:        users,
+		sessions:     sessions,
+		apiTokens:    apiTokens,
+		loginLimiter: lim,
+	}
+}
+
 // Deps — общие зависимости HTTP-слоя (без clickhouse.Conn — только usecase/ports).
+// Auth-поля пока дублируются с AuthDeps (shared pointers); удаление — follow-up W4.2.
 type Deps struct {
 	cfg             config.Config
 	ingest          Ingester
@@ -39,6 +72,21 @@ type Deps struct {
 	searchTemplates SearchTemplatesStore
 	prom            MetricsRecorder // optional Prometheus
 	loginLimiter    *loginthrottle.Limiter
+}
+
+// AuthSnapshot копирует auth-поля в AuthDeps (те же указатели, что на Deps).
+func (d *Deps) AuthSnapshot() *AuthDeps {
+	if d == nil {
+		return nil
+	}
+	return &AuthDeps{
+		cfg:          d.cfg,
+		authUC:       d.authUC,
+		users:        d.users,
+		sessions:     d.sessions,
+		apiTokens:    d.apiTokens,
+		loginLimiter: d.loginLimiter,
+	}
 }
 
 // MetricsRecorder — HTTP + scrape handler (реализация: *metrics.Registry).

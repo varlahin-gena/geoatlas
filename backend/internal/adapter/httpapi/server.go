@@ -78,9 +78,10 @@ func NewServer(
 	repH := &ReputationHandler{deps}
 	system := &SystemHandler{deps}
 	parse := &ParseHandler{deps}
-	authH := &AuthHandler{deps}
-	usersH := &UsersHandler{deps}
-	tokensH := &APITokensHandler{deps}
+	authDeps := deps.AuthSnapshot()
+	authH := &AuthHandler{authDeps}
+	usersH := &UsersHandler{authDeps}
+	tokensH := &APITokensHandler{authDeps}
 	tplH := &SearchTemplatesHandler{deps}
 
 	envTokens := cfg.APIAuthTokens()
