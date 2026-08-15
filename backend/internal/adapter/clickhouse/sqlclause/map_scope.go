@@ -55,7 +55,7 @@ func (s MapScope) LogsWhere() (clause string, args []any) {
 		args = append(args, c.Country, c.Country)
 	}
 	if c.Query != "" {
-		pred, sargs := mapsearch.Compile(c.Query).SQL(mapsearch.LogsColumns)
+		pred, sargs := MapSearchSQL(mapsearch.Compile(c.Query), LogsMapSearchColumns)
 		if pred != "" {
 			clause += " AND (" + pred + ")"
 			args = append(args, sargs...)
@@ -73,7 +73,7 @@ func (s MapScope) GeoAggHavingExpr() (expr string, args []any) {
 		args = append(args, c.Country, c.Country, c.Country, c.Country)
 	}
 	if c.Query != "" {
-		pred, sargs := mapsearch.Compile(c.Query).SQL(mapsearch.GeoColumns)
+		pred, sargs := MapSearchSQL(mapsearch.Compile(c.Query), GeoMapSearchColumns)
 		if pred != "" {
 			parts = append(parts, "("+pred+")")
 			args = append(args, sargs...)
@@ -91,7 +91,7 @@ func (s MapScope) IPAggHavingExpr() (expr string, args []any) {
 		args = append(args, c.Country, c.Country)
 	}
 	if c.Query != "" {
-		pred, sargs := mapsearch.Compile(c.Query).SQL(mapsearch.IPAggColumns)
+		pred, sargs := MapSearchSQL(mapsearch.Compile(c.Query), IPAggMapSearchColumns)
 		if pred != "" {
 			parts = append(parts, "("+pred+")")
 			args = append(args, sargs...)

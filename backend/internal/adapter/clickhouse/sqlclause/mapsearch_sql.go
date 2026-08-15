@@ -1,9 +1,13 @@
-package mapsearch
+package sqlclause
 
-import "strings"
+import (
+	"strings"
 
-// Columns — выражения ClickHouse (не user input) для bind-предикатов.
-type Columns struct {
+	"network_monitor/internal/mapsearch"
+)
+
+// MapSearchColumns — выражения ClickHouse (не user input) для bind-предикатов mapsearch.
+type MapSearchColumns struct {
 	AllConcat string
 	IP        []string
 	Country   []string
@@ -16,32 +20,32 @@ type Columns struct {
 	Zone      []string
 }
 
-func (c Columns) cols(f Field) []string {
+func (c MapSearchColumns) cols(f mapsearch.Field) []string {
 	switch f {
-	case FieldIP:
+	case mapsearch.FieldIP:
 		return c.IP
-	case FieldCountry:
+	case mapsearch.FieldCountry:
 		return c.Country
-	case FieldCity:
+	case mapsearch.FieldCity:
 		return c.City
-	case FieldRule:
+	case mapsearch.FieldRule:
 		return c.Rule
-	case FieldDevice:
+	case mapsearch.FieldDevice:
 		return c.Device
-	case FieldSrc:
+	case mapsearch.FieldSrc:
 		return c.Src
-	case FieldDst:
+	case mapsearch.FieldDst:
 		return c.Dst
-	case FieldProto:
+	case mapsearch.FieldProto:
 		return c.Proto
-	case FieldZone:
+	case mapsearch.FieldZone:
 		return c.Zone
 	default:
 		return nil
 	}
 }
 
-var LogsColumns = Columns{
+var LogsMapSearchColumns = MapSearchColumns{
 	AllConcat: "concat_ws(' ', toString(src_ip), toString(dst_ip), src_country, dst_country, src_city, dst_city, rule, device, proto, src_zone, dst_zone)",
 	IP:        []string{"toString(src_ip)", "toString(dst_ip)"},
 	Country:   []string{"src_country", "dst_country"},
@@ -54,7 +58,7 @@ var LogsColumns = Columns{
 	Zone:      []string{"src_zone", "dst_zone"},
 }
 
-var GeoColumns = Columns{
+var GeoMapSearchColumns = MapSearchColumns{
 	AllConcat: "concat_ws(' ', src_key, dst_key, src_label, dst_label, src_country, dst_country, src_city, dst_city, rule, device, proto)",
 	IP:        []string{"src_key", "dst_key", "src_label", "dst_label"},
 	Country:   []string{"src_country", "dst_country", "src_key", "dst_key"},
@@ -67,7 +71,7 @@ var GeoColumns = Columns{
 	Zone:      []string{"src_key", "dst_key"},
 }
 
-var IPAggColumns = Columns{
+var IPAggMapSearchColumns = MapSearchColumns{
 	AllConcat: "concat_ws(' ', toString(src_ip), toString(dst_ip), src_country, dst_country, src_city, dst_city, rule, device, proto)",
 	IP:        []string{"toString(src_ip)", "toString(dst_ip)"},
 	Country:   []string{"src_country", "dst_country"},
@@ -98,8 +102,8 @@ var countryNeedles = map[string][]string{
 	"de":                 {"Германия", "Germany", "DE"},
 }
 
-// SQL returns a parenthesized predicate and bind args, or empty if nothing to filter.
-func (c Compiled) SQL(cols Columns) (clause string, args []any) {
+// MapSearchSQL returns a parenthesized predicate and bind args, or empty if nothing to filter.
+func MapSearchSQL(c mapsearch.Compiled, cols MapSearchColumns) (clause string, args []any) {
 	if c.Empty {
 		return "", nil
 	}
@@ -112,22 +116,22 @@ func (c Compiled) SQL(cols Columns) (clause string, args []any) {
 	return nodeSQL(c.Root, cols)
 }
 
-func nodeSQL(n *Node, cols Columns) (string, []any) {
+func nodeSQL(n *mapsearch.Node, cols MapSearchColumns) (string, []any) {
 	if n == nil {
 		return "", nil
 	}
 	switch n.Kind {
-	case KindNot:
+	case mapsearch.KindNot:
 		inner, args := nodeSQL(n.Expr, cols)
 		if inner == "" {
 			return "", nil
 		}
 		return "NOT (" + inner + ")", args
-	case KindAnd:
+	case mapsearch.KindAnd:
 		l, la := nodeSQL(n.Left, cols)
 		r, ra := nodeSQL(n.Right, cols)
 		return joinBool("AND", l, r, la, ra)
-	case KindOr:
+	case mapsearch.KindOr:
 		l, la := nodeSQL(n.Left, cols)
 		r, ra := nodeSQL(n.Right, cols)
 		return joinBool("OR", l, r, la, ra)
@@ -149,14 +153,14 @@ func joinBool(op, l, r string, la, ra []any) (string, []any) {
 	}
 }
 
-func termSQL(n *Node, cols Columns) (string, []any) {
+func termSQL(n *mapsearch.Node, cols MapSearchColumns) (string, []any) {
 	needles := []string{n.Value}
-	if n.Field == FieldCountry || n.Field == FieldAll {
-		if extra := countryNeedles[normalize(n.Value)]; len(extra) > 0 {
+	if n.Field == mapsearch.FieldCountry || n.Field == mapsearch.FieldAll {
+		if extra := countryNeedles[strings.ToLower(strings.TrimSpace(n.Value))]; len(extra) > 0 {
 			needles = extra
 		}
 	}
-	if n.Field == FieldAll || n.Field == "" {
+	if n.Field == mapsearch.FieldAll || n.Field == "" {
 		parts := make([]string, 0, len(needles))
 		args := make([]any, 0, len(needles))
 		for _, needle := range needles {
