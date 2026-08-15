@@ -47,6 +47,21 @@ type InsertObserver interface {
 	ObserveInsert(d time.Duration, rows int, success bool)
 }
 
+// InsertErrorClassifier — ретраибельны ли ошибки INSERT (реализация в ingeststore).
+type InsertErrorClassifier interface {
+	IsRetryableInsertError(err error) bool
+}
+
+// InsertErrorClassifyFunc адаптирует функцию к InsertErrorClassifier.
+type InsertErrorClassifyFunc func(error) bool
+
+func (f InsertErrorClassifyFunc) IsRetryableInsertError(err error) bool {
+	if f == nil {
+		return true
+	}
+	return f(err)
+}
+
 // Deps — зависимости Processor / sync ProcessReader.
 type Deps struct {
 	Logs          TrafficLogInserter
@@ -60,4 +75,6 @@ type Deps struct {
 	Circuit *CircuitBreaker
 	// InsertObs — опциональные метрики insert; nil = no-op.
 	InsertObs InsertObserver
+	// Retryable — классификатор ошибок INSERT; nil → ретраить всё, кроме cancel/circuit.
+	Retryable InsertErrorClassifier
 }

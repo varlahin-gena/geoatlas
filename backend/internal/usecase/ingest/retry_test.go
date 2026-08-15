@@ -3,36 +3,30 @@ package ingest
 import (
 	"context"
 	"errors"
-	"net"
 	"testing"
 	"time"
-
-	"github.com/ClickHouse/clickhouse-go/v2"
 )
 
-func TestIsRetryableInsertError(t *testing.T) {
+func TestShouldRetryInsert(t *testing.T) {
+	always := InsertErrorClassifyFunc(func(error) bool { return true })
+	never := InsertErrorClassifyFunc(func(error) bool { return false })
 	cases := []struct {
-		err  error
-		want bool
+		name      string
+		err       error
+		classify  InsertErrorClassifier
+		wantRetry bool
 	}{
-		{nil, false},
-		{context.Canceled, false},
-		{context.DeadlineExceeded, false},
-		{errInsertCircuitOpen, false},
-		{errors.New("syntax error"), false},
-		{errors.New("code: 60, message: Table x doesn't exist"), false},
-		{errors.New("code: 516, message: Authentication failed"), false},
-		{&clickhouse.Exception{Code: 60, Message: "UNKNOWN_TABLE"}, false},
-		{&clickhouse.Exception{Code: 241, Message: "Memory limit exceeded"}, true},
-		{errors.New("code: 241, message: Memory limit exceeded"), true},
-		{errors.New("connection refused"), true},
-		{errors.New("i/o timeout"), true},
-		{errors.New("weird unknown"), true},
-		{&net.OpError{Op: "dial", Err: errors.New("connection refused")}, true},
+		{"nil", nil, always, false},
+		{"canceled", context.Canceled, always, false},
+		{"deadline", context.DeadlineExceeded, always, false},
+		{"circuit", errInsertCircuitOpen, always, false},
+		{"nil classify retries", errors.New("x"), nil, true},
+		{"classify false", errors.New("x"), never, false},
+		{"classify true", errors.New("x"), always, true},
 	}
 	for _, tc := range cases {
-		if got := isRetryableInsertError(tc.err); got != tc.want {
-			t.Errorf("%v: got %v want %v", tc.err, got, tc.want)
+		if got := shouldRetryInsert(tc.err, tc.classify); got != tc.wantRetry {
+			t.Errorf("%s: got %v want %v", tc.name, got, tc.wantRetry)
 		}
 	}
 }
@@ -47,7 +41,7 @@ func TestInsertWithRetrySucceedsAfterTransient(t *testing.T) {
 	})
 
 	n := 0
-	err := insertWithRetry(context.Background(), time.Second, "t", func(ctx context.Context) error {
+	err := insertWithRetry(context.Background(), time.Second, "t", nil, func(ctx context.Context) error {
 		n++
 		if n < 2 {
 			return errors.New("connection reset")
@@ -59,6 +53,29 @@ func TestInsertWithRetrySucceedsAfterTransient(t *testing.T) {
 	}
 	if n != 2 {
 		t.Fatalf("attempts=%d", n)
+	}
+}
+
+func TestInsertWithRetryStopsWhenNotRetryable(t *testing.T) {
+	oldA, oldB := insertRetryAttempts, insertRetryBase
+	insertRetryAttempts = 5
+	insertRetryBase = time.Millisecond
+	t.Cleanup(func() {
+		insertRetryAttempts = oldA
+		insertRetryBase = oldB
+	})
+
+	n := 0
+	never := InsertErrorClassifyFunc(func(error) bool { return false })
+	err := insertWithRetry(context.Background(), time.Second, "t", never, func(ctx context.Context) error {
+		n++
+		return errors.New("permanent")
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if n != 1 {
+		t.Fatalf("attempts=%d want 1", n)
 	}
 }
 
