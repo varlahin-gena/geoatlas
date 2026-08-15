@@ -17,7 +17,7 @@ import (
 // traffic_edges_daily только когда backfill помечен ready. Частичный
 // агрегат даёт дыры на карте — до готовности читаем сырой traffic_logs.
 func ScanRawAggs(ctx context.Context, ch clickhouse.Conn, days, limit int, filter string, timeout time.Duration) ([]model.RawAgg, error) {
-	if aggstate.PreferDailyEdgesAgg() {
+	if aggstate.AggFromContext(ctx).PreferDailyEdgesAgg() {
 		return scanEdgesAgg(ctx, ch, days, limit, filter, timeout)
 	}
 	return scanRawLogs(ctx, ch, days, limit, filter, timeout)

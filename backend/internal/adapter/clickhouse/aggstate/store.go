@@ -1,6 +1,7 @@
 package aggstate
 
 import (
+	"context"
 	"sync"
 	"time"
 )
@@ -43,6 +44,29 @@ func NewStore() *Store {
 	return &Store{
 		edgesStatus: EdgesAggStatus{State: "idle", Message: "not started"},
 	}
+}
+
+type aggCtxKey struct{}
+
+// WithAgg attaches s to ctx for Scan* readiness checks (nil s → unchanged ctx).
+func WithAgg(ctx context.Context, s *Store) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if s == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, aggCtxKey{}, s)
+}
+
+// AggFromContext returns the Store from ctx, or Default. Never nil.
+func AggFromContext(ctx context.Context) *Store {
+	if ctx != nil {
+		if s, ok := ctx.Value(aggCtxKey{}).(*Store); ok && s != nil {
+			return s
+		}
+	}
+	return Default
 }
 
 func (s *Store) SetEdgesAggStatus(st EdgesAggStatus) {
@@ -95,7 +119,7 @@ func SetEdgesAggStatus(st EdgesAggStatus) { Default.SetEdgesAggStatus(st) }
 func GetEdgesAggStatus() EdgesAggStatus   { return Default.GetEdgesAggStatus() }
 func PreferDailyEdgesAgg() bool           { return Default.PreferDailyEdgesAgg() }
 
-func PreferGeoEdgesAgg() bool      { return Default.PreferGeoEdgesAgg() }
-func SetGeoEdgesAggReady(v bool)   { Default.SetGeoEdgesAggReady(v) }
-func PreferHourlyEdgesAgg() bool   { return Default.PreferHourlyEdgesAgg() }
+func PreferGeoEdgesAgg() bool       { return Default.PreferGeoEdgesAgg() }
+func SetGeoEdgesAggReady(v bool)    { Default.SetGeoEdgesAggReady(v) }
+func PreferHourlyEdgesAgg() bool    { return Default.PreferHourlyEdgesAgg() }
 func SetHourlyEdgesAggReady(v bool) { Default.SetHourlyEdgesAggReady(v) }

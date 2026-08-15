@@ -8,6 +8,7 @@ import (
 
 	ch "github.com/ClickHouse/clickhouse-go/v2"
 
+	"network_monitor/internal/adapter/clickhouse/aggstate"
 	"network_monitor/internal/adapter/clickhouse/query"
 	"network_monitor/internal/model"
 	"network_monitor/internal/usecase/events"
@@ -25,6 +26,7 @@ func NewTrafficRepository(apiCH ch.Conn) *TrafficRepository {
 var _ events.TrafficRepository = (*TrafficRepository)(nil)
 
 func scopeCtx(ctx context.Context, dataSource string) context.Context {
+	ctx = aggstate.WithAgg(ctx, aggstate.Default)
 	if strings.EqualFold(strings.TrimSpace(dataSource), "backup") {
 		return query.WithTables(ctx, query.BackupTables())
 	}
