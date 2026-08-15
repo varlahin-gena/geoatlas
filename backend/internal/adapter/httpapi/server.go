@@ -76,7 +76,7 @@ func NewServer(
 	ingestH := &IngestHandler{deps}
 	geoH := &GeoHandler{deps}
 	repH := &ReputationHandler{deps}
-	system := &SystemHandler{deps}
+	system := &SystemHandler{deps.System()}
 	parse := &ParseHandler{deps}
 	authDeps := deps.Auth()
 	authH := &AuthHandler{authDeps}

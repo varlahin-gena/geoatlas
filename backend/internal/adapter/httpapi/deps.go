@@ -78,6 +78,44 @@ func (d *Deps) Auth() *AuthDeps {
 	return d.auth
 }
 
+// SystemDeps — зависимости SystemHandler (system/retention/backup + shared loginLimiter).
+type SystemDeps struct {
+	cfg          config.Config
+	systemUC     *usecasesystem.Service
+	retentionUC  *usecaseretention.Service
+	backupUC     *usecasebackup.Service
+	loginLimiter *loginthrottle.Limiter
+}
+
+// NewSystemDeps собирает system bag; lim обычно shared с AuthDeps.
+func NewSystemDeps(
+	cfg config.Config,
+	systemUC *usecasesystem.Service,
+	retentionUC *usecaseretention.Service,
+	backupUC *usecasebackup.Service,
+	lim *loginthrottle.Limiter,
+) *SystemDeps {
+	return &SystemDeps{
+		cfg:          cfg,
+		systemUC:     systemUC,
+		retentionUC:  retentionUC,
+		backupUC:     backupUC,
+		loginLimiter: lim,
+	}
+}
+
+// System копирует system-поля + shared loginLimiter из owned Auth.
+func (d *Deps) System() *SystemDeps {
+	if d == nil {
+		return nil
+	}
+	var lim *loginthrottle.Limiter
+	if d.auth != nil {
+		lim = d.auth.loginLimiter
+	}
+	return NewSystemDeps(d.cfg, d.systemUC, d.retentionUC, d.backupUC, lim)
+}
+
 // MetricsRecorder — HTTP + scrape handler (реализация: *metrics.Registry).
 type MetricsRecorder interface {
 	Handler() http.Handler
@@ -172,7 +210,7 @@ type HealthHandler struct{ *Deps }
 type EventsHandler struct{ *Deps }
 type IngestHandler struct{ *Deps }
 type GeoHandler struct{ *Deps }
-type SystemHandler struct{ *Deps }
+type SystemHandler struct{ *SystemDeps }
 type ParseHandler struct{ *Deps }
 
 func metricsHandler(m MetricsRecorder) http.Handler {
