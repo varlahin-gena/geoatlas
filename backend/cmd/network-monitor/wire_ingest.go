@@ -47,6 +47,7 @@ func startIngest(a *app, cfg config.Config, geo *geostore.ReloadableGeoIndex, pa
 		Logs: ingestRepo, Errors: ingestRepo, Parser: lineParser,
 		Geo: geo, EnrichCountry: cfg.GeoEnrichOnIngest,
 		InsertObs: insertObs,
+		Retryable: usecaseingest.InsertErrorClassifyFunc(ingeststore.IsRetryableInsertError),
 	})
 	a.ingestDone = make(chan error, 1)
 	go func() {
