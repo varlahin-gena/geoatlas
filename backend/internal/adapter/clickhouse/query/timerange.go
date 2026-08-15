@@ -28,7 +28,7 @@ func ScanRawAggsForTimeRange(
 		return scanRawLogsRelative(ctx, ch, tr.Mode, tr.Amount, sel, timeout)
 	case "days":
 		tables := TablesOf(ctx)
-		if tables.IsBackup() || aggstate.PreferDailyEdgesAgg() {
+		if tables.IsBackup() || aggstate.AggFromContext(ctx).PreferDailyEdgesAgg() {
 			rows, err := scanEdgesDailyAsRaw(ctx, ch, tables.EdgesDaily, tr.Amount, sel, timeout)
 			if err != nil {
 				slog.Warn("edges daily scan failed, falling back to traffic_logs", "err", err)

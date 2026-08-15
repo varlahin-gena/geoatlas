@@ -44,19 +44,20 @@ func ScanGeoEdgesForTimeRange(
 	}
 
 	tables := TablesOf(ctx)
+	agg := aggstate.AggFromContext(ctx)
 	switch groupBy {
 	case "ip", "subnet":
-		tr = promoteHoursToDays(tr, tables.IsBackup() || aggstate.PreferDailyEdgesAgg())
-		tr = promoteMinutesToHours(tr, tables.IsBackup() || aggstate.PreferHourlyEdgesAgg())
+		tr = promoteHoursToDays(tr, tables.IsBackup() || agg.PreferDailyEdgesAgg())
+		tr = promoteMinutesToHours(tr, tables.IsBackup() || agg.PreferHourlyEdgesAgg())
 	case "city", "country":
-		tr = promoteHoursToDays(tr, tables.IsBackup() || aggstate.PreferGeoEdgesAgg())
-		tr = promoteMinutesToHours(tr, tables.IsBackup() || aggstate.PreferHourlyEdgesAgg())
+		tr = promoteHoursToDays(tr, tables.IsBackup() || agg.PreferGeoEdgesAgg())
+		tr = promoteMinutesToHours(tr, tables.IsBackup() || agg.PreferHourlyEdgesAgg())
 	}
 
 	switch tr.Mode {
 	case "days":
 		if groupBy == "ip" || groupBy == "subnet" {
-			tryDaily := tables.IsBackup() || aggstate.PreferDailyEdgesAgg()
+			tryDaily := tables.IsBackup() || agg.PreferDailyEdgesAgg()
 			if tryDaily && tables.EdgesDaily != "" {
 				rows, err := scanIPEdgesRelative(ctx, ch, tables.EdgesDaily, "day", "DAY", tr.Amount, groupBy, sel, timeout)
 				if err != nil {
@@ -73,7 +74,7 @@ func ScanGeoEdgesForTimeRange(
 			return rows, true, nil
 		}
 		// city|country: pre-agg если готов — даже пустой ответ (нет данных за период).
-		tryEdges := tables.IsBackup() || aggstate.PreferGeoEdgesAgg()
+		tryEdges := tables.IsBackup() || agg.PreferGeoEdgesAgg()
 		if tryEdges {
 			table := tables.GeoEdges(groupBy)
 			if table != "" {
@@ -92,7 +93,7 @@ func ScanGeoEdgesForTimeRange(
 		}
 		return rows, true, nil
 	case "minutes", "hours":
-		tryHourly := (tables.IsBackup() || aggstate.PreferHourlyEdgesAgg()) && tr.Mode == "hours"
+		tryHourly := (tables.IsBackup() || agg.PreferHourlyEdgesAgg()) && tr.Mode == "hours"
 		if tryHourly && tables.EdgesHourly != "" {
 			rows, err := scanIPEdgesRelative(ctx, ch, tables.EdgesHourly, "hour", "HOUR", tr.Amount, groupBy, sel, timeout)
 			if err != nil {
@@ -111,7 +112,7 @@ func ScanGeoEdgesForTimeRange(
 		if !tr.To.After(tr.From) {
 			return nil, false, nil
 		}
-		tryHourly := tables.IsBackup() || aggstate.PreferHourlyEdgesAgg()
+		tryHourly := tables.IsBackup() || agg.PreferHourlyEdgesAgg()
 		if tryHourly && tables.EdgesHourly != "" && tr.To.Sub(tr.From) <= 7*24*time.Hour {
 			rows, err := scanIPEdgesAbsolute(ctx, ch, tables.EdgesHourly, "hour", tr.From, tr.To, groupBy, sel, timeout)
 			if err != nil {

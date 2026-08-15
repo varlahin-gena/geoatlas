@@ -1,6 +1,9 @@
 package aggstate
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 func TestPreferDailyEdgesAggOnlyWhenReady(t *testing.T) {
 	t.Cleanup(func() {
@@ -69,5 +72,33 @@ func TestIsolatedStoreDoesNotAffectDefault(t *testing.T) {
 	}
 	if !s.PreferDailyEdgesAgg() || !s.PreferGeoEdgesAgg() {
 		t.Fatal("isolated Store must report its own state")
+	}
+}
+
+func TestWithAggIsolatesPreferFromDefault(t *testing.T) {
+	t.Cleanup(func() {
+		SetEdgesAggStatus(EdgesAggStatus{State: "idle", Message: "not started"})
+		SetGeoEdgesAggReady(false)
+		SetHourlyEdgesAggReady(false)
+	})
+	SetEdgesAggStatus(EdgesAggStatus{State: "idle", Message: "not started"})
+	SetGeoEdgesAggReady(false)
+	SetHourlyEdgesAggReady(false)
+
+	s := NewStore()
+	s.SetEdgesAggStatus(EdgesAggStatus{State: "ready"})
+	s.SetGeoEdgesAggReady(true)
+	s.SetHourlyEdgesAggReady(true)
+
+	ctx := WithAgg(context.Background(), s)
+	got := AggFromContext(ctx)
+	if !got.PreferDailyEdgesAgg() || !got.PreferGeoEdgesAgg() || !got.PreferHourlyEdgesAgg() {
+		t.Fatal("AggFromContext must use attached Store")
+	}
+	if PreferDailyEdgesAgg() || PreferGeoEdgesAgg() || PreferHourlyEdgesAgg() {
+		t.Fatal("WithAgg must not flip Default Prefer*")
+	}
+	if AggFromContext(context.Background()) != Default {
+		t.Fatal("missing ctx value must fall back to Default")
 	}
 }
