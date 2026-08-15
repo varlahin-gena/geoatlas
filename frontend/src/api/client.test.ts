@@ -4,6 +4,8 @@ import {
   apiFetch,
   apiFetchRaw,
   apiGet,
+  apiGetQuery,
+  apiPath,
   apiPost,
   authHeaders,
   csrfToken,
@@ -197,5 +199,29 @@ describe('apiGet / apiPost', () => {
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(init.method).toBe('POST');
     expect(init.body).toBe(JSON.stringify({ username: 'admin', password: 'x' }));
+  });
+});
+
+describe('apiGetQuery / apiPath', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('appends query params to OpenAPI path', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    await apiGetQuery('/api/system/history', { period: '1h' });
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/system/history?period=1h');
+  });
+
+  it('encodes path template params', () => {
+    expect(apiPath('/api/users/{username}/role', { username: 'a/b' })).toBe(
+      '/api/users/a%2Fb/role',
+    );
   });
 });
