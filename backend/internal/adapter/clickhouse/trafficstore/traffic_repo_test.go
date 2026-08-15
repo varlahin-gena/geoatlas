@@ -1,8 +1,10 @@
 package trafficstore
 
 import (
+	"context"
 	"testing"
 
+	"network_monitor/internal/adapter/clickhouse/query"
 	"network_monitor/internal/model"
 )
 
@@ -30,5 +32,21 @@ func TestComposeMapAggRawWhenGeoUnavailable(t *testing.T) {
 	}
 	if len(got.GeoEdges) != 0 {
 		t.Fatalf("geo edges must be omitted on raw path: %#v", got.GeoEdges)
+	}
+}
+
+func TestScopeCtxBackupUsesShadowTables(t *testing.T) {
+	ctx := scopeCtx(context.Background(), "backup")
+	tables := query.TablesOf(ctx)
+	if !tables.IsBackup() {
+		t.Fatalf("expected backup tables, got %#v", tables)
+	}
+	live := scopeCtx(context.Background(), "live")
+	if query.TablesOf(live).IsBackup() {
+		t.Fatal("live must not use backup tables")
+	}
+	empty := scopeCtx(context.Background(), "")
+	if query.TablesOf(empty).IsBackup() {
+		t.Fatal("empty dataSource must stay live")
 	}
 }

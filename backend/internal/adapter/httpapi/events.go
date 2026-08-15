@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"network_monitor/internal/adapter/clickhouse/query"
 	"network_monitor/internal/model"
 	usecaseevents "network_monitor/internal/usecase/events"
 )
@@ -211,18 +210,14 @@ func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	if h.backupUC != nil {
 		attached = h.backupUC.AttachedName()
 	}
-	ctx := r.Context()
-	if dataSource == "backup" {
-		if attached == "" {
-			writeJSON(w, http.StatusBadRequest, map[string]any{
-				"error": "backup not attached; connect a backup in System → Резервное копирование",
-			})
-			return
-		}
-		ctx = query.WithTables(ctx, query.BackupTables())
+	if dataSource == "backup" && attached == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": "backup not attached; connect a backup in System → Резервное копирование",
+		})
+		return
 	}
 
-	result, err := h.eventsUC.GetMap(ctx, usecaseevents.GetMapInput{
+	result, err := h.eventsUC.GetMap(r.Context(), usecaseevents.GetMapInput{
 		TimeRange:     model.TimeRange{Mode: tr.Mode, Amount: tr.Amount, From: tr.From, To: tr.To},
 		Limit:         parseOptionalLimit(q.Get("limit")),
 		GroupBy:       normalizeGroupBy(q.Get("group_by")),
@@ -232,6 +227,7 @@ func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 		RepCategories: parseCSVParam(q.Get("rep_cat"), 32),
 		RepLists:      parseCSVParam(q.Get("rep_list"), 32),
 		RepSide:       normalizeRepSide(q.Get("rep_side")),
+		DataSource:    dataSource,
 		Timeout:       h.cfg.QueryTimeout,
 	})
 	if err != nil {
@@ -289,20 +285,17 @@ func (h *EventsHandler) GetEventsSeries(w http.ResponseWriter, r *http.Request) 
 	if h.backupUC != nil {
 		attached = h.backupUC.AttachedName()
 	}
-	ctx := r.Context()
-	if dataSource == "backup" {
-		if attached == "" {
-			writeJSON(w, http.StatusBadRequest, map[string]any{
-				"error": "backup not attached; connect a backup in System → Резервное копирование",
-			})
-			return
-		}
-		ctx = query.WithTables(ctx, query.BackupTables())
+	if dataSource == "backup" && attached == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": "backup not attached; connect a backup in System → Резервное копирование",
+		})
+		return
 	}
-	result, err := h.eventsUC.GetSeries(ctx, usecaseevents.GetSeriesInput{
-		TimeRange: model.TimeRange{Mode: tr.Mode, Amount: tr.Amount, From: tr.From, To: tr.To},
-		Country:   country,
-		Timeout:   h.cfg.QueryTimeout,
+	result, err := h.eventsUC.GetSeries(r.Context(), usecaseevents.GetSeriesInput{
+		TimeRange:  model.TimeRange{Mode: tr.Mode, Amount: tr.Amount, From: tr.From, To: tr.To},
+		Country:    country,
+		DataSource: dataSource,
+		Timeout:    h.cfg.QueryTimeout,
 	})
 	if err != nil {
 		writeInternalError(w, "events: get series failed", err)

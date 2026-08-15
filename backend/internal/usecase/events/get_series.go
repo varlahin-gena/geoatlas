@@ -10,9 +10,10 @@ import (
 
 // GetSeriesInput — параметры временного ряда для страны.
 type GetSeriesInput struct {
-	TimeRange model.TimeRange
-	Country   string
-	Timeout   time.Duration
+	TimeRange  model.TimeRange
+	Country    string
+	DataSource string // live|backup — table scope выбирает репозиторий
+	Timeout    time.Duration
 }
 
 // GetSeriesResult — ответ для sparkline.
@@ -40,7 +41,7 @@ func (s *Service) GetSeries(ctx context.Context, in GetSeriesInput) (GetSeriesRe
 	if country == "" {
 		return out, nil
 	}
-	points, bucket, err := s.traffic.ScanCountrySeries(ctx, in.TimeRange, country, in.Timeout)
+	points, bucket, err := s.traffic.ScanCountrySeries(ctx, in.TimeRange, country, in.DataSource, in.Timeout)
 	if err != nil {
 		return GetSeriesResult{}, err
 	}
