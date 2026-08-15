@@ -386,7 +386,7 @@ type stubTraffic struct{}
 func (stubTraffic) ScanMapAggs(context.Context, model.TimeRange, usecaseevents.MapScanQuery, time.Duration) (usecaseevents.MapAggScanResult, error) {
 	return usecaseevents.MapAggScanResult{}, nil
 }
-func (stubTraffic) ScanCountrySeries(context.Context, model.TimeRange, string, time.Duration) ([]usecaseevents.SeriesPoint, int, error) {
+func (stubTraffic) ScanCountrySeries(context.Context, model.TimeRange, string, string, time.Duration) ([]usecaseevents.SeriesPoint, int, error) {
 	return nil, 3600, nil
 }
 

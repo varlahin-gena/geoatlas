@@ -21,7 +21,7 @@ func (s *stubRepo) ScanMapAggs(ctx context.Context, tr model.TimeRange, q MapSca
 	return MapAggScanResult{Source: "ip_live_" + q.GroupBy, Raws: s.raws}, nil
 }
 
-func (s *stubRepo) ScanCountrySeries(ctx context.Context, tr model.TimeRange, country string, timeout time.Duration) ([]SeriesPoint, int, error) {
+func (s *stubRepo) ScanCountrySeries(ctx context.Context, tr model.TimeRange, country, dataSource string, timeout time.Duration) ([]SeriesPoint, int, error) {
 	return nil, 3600, nil
 }
 

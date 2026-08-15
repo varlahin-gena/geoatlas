@@ -11,7 +11,7 @@ import (
 // TrafficRepository — чтение агрегатов для карты.
 type TrafficRepository interface {
 	ScanMapAggs(ctx context.Context, tr model.TimeRange, q MapScanQuery, timeout time.Duration) (MapAggScanResult, error)
-	ScanCountrySeries(ctx context.Context, tr model.TimeRange, country string, timeout time.Duration) ([]SeriesPoint, int, error)
+	ScanCountrySeries(ctx context.Context, tr model.TimeRange, country, dataSource string, timeout time.Duration) ([]SeriesPoint, int, error)
 }
 
 // MapAggScanResult — готовый результат выбора источника данных для карты.

@@ -36,7 +36,7 @@ func (s *stubTraffic) ScanMapAggs(ctx context.Context, tr model.TimeRange, q use
 	}, nil
 }
 
-func (s *stubTraffic) ScanCountrySeries(ctx context.Context, tr model.TimeRange, country string, timeout time.Duration) ([]usecaseevents.SeriesPoint, int, error) {
+func (s *stubTraffic) ScanCountrySeries(ctx context.Context, tr model.TimeRange, country, dataSource string, timeout time.Duration) ([]usecaseevents.SeriesPoint, int, error) {
 	return nil, 3600, nil
 }
 

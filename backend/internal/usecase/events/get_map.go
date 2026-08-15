@@ -22,16 +22,18 @@ type GetMapInput struct {
 	RepCategories []string
 	RepLists      []string
 	RepSide       string // any|src|dst|both
+	DataSource    string // live|backup — table scope выбирает репозиторий
 	Timeout       time.Duration
 }
 
 // MapScanQuery — параметры скана агрегатов карты (LIMIT после action/country/q).
 type MapScanQuery struct {
-	GroupBy string
-	Limit   int
-	Filter  string
-	Country string
-	Query   string
+	GroupBy    string
+	Limit      int
+	Filter     string
+	Country    string
+	Query      string
+	DataSource string // live|backup
 }
 
 const mapScanHardMax = 50000
@@ -91,11 +93,12 @@ func (s *Service) GetMap(ctx context.Context, in GetMapInput) (GetMapResult, err
 	}
 
 	scan, err := s.traffic.ScanMapAggs(ctx, in.TimeRange, MapScanQuery{
-		GroupBy: groupBy,
-		Limit:   scanLimit,
-		Filter:  filter,
-		Country: country,
-		Query:   queryText,
+		GroupBy:    groupBy,
+		Limit:      scanLimit,
+		Filter:     filter,
+		Country:    country,
+		Query:      queryText,
+		DataSource: in.DataSource,
 	}, in.Timeout)
 	if err != nil {
 		return GetMapResult{}, err

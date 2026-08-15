@@ -3,6 +3,7 @@ package trafficstore
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"time"
 
 	ch "github.com/ClickHouse/clickhouse-go/v2"
@@ -23,6 +24,13 @@ func NewTrafficRepository(apiCH ch.Conn) *TrafficRepository {
 
 var _ events.TrafficRepository = (*TrafficRepository)(nil)
 
+func scopeCtx(ctx context.Context, dataSource string) context.Context {
+	if strings.EqualFold(strings.TrimSpace(dataSource), "backup") {
+		return query.WithTables(ctx, query.BackupTables())
+	}
+	return ctx
+}
+
 // composeMapAgg: geo-путь (даже пустой) не должен падать во второй raw scan.
 func composeMapAgg(groupBy string, geoRows []model.GeoEdgeAgg, geoOK bool, raws []model.RawAgg) events.MapAggScanResult {
 	if geoOK {
@@ -32,6 +40,7 @@ func composeMapAgg(groupBy string, geoRows []model.GeoEdgeAgg, geoOK bool, raws 
 }
 
 func (r *TrafficRepository) ScanMapAggs(ctx context.Context, tr model.TimeRange, q events.MapScanQuery, timeout time.Duration) (events.MapAggScanResult, error) {
+	ctx = scopeCtx(ctx, q.DataSource)
 	sel := query.MapSelect{Limit: q.Limit, Filter: q.Filter, Country: q.Country, Query: q.Query}
 	geoRows, ok, err := query.ScanGeoEdgesForTimeRange(ctx, r.apiCH, tr, q.GroupBy, sel, timeout)
 	if err != nil {
@@ -55,7 +64,8 @@ func (r *TrafficRepository) ScanGeoMissingIPsForTimeRange(ctx context.Context, t
 	return query.ScanGeoMissingIPsForTimeRange(ctx, r.apiCH, tr, limit, timeout)
 }
 
-func (r *TrafficRepository) ScanCountrySeries(ctx context.Context, tr model.TimeRange, country string, timeout time.Duration) ([]events.SeriesPoint, int, error) {
+func (r *TrafficRepository) ScanCountrySeries(ctx context.Context, tr model.TimeRange, country, dataSource string, timeout time.Duration) ([]events.SeriesPoint, int, error) {
+	ctx = scopeCtx(ctx, dataSource)
 	rows, bucket, err := query.ScanCountrySeries(ctx, r.apiCH, tr, country, timeout)
 	if err != nil {
 		return nil, bucket, err
