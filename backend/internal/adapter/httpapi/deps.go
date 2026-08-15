@@ -155,6 +155,96 @@ func (d *Deps) Events() *EventsDeps {
 	return NewEventsDeps(d.cfg, d.eventsUC, d.backupUC)
 }
 
+// GeoDeps — зависимости GeoHandler.
+type GeoDeps struct {
+	cfg   config.Config
+	geoUC *usecasegeo.Service
+}
+
+func NewGeoDeps(cfg config.Config, geoUC *usecasegeo.Service) *GeoDeps {
+	return &GeoDeps{cfg: cfg, geoUC: geoUC}
+}
+
+func (d *Deps) Geo() *GeoDeps {
+	if d == nil {
+		return nil
+	}
+	return NewGeoDeps(d.cfg, d.geoUC)
+}
+
+// IngestDeps — зависимости IngestHandler.
+type IngestDeps struct {
+	cfg    config.Config
+	ingest Ingester
+}
+
+func NewIngestDeps(cfg config.Config, ingest Ingester) *IngestDeps {
+	return &IngestDeps{cfg: cfg, ingest: ingest}
+}
+
+func (d *Deps) Ingest() *IngestDeps {
+	if d == nil {
+		return nil
+	}
+	return NewIngestDeps(d.cfg, d.ingest)
+}
+
+// ParseDeps — зависимости ParseHandler (parse-errors + parse-test).
+type ParseDeps struct {
+	cfg           config.Config
+	parseErrorsUC *parseerrors.Service
+	parseTestUC   *parsetest.Service
+}
+
+func NewParseDeps(cfg config.Config, parseErrorsUC *parseerrors.Service, parseTestUC *parsetest.Service) *ParseDeps {
+	return &ParseDeps{cfg: cfg, parseErrorsUC: parseErrorsUC, parseTestUC: parseTestUC}
+}
+
+func (d *Deps) Parse() *ParseDeps {
+	if d == nil {
+		return nil
+	}
+	return NewParseDeps(d.cfg, d.parseErrorsUC, d.parseTestUC)
+}
+
+// ReputationDeps — зависимости ReputationHandler.
+type ReputationDeps struct {
+	reputationUC *usecasereputation.Service
+}
+
+func NewReputationDeps(reputationUC *usecasereputation.Service) *ReputationDeps {
+	return &ReputationDeps{reputationUC: reputationUC}
+}
+
+func (d *Deps) Reputation() *ReputationDeps {
+	if d == nil {
+		return nil
+	}
+	return NewReputationDeps(d.reputationUC)
+}
+
+// SearchTemplatesDeps — зависимости SearchTemplatesHandler.
+type SearchTemplatesDeps struct {
+	cfg             config.Config
+	searchTemplates SearchTemplatesStore
+	sessions        SessionParser // shared с AuthDeps
+}
+
+func NewSearchTemplatesDeps(cfg config.Config, store SearchTemplatesStore, sessions SessionParser) *SearchTemplatesDeps {
+	return &SearchTemplatesDeps{cfg: cfg, searchTemplates: store, sessions: sessions}
+}
+
+func (d *Deps) SearchTemplates() *SearchTemplatesDeps {
+	if d == nil {
+		return nil
+	}
+	var sessions SessionParser
+	if d.auth != nil {
+		sessions = d.auth.sessions
+	}
+	return NewSearchTemplatesDeps(d.cfg, d.searchTemplates, sessions)
+}
+
 // MetricsRecorder — HTTP + scrape handler (реализация: *metrics.Registry).
 type MetricsRecorder interface {
 	Handler() http.Handler
@@ -247,10 +337,10 @@ func (d *Deps) WithMetrics(m MetricsRecorder) *Deps {
 
 type HealthHandler struct{ *HealthDeps }
 type EventsHandler struct{ *EventsDeps }
-type IngestHandler struct{ *Deps }
-type GeoHandler struct{ *Deps }
+type IngestHandler struct{ *IngestDeps }
+type GeoHandler struct{ *GeoDeps }
 type SystemHandler struct{ *SystemDeps }
-type ParseHandler struct{ *Deps }
+type ParseHandler struct{ *ParseDeps }
 
 func metricsHandler(m MetricsRecorder) http.Handler {
 	if m != nil {

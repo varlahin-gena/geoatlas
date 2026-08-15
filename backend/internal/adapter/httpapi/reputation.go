@@ -11,7 +11,7 @@ import (
 	usecasereputation "network_monitor/internal/usecase/reputation"
 )
 
-type ReputationHandler struct{ *Deps }
+type ReputationHandler struct{ *ReputationDeps }
 
 func (h *ReputationHandler) UploadReputation(w http.ResponseWriter, r *http.Request) {
 	if h.reputationUC == nil {
