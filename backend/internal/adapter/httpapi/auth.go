@@ -403,7 +403,7 @@ func (h *AuthHandler) bearerScopeOK(r *http.Request, need string) bool {
 	}
 	env := h.cfg.APIAuthTokens()
 	ba := newBearerAuth(env, h.apiTokens)
-	return ba.ok(r, need)
+	return ba.OK(r, need)
 }
 
 // --- Users CRUD (admin) ---
