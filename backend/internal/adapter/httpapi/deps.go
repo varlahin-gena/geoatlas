@@ -51,33 +51,6 @@ func NewAuthDeps(
 	}
 }
 
-// Deps — общие зависимости HTTP-слоя (без clickhouse.Conn — только usecase/ports).
-// Auth живёт в auth *AuthDeps (единственный источник limiter/sessions/UC).
-type Deps struct {
-	cfg             config.Config
-	ingest          Ingester
-	parseErrorsUC   *parseerrors.Service
-	parseTestUC     *parsetest.Service
-	eventsUC        *usecaseevents.Service
-	geoUC           *usecasegeo.Service
-	reputationUC    *usecasereputation.Service
-	systemUC        *usecasesystem.Service
-	systemPinger    usecasesystem.ClickHousePinger
-	retentionUC     *usecaseretention.Service
-	backupUC        *usecasebackup.Service
-	auth            *AuthDeps
-	searchTemplates SearchTemplatesStore
-	prom            MetricsRecorder // optional Prometheus
-}
-
-// Auth возвращает owned AuthDeps (nil-safe).
-func (d *Deps) Auth() *AuthDeps {
-	if d == nil {
-		return nil
-	}
-	return d.auth
-}
-
 // SystemDeps — зависимости SystemHandler (system/retention/backup + shared loginLimiter).
 type SystemDeps struct {
 	cfg          config.Config
@@ -104,18 +77,6 @@ func NewSystemDeps(
 	}
 }
 
-// System копирует system-поля + shared loginLimiter из owned Auth.
-func (d *Deps) System() *SystemDeps {
-	if d == nil {
-		return nil
-	}
-	var lim *loginthrottle.Limiter
-	if d.auth != nil {
-		lim = d.auth.loginLimiter
-	}
-	return NewSystemDeps(d.cfg, d.systemUC, d.retentionUC, d.backupUC, lim)
-}
-
 // HealthDeps — зависимости HealthHandler (Ready: systemUC + CH pinger).
 type HealthDeps struct {
 	systemUC     *usecasesystem.Service
@@ -127,32 +88,16 @@ func NewHealthDeps(systemUC *usecasesystem.Service, systemPinger usecasesystem.C
 	return &HealthDeps{systemUC: systemUC, systemPinger: systemPinger}
 }
 
-// Health копирует systemUC/pinger с Deps.
-func (d *Deps) Health() *HealthDeps {
-	if d == nil {
-		return nil
-	}
-	return NewHealthDeps(d.systemUC, d.systemPinger)
-}
-
 // EventsDeps — зависимости EventsHandler (map/series + attached backup name).
 type EventsDeps struct {
-	cfg       config.Config
-	eventsUC  *usecaseevents.Service
-	backupUC  *usecasebackup.Service
+	cfg      config.Config
+	eventsUC *usecaseevents.Service
+	backupUC *usecasebackup.Service
 }
 
 // NewEventsDeps собирает events bag.
 func NewEventsDeps(cfg config.Config, eventsUC *usecaseevents.Service, backupUC *usecasebackup.Service) *EventsDeps {
 	return &EventsDeps{cfg: cfg, eventsUC: eventsUC, backupUC: backupUC}
-}
-
-// Events копирует events/backup/cfg с Deps.
-func (d *Deps) Events() *EventsDeps {
-	if d == nil {
-		return nil
-	}
-	return NewEventsDeps(d.cfg, d.eventsUC, d.backupUC)
 }
 
 // GeoDeps — зависимости GeoHandler.
@@ -165,13 +110,6 @@ func NewGeoDeps(cfg config.Config, geoUC *usecasegeo.Service) *GeoDeps {
 	return &GeoDeps{cfg: cfg, geoUC: geoUC}
 }
 
-func (d *Deps) Geo() *GeoDeps {
-	if d == nil {
-		return nil
-	}
-	return NewGeoDeps(d.cfg, d.geoUC)
-}
-
 // IngestDeps — зависимости IngestHandler.
 type IngestDeps struct {
 	cfg    config.Config
@@ -180,13 +118,6 @@ type IngestDeps struct {
 
 func NewIngestDeps(cfg config.Config, ingest Ingester) *IngestDeps {
 	return &IngestDeps{cfg: cfg, ingest: ingest}
-}
-
-func (d *Deps) Ingest() *IngestDeps {
-	if d == nil {
-		return nil
-	}
-	return NewIngestDeps(d.cfg, d.ingest)
 }
 
 // ParseDeps — зависимости ParseHandler (parse-errors + parse-test).
@@ -200,13 +131,6 @@ func NewParseDeps(cfg config.Config, parseErrorsUC *parseerrors.Service, parseTe
 	return &ParseDeps{cfg: cfg, parseErrorsUC: parseErrorsUC, parseTestUC: parseTestUC}
 }
 
-func (d *Deps) Parse() *ParseDeps {
-	if d == nil {
-		return nil
-	}
-	return NewParseDeps(d.cfg, d.parseErrorsUC, d.parseTestUC)
-}
-
 // ReputationDeps — зависимости ReputationHandler.
 type ReputationDeps struct {
 	reputationUC *usecasereputation.Service
@@ -214,13 +138,6 @@ type ReputationDeps struct {
 
 func NewReputationDeps(reputationUC *usecasereputation.Service) *ReputationDeps {
 	return &ReputationDeps{reputationUC: reputationUC}
-}
-
-func (d *Deps) Reputation() *ReputationDeps {
-	if d == nil {
-		return nil
-	}
-	return NewReputationDeps(d.reputationUC)
 }
 
 // SearchTemplatesDeps — зависимости SearchTemplatesHandler.
@@ -234,15 +151,83 @@ func NewSearchTemplatesDeps(cfg config.Config, store SearchTemplatesStore, sessi
 	return &SearchTemplatesDeps{cfg: cfg, searchTemplates: store, sessions: sessions}
 }
 
+// Deps — композитор HTTP-слоя: владеет domain bags (без плоских UC-полей).
+// Shared pointers: backupUC (system+events), systemUC (system+health), loginLimiter/sessions (auth+…).
+type Deps struct {
+	cfg         config.Config
+	auth        *AuthDeps
+	system      *SystemDeps
+	health      *HealthDeps
+	events      *EventsDeps
+	geo         *GeoDeps
+	ingest      *IngestDeps
+	parse       *ParseDeps
+	reputation  *ReputationDeps
+	templates   *SearchTemplatesDeps
+	prom        MetricsRecorder // optional Prometheus
+}
+
+func (d *Deps) Auth() *AuthDeps {
+	if d == nil {
+		return nil
+	}
+	return d.auth
+}
+
+func (d *Deps) System() *SystemDeps {
+	if d == nil {
+		return nil
+	}
+	return d.system
+}
+
+func (d *Deps) Health() *HealthDeps {
+	if d == nil {
+		return nil
+	}
+	return d.health
+}
+
+func (d *Deps) Events() *EventsDeps {
+	if d == nil {
+		return nil
+	}
+	return d.events
+}
+
+func (d *Deps) Geo() *GeoDeps {
+	if d == nil {
+		return nil
+	}
+	return d.geo
+}
+
+func (d *Deps) Ingest() *IngestDeps {
+	if d == nil {
+		return nil
+	}
+	return d.ingest
+}
+
+func (d *Deps) Parse() *ParseDeps {
+	if d == nil {
+		return nil
+	}
+	return d.parse
+}
+
+func (d *Deps) Reputation() *ReputationDeps {
+	if d == nil {
+		return nil
+	}
+	return d.reputation
+}
+
 func (d *Deps) SearchTemplates() *SearchTemplatesDeps {
 	if d == nil {
 		return nil
 	}
-	var sessions SessionParser
-	if d.auth != nil {
-		sessions = d.auth.sessions
-	}
-	return NewSearchTemplatesDeps(d.cfg, d.searchTemplates, sessions)
+	return d.templates
 }
 
 // MetricsRecorder — HTTP + scrape handler (реализация: *metrics.Registry).
@@ -266,23 +251,19 @@ func NewDeps(
 	retentionUC *usecaseretention.Service,
 	backupUC *usecasebackup.Service,
 ) *Deps {
-	d := &Deps{
-		cfg:           cfg,
-		eventsUC:      eventsUC,
-		geoUC:         geoUC,
-		reputationUC:  reputationUC,
-		parseErrorsUC: parseErrorsUC,
-		parseTestUC:   parseTestUC,
-		systemUC:      systemUC,
-		systemPinger:  systemPinger,
-		retentionUC:   retentionUC,
-		backupUC:      backupUC,
-		auth:          NewAuthDeps(cfg, nil, nil, nil, nil, nil),
+	auth := NewAuthDeps(cfg, nil, nil, nil, nil, nil)
+	return &Deps{
+		cfg:        cfg,
+		auth:       auth,
+		system:     NewSystemDeps(cfg, systemUC, retentionUC, backupUC, auth.loginLimiter),
+		health:     NewHealthDeps(systemUC, systemPinger),
+		events:     NewEventsDeps(cfg, eventsUC, backupUC),
+		geo:        NewGeoDeps(cfg, geoUC),
+		ingest:     NewIngestDeps(cfg, ingestSvc),
+		parse:      NewParseDeps(cfg, parseErrorsUC, parseTestUC),
+		reputation: NewReputationDeps(reputationUC),
+		templates:  NewSearchTemplatesDeps(cfg, nil, nil),
 	}
-	if ingestSvc != nil {
-		d.ingest = ingestSvc
-	}
-	return d
 }
 
 func (d *Deps) ensureAuth() *AuthDeps {
@@ -295,6 +276,30 @@ func (d *Deps) ensureAuth() *AuthDeps {
 	return d.auth
 }
 
+func (d *Deps) ensureSystem() *SystemDeps {
+	if d == nil {
+		return nil
+	}
+	if d.system == nil {
+		var lim *loginthrottle.Limiter
+		if a := d.ensureAuth(); a != nil {
+			lim = a.loginLimiter
+		}
+		d.system = NewSystemDeps(d.cfg, nil, nil, nil, lim)
+	}
+	return d.system
+}
+
+func (d *Deps) ensureTemplates() *SearchTemplatesDeps {
+	if d == nil {
+		return nil
+	}
+	if d.templates == nil {
+		d.templates = NewSearchTemplatesDeps(d.cfg, nil, nil)
+	}
+	return d.templates
+}
+
 func (d *Deps) WithAuth(authUC *usecaseauth.Service, users UserDirectory, sessions SessionParser, apiTokens APITokenStore) *Deps {
 	if d == nil {
 		return nil
@@ -305,6 +310,14 @@ func (d *Deps) WithAuth(authUC *usecaseauth.Service, users UserDirectory, sessio
 	a.users = users
 	a.sessions = sessions
 	a.apiTokens = apiTokens
+	if t := d.ensureTemplates(); t != nil {
+		t.sessions = sessions
+		t.cfg = d.cfg
+	}
+	if s := d.ensureSystem(); s != nil {
+		s.loginLimiter = a.loginLimiter
+		s.cfg = d.cfg
+	}
 	return d
 }
 
@@ -312,7 +325,12 @@ func (d *Deps) WithSearchTemplates(store SearchTemplatesStore) *Deps {
 	if d == nil {
 		return nil
 	}
-	d.searchTemplates = store
+	t := d.ensureTemplates()
+	t.searchTemplates = store
+	t.cfg = d.cfg
+	if d.auth != nil {
+		t.sessions = d.auth.sessions
+	}
 	return d
 }
 
@@ -320,9 +338,13 @@ func (d *Deps) WithLoginLimiter(lim *loginthrottle.Limiter) *Deps {
 	if d == nil {
 		return nil
 	}
+	if lim == nil {
+		return d
+	}
 	a := d.ensureAuth()
-	if lim != nil {
-		a.loginLimiter = lim
+	a.loginLimiter = lim
+	if s := d.ensureSystem(); s != nil {
+		s.loginLimiter = lim
 	}
 	return d
 }
