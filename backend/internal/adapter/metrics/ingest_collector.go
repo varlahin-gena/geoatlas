@@ -5,10 +5,10 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"network_monitor/internal/ingest"
+	"network_monitor/internal/adapter/ingestnet"
 )
 
-// ingestCollector читает StatsSnapshot на каждом scrape.
+// ingestCollector С‡РёС‚Р°РµС‚ StatsSnapshot РЅР° РєР°Р¶РґРѕРј scrape.
 type ingestCollector struct {
 	mu  sync.RWMutex
 	src IngestStats
@@ -70,7 +70,7 @@ func (c *ingestCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (c *ingestCollector) Collect(ch chan<- prometheus.Metric) {
-	var snap ingest.StatsSnapshot
+	var snap ingestnet.StatsSnapshot
 	if c != nil {
 		c.mu.RLock()
 		src := c.src

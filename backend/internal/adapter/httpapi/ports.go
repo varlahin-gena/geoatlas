@@ -7,13 +7,13 @@ import (
 
 	"network_monitor/internal/adapter/searchtemplatesfile"
 	"network_monitor/internal/auth"
-	"network_monitor/internal/ingest"
+	"network_monitor/internal/adapter/ingestnet"
 	"network_monitor/internal/model"
 )
 
-// Ingester — live syslog ingest (реализация: *ingest.Service).
+// Ingester — live syslog ingest (реализация: *ingestnet.Service).
 type Ingester interface {
-	Stats() ingest.StatsSnapshot
+	Stats() ingestnet.StatsSnapshot
 	// FeedReader ставит строки в общую очередь workers (тот же backpressure, что TCP).
 	FeedReader(ctx context.Context, r io.Reader, transport string) (model.IngestStats, error)
 }

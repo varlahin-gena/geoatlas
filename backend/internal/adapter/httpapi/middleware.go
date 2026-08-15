@@ -3,7 +3,6 @@ package httpapi
 import (
 	"context"
 	"crypto/rand"
-	"crypto/subtle"
 	"encoding/hex"
 	"log/slog"
 	"net/http"
@@ -11,41 +10,22 @@ import (
 	"strings"
 	"time"
 
+	"network_monitor/internal/adapter/httpapi/authmw"
 	"network_monitor/internal/auth"
 )
 
 type ctxKey int
 
 const (
-	sessionCtxKey      ctxKey = 1
 	requestIDCtxKey    ctxKey = 2
 	routePatternCtxKey ctxKey = 3
 )
 
 const requestIDHeader = "X-Request-ID"
 
+// SessionFromContext — live session from authmw Require* middleware.
 func SessionFromContext(ctx context.Context) (auth.Session, bool) {
-	if ctx == nil {
-		return auth.Session{}, false
-	}
-	s, ok := ctx.Value(sessionCtxKey).(auth.Session)
-	return s, ok
-}
-
-func withSession(ctx context.Context, s auth.Session) context.Context {
-	return context.WithValue(ctx, sessionCtxKey, s)
-}
-
-func RequestIDFromContext(ctx context.Context) string {
-	if ctx == nil {
-		return ""
-	}
-	id, _ := ctx.Value(requestIDCtxKey).(string)
-	return id
-}
-
-func withRequestID(ctx context.Context, id string) context.Context {
-	return context.WithValue(ctx, requestIDCtxKey, id)
+	return authmw.SessionFromContext(ctx)
 }
 
 type middleware func(http.Handler) http.Handler
@@ -97,6 +77,18 @@ func newRequestID() string {
 		return hex.EncodeToString([]byte(time.Now().UTC().Format("150405.000000000")))
 	}
 	return hex.EncodeToString(b[:])
+}
+
+func RequestIDFromContext(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	id, _ := ctx.Value(requestIDCtxKey).(string)
+	return id
+}
+
+func withRequestID(ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, requestIDCtxKey, id)
 }
 
 // statusRecorder перехватывает код ответа и объём для request-лога.
@@ -201,169 +193,31 @@ func maxBytesMW(n int64) middleware {
 	}
 }
 
-// bearerAuth — env Bearer (всегда admin) + именованные токены из TokenStore.
-type bearerAuth struct {
-	envTokens []string
-	store     APITokenStore
+// Thin wrappers keep server/tests on httpapi names while auth lives in authmw.
+
+func newBearerAuth(envTokens []string, store APITokenStore) authmw.BearerAuth {
+	return authmw.NewBearerAuth(envTokens, store)
 }
 
-func newBearerAuth(envTokens []string, store APITokenStore) bearerAuth {
-	return bearerAuth{envTokens: envTokens, store: store}
-}
-
-func (b bearerAuth) scope(r *http.Request) (string, bool) {
-	got := bearerPlain(r)
-	if got == "" {
-		return "", false
-	}
-	gotb := []byte(got)
-	for _, token := range b.envTokens {
-		if token == "" {
-			continue
-		}
-		tb := []byte(token)
-		if len(tb) != len(gotb) {
-			continue
-		}
-		if subtle.ConstantTimeCompare(gotb, tb) == 1 {
-			return auth.ScopeAdmin, true
-		}
-	}
-	if b.store != nil {
-		if scope, ok := b.store.Verify(got); ok {
-			return scope, true
-		}
-	}
-	return "", false
-}
-
-func (b bearerAuth) ok(r *http.Request, need string) bool {
-	scope, ok := b.scope(r)
-	return ok && auth.ScopeAtLeast(scope, need)
-}
-
-func (b bearerAuth) any(r *http.Request) bool {
-	_, ok := b.scope(r)
-	return ok
-}
-
-func bearerPlain(r *http.Request) string {
-	if r == nil {
-		return ""
-	}
-	return strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
-}
-
-// requireLoginMW требует cookie-сессию, Bearer (scope≥read), либо AUTH_DISABLED.
-func requireLoginMW(ba bearerAuth, sessions SessionParser, users UserDirectory, authDisabled bool) middleware {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if authDisabled {
-				next.ServeHTTP(w, r)
-				return
-			}
-			if ba.ok(r, auth.ScopeRead) {
-				next.ServeHTTP(w, r)
-				return
-			}
-			sess, err := SessionFromRequest(r, sessions)
-			if err != nil {
-				writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
-				return
-			}
-			live, ok := auth.LiveSession(users, sess)
-			if !ok {
-				writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
-				return
-			}
-			if denyIfMustReset(w, users, live.Username) {
-				return
-			}
-			next.ServeHTTP(w, r.WithContext(withSession(r.Context(), live)))
-		})
+func sessionLoader(sessions SessionParser) authmw.SessionLoader {
+	return func(r *http.Request) (auth.Session, error) {
+		return SessionFromRequest(r, sessions)
 	}
 }
 
-// requireAdminMW — роль administrator, Bearer scope=admin, либо AUTH_DISABLED.
-func requireAdminMW(ba bearerAuth, sessions SessionParser, users UserDirectory, authDisabled bool) middleware {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if authDisabled {
-				next.ServeHTTP(w, r)
-				return
-			}
-			if ba.ok(r, auth.ScopeAdmin) {
-				next.ServeHTTP(w, r)
-				return
-			}
-			sess, err := SessionFromRequest(r, sessions)
-			if err != nil {
-				writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
-				return
-			}
-			live, ok := auth.LiveSession(users, sess)
-			if !ok {
-				writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
-				return
-			}
-			if !auth.IsAdmin(live.Role) {
-				writeJSON(w, http.StatusForbidden, map[string]any{"error": "forbidden"})
-				return
-			}
-			if denyIfMustReset(w, users, live.Username) {
-				return
-			}
-			next.ServeHTTP(w, r.WithContext(withSession(r.Context(), live)))
-		})
-	}
+func requireLoginMW(ba authmw.BearerAuth, sessions SessionParser, users UserDirectory, authDisabled bool) middleware {
+	return middleware(authmw.RequireLogin(ba, sessionLoader(sessions), users, authDisabled))
 }
 
-// requireOpsMW — mutate / metrics / ingest stats: Bearer scope≥ops или administrator.
-// API_AUTH_DISABLED или AUTH_DISABLED открывают доступ (dev / локальный контур).
-func requireOpsMW(ba bearerAuth, sessions SessionParser, users UserDirectory, apiAuthDisabled, authDisabled bool) middleware {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if authDisabled || apiAuthDisabled {
-				next.ServeHTTP(w, r)
-				return
-			}
-			if ba.ok(r, auth.ScopeOps) {
-				next.ServeHTTP(w, r)
-				return
-			}
-			sess, err := SessionFromRequest(r, sessions)
-			if err != nil {
-				writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
-				return
-			}
-			live, ok := auth.LiveSession(users, sess)
-			if !ok {
-				writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
-				return
-			}
-			if !auth.IsAdmin(live.Role) {
-				writeJSON(w, http.StatusForbidden, map[string]any{"error": "forbidden"})
-				return
-			}
-			if denyIfMustReset(w, users, live.Username) {
-				return
-			}
-			next.ServeHTTP(w, r.WithContext(withSession(r.Context(), live)))
-		})
-	}
+func requireAdminMW(ba authmw.BearerAuth, sessions SessionParser, users UserDirectory, authDisabled bool) middleware {
+	return middleware(authmw.RequireAdmin(ba, sessionLoader(sessions), users, authDisabled))
 }
 
-func denyIfMustReset(w http.ResponseWriter, users UserDirectory, username string) bool {
-	if users != nil && users.MustReset(username) {
-		writeJSON(w, http.StatusForbidden, map[string]any{"error": "password reset required"})
-		return true
-	}
-	return false
+func requireOpsMW(ba authmw.BearerAuth, sessions SessionParser, users UserDirectory, apiAuthDisabled, authDisabled bool) middleware {
+	return middleware(authmw.RequireOps(ba, sessionLoader(sessions), users, apiAuthDisabled, authDisabled))
 }
 
 // withTimeout навешивает жёсткий дедлайн на быстрые read-эндпоинты.
-// TimeoutHandler проставляет deadline в request-контекст, поэтому
-// ClickHouse-запросы, использующие r.Context(), тоже отменяются.
 func withTimeout(next http.Handler, d time.Duration) http.Handler {
 	return http.TimeoutHandler(next, d, `{"error":"request timeout"}`)
 }

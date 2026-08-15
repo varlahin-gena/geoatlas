@@ -6,9 +6,9 @@ import (
 
 	"network_monitor/internal/adapter/clickhouse/geostore"
 	"network_monitor/internal/adapter/clickhouse/ingeststore"
+	"network_monitor/internal/adapter/ingestnet"
 	"network_monitor/internal/adapter/parseradapter"
 	"network_monitor/internal/config"
-	"network_monitor/internal/ingest"
 	"network_monitor/internal/parser"
 	usecaseingest "network_monitor/internal/usecase/ingest"
 )
@@ -31,7 +31,7 @@ func startIngest(a *app, cfg config.Config, geo *geostore.ReloadableGeoIndex, pa
 	if a.prom != nil {
 		insertObs = a.prom
 	}
-	a.ingestSvc = ingest.NewService(ingest.Config{
+	a.ingestSvc = ingestnet.NewService(ingestnet.Config{
 		Bindings:        ingestBindings(cfg),
 		BatchSize:       cfg.IngestBatchSize,
 		FlushInterval:   time.Duration(cfg.IngestFlushSec) * time.Second,
@@ -43,7 +43,7 @@ func startIngest(a *app, cfg config.Config, geo *geostore.ReloadableGeoIndex, pa
 		ConnIdleTimeout: time.Duration(cfg.IngestConnIdleSec) * time.Second,
 		SharedSecret:    cfg.IngestSharedSecret,
 		AllowFrom:       cfg.IngestAllowFrom,
-	}, ingest.ProcessorDeps{
+	}, ingestnet.ProcessorDeps{
 		Logs: ingestRepo, Errors: ingestRepo, Parser: lineParser,
 		Geo: geo, EnrichCountry: cfg.GeoEnrichOnIngest,
 		InsertObs: insertObs,
@@ -64,16 +64,16 @@ func startIngest(a *app, cfg config.Config, geo *geostore.ReloadableGeoIndex, pa
 	}()
 }
 
-func ingestBindings(cfg config.Config) []ingest.Binding {
+func ingestBindings(cfg config.Config) []ingestnet.Binding {
 	if cfg.IngestListenAddr != "" {
-		return []ingest.Binding{{Addr: cfg.IngestListenAddr}}
+		return []ingestnet.Binding{{Addr: cfg.IngestListenAddr}}
 	}
-	var bindings []ingest.Binding
+	var bindings []ingestnet.Binding
 	if cfg.IngestUDPListenAddr != "" {
-		bindings = append(bindings, ingest.Binding{Addr: cfg.IngestUDPListenAddr, Transport: "udp"})
+		bindings = append(bindings, ingestnet.Binding{Addr: cfg.IngestUDPListenAddr, Transport: "udp"})
 	}
 	if cfg.IngestTCPListenAddr != "" {
-		bindings = append(bindings, ingest.Binding{Addr: cfg.IngestTCPListenAddr, Transport: "tcp"})
+		bindings = append(bindings, ingestnet.Binding{Addr: cfg.IngestTCPListenAddr, Transport: "tcp"})
 	}
 	return bindings
 }
