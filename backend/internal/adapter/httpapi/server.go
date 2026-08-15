@@ -73,16 +73,16 @@ func NewServer(
 	}
 	health := &HealthHandler{deps.Health()}
 	events := &EventsHandler{deps.Events()}
-	ingestH := &IngestHandler{deps}
-	geoH := &GeoHandler{deps}
-	repH := &ReputationHandler{deps}
+	ingestH := &IngestHandler{deps.Ingest()}
+	geoH := &GeoHandler{deps.Geo()}
+	repH := &ReputationHandler{deps.Reputation()}
 	system := &SystemHandler{deps.System()}
-	parse := &ParseHandler{deps}
+	parse := &ParseHandler{deps.Parse()}
 	authDeps := deps.Auth()
 	authH := &AuthHandler{authDeps}
 	usersH := &UsersHandler{authDeps}
 	tokensH := &APITokensHandler{authDeps}
-	tplH := &SearchTemplatesHandler{deps}
+	tplH := &SearchTemplatesHandler{deps.SearchTemplates()}
 
 	envTokens := cfg.APIAuthTokens()
 	if cfg.APIAuthDisabled {

@@ -9,7 +9,7 @@ import (
 	"network_monitor/internal/adapter/searchtemplatesfile"
 )
 
-type SearchTemplatesHandler struct{ *Deps }
+type SearchTemplatesHandler struct{ *SearchTemplatesDeps }
 
 type searchTemplateRequest struct {
 	Name  string `json:"name"`
@@ -137,10 +137,10 @@ func (h *SearchTemplatesHandler) currentUsername(r *http.Request) (string, bool)
 	if sess, ok := SessionFromContext(r.Context()); ok && strings.TrimSpace(sess.Username) != "" {
 		return sess.Username, true
 	}
-	if h == nil || h.auth == nil || h.auth.sessions == nil {
+	if h == nil || h.sessions == nil {
 		return "", false
 	}
-	sess, err := SessionFromRequest(r, h.auth.sessions)
+	sess, err := SessionFromRequest(r, h.sessions)
 	if err != nil || strings.TrimSpace(sess.Username) == "" {
 		return "", false
 	}
