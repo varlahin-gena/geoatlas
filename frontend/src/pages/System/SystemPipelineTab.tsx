@@ -62,10 +62,10 @@ export function SystemPipelineTab({
   const syslogCap = syslogngFifo * 2;
   const syslogQueuePct = syslogCap > 0 ? num(syslogng.queued) / syslogCap : 0;
   return (
-    <div className="tab-panel active" id="tab-pipeline" role="tabpanel">
+    <div className="tab-panel active" role="tabpanel">
       <section className="card card-compact">
         <h3 className="card-title">Pipeline</h3>
-        <div className="pipeline" id="pipelineRow">
+        <div className="pipeline">
           <div className={`pipeline-stage ${syslogStageStatus}`}>
             <div className="stage-name">Syslog-NG</div>
             <div className="stage-value">{fmtNumber(syslogEps)} eps</div>
@@ -115,7 +115,7 @@ export function SystemPipelineTab({
       <section className="row cols-2">
         <div className="card card-compact">
           <h3 className="card-title">Ingest</h3>
-          <div className="kv-grid cols-2" id="ingestList">
+          <div className="kv-grid cols-2">
             {(
               [
                 ['Лаг', fmtLag(ingest.lag_sec)],
@@ -165,7 +165,7 @@ export function SystemPipelineTab({
         </div>
         <div className="card card-compact">
           <h3 className="card-title">Хранилище</h3>
-          <div className="kv-grid cols-2" id="storageList">
+          <div className="kv-grid cols-2">
             <div className="kv-row">
               <span className="k">traffic_logs</span>
               <span className="v">
@@ -189,7 +189,7 @@ export function SystemPipelineTab({
 
       <section className="card card-compact">
         <h3 className="card-title">Срок хранения</h3>
-        <form id="retentionForm" className="form-row" onSubmit={saveRetention}>
+        <form className="form-row" onSubmit={saveRetention}>
           {(
             [
               ['traffic_logs_days', 'Логи трафика (дни)', 'retTrafficLogs'],
@@ -214,11 +214,11 @@ export function SystemPipelineTab({
               <span className="hint">сейчас: {Number(retention[key] ?? 0)} дн.</span>
             </div>
           ))}
-          <button type="submit" className="btn primary" id="retentionSaveBtn">
+          <button type="submit" className="btn primary">
             Сохранить
           </button>
         </form>
-        <p className="hint" id="retentionUpdatedAt">
+        <p className="hint">
           Уменьшение TTL удалит старые партиции при следующем merge/drop в ClickHouse.
           {retention.updated_at ? ` Обновлено: ${fmtDate(retention.updated_at)}` : ''}
         </p>

@@ -1,9 +1,7 @@
 export type {
-  Alert,
   BackupCatalog,
   BackupEntry,
   BackupSchedule,
-  BackupStatus,
   EdgesAgg,
   FailedLogin,
   HistoryPayload,

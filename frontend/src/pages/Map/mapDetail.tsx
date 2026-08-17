@@ -110,12 +110,11 @@ export function MapDetailPanel({
 }) {
   const open = !!detail;
   return (
-    <aside className={`detail-panel${open ? ' open' : ''}`} id="detailPanel">
+    <aside className={`detail-panel${open ? ' open' : ''}`}>
       <div className="detail-header">
-        <h3 id="detailTitle">{detail?.title || 'Детали'}</h3>
+        <h3>{detail?.title || 'Детали'}</h3>
         <button
           className="close-btn"
-          id="btnCloseDetail"
           type="button"
           aria-label="Закрыть панель деталей"
           onClick={onClose}
@@ -124,7 +123,7 @@ export function MapDetailPanel({
         </button>
       </div>
       {detail?.actions?.length ? (
-        <div className="detail-actions" id="detailActions" style={{ display: 'flex' }}>
+        <div className="detail-actions">
           {detail.actions.map((a) => (
             <button
               key={a.label}
@@ -136,10 +135,8 @@ export function MapDetailPanel({
             </button>
           ))}
         </div>
-      ) : (
-        <div className="detail-actions" id="detailActions" style={{ display: 'none' }} />
-      )}
-      <div className="detail-body" id="detailBody">
+      ) : null}
+      <div className="detail-body">
         {detail ? <DetailSparkline detail={detail} /> : null}
         {detail?.sections.map((sec, si) => (
           <div key={`${sec.title || 'sec'}-${si}`}>

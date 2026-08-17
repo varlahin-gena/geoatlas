@@ -20,10 +20,6 @@ const geoBackfillIPLimit = 200_000
 const geoEnrichInsertBatch = 25_000
 const geoStrMaxRunes = 256
 
-// DefaultGeoBackfillLookbackDays — окно авто-backfill (startup / upload).
-// 0 = без ограничения по времени (полный скан, дорого по CPU).
-const DefaultGeoBackfillLookbackDays = 7
-
 // GeoResolver — порт для backfill (реализация: *geoip.Index / *ReloadableGeoIndex).
 // EnrichLogsMissingGeo принимает интерфейс, чтобы не требовать конкретный тип индекса.
 type GeoResolver interface {

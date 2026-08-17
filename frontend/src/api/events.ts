@@ -1,8 +1,6 @@
 import { apiGetQuery } from './client';
 import type { EventsPayload, SeriesPayload } from './eventsTypes';
 
-export type { EventsPayload, SeriesPayload };
-
 export function fetchMapEvents(opts: {
   groupBy: string;
   limit: number;

@@ -314,7 +314,7 @@ export default function SystemPage() {
       showSystemHealth={false}
       actions={
         <>
-          <div className="period-tabs" id="periodTabs" hidden={tab !== 'charts'}>
+          <div className="period-tabs" hidden={tab !== 'charts'}>
             {PERIODS.map(([v, label]) => (
               <button
                 key={v}
@@ -335,9 +335,9 @@ export default function SystemPage() {
             />{' '}
             Авто-обновление
           </label>
-          <div className={`health-pill ${healthLevel}`} id="healthPill">
+          <div className={`health-pill ${healthLevel}`}>
             <span className="dot" />
-            <span id="healthText">{stats ? healthText : '— загрузка —'}</span>
+            <span>{stats ? healthText : '— загрузка —'}</span>
           </div>
         </>
       }
@@ -345,16 +345,15 @@ export default function SystemPage() {
           <div className="content-chrome">
             <section
               className={`chrome-section chrome-alerts${alerts.length ? '' : ' chrome-alerts--empty'}`}
-              id="chromeAlerts"
             >
               <div className="chrome-section-head">
                 <span className="accent-dot" style={{ background: 'var(--orange)' }} />
                 <span>Алёрты</span>
-                <span className="chrome-section-meta" id="alertsCount">
+                <span className="chrome-section-meta">
                   {alerts.length ? alerts.length : ''}
                 </span>
               </div>
-              <div className="alerts" id="alertsList">
+              <div className="alerts">
                 {!alerts.length ? (
                   <div className="alert-row info">
                     <span className="empty">Активных алертов нет</span>
@@ -372,22 +371,22 @@ export default function SystemPage() {
               </div>
             </section>
 
-            <div className="status-strip" id="statusStrip" aria-label="Ключевые метрики">
+            <div className="status-strip" aria-label="Ключевые метрики">
               <div className="status-metric">
                 <span className="sm-label">EPS</span>
-                <span className="sm-value" id="statusEps">
+                <span className="sm-value">
                   {fmtNumber(eps)}
                 </span>
               </div>
               <div className="status-metric">
                 <span className="sm-label">Лаг</span>
-                <span className={`sm-value ${toneClass(lagTone(lag))}`} id="statusLag">
+                <span className={`sm-value ${toneClass(lagTone(lag))}`}>
                   {fmtLag(ingest.lag_sec)}
                 </span>
               </div>
               <div className="status-metric">
                 <span className="sm-label">Очередь</span>
-                <span className={`sm-value ${toneClass(queueTone(qDepth, qCap))}`} id="statusQueue">
+                <span className={`sm-value ${toneClass(queueTone(qDepth, qCap))}`}>
                   {qCap > 0
                     ? `${fmtNumber(qDepth)}/${fmtNumber(qCap)}`
                     : fmtNumber(qDepth)}
@@ -395,7 +394,7 @@ export default function SystemPage() {
               </div>
               <div className="status-metric">
                 <span className="sm-label">Буфер</span>
-                <span className={`sm-value ${toneClass(bufferTone(buffered))}`} id="statusBuffer">
+                <span className={`sm-value ${toneClass(bufferTone(buffered))}`}>
                   {fmtNumber(buffered)}
                 </span>
               </div>
@@ -409,15 +408,15 @@ export default function SystemPage() {
                   {fmtNumber(dropsPerSec + bufferDropsPerSec + syslogngDropsPerSec)}/s
                 </span>
               </div>
-              <div className="status-metric" id="statusCapacityWrap" hidden={!epsMax}>
+              <div className="status-metric" hidden={!epsMax}>
                 <span className="sm-label">Ёмкость</span>
-                <span className={`sm-value ${toneClass(capacityTone(capPct))}`} id="statusCapacity">
+                <span className={`sm-value ${toneClass(capacityTone(capPct))}`}>
                   {capPct}%
                 </span>
               </div>
             </div>
 
-            <nav className="view-tabs" id="viewTabs" role="tablist" aria-label="Разделы мониторинга">
+            <nav className="view-tabs" role="tablist" aria-label="Разделы мониторинга">
               {(
                 [
                   ['overview', 'Обзор'],
@@ -438,7 +437,7 @@ export default function SystemPage() {
                 >
                   {label}
                   {id === 'security' && failed.length ? (
-                    <span className="tab-badge" id="securityTabBadge">
+                    <span className="tab-badge">
                       {failed.length}
                     </span>
                   ) : null}

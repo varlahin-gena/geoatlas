@@ -28,7 +28,7 @@ function monoArcRGB(): [number, number, number] {
   return [88, 166, 255];
 }
 
-export function arcRGB(
+function arcRGB(
   status: string | undefined,
   line: MapLine,
   monoArcColor: boolean,
@@ -50,7 +50,7 @@ export function hasCoords(line: MapLine): boolean {
   );
 }
 
-export function nodeLonLat(
+function nodeLonLat(
   key: string,
   fallbackLon: number | undefined,
   fallbackLat: number | undefined,
@@ -66,7 +66,7 @@ export function topByCount(arr: MapLine[], max: number): MapLine[] {
   return [...arr].sort((a, b) => (b.count || 0) - (a.count || 0)).slice(0, max);
 }
 
-export function decorateFlowLines(lines: MapLine[]): MapLine[] {
+function decorateFlowLines(lines: MapLine[]): MapLine[] {
   if (!lines.length) return lines;
   const sorted = [...lines].sort((a, b) => (b.count || 0) - (a.count || 0));
   const n = sorted.length;
@@ -114,7 +114,7 @@ function globeArcHeight(d: MapLine, allPoints: Record<string, MapPoint>): number
   return Math.max(0.06, Math.min(0.18, 0.04 + dist / 380));
 }
 
-export function isOnVisibleGlobeHemisphere(
+function isOnVisibleGlobeHemisphere(
   lon: number,
   lat: number,
   viewLon: number,
@@ -140,7 +140,7 @@ function globeAngularDistanceRad(lon1: number, lat1: number, lon2: number, lat2:
   return Math.acos(Math.max(-1, Math.min(1, cosC)));
 }
 
-export function isArcVisibleOnGlobe(
+function isArcVisibleOnGlobe(
   line: MapLine,
   viewLon: number,
   viewLat: number,
@@ -167,7 +167,7 @@ export function isArcVisibleOnGlobe(
   return true;
 }
 
-export function getVisiblePointsFromLines(
+function getVisiblePointsFromLines(
   lines: MapLine[],
   allPoints: Record<string, MapPoint>,
 ): MapPointEntry[] {
@@ -224,7 +224,7 @@ export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
     ? opts.maxArcs
     : Math.min(opts.maxArcs, 800);
 
-  // Country heatmap stats use full visible set (before top-N), matching vanilla getStatsCache.
+  // Country heatmap stats use the full visible set (before top-N).
   const statsPoints = getVisiblePointsFromLines(lines, opts.points);
   const statsCache = getCountryStatsCache(statsPoints, opts.countriesGeoJSON);
 
@@ -420,10 +420,4 @@ export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
   );
 
   return { layers, shown: drawnForCount, total: totalBeforeLimit };
-}
-
-export function escapeHTML(v: unknown): string {
-  return String(v ?? '').replace(/[&<>"']/g, (ch) =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch] || ch,
-  );
 }

@@ -2,7 +2,7 @@
 
 export type GeoWizardStep = 'why' | 'upload' | 'done';
 
-export const GEO_WIZARD_LS_KEY = 'nm.geoWizardDismissed';
+const GEO_WIZARD_LS_KEY = 'nm.geoWizardDismissed';
 export const GEO_UPLOAD_LARGE_BYTES = 32 * 1024 * 1024;
 
 export interface GeoStatus {

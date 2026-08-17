@@ -56,7 +56,7 @@ export const PAGE_NAV: NavItem[] = [
   },
 ];
 
-export function normalizePath(pathname: string): string {
+function normalizePath(pathname: string): string {
   let p = pathname || '/';
   if (p.length > 1 && p.endsWith('/')) p = p.slice(0, -1);
   return p || '/';

@@ -2,10 +2,8 @@ import type { MapPoint, SeriesPoint } from '@/api/eventsTypes';
 import type { ReputationHit } from '@/api/types';
 
 export type {
-  EventsPayload,
   MapLine,
   MapPoint,
-  SeriesPayload,
   SeriesPoint,
 } from '@/api/eventsTypes';
 export type { ReputationHit };
@@ -14,7 +12,7 @@ export interface MapPointEntry extends MapPoint {
   key: string;
 }
 
-export type DetailKind = 'line' | 'point' | 'country';
+type DetailKind = 'line' | 'point' | 'country';
 
 export interface DetailRow {
   key: string;

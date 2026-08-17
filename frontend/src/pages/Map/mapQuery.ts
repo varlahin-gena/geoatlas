@@ -3,13 +3,12 @@ import { useSearchParams } from 'react-router-dom';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import { PERIODS } from './mapPeriods';
 
-export const MAP_LIMIT_MIN = 100;
-export const MAP_LIMIT_MAX = 20000;
-export const MAP_LIMIT_HARD_MAX = 50000;
+const MAP_LIMIT_MIN = 100;
+const MAP_LIMIT_MAX = 20000;
 
 export type MapActionFilter = 'all' | 'allowed' | 'blocked';
 
-export const MAP_VIEW_DEFAULTS = {
+const MAP_VIEW_DEFAULTS = {
   period: '1d',
   periodFrom: '',
   periodTo: '',

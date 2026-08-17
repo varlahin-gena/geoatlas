@@ -5,10 +5,6 @@ import "time"
 type TrafficAction string
 
 const (
-	ActionAllow   TrafficAction = "allow"
-	ActionDeny    TrafficAction = "deny"
-	ActionDrop    TrafficAction = "drop"
-	ActionReject  TrafficAction = "reject"
 	ActionUnknown TrafficAction = "unknown"
 )
 

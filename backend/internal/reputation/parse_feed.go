@@ -9,9 +9,6 @@ import (
 	"network_monitor/internal/model"
 )
 
-// SupportedFeedFormats — допустимые format для URL-фидов.
-var SupportedFeedFormats = []string{"netset", "plain", "spamhaus_json", "csv_ip"}
-
 // NormalizeFeedFormat приводит алиасы (plain → netset).
 func NormalizeFeedFormat(format string) string {
 	format = strings.ToLower(strings.TrimSpace(format))

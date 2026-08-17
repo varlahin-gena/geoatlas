@@ -25,7 +25,7 @@ export const MAP_FIXTURE = {
   stats: { raw_pairs: 1, skipped_no_geo: 0 },
 };
 
-export async function fulfillJson(route: Route, status: number, body: unknown) {
+async function fulfillJson(route: Route, status: number, body: unknown) {
   await route.fulfill({
     status,
     contentType: 'application/json',

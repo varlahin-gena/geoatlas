@@ -12,7 +12,7 @@ import { SESSION_EXPIRED_EVENT } from '@/api/client';
 import * as authApi from '@/api/auth';
 import type { AuthUser } from '@/api/types';
 import { safeNext } from '@/lib/format';
-import { applyTheme, getTheme, toggleTheme, type Theme } from './theme';
+import { getTheme, toggleTheme, type Theme } from './theme';
 import { deriveIsAdmin, deriveReputationEnabled, deriveUiAuthEnabled } from './roles';
 
 interface AuthContextValue {
@@ -27,7 +27,6 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   /** Завершить все сессии (все устройства) и перейти на /login. */
   logoutAll: () => Promise<void>;
-  setTheme: (t: Theme) => void;
   toggleTheme: () => void;
 }
 
@@ -106,10 +105,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     navigate('/login');
   }, [navigate]);
 
-  const setTheme = useCallback((t: Theme) => {
-    setThemeState(applyTheme(t));
-  }, []);
-
   const doToggleTheme = useCallback(() => {
     setThemeState(toggleTheme());
   }, []);
@@ -126,10 +121,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       logoutAll,
-      setTheme,
       toggleTheme: doToggleTheme,
     };
-  }, [user, loading, theme, refresh, login, logout, logoutAll, setTheme, doToggleTheme]);
+  }, [user, loading, theme, refresh, login, logout, logoutAll, doToggleTheme]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

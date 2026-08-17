@@ -309,7 +309,7 @@ export default function MapPage() {
   }, [isAdmin, reloadGeoStatus]);
 
   return (
-    <div className={`app${sidebarCollapsed ? ' sidebar-collapsed' : ''}`} id="app">
+    <div className={`app${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
       <a className="skip-link" href="#map-main">
         К содержимому
       </a>

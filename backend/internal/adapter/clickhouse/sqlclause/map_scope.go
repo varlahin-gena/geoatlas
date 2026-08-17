@@ -38,11 +38,6 @@ func (s MapScope) sanitized() MapScope {
 	return MapScope{Country: SanitizeMapCountry(s.Country), Query: SanitizeMapQuery(s.Query)}
 }
 
-func (s MapScope) Empty() bool {
-	c := s.sanitized()
-	return c.Country == "" && c.Query == ""
-}
-
 func countryPred() string {
 	return "(lowerUTF8(src_country) = lowerUTF8(?) OR lowerUTF8(dst_country) = lowerUTF8(?))"
 }

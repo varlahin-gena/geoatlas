@@ -77,7 +77,7 @@ export default function ApiTokensPage() {
               <p>
                 Секрет показывается один раз:
               </p>
-              <code id="secretValue">{secret}</code>
+              <code>{secret}</code>
               <div className="actions" style={{ marginTop: 8 }}>
                 <button
                   type="button"

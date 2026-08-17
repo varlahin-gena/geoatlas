@@ -5,6 +5,7 @@ linters:
     - bodyclose
     - contextcheck
     - gosec
+    - unused
   settings:
     gosec:
       excludes:

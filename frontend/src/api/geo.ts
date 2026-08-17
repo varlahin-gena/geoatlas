@@ -9,7 +9,7 @@ export interface GeoRange {
   lon?: number;
 }
 
-export interface GeoRangesLimits {
+interface GeoRangesLimits {
   upload_max_bytes?: number;
   upload_max_ranges?: number;
 }

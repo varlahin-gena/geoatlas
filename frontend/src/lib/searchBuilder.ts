@@ -19,7 +19,7 @@ export interface BuilderTerm {
   value: string;
 }
 
-export interface BuilderGroupChild {
+interface BuilderGroupChild {
   negate: boolean;
   field: SearchField;
   value: string;
@@ -35,7 +35,7 @@ export interface BuilderGroup {
 
 export type BuilderRow = BuilderTerm | BuilderGroup;
 
-export function quoteSearchValue(raw: string): string {
+function quoteSearchValue(raw: string): string {
   const value = String(raw || '').trim();
   if (!value) return '';
   if (!/[\s()"']/u.test(value)) return value;

@@ -100,7 +100,6 @@ export function MapSidebar({
         <div className="mode-switch">
           <button
             type="button"
-            id="mode-map"
             className={viewMode === 'map' ? 'active' : ''}
             onClick={() => setViewMode('map')}
           >
@@ -108,7 +107,6 @@ export function MapSidebar({
           </button>
           <button
             type="button"
-            id="mode-globe"
             className={viewMode === 'globe' ? 'active' : ''}
             onClick={() => setViewMode('globe')}
           >
@@ -121,7 +119,6 @@ export function MapSidebar({
         <div className="mode-switch-icons">
           <button
             type="button"
-            id="mode-map-icon"
             className={viewMode === 'map' ? 'active' : ''}
             title="Map (2D)"
             onClick={() => setViewMode('map')}
@@ -130,7 +127,6 @@ export function MapSidebar({
           </button>
           <button
             type="button"
-            id="mode-globe-icon"
             className={viewMode === 'globe' ? 'active' : ''}
             title="Globe (3D)"
             onClick={() => setViewMode('globe')}
@@ -221,7 +217,7 @@ export function MapSidebar({
       </div>
 
       {isAdmin ? (
-        <div className="sidebar-section" id="adminNavSection">
+        <div className="sidebar-section">
           <div className="sidebar-section-title">Администрирование</div>
           {adminLinks.map((item) => {
             const active = isNavActive(item, location.pathname);
@@ -255,7 +251,7 @@ export function MapSidebar({
           <span>
             от <b>{minCount}</b> соб.
           </span>
-          <span id="arcCountInfo" style={{ color: arcCountInfo.total > arcCountInfo.shown ? 'var(--orange)' : 'var(--text-muted)' }}>
+          <span style={{ color: arcCountInfo.total > arcCountInfo.shown ? 'var(--orange)' : 'var(--text-muted)' }}>
             {arcCountInfo.total > arcCountInfo.shown
               ? `${fmtNumber(arcCountInfo.shown)} из ${fmtNumber(arcCountInfo.total)}`
               : `${fmtNumber(arcCountInfo.shown)} связей`}
@@ -298,7 +294,6 @@ export function MapSidebar({
         >
           <input
             type="checkbox"
-            id="toggleHeatmapChk"
             checked={showHeatmap}
             onChange={(e) => setShowHeatmap(e.target.checked)}
           />
@@ -307,7 +302,6 @@ export function MapSidebar({
         <label className="side-toggle">
           <input
             type="checkbox"
-            id="toggleCountryLabelsChk"
             checked={showCountryLabels}
             onChange={(e) => setShowCountryLabels(e.target.checked)}
           />
@@ -357,12 +351,10 @@ export function MapSidebar({
         )}
         <label
           className="side-toggle"
-          id="autoRotateWrap"
           style={{ display: viewMode === 'globe' ? undefined : 'none' }}
         >
           <input
             type="checkbox"
-            id="autoRotate"
             checked={autoRotate}
             onChange={(e) => setAutoRotate(e.target.checked)}
           />
@@ -374,13 +366,11 @@ export function MapSidebar({
         <button
           type="button"
           className="side-btn"
-          id="btnToggleSidebar"
           title="Развернуть / свернуть меню"
           onClick={toggleSidebar}
         >
           <svg
             className="icon"
-            id="collapseIcon"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"

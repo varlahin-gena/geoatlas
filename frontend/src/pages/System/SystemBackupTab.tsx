@@ -209,7 +209,7 @@ export function SystemBackupTab() {
   const timeValue = `${pad2(sched.hour ?? 0)}:${pad2(sched.minute ?? 0)}`;
 
   return (
-    <div className="tab-panel active" id="tab-backup" role="tabpanel">
+    <div className="tab-panel active" role="tabpanel">
       <section className="card card-compact">
         <div
           style={{

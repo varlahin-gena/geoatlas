@@ -71,7 +71,7 @@ export default function LoginPage() {
             <p>Локальный вход</p>
           </div>
         </div>
-        <div className={`auth-error${error ? ' show' : ''}`} id="error" role="alert">
+        <div className={`auth-error${error ? ' show' : ''}`} role="alert">
           {error}
         </div>
         <label htmlFor="username">Логин</label>

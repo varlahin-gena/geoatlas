@@ -102,8 +102,7 @@ body.page-admin .app.sidebar-collapsed .sidebar-header {
   justify-content: center;
 }
 body.page-admin .sidebar-header .logo,
-body.page-admin .topbar .logo,
-.logo-mark {
+body.page-admin .topbar .logo {
   width: 28px;
   height: 28px;
   border-radius: 6px;
@@ -208,14 +207,7 @@ body.page-admin .topbar .title .sub {
   margin-left: 6px;
 }
 .topbar-spacer { flex: 1; }
-body.page-map .topbar .topbar-spacer,
-body.page-map .map-topbar .topbar-spacer { flex: 1; min-width: 8px; }
-body.page-map .map-topbar #userBarHost,
-body.page-map .map-topbar #userBar {
-  display: flex;
-  align-items: center;
-  margin-left: 0;
-}
+body.page-map .topbar .topbar-spacer { flex: 1; min-width: 8px; }
 
 /* Индикатор состояния системы (карта + админ-страницы). */
 a.status-pill { transition: background 0.15s; color: var(--text-dim); }
@@ -246,23 +238,6 @@ a.status-pill:hover { background: var(--panel-3); color: var(--text); }
 .status-pill.bad { color: var(--red); }
 .status-pill .status-pill-icon { margin-left: 4px; opacity: 0.6; flex-shrink: 0; }
 .status-pill:not(a) { cursor: default; }
-
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--accent);
-  text-decoration: none;
-  font-size: 13px;
-  font-weight: 500;
-  padding: 5px 12px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: transparent;
-  transition: background 0.15s;
-}
-.back-link:hover { background: var(--panel-3); }
-.back-link svg { width: 16px; height: 16px; }
 
 .page-content {
   flex: 1 1 auto;

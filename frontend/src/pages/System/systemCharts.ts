@@ -4,7 +4,7 @@ import { getTheme } from '@/auth/theme';
 import { fmtBytes, fmtBytesAxisTicks, num } from './systemFormat';
 import type { HistoryPoint } from './systemTypes';
 
-export function chartAxisStroke(): string {
+function chartAxisStroke(): string {
   return getTheme() === 'light' ? '#334155' : '#94a3b8';
 }
 
@@ -29,7 +29,7 @@ export function alignSeries(
 
 export type ChartFormatOpts = { isBytes?: boolean; isPercent?: boolean; isInt?: boolean };
 
-export function formatSeriesValue(v: number | null | undefined, opts?: ChartFormatOpts): string {
+function formatSeriesValue(v: number | null | undefined, opts?: ChartFormatOpts): string {
   if (v == null || Number.isNaN(Number(v))) return '—';
   if (opts?.isPercent) return `${Number(v).toFixed(2)}%`;
   if (opts?.isBytes) return fmtBytes(v);
@@ -40,7 +40,7 @@ export function formatSeriesValue(v: number | null | undefined, opts?: ChartForm
   return fmtNumber(Math.round(n));
 }
 
-export function buildChartLegend(labels: string[], colors: string[]): HTMLDivElement {
+function buildChartLegend(labels: string[], colors: string[]): HTMLDivElement {
   const legend = document.createElement('div');
   legend.className = 'chart-legend';
   labels.forEach((label, i) => {
@@ -62,7 +62,7 @@ export function buildChartLegend(labels: string[], colors: string[]): HTMLDivEle
   return legend;
 }
 
-export function updateCustomLegend(u: uPlot, legendEl: HTMLElement, opts?: ChartFormatOpts): void {
+function updateCustomLegend(u: uPlot, legendEl: HTMLElement, opts?: ChartFormatOpts): void {
   const valueEls = legendEl.querySelectorAll('.chart-legend-value');
   const idx = u.cursor?.idx ?? null;
   const data = u.data || [];

@@ -43,7 +43,7 @@ export function heatmapColorRGB(
   return [220, 60, 50, 210];
 }
 
-export function featureCountryName(feature: GeoFeature): string {
+function featureCountryName(feature: GeoFeature): string {
   const p = feature.properties || {};
   return String(
     p.name_long || p.NAME_LONG || p.admin || p.ADMIN || p.name || p.NAME || '',

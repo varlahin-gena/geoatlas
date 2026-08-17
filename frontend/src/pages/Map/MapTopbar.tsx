@@ -75,14 +75,12 @@ export function MapTopbar({ search: searchCtl, grouping, reputation, period: per
         </svg>
         <input
           type="text"
-          id="searchInput"
           placeholder="Поиск: IP, страна, city:Москва, rule:block…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
         <button
           type="button"
-          id="btnSearchBuilder"
           className={`search-builder-toggle${builderOpen ? ' active' : ''}`}
           aria-label="Открыть расширенный поиск"
           aria-expanded={builderOpen}
@@ -106,7 +104,7 @@ export function MapTopbar({ search: searchCtl, grouping, reputation, period: per
 
       <div className="group-control">
         <span>Группа:</span>
-        <select id="groupBy" value={groupBy} onChange={(e) => setGroupBy(e.target.value)}>
+        <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)}>
           <option value="ip">IP</option>
           <option value="subnet">/24</option>
           <option value="city">Город</option>
@@ -139,10 +137,9 @@ export function MapTopbar({ search: searchCtl, grouping, reputation, period: per
       </div>
 
       {reputationEnabled ? (
-        <div className="reputation-filter" id="reputationFilterWrap" data-reputation-only>
+        <div className="reputation-filter" id="reputationFilterWrap">
           <button
             type="button"
-            id="btnReputationFilter"
             className={`rep-filter-btn${(repFilterCount > 0 || repColorArcs) && ipMode ? ' active' : ''}`}
             title={
               ipMode
@@ -158,7 +155,6 @@ export function MapTopbar({ search: searchCtl, grouping, reputation, period: per
           >
             Репутация
             <span
-              id="repFilterBadge"
               className="rep-badge"
               style={{
                 display: repFilterCount > 0 && ipMode ? 'inline-flex' : 'none',
@@ -169,7 +165,6 @@ export function MapTopbar({ search: searchCtl, grouping, reputation, period: per
           </button>
           <div
             className={`reputation-menu${repMenuOpen ? ' open' : ''}`}
-            id="reputationMenu"
             role="dialog"
             aria-label="Фильтр репутации"
           >
@@ -178,7 +173,6 @@ export function MapTopbar({ search: searchCtl, grouping, reputation, period: per
               <button
                 type="button"
                 className="rep-clear"
-                id="btnRepFilterClear"
                 onClick={() => {
                   setRepCategories(new Set());
                   setRepLists(new Set());
@@ -204,7 +198,6 @@ export function MapTopbar({ search: searchCtl, grouping, reputation, period: per
             <label className="rep-color-toggle">
               <input
                 type="checkbox"
-                id="repColorArcsChk"
                 checked={repColorArcs}
                 onChange={(e) => setRepColorArcs(e.target.checked)}
               />
@@ -214,7 +207,7 @@ export function MapTopbar({ search: searchCtl, grouping, reputation, period: per
               Частные и спец. сети (RFC1918, CGNAT, loopback) не учитываются. В деталях дуги
               смотрите «диапазон».
             </p>
-            <div className="rep-menu-body" id="reputationMenuBody">
+            <div className="rep-menu-body">
               {!ipMode ? (
                 <div className="rep-menu-empty">Переключите «Группа» на IP</div>
               ) : Object.keys(repTree).length === 0 ? (
@@ -270,7 +263,6 @@ export function MapTopbar({ search: searchCtl, grouping, reputation, period: per
       <div className="period-control">
         <span>Период:</span>
         <select
-          id="periodPreset"
           title="Период данных"
           value={period}
           onChange={(e) => setPeriod(e.target.value)}
@@ -303,9 +295,7 @@ export function MapTopbar({ search: searchCtl, grouping, reputation, period: per
       </div>
 
       <div className="topbar-spacer" />
-      <div id="userBarHost">
-        <UserMenu />
-      </div>
+      <UserMenu />
       <SystemHealthPill />
     </header>
   );

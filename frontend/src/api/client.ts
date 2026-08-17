@@ -50,7 +50,7 @@ export function isAuthApiPath(path: string): boolean {
   }
 }
 
-export function notifySessionExpired(path: string, status: number): void {
+function notifySessionExpired(path: string, status: number): void {
   if (status !== 401 || isAuthApiPath(path)) return;
   if (typeof window === 'undefined') return;
   if (window.location.pathname === '/login') return;

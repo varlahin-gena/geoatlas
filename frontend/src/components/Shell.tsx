@@ -126,7 +126,7 @@ export function AdminSidebar({ adminLinksOnly = false }: { adminLinksOnly?: bool
   });
 
   return (
-    <aside id="adminSidebar" className="sidebar" aria-label="Навигация" data-nm-dynamic-nav="1">
+    <aside className="sidebar" aria-label="Навигация">
       <div className="sidebar-header">
         <img className="logo" src="/logo.png" alt="" width={28} height={28} aria-hidden="true" />
         <div className="title">ГеоАтлас</div>
@@ -354,7 +354,7 @@ export function SystemHealthPill() {
   const content = (
     <>
       <span className="dot" />
-      <span id="systemHealthText">{text}</span>
+      <span>{text}</span>
       <svg className="status-pill-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
         <path d="M14 3h7v7M10 14L21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5" />
       </svg>
@@ -365,7 +365,6 @@ export function SystemHealthPill() {
     return (
       <Link
         to="/system"
-        id="systemHealthPill"
         className={cls}
         style={{ textDecoration: 'none', cursor: 'pointer' }}
         title={title}
@@ -375,7 +374,7 @@ export function SystemHealthPill() {
     );
   }
   return (
-    <span id="systemHealthPill" className={cls} title={title}>
+    <span className={cls} title={title}>
       {content}
     </span>
   );

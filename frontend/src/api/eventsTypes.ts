@@ -1,7 +1,4 @@
 import type { components } from './openapi';
-import type { ReputationHit } from './types';
-
-export type { ReputationHit };
 
 /** Keep in sync with openapi.yaml MapPoint / MapLine (+ backend model.Node / model.Line). */
 export type MapPoint = components['schemas']['MapPoint'];

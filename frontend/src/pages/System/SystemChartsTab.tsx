@@ -16,7 +16,7 @@ export function SystemChartsTab({
   chartStorage: RefObject<HTMLDivElement | null>;
 }) {
   return (
-    <div className="tab-panel active" id="tab-charts" role="tabpanel">
+    <div className="tab-panel active" role="tabpanel">
       <section className="row cols-2">
         <div className="card chart-card">
           <div className="chart-host" ref={chartEvents} style={{ height: 240 }} />

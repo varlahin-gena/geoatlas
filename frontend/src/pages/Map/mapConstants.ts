@@ -1,7 +1,6 @@
 export const MAP_STYLE_DARK = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 export const MAP_STYLE_LIGHT = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
 
-export const FIRST_PAINT_MAX_ARCS = 800;
 export const COUNTRY_LABEL_MAX_RANK = 5;
 
 export const DEFAULT_MAP_VIEW = Object.freeze({
@@ -29,7 +28,7 @@ export const LABEL_CHARSET = (
   ' .,-—()[]{}/:;«»"\'!?+*&#@%_'
 ).split('');
 
-/** Full RU country map for heatmap/detail (vanilla map-state.js parity). */
+/** Full RU country map for heatmap/detail. */
 export const COUNTRY_NAMES_RU: Record<string, string> = {
   Russia: 'Россия',
   'Russian Federation': 'Россия',
@@ -225,7 +224,7 @@ export function cssRgb(varName: string, fallback = 0): [number, number, number] 
     : [fallback, fallback, fallback];
 }
 
-export function mapBaseCss(): string {
+function mapBaseCss(): string {
   const rgb = cssRgb('--map-base-rgb');
   return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
 }
@@ -253,7 +252,7 @@ function cssVar(name: string, fallback: string): string {
   }
 }
 
-/** Match vanilla buildPeriodQuery — backend expects minutes/hours/days, not period=. */
+/** Backend period query: minutes/hours/days, not period=. */
 export function buildPeriodQuery(
   period: string,
   periodFrom: string,

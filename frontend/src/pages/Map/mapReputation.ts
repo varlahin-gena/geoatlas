@@ -77,20 +77,6 @@ export function categoryLabel(cat: string | undefined): string {
   }
 }
 
-export function formatOneReputationHit(h: ReputationHit | undefined): string {
-  if (!h) return '';
-  const parts: string[] = [];
-  if (h.list) parts.push(h.list);
-  if (h.category) parts.push(categoryLabel(h.category));
-  if (h.network) parts.push(h.network);
-  return parts.join(' · ');
-}
-
-export function formatReputationHits(hits: ReputationHit[] | undefined): string {
-  if (!hits || !hits.length) return '';
-  return hits.map(formatOneReputationHit).join('; ');
-}
-
 export function reputationDetailRows(
   sideLabel: string,
   ip: string | undefined,

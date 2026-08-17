@@ -303,6 +303,9 @@ jobs:
       - name: lint
         run: npm run lint
 
+      - name: knip
+        run: npm run knip
+
       - name: vitest
         run: npm test
 

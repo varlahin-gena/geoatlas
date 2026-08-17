@@ -33,7 +33,7 @@ export function AdminLayout({
     <div id="adminApp" className={appClass}>
       <AdminSidebar />
       <div className="admin-main">
-        <header id="adminTopbar" className="topbar">
+        <header className="topbar">
           <div className="topbar-title title">
             {title}
             {subtitle ? <span className="sub">{subtitle}</span> : null}
@@ -41,13 +41,11 @@ export function AdminLayout({
           <div className="topbar-spacer" />
           <div className="topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {actions}
-            <div id="userBarHost">
-              <UserMenu />
-            </div>
+            <UserMenu />
             {showSystemHealth ? <SystemHealthPill /> : null}
           </div>
         </header>
-        <main className={mainClassName} id={mainClassName === 'content' ? 'system-main' : undefined}>
+        <main className={mainClassName}>
           {children}
         </main>
       </div>

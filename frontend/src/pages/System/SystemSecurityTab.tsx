@@ -3,14 +3,14 @@ import type { FailedLogin } from './systemTypes';
 
 export function SystemSecurityTab({ failed }: { failed: FailedLogin[] }) {
   return (
-    <div className="tab-panel active" id="tab-security" role="tabpanel">
-      <section className="card" id="failedLoginsSection">
-        <details className="section-details" id="failedLoginsDetails" open>
+    <div className="tab-panel active" role="tabpanel">
+      <section className="card">
+        <details className="section-details" open>
           <summary className="card-title" style={{ color: 'var(--red)' }}>
             ■ Неуспешные попытки входа{' '}
-            <span id="failedLoginsCount">({failed.length ? failed.length : 'нет'})</span>
+            <span>({failed.length ? failed.length : 'нет'})</span>
           </summary>
-          <div id="failedLoginsHost">
+          <div>
             {!failed.length ? (
               <p className="auth-fails-empty empty">Нет неуспешных попыток</p>
             ) : (

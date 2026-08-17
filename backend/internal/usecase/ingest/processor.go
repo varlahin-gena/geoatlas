@@ -340,9 +340,6 @@ func (p *Processor) EnrichGeo(logEntry *model.TrafficLog)     { p.enrichGeo(logE
 
 func (p *Processor) ErrBufLen() int { return len(p.errBuf) }
 func (p *Processor) BufLen() int    { return len(p.buf) }
-func (p *Processor) ErrBufBytes() int {
-	return p.errBufBytes
-}
 func (p *Processor) ErrBufRawLen(i int) int {
 	if i < 0 || i >= len(p.errBuf) {
 		return -1

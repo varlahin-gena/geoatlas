@@ -2,7 +2,7 @@ import type maplibregl from 'maplibre-gl';
 import { DEFAULT_GLOBE_VIEW, DEFAULT_MAP_VIEW } from './mapConstants';
 import type { ViewState } from './mapTypes';
 
-export function computeGlobeFitZoom(lat: number, width: number, height: number): number {
+function computeGlobeFitZoom(lat: number, width: number, height: number): number {
   const padding = 6;
   const w = Math.max(1, width || 1);
   const h = Math.max(1, height || 1);
@@ -13,7 +13,7 @@ export function computeGlobeFitZoom(lat: number, width: number, height: number):
   return Math.log2(requiredWorldCircumferencePx / 512);
 }
 
-export function computeMapFitZoom(width: number, height: number): number {
+function computeMapFitZoom(width: number, height: number): number {
   const padding = 8;
   const w = Math.max(1, width || 1);
   const h = Math.max(1, height || 1);

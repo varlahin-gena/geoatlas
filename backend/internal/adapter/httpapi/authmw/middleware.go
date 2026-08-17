@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"network_monitor/internal/auth"
 )
@@ -35,12 +34,6 @@ type UserDirectory interface {
 	Get(string) (auth.UserPublic, bool)
 	SessionVersion(string) (int64, bool)
 	MustReset(string) bool
-}
-
-// SessionParser — cookie session parse (TTL unused by MW but kept for store shape).
-type SessionParser interface {
-	Parse(string) (auth.Session, error)
-	TTL() time.Duration
 }
 
 // TokenStore — named API token verify.

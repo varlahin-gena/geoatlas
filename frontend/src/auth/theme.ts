@@ -14,7 +14,7 @@ export function themeLabel(theme: Theme): string {
   return theme === 'light' ? 'Светлая' : 'Тёмная';
 }
 
-export function applyTheme(theme: Theme): Theme {
+function applyTheme(theme: Theme): Theme {
   const t = theme === 'light' ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', t);
   try {

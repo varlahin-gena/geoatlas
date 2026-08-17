@@ -45,32 +45,31 @@ export function SystemOverviewTab({
     .join(' · ');
 
   return (
-    <div className="tab-panel active" id="tab-overview" role="tabpanel">
+    <div className="tab-panel active" role="tabpanel">
       {showInstallProfile ? (
-        <section className="card card-compact" id="installProfileSection">
+        <section className="card card-compact">
           <h3 className="card-title">
             Профиль установки{' '}
-            <span className="profile-badge" id="profileBadge">
+            <span className="profile-badge">
               {stats?.install_profile?.profile_label ||
                 stats?.install_profile?.profile ||
                 '—'}
             </span>
           </h3>
-          <div className="capacity-meter" id="capacityMeter">
+          <div className="capacity-meter">
             <div className="meter-label">
               Нагрузка к ёмкости:{' '}
-              <span id="capacityLabel">
+              <span>
                 {fmtNumber(Math.round(eps))} / {fmtNumber(epsMax)} eps
               </span>
             </div>
             <div className="capacity-track">
               <div
                 className={`capacity-fill ${capacityTone(capPct)}`}
-                id="capacityFill"
                 style={{ width: `${Math.min(150, Math.min(100, capPct))}%` }}
               />
             </div>
-            <div className="capacity-hint" id="capacityHint">
+            <div className="capacity-hint">
               {capPct > 125
                 ? 'Нагрузка превышает расчётную ёмкость профиля — рассмотрите upgrade или ./scripts/tune-resources.sh'
                 : 'Нагрузка близка к лимиту профиля'}
@@ -82,7 +81,7 @@ export function SystemOverviewTab({
       <section className="row cols-2">
         <div className="card card-compact">
           <h3 className="card-title">Health компонентов</h3>
-          <div className="health-grid" id="componentHealthGrid">
+          <div className="health-grid">
             {([
               {
                 name: 'Backend',
@@ -124,7 +123,7 @@ export function SystemOverviewTab({
 
         <div className="card card-compact">
           <h3 className="card-title">Контейнеры</h3>
-          <div className="container-strip" id="containersRow">
+          <div className="container-strip">
             {CONTAINERS.map((name) => {
               const c = stats?.containers?.[name];
               const up = num(c?.mem_bytes) > 0;
@@ -143,14 +142,14 @@ export function SystemOverviewTab({
         </div>
       </section>
 
-      <section className="card card-compact edges-card" id="edgesAggSection">
+      <section className="card card-compact edges-card">
         <h3 className="card-title">
           Агрегаты рёбер{' '}
-          <span className="profile-badge" id="edgesAggBadge">
+          <span className="profile-badge">
             {edgesBadge}
           </span>
         </h3>
-        <div className="kv-grid cols-3" id="edgesAggPrimary">
+        <div className="kv-grid cols-3">
           <div className="kv-row">
             <span className="k">Raw / agg</span>
             <span className="v">
@@ -170,16 +169,15 @@ export function SystemOverviewTab({
             </span>
           </div>
         </div>
-        <div className="capacity-hint" id="edgesAggHint">
+        <div className="capacity-hint">
           {edgesHint}
         </div>
         <details
           className="details-toggle"
-          id="edgesAggDetails"
           open={edges?.state === 'running' || edges?.state === 'error'}
         >
           <summary>+ Подробности</summary>
-          <div className="kv-grid cols-2" id="edgesAggSecondary">
+          <div className="kv-grid cols-2">
             <div className="kv-row">
               <span className="k">Сообщение</span>
               <span className="v">{edges?.message || '—'}</span>
@@ -204,7 +202,7 @@ export function SystemOverviewTab({
         </details>
       </section>
 
-      <div className="footer-info" id="footerInfoOverview">
+      <div className="footer-info">
         обновлено: {updatedAt ? updatedAt.toLocaleString('ru-RU') : '—'}
         {stats?.backend_info ? ` · ${backendMeta}` : ''}
       </div>

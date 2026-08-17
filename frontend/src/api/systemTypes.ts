@@ -1,6 +1,6 @@
 import type { components } from './openapi';
 
-export type Alert = components['schemas']['SystemAlert'];
+type Alert = components['schemas']['SystemAlert'];
 export type FailedLogin = components['schemas']['SystemFailedLogin'];
 export type EdgesAgg = components['schemas']['SystemEdgesAgg'];
 
@@ -33,7 +33,7 @@ export interface Retention {
   updated_at?: string;
 }
 
-export interface BackupStatus {
+interface BackupStatus {
   state?: string;
   message?: string;
   name?: string;

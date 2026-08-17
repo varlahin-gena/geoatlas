@@ -22,31 +22,11 @@ export type SearchAst =
 type Token =
   | { type: 'WORD' | 'STRING' | 'COLON' | 'LPAREN' | 'RPAREN' | 'AND' | 'OR' | 'NOT'; value: string };
 
-export function normalizeText(v: unknown): string {
+function normalizeText(v: unknown): string {
   return String(v ?? '')
     .toLowerCase()
     .normalize('NFKC')
     .trim();
-}
-
-const countryNamesRu: Record<string, string> = {
-  Russia: 'Россия',
-  'Russian Federation': 'Россия',
-  RU: 'Россия',
-  'United States': 'США',
-  USA: 'США',
-  US: 'США',
-  Kazakhstan: 'Казахстан',
-  KZ: 'Казахстан',
-  China: 'Китай',
-  CN: 'Китай',
-  Germany: 'Германия',
-  DE: 'Германия',
-};
-
-export function ruCountry(name: string | null | undefined): string {
-  if (!name) return 'Неизвестно';
-  return countryNamesRu[name] || name;
 }
 
 let aliasMap: Record<string, SearchField> | null = null;
@@ -62,12 +42,12 @@ function getAliasMap(): Record<string, SearchField> {
   return aliasMap;
 }
 
-export function canonicalSearchField(field: string): SearchField | null {
+function canonicalSearchField(field: string): SearchField | null {
   if (!field) return 'all';
   return getAliasMap()[normalizeText(field)] || null;
 }
 
-export function searchValueTokens(text: string): Token[] {
+function searchValueTokens(text: string): Token[] {
   const raw = String(text || '').trim();
   if (!raw) return [];
   const tokens: Token[] = [];
