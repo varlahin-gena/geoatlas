@@ -6,18 +6,20 @@
 ## [Unreleased]
 
 ### Added
+- Обновление из локального пакета: `geoatlas-X.Y.Z.tar.gz` в GitHub Release, `./update.sh` на сервере (без `git pull`); установщик умеет `NM_INSTALL_PACKAGE`
 - Compact GeoIP snapshot на `/app/data/geo_index.snap`: карта после рестарта не ждёт полный скан `geo_ranges`; сверка stamp с ClickHouse, файл не входит в auth-tarball
 - Лицензия **Apache License 2.0** (`LICENSE`, `NOTICE`); продукт бесплатный, доработки через GitHub Issues
 - Политика уязвимостей: [`SECURITY.md`](SECURITY.md) (приватный GitHub advisory, ответ за 5 рабочих дней)
 - Контракт релизов: `scripts/check-release-contract.sh` (CI) — VERSION, CHANGELOG Notes и OpenAPI не разъезжаются
 - CI: путь «лог → карта» (`TestIntegrationMapPathLogToEvents`: upload-geo + parser samples → `/api/events`)
-- CI: `scripts/shellcheck.sh` (`-S error`) на `start.sh` / `stop.sh` / `scripts/` / `deploy/`
+- CI: `scripts/shellcheck.sh` (`-S error`) на `start.sh` / `stop.sh` / `update.sh` / `scripts/` / `deploy/`
 - Карта: period / group / filter / q / country в query string; 401 вне `/api/auth` → `/login?next=`
 - Playwright: фикстура карты + URL-параметры + редирект по 401
 - `bootstrap.RunStartup` unit-тесты; `trafficstore` — geo-path не падает в raw scan
 - Playwright GeoIP wizard (Escape) + в CI `vite preview`, не только `vite dev`
 
 ### Changed
+- Установка/обновление `release`: сначала tar.gz с GitHub Releases, git clone тега — только если пакета нет (`NM_INSTALL_PREFER_GIT=1` — сразу git)
 - Образы: `nginx:1.27-alpine` → `1.30.4-alpine` (stable; 1.27 EOL), runtime/`volume-perms` `alpine:3.20` → `3.23` (3.20 EOL). Без `apk upgrade`.
 - Toolchain: Go 1.24 → 1.25 (`go.mod` / `go.work` / CI `1.25.x` / `golang:1.25-alpine`); `golang.org/x/crypto` v0.31.0 → v0.55.0 (bcrypt). `clickhouse-go` пока 2.17.1.
 - ClickHouse LTS patch: `clickhouse/clickhouse-server:25.8.28.1` → `25.8.29.51` в compose, CI integration и image scan.
@@ -63,6 +65,7 @@
 
 ### Notes
 - После обновления: `./start.sh` — в `.env` появится `CLICKHOUSE_PASSWORD`, ClickHouse перезапустится с паролем (данные на месте). `clickhouse-client` внутри контейнера: `sh -c 'clickhouse-client --password "$CLICKHOUSE_PASSWORD" -q "SELECT 1"'`.
+- Обновление без git: скачать `geoatlas-X.Y.Z.tar.gz` с GitHub Release и `sudo /opt/network-monitor/update.sh ./geoatlas-X.Y.Z.tar.gz` (тома Docker, `.env`, certs на месте).
 - Сгенерированный admin-пароль: файл `.admin_password_once` (не stdout); удалите после входа.
 - Пример ключей `.env` без секретов: [`.env.example`](.env.example)
 

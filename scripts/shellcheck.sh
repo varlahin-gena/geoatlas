@@ -10,7 +10,7 @@ fail() { echo "shellcheck FAIL: $*" >&2; exit 1; }
 
 command -v shellcheck >/dev/null 2>&1 || fail "shellcheck is not installed"
 
-mapfile -t files < <(git ls-files --cached --others --exclude-standard '*.sh' | grep -E '^(start\.sh|stop\.sh|scripts/|deploy/)' | sort)
+mapfile -t files < <(git ls-files --cached --others --exclude-standard '*.sh' | grep -E '^(start\.sh|stop\.sh|update\.sh|scripts/|deploy/)' | sort)
 [[ ${#files[@]} -gt 0 ]] || fail "no shell scripts matched"
 
 echo "shellcheck -S error (${#files[@]} files)"

@@ -17,6 +17,7 @@ certs/*
 !certs/README.md
 
 # Локальные инструменты разработки
+dist/
 .tmp/
 .tmp_*
 backend/.gotmp/

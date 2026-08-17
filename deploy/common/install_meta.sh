@@ -6,7 +6,7 @@
 #
 # Поля JSON:
 #   version  — из VERSION (продуктовая semver)
-#   source   — release | main | git
+#   source   — release | main | git | package
 #   ref      — тег (v1.1.4) или ветка (main)
 #   commit   — короткий SHA (если есть git)
 #   display  — строка для UI («v1.1.4» или «main»)
@@ -72,6 +72,14 @@ nm_write_install_meta() {
                     fi
                 fi
                 ;;
+            package)
+                source="package"
+                if [[ -z "$ref" || "$ref" == "main" || "$ref" == "master" || "$ref" == "package" ]]; then
+                    if [[ "$version" != "unknown" ]]; then
+                        ref="v${version}"
+                    fi
+                fi
+                ;;
             main)
                 source="main"
                 [[ -z "$ref" ]] && ref="main"
@@ -90,6 +98,10 @@ nm_write_install_meta() {
 
     case "$source" in
         release)
+            display="$ref"
+            [[ "$display" != v* && "$version" != "unknown" ]] && display="v${version}"
+            ;;
+        package)
             display="$ref"
             [[ "$display" != v* && "$version" != "unknown" ]] && display="v${version}"
             ;;

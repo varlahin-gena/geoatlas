@@ -29,6 +29,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: shellcheck
         run: bash scripts/shellcheck.sh
+      - name: pack + apply-package smoke
+        run: bash scripts/test-apply-package.sh
 
   backend:
     name: backend (test + lint)

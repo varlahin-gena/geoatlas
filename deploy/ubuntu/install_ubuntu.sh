@@ -40,8 +40,8 @@ ${src_line}
 
 Шаги:
   1. Пакеты и Docker
-  2. Источник (релиз / main)
-  3. Клонирование репозитория
+  2. Источник (релиз / main / пакет)
+  3. Получение исходников
   4. Выбор модулей
   5. HTTPS
   6. Порт веб-интерфейса
@@ -182,7 +182,7 @@ _welcome_dialog() {
 Каталог: ${PROJECT_DIR}
 Репозиторий: ${REPO_URL}
 
-Далее: Docker, выбор релиза или main, модули и запуск." || true
+Далее: Docker, выбор релиза / main / пакета, модули и запуск." || true
         fi
         return 0
     fi
@@ -353,6 +353,10 @@ configure_firewall() {
 }
 
 clone_or_update_repo() {
+    if declare -F nm_fetch_project >/dev/null 2>&1; then
+        nm_fetch_project "$PROJECT_DIR" "$REPO_URL" "$BRANCH" "${NM_INSTALL_IS_TAG:-0}"
+        return
+    fi
     if declare -F nm_clone_or_update_repo >/dev/null 2>&1; then
         nm_clone_or_update_repo "$PROJECT_DIR" "$REPO_URL" "$BRANCH" "${NM_INSTALL_IS_TAG:-0}"
         return
@@ -523,11 +527,12 @@ configure_resources() {
 prepare_project() {
     cd "$PROJECT_DIR"
 
-    [[ -f docker-compose.yml ]] || { log "docker-compose.yml не найден после клонирования."; exit 1; }
+    [[ -f docker-compose.yml ]] || { log "docker-compose.yml не найден после получения исходников."; exit 1; }
 
     log "Выставление прав на исполнение..."
-    for f in start.sh stop.sh \
+    for f in start.sh stop.sh update.sh \
              scripts/tune-resources.sh \
+             scripts/pack-release.sh \
              scripts/backup-clickhouse.sh \
              scripts/restore-clickhouse.sh \
              clickhouse/backfill_edges_agg.sh \
@@ -536,6 +541,7 @@ prepare_project() {
              deploy/common/detect_resources.sh \
              deploy/common/select_modules.sh \
              deploy/common/select_source.sh \
+             deploy/common/apply_package.sh \
              deploy/common/select_http_port.sh \
              deploy/common/select_https.sh \
              deploy/common/full_auto_preset.sh \
@@ -639,7 +645,12 @@ main() {
     _nm_run_gauge_fn "Docker" "Установка Docker Engine и Compose…" install_docker
     choose_install_source
     print_banner
-    _nm_run_gauge_fn "Репозиторий" "Клонирование / обновление ${BRANCH}…" clone_or_update_repo
+    local fetch_msg="Клонирование / обновление ${BRANCH}…"
+    case "${NM_INSTALL_SOURCE:-}" in
+        package) fetch_msg="Распаковка локального пакета…" ;;
+        release) fetch_msg="Пакет релиза ${BRANCH} (или git)…" ;;
+    esac
+    _nm_run_gauge_fn "Исходники" "$fetch_msg" clone_or_update_repo
     # После clone — источник установки в .env + UI-слой из репозитория
     if declare -F apply_install_source >/dev/null 2>&1; then
         apply_install_source "$PROJECT_DIR"

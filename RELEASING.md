@@ -51,6 +51,8 @@ gh release create "v$(tr -d '[:space:]' < VERSION)" \
 
 Не тегировать раньше секции в CHANGELOG: job на `v*` упадёт, если OpenAPI ещё только в Unreleased.
 
+На тег CI собирает `dist/geoatlas-X.Y.Z.tar.gz` (+ `.sha256`) и прикрепляет к GitHub Release. Локально: `bash scripts/pack-release.sh`. Обновление сервера из пакета: `sudo /opt/network-monitor/update.sh geoatlas-X.Y.Z.tar.gz` (см. README, «Обновление системы»).
+
 ## После релиза
 
 - Установщик / README — только если менялся UX установки.
