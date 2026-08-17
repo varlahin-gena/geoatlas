@@ -35,6 +35,7 @@ OpenAPI: минор (`1.8` → `1.9`) — новый endpoint или новое 
    - логин, карта, `/system`
    - API-токен scope=ops, `curl -H "Authorization: Bearer …" /api/ingest/stats`
 6. (Опционально) `./scripts/watch-ingest.sh` без drops в покое.
+7. (Опционально) `bash scripts/pack-release.sh` — локально проверить `dist/geoatlas-X.Y.Z.tar.gz`.
 
 ## Создать релиз
 
@@ -42,18 +43,21 @@ OpenAPI: минор (`1.8` → `1.9`) — новый endpoint или новое 
 # working tree clean, main запушен, VERSION уже X.Y.Z
 git tag -a "v$(tr -d '[:space:]' < VERSION)" -m "ГеоАтлас v$(tr -d '[:space:]' < VERSION)"
 git push origin "v$(tr -d '[:space:]' < VERSION)"
-
-gh release create "v$(tr -d '[:space:]' < VERSION)" \
-  --title "v$(tr -d '[:space:]' < VERSION)" \
-  --notes-file /tmp/release-notes.md
-# или GitHub → Releases, вставить секцию из CHANGELOG
 ```
 
 Не тегировать раньше секции в CHANGELOG: job на `v*` упадёт, если OpenAPI ещё только в Unreleased.
 
-На тег CI собирает `dist/geoatlas-X.Y.Z.tar.gz` (+ `.sha256`) и прикрепляет к GitHub Release. Локально: `bash scripts/pack-release.sh`. Обновление сервера из пакета: `sudo /opt/network-monitor/update.sh geoatlas-X.Y.Z.tar.gz` (см. README, «Обновление системы»).
+На тег CI сам:
+
+1. проверяет контракт (`VERSION` / CHANGELOG / OpenAPI);
+2. создаёт GitHub Release из секции CHANGELOG (если релиза ещё нет);
+3. собирает **`geoatlas-X.Y.Z.tar.gz`** (+ `.sha256`) и прикрепляет к релизу.
+
+Ручной `gh release create` не нужен, пока job **github-release** зелёный. Один tar.gz — и для Ubuntu, и для Oracle Linux; операторы обновляют через `sudo /opt/network-monitor/update.sh geoatlas-X.Y.Z.tar.gz` (README, «Обновление системы»).
+
+Проверьте Assets релиза: `geoatlas-X.Y.Z.tar.gz` и `geoatlas-X.Y.Z.tar.gz.sha256`.
 
 ## После релиза
 
-- Установщик / README — только если менялся UX установки.
+- Установщик / README — только если менялся UX установки. Проверьте, что в Assets релиза есть tar.gz.
 - Следующие коммиты **не** двигают `VERSION`, пока не решите релизить снова. Новое — в Unreleased (и bump `info.version`, если менялся HTTP-контракт).

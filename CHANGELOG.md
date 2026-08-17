@@ -5,8 +5,12 @@
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-08-18
+
+Минорный релиз: обновление из установочного пакета без `git pull`, OpenAPI **1.11.0**, hardening и bootstrap схемы ClickHouse из `EnsureBaseSchema`.
+
 ### Added
-- Обновление из локального пакета: `geoatlas-X.Y.Z.tar.gz` в GitHub Release, `./update.sh` на сервере (без `git pull`); установщик умеет `NM_INSTALL_PACKAGE`
+- Обновление из локального пакета: `geoatlas-1.4.0.tar.gz` в GitHub Release (один архив для Ubuntu и Oracle Linux / RHEL), `./update.sh` на сервере (без `git pull`); установщик умеет `NM_INSTALL_PACKAGE`
 - Compact GeoIP snapshot на `/app/data/geo_index.snap`: карта после рестарта не ждёт полный скан `geo_ranges`; сверка stamp с ClickHouse, файл не входит в auth-tarball
 - Лицензия **Apache License 2.0** (`LICENSE`, `NOTICE`); продукт бесплатный, доработки через GitHub Issues
 - Политика уязвимостей: [`SECURITY.md`](SECURITY.md) (приватный GitHub advisory, ответ за 5 рабочих дней)
@@ -19,14 +23,14 @@
 - Playwright GeoIP wizard (Escape) + в CI `vite preview`, не только `vite dev`
 
 ### Changed
-- Установка/обновление `release`: сначала tar.gz с GitHub Releases, git clone тега — только если пакета нет (`NM_INSTALL_PREFER_GIT=1` — сразу git)
+- Документация: один `geoatlas-X.Y.Z.tar.gz` для Ubuntu и Oracle Linux; `update.sh` сохраняет runtime-файлы; CI на тег сам клеит архив к GitHub Release
 - Образы: `nginx:1.27-alpine` → `1.30.4-alpine` (stable; 1.27 EOL), runtime/`volume-perms` `alpine:3.20` → `3.23` (3.20 EOL). Без `apk upgrade`.
 - Toolchain: Go 1.24 → 1.25 (`go.mod` / `go.work` / CI `1.25.x` / `golang:1.25-alpine`); `golang.org/x/crypto` v0.31.0 → v0.55.0 (bcrypt). `clickhouse-go` пока 2.17.1.
 - ClickHouse LTS patch: `clickhouse/clickhouse-server:25.8.28.1` → `25.8.29.51` в compose, CI integration и image scan.
 - ClickHouse Go stack: `clickhouse-go` `v2.17.1` → `v2.48.0` и совместимые indirect зависимости (`ch-go`, `orb`, `lz4`, `otel`, `compress`).
 - Schema SoT: базовые таблицы в `migrate.EnsureBaseSchema`; `clickhouse/init.sql` и `migrate_*.sql` генерируются из того же DDL (`go generate ./internal/adapter/clickhouse/migrate/...`). Пустой том без init.sql больше не оставляет `traffic_logs` несозданным.
 - JSON control plane: запись users/tokens/retention/feeds/templates/backup-schedule через общий `fileatomic` (tmp + fsync + rename)
-- HTTP API doc **1.5.0 → 1.11.0** (после v1.3.1, ещё не в продуктовом теге):
+- HTTP API doc **1.5.0 → 1.11.0**:
   - **1.7.0**: `GET /metrics` (Prometheus, Bearer≥ops), `POST /api/auth/logout-all` в спецификации, ingest SLO в `/api/system/stats`
   - **1.8.0**: `/api/events` — серверные `filter` / `limit` / `country` / `q`; live `pipeline.syslogng` в `/api/system/stats`
   - **1.9.0**: `/api/events` — AST-поиск `q` и фильтр репутации `rep_cat`/`rep_list`/`rep_side` до LIMIT; `reputation_facets`; схема `SystemStats`; SPA-типы из `openapi-typescript`
@@ -64,10 +68,14 @@
 - Frontend `GET /health` — локальный 200 без прокси на backend; при HTTPS `:80` `/health` не уходит в 301
 
 ### Notes
-- После обновления: `./start.sh` — в `.env` появится `CLICKHOUSE_PASSWORD`, ClickHouse перезапустится с паролем (данные на месте). `clickhouse-client` внутри контейнера: `sh -c 'clickhouse-client --password "$CLICKHOUSE_PASSWORD" -q "SELECT 1"'`.
-- Обновление без git: скачать `geoatlas-X.Y.Z.tar.gz` с GitHub Release и `sudo /opt/network-monitor/update.sh ./geoatlas-X.Y.Z.tar.gz` (тома Docker, `.env`, certs на месте).
-- Сгенерированный admin-пароль: файл `.admin_password_once` (не stdout); удалите после входа.
+- OpenAPI API doc version: **1.11.0**
+- Продуктовая версия: **1.4.0**
+- После обновления: скачать `geoatlas-1.4.0.tar.gz` (+ `.sha256`) с GitHub Release и `sudo /opt/network-monitor/update.sh ./geoatlas-1.4.0.tar.gz` (тома Docker, `.env`, certs на месте). Health: `/api/ready`.
+- В `.env` появится `CLICKHOUSE_PASSWORD`, если его ещё не было; ClickHouse перезапустится с паролем (данные на месте). `clickhouse-client` внутри контейнера: `sh -c 'clickhouse-client --password "$CLICKHOUSE_PASSWORD" -q "SELECT 1"'`.
+- Пустой том ClickHouse: базовые таблицы создаёт `migrate.EnsureBaseSchema` (`init.sql` generated).
+- Сгенерированный admin-пароль: `.admin_password_once` (не stdout); удалите после входа.
 - Пример ключей `.env` без секретов: [`.env.example`](.env.example)
+- 64 коммита с `v1.3.1`
 
 ## [1.3.1] — 2026-08-12
 
@@ -303,6 +311,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[1.4.0]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.4.0
 [1.3.1]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.3.1
 [1.3.0]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.3.0
 [1.2.1]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.2.1

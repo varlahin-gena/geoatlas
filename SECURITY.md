@@ -7,7 +7,7 @@
 Откройте [приватный advisory](https://github.com/varlahin-gena/network_monitor/security/advisories/new) в этом репозитории.
 
 В отчёте желательно:
-- затронутая версия (git-тег или `GET /api/system/version`);
+- затронутая версия (git-тег, `GET /api/system/version` или `VERSION` из пакета `geoatlas-X.Y.Z.tar.gz`);
 - шаги воспроизведения или PoC (без массового сканирования чужих установок);
 - ожидаемый и фактический эффект (обход auth, утечка данных, RCE и т.п.).
 
@@ -29,7 +29,7 @@
 
 ## Что в скоупе
 
-Код репозитория в том виде, как его ставят скрипты и `./start.sh`: backend, frontend, stats-collector, `pkg/`, compose, nginx, install/uninstall.
+Код репозитория в том виде, как его ставят скрипты, установочный пакет `geoatlas-X.Y.Z.tar.gz` и `./start.sh` / `./update.sh`: backend, frontend, stats-collector, `pkg/`, compose, nginx, install/uninstall.
 
 Примеры: обход авторизации/CSRF/ролей, утечка секретов из образа или API, инъекции через загрузку логов/GeoIP/репутации, небезопасный дефолт в нашем конфиге (не в upstream).
 
@@ -43,4 +43,4 @@
 
 ## После исправления
 
-Патч выходит обычным GitHub Release. Кратко — в CHANGELOG (секция Security), подробности — в GitHub Security Advisory, когда исправление уже доступно.
+Патч выходит обычным GitHub Release (в Assets — `geoatlas-X.Y.Z.tar.gz`). Операторы накладывают его через `./update.sh` (см. README, «Обновление системы»). Кратко — в CHANGELOG (секция Security), подробности — в GitHub Security Advisory, когда исправление уже доступно.

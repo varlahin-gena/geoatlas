@@ -14,6 +14,7 @@
   - [HTTPS (свои сертификаты)](#https-свои-сертификаты)
 - [Быстрый старт](#быстрый-старт)
 - [Установка](#установка)
+  - [Установочный пакет](#установочный-пакет)
   - [Ubuntu (автоматическая)](#ubuntu-автоматическая)
   - [Oracle Linux / RHEL (автоматическая)](#oracle-linux--rhel-автоматическая)
   - [Ручная установка](#ручная-установка)
@@ -52,6 +53,7 @@
 - Опциональный **HTTPS** на nginx со своими PEM-сертификатами (редирект HTTP→HTTPS)
 - Загрузка и правка **GeoIP-базы** (CSV SIEM KUMA, `/geo-ranges`, IP без координат на `/geo-missing`); лимиты upload по профилю, очистка базы, большие CSV — с сервера через `curl` (см. [GeoIP](#geoip))
 - Установка **«Сделай мне хорошо»** (`NM_FULL_AUTO` / `--full-auto`): релиз, все модули, порт 8080, автопрофиль, firewall allowlist (UI + :514)
+- **Один установочный пакет** `geoatlas-X.Y.Z.tar.gz` для Ubuntu и Oracle Linux / RHEL; обновление без `git pull` через `./update.sh`
 - Toast-уведомления без автоскрытия (крестик), сохраняются при смене страниц до ручного закрытия
 - **Репутация IP** (модуль опционален при установке): offline-списки и URL-фиды (`/reputation`), каталог публичных источников, фильтр и подсветка дуг на карте; приватные IP не помечаются
 - Хранение и аналитика в **ClickHouse**; дневные geo-агрегаты для пресетов `1d+` (city/country)
@@ -255,11 +257,25 @@ http://<IP_сервера>/
 
 Каталог установки по умолчанию: **`/opt/network-monitor`**.
 
+### Установочный пакет
+
+Один архив **`geoatlas-X.Y.Z.tar.gz`** (плюс `.sha256`) с GitHub Release — это исходники стека, **оба** установщика (`deploy/ubuntu/…` и `deploy/oracle_linux/…`) и `update.sh`. Это не `.deb`/`.rpm`: пакет Docker и файрвол хоста по-прежнему ставит OS-скрипт.
+
+| Задача | Что запускать | Пакет |
+|--------|----------------|-------|
+| Первая установка, Ubuntu | `deploy/ubuntu/install_ubuntu.sh` | тот же tar.gz (или скачать релиз с GitHub) |
+| Первая установка, Oracle Linux / RHEL | `deploy/oracle_linux/install_oraclelinux.sh` | тот же tar.gz |
+| Обновление уже стоящей системы | `/opt/network-monitor/update.sh` | тот же tar.gz |
+
+Источник в TUI установщика: **релиз** (скачать tar.gz с GitHub), **`main`** (git) или **локальный пакет**. Режим `release` без локального файла сам берёт `geoatlas-X.Y.Z.tar.gz` с Releases; если asset ещё нет — `git clone` тега.
+
+Локально собрать архив (для проверки, не вместо CI на теге): `bash scripts/pack-release.sh` → `dist/geoatlas-<VERSION>.tar.gz`.
+
 ### Ubuntu (автоматическая)
 
-Скрипт устанавливает Docker, **спрашивает источник** (последний релиз, ветка `main` или локальный пакет `.tar.gz`), получает исходники, **интерактивно предлагает модули** и профиль производительности, настраивает UFW и запускает стек.
+Скрипт устанавливает Docker, **спрашивает источник** (последний релиз, ветка `main` или локальный пакет `.tar.gz` — тот же архив, что и для Oracle Linux), получает исходники, **интерактивно предлагает модули** и профиль производительности, настраивает UFW и запускает стек.
 
-Диалоги установки и удаления — **TUI** (`whiptail` → `dialog` → текст). Долгие шаги (apt/Docker/clone) показывают **gauge**.
+Диалоги установки и удаления — **TUI** (`whiptail` → `dialog` → текст). Долгие шаги (apt/Docker/исходники) показывают **gauge**.
 
 ```bash
 # Скачать скрипт (или скопировать из репозитория)
@@ -337,7 +353,7 @@ sudo ./install_ubuntu.sh --full-auto
 
 ### Oracle Linux / RHEL (автоматическая)
 
-Поддерживаются Oracle Linux, RHEL, Rocky Linux, AlmaLinux, CentOS.
+Поддерживаются Oracle Linux, RHEL, Rocky Linux, AlmaLinux, CentOS. Установочный **`geoatlas-X.Y.Z.tar.gz` тот же**, что для Ubuntu (см. [Установочный пакет](#установочный-пакет)).
 
 ```bash
 curl -fsSL -o install_oraclelinux.sh \
@@ -365,13 +381,16 @@ sudo ./install_oraclelinux.sh
 ```bash
 # 1. Установить Docker и compose plugin (см. docs.docker.com)
 
-# 2. Клонировать репозиторий
+# 2a. Из пакета релиза (без git; Ubuntu и Oracle Linux одинаково)
+#     tar -xzf geoatlas-X.Y.Z.tar.gz && sudo mkdir -p /opt
+#     sudo cp -a geoatlas-X.Y.Z /opt/network-monitor
+# 2b. Или клонировать репозиторий
 sudo mkdir -p /opt
 sudo git clone -b main https://github.com/varlahin-gena/network_monitor.git /opt/network-monitor
 cd /opt/network-monitor
 
 # 3. Права на скрипты
-chmod +x start.sh stop.sh scripts/tune-resources.sh \
+chmod +x start.sh stop.sh update.sh scripts/tune-resources.sh \
   deploy/common/detect_resources.sh deploy/common/select_modules.sh deploy/common/ui.sh \
   deploy/common/admin_auth.sh
 
@@ -455,6 +474,9 @@ DO_BUILD=0 ./start.sh
 
 # Остановка (данные сохраняются)
 ./stop.sh
+
+# Обновление из пакета (тома Docker и .env не трогает) — см. ниже
+# sudo ./update.sh /path/to/geoatlas-X.Y.Z.tar.gz
 ```
 
 **Прямые команды Docker Compose:**
@@ -734,23 +756,32 @@ docker compose exec clickhouse sh -c 'clickhouse-client --password "$CLICKHOUSE_
 
 Данные ClickHouse и учётки UI сохраняются (тома Docker не трогаем), меняется только код в `/opt/network-monitor`.
 Не используйте `REMOVE_DOCKER_VOLUMES=1` / `docker compose down -v` при обновлении.
-`.env`, сертификаты в `certs/`, `docker-compose.override.yml` и `install-profile.json` пакет не затирает.
+
+Один **`geoatlas-X.Y.Z.tar.gz`** на Ubuntu и на Oracle Linux / RHEL. `update.sh` не затирает:
+
+- `.env`, `.admin_password_once`
+- `docker-compose.override.yml`, `install-profile.json`, `install-modules.json`
+- `certs/` (PEM)
+- `syslog-ng.d/zz_profile.conf`, `syslog-ng.d/zz_ingest_auth.conf`
+- `clickhouse/users.d/zz_install_limits.xml`
+
+Образы пересобираются на сервере (`./start.sh`); нужен доступ к Docker Hub (базовые образы), сам GitHub после скачивания tar.gz не обязателен.
 
 **Рекомендуемый путь — локальный пакет** (без `git pull`):
 
 ```bash
 # 1. Скачать архив релиза (на машине с интернетом или сразу на сервер)
-#    GitHub → Releases → geoatlas-X.Y.Z.tar.gz (+ .sha256)
-VER=1.3.1   # подставьте версию с страницы Releases
+#    GitHub → Releases → Assets → geoatlas-X.Y.Z.tar.gz (+ .sha256)
+VER=1.4.0
 curl -fLO "https://github.com/varlahin-gena/network_monitor/releases/download/v${VER}/geoatlas-${VER}.tar.gz"
 curl -fLO "https://github.com/varlahin-gena/network_monitor/releases/download/v${VER}/geoatlas-${VER}.tar.gz.sha256"
 sha256sum -c "geoatlas-${VER}.tar.gz.sha256"
 
-# 2. На сервере: остановить стек, наложить пакет, пересобрать образы
+# 2. На сервере (Ubuntu и Oracle Linux одинаково)
 sudo /opt/network-monitor/update.sh ./geoatlas-${VER}.tar.gz
 ```
 
-Если на сервере ещё старый `update.sh` (установка до этого механизма):
+Если на сервере ещё нет `update.sh` (установка до этого механизма):
 
 ```bash
 tar -xzf geoatlas-${VER}.tar.gz
@@ -763,7 +794,9 @@ sudo ./geoatlas-${VER}/update.sh --package "$PWD/geoatlas-${VER}.tar.gz"
 sudo /opt/network-monitor/update.sh --download
 ```
 
-Первичная установка из уже скачанного пакета (без git):
+Полезные опции: `--no-start`, `--no-stop`, `--project-dir DIR`. Проверка суммы: рядом с tar.gz файл `.sha256` или `NM_INSTALL_PACKAGE_SHA256=<hex>`.
+
+Первичная установка из уже скачанного пакета (без git) — OS-скрипт из архива:
 
 ```bash
 tar -xzf geoatlas-${VER}.tar.gz
@@ -977,6 +1010,7 @@ Unit-тесты карты (репутация / heatmap focus / coords helpers)
 - Syslog `:514` **без TLS/auth** — ограничьте источником МСЭ (`NM_SYSLOG_ALLOW_FROM` / Security Group / firewall)
 - Ingest внутри docker: маркер с `INGEST_SHARED_SECRET` + `INGEST_ALLOW_FROM=syslog-ng` (HTTP upload API — без маркера)
 - Reputation URL-фиды: только публичные IPv4-хосты (private/metadata блокируются)
+- Обновление: проверяйте `geoatlas-X.Y.Z.tar.gz.sha256` до `./update.sh`
 
 ## Структура репозитория
 
@@ -1062,18 +1096,23 @@ network_monitor/
 ├── SECURITY.md                       # как сообщать об уязвимостях
 ├── VERSION / CHANGELOG.md / RELEASING.md
 ├── .github/workflows/ci.yml
+├── .github/workflows/release-tag.yml # тег v*: Release + geoatlas-X.Y.Z.tar.gz
 ├── start.sh / stop.sh / update.sh    # update.sh — наложение geoatlas-*.tar.gz
 ├── syslog-ng.conf
 └── syslog-ng.d/                      # 00-keep.conf + zz_profile.conf.example; zz_profile.conf генерируется
 ```
 
-**Генерируемые при установке (не в git):**
+**Генерируемые при установке (не в git). `update.sh` сохраняет runtime; `install-meta.json` заново пишет `./start.sh`:**
 
 ```
 /opt/network-monitor/
 ├── docker-compose.override.yml   # Лимиты по профилю
 ├── .env                          # COMPOSE_PROFILES, секреты, лимиты
+├── .admin_password_once          # одноразовый пароль admin (если генерировали)
 ├── install-profile.json          # Сводка установки
+├── install-modules.json          # Выбор модулей
+├── install-meta.json             # Версия для UI (переписывается при старте)
 ├── syslog-ng.d/zz_profile.conf   # Буферы syslog-ng
+├── syslog-ng.d/zz_ingest_auth.conf
 └── clickhouse/users.d/zz_install_limits.xml
 ```
