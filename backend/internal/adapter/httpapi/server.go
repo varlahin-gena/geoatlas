@@ -8,16 +8,6 @@ import (
 
 	"network_monitor/internal/adapter/httpapi/loginthrottle"
 	"network_monitor/internal/adapter/searchtemplatesfile"
-	"network_monitor/internal/config"
-	usecaseauth "network_monitor/internal/usecase/auth"
-	usecasebackup "network_monitor/internal/usecase/backup"
-	usecaseevents "network_monitor/internal/usecase/events"
-	usecasegeo "network_monitor/internal/usecase/geo"
-	"network_monitor/internal/usecase/parseerrors"
-	"network_monitor/internal/usecase/parsetest"
-	usecasereputation "network_monitor/internal/usecase/reputation"
-	usecaseretention "network_monitor/internal/usecase/retention"
-	usecasesystem "network_monitor/internal/usecase/system"
 )
 
 const (
@@ -40,62 +30,47 @@ type ServerOption func(*Deps)
 func WithMetrics(m MetricsRecorder) ServerOption {
 	return func(d *Deps) {
 		if d != nil {
-			d.WithMetrics(m)
+			d.prom = m
 		}
 	}
 }
 
-func NewServer(
-	cfg config.Config,
-	ingestSvc Ingester,
-	eventsUC *usecaseevents.Service,
-	geoUC *usecasegeo.Service,
-	reputationUC *usecasereputation.Service,
-	parseErrorsUC *parseerrors.Service,
-	systemUC *usecasesystem.Service,
-	systemPinger usecasesystem.ClickHousePinger,
-	parseTestUC *parsetest.Service,
-	retentionUC *usecaseretention.Service,
-	backupUC *usecasebackup.Service,
-	authUC *usecaseauth.Service,
-	users UserDirectory,
-	sessions SessionParser,
-	apiTokens APITokenStore,
-	opts ...ServerOption,
-) *Server {
-	deps := NewDeps(cfg, ingestSvc, eventsUC, geoUC, reputationUC, parseErrorsUC, systemUC, systemPinger, parseTestUC, retentionUC, backupUC).
-		WithAuth(authUC, users, sessions, apiTokens).
-		WithSearchTemplates(searchtemplatesfile.New(cfg.SearchTemplatesFile))
+func NewServer(p Params, opts ...ServerOption) *Server {
+	if p.SearchTemplates == nil {
+		p.SearchTemplates = searchtemplatesfile.New(p.Cfg.SearchTemplatesFile)
+	}
+	deps := NewDeps(p)
 	for _, opt := range opts {
 		if opt != nil {
 			opt(deps)
 		}
 	}
-	health := &HealthHandler{deps.Health()}
-	events := &EventsHandler{deps.Events()}
-	ingestH := &IngestHandler{deps.Ingest()}
-	geoH := &GeoHandler{deps.Geo()}
-	repH := &ReputationHandler{deps.Reputation()}
-	system := &SystemHandler{deps.System()}
-	parse := &ParseHandler{deps.Parse()}
-	authDeps := deps.Auth()
+	health := &HealthHandler{deps.health}
+	events := &EventsHandler{deps.events}
+	ingestH := &IngestHandler{deps.ingest}
+	geoH := &GeoHandler{deps.geo}
+	repH := &ReputationHandler{deps.reputation}
+	system := &SystemHandler{deps.system}
+	parse := &ParseHandler{deps.parse}
+	authDeps := deps.auth
 	authH := &AuthHandler{authDeps}
 	usersH := &UsersHandler{authDeps}
 	tokensH := &APITokensHandler{authDeps}
-	tplH := &SearchTemplatesHandler{deps.SearchTemplates()}
+	tplH := &SearchTemplatesHandler{deps.templates}
 
+	cfg := p.Cfg
 	envTokens := cfg.APIAuthTokens()
 	if cfg.APIAuthDisabled {
 		envTokens = nil
 	}
-	ba := newBearerAuth(envTokens, apiTokens)
+	ba := newBearerAuth(envTokens, p.APITokens)
 	uiAuthOff := cfg.AuthDisabled
 	apiAuthOff := cfg.APIAuthDisabled
 
-	loginMW := requireLoginMW(ba, sessions, users, uiAuthOff)
-	adminMW := requireAdminMW(ba, sessions, users, uiAuthOff)
+	loginMW := requireLoginMW(ba, p.Sessions, p.Users, uiAuthOff)
+	adminMW := requireAdminMW(ba, p.Sessions, p.Users, uiAuthOff)
 	// Pipeline ops: Bearer≥ops / administrator; open if AUTH_DISABLED или API_AUTH_DISABLED.
-	opsMW := requireOpsMW(ba, sessions, users, apiAuthOff, uiAuthOff)
+	opsMW := requireOpsMW(ba, p.Sessions, p.Users, apiAuthOff, uiAuthOff)
 	csrf := csrfMW(ba, uiAuthOff)
 
 	rr := newRouteRegistrar()

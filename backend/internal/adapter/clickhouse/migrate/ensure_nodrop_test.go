@@ -23,7 +23,7 @@ func TestEnsureEdgesAggNoDropWhenSchemaVersionErrors(t *testing.T) {
 	}
 
 	// ch=nil безопасен: Ensure возвращает до applyEdgesAggSchema / Exec(DROP).
-	err := EnsureEdgesAgg(context.Background(), nil)
+	err := EnsureEdgesAggSchema(context.Background(), nil)
 	if err == nil {
 		t.Fatal("expected error from needsSchemaDDL")
 	}
@@ -47,7 +47,7 @@ func TestEnsureGeoEdgesAggNoDropWhenSchemaVersionErrors(t *testing.T) {
 	}
 
 	aggstate.SetGeoEdgesAggReady(true)
-	err := EnsureGeoEdgesAgg(context.Background(), nil)
+	err := EnsureGeoEdgesAggSchema(context.Background(), nil)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -102,7 +102,7 @@ func TestEnsureHourlyEdgesAggNoDropWhenSchemaVersionErrors(t *testing.T) {
 		return true, errors.New("clickhouse blip")
 	}
 	aggstate.SetHourlyEdgesAggReady(true)
-	if err := EnsureHourlyEdgesAgg(context.Background(), nil); err == nil {
+	if err := EnsureHourlyEdgesAggSchema(context.Background(), nil); err == nil {
 		t.Fatal("expected error")
 	}
 	if aggstate.PreferHourlyEdgesAgg() {

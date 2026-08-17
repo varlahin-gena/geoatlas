@@ -15,7 +15,14 @@ func TestLoadGeoRangesRejectsNil(t *testing.T) {
 	}
 }
 
-func TestReplaceGeoRangesRejectsEmpty(t *testing.T) {
+func TestQuerySourceStampRejectsNil(t *testing.T) {
+	_, err := QuerySourceStamp(context.Background(), nil)
+	if err == nil || !strings.Contains(err.Error(), "nil") {
+		t.Fatalf("nil conn: %v", err)
+	}
+}
+
+func TestReplaceGeoRangesRejectsEmptyAndNil(t *testing.T) {
 	_, err := ReplaceGeoRanges(context.Background(), nil, nil)
 	if err == nil || !strings.Contains(err.Error(), "no geo ranges") {
 		t.Fatalf("empty ranges: %v", err)

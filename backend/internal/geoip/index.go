@@ -171,6 +171,18 @@ func (i *Index) storeSnapshot(snap *snapshot) {
 	i.data.Store(snap)
 }
 
+// Built возвращает текущий compact snapshot для persist на диск.
+func (i *Index) Built() *BuiltSnapshot {
+	if i == nil {
+		return &BuiltSnapshot{snap: &snapshot{}}
+	}
+	snap := i.loadSnapshot()
+	if snap == nil {
+		return &BuiltSnapshot{snap: &snapshot{}}
+	}
+	return &BuiltSnapshot{snap: snap}
+}
+
 // ReplaceRanges заменяет индекс (для тестов и in-memory сценариев).
 // Пересечения отбрасываются через NormalizeRanges.
 func (i *Index) ReplaceRanges(ranges []model.GeoRange) {
@@ -200,6 +212,11 @@ func (i *Index) RangeCount() int {
 		return 0
 	}
 	return len(snap.rows)
+}
+
+// IndexReady — in-memory index всегда готов к lookup после создания.
+func (i *Index) IndexReady() bool {
+	return i != nil
 }
 
 // ApproxBytes возвращает оценку RAM текущего compact snapshot.

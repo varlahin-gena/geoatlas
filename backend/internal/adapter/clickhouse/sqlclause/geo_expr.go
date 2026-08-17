@@ -51,12 +51,8 @@ func colRef(table, col string) string {
 	return table + "." + col
 }
 
-// CityKeyExpr / CountryKeyExpr — ключи по сохранённым колонкам traffic_logs
+// cityKeyExpr / countryKeyExpr — ключи по сохранённым колонкам traffic_logs
 // (live GeoIP path в service.IPGroupMeta может отличаться при miss).
-func CityKeyExpr(side string) string {
-	return cityKeyExpr(side, "")
-}
-
 func cityKeyExpr(side, table string) string {
 	city := colRef(table, side+"_city")
 	country := colRef(table, side+"_country")
@@ -75,10 +71,6 @@ func cityKeyExpr(side, table string) string {
 	)`, city, country, ip, badCountry)
 }
 
-func CityLabelExpr(side string) string {
-	return cityLabelExpr(side, "")
-}
-
 func cityLabelExpr(side, table string) string {
 	city := colRef(table, side+"_city")
 	country := colRef(table, side+"_country")
@@ -91,27 +83,13 @@ func cityLabelExpr(side, table string) string {
 	)`, city, country, ip, badCountry)
 }
 
-func CountryKeyExpr(side string) string {
-	return countryKeyExpr(side, "")
-}
-
 func countryKeyExpr(side, table string) string {
 	country := colRef(table, side+"_country")
 	return fmt.Sprintf(`if(trimBoth(%[1]s) = '' OR %[1]s IN ('Неизвестно', 'Unknown', 'unknown', 'Reserved', 'reserved'), 'Неизвестно', %[1]s)`, country)
 }
 
-// IPKeyExpr — ключ/лейбл узла при группировке по IP (dotted-quad String).
-func IPKeyExpr(side string) string {
-	return ipKeyExpr(side, "")
-}
-
 func ipKeyExpr(side, table string) string {
 	return fmt.Sprintf("toString(%s)", colRef(table, side+"_ip"))
-}
-
-// SubnetKeyExpr — IPv4 /24 (колонка типа IPv4).
-func SubnetKeyExpr(side string) string {
-	return subnetKeyExpr(side, "")
 }
 
 func subnetKeyExpr(side, table string) string {

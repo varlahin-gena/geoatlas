@@ -29,6 +29,18 @@ func (b *BuiltSnapshot) Skipped() int {
 	return b.skipped
 }
 
+// Ranges — материализация compact snapshot в []GeoRange (для stamp/тестов).
+func (b *BuiltSnapshot) Ranges() []model.GeoRange {
+	if b == nil || b.snap == nil || len(b.snap.rows) == 0 {
+		return nil
+	}
+	out := make([]model.GeoRange, len(b.snap.rows))
+	for i, row := range b.snap.rows {
+		out[i] = b.snap.toGeoRange(row)
+	}
+	return out
+}
+
 // CompactBuilder строит compact snapshot потоково по уже отсортированным диапазонам.
 // Невалидные и пересекающиеся диапазоны пропускаются так же, как NormalizeRanges.
 type CompactBuilder struct {

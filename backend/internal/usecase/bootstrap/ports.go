@@ -7,11 +7,10 @@ import (
 
 // SchemaEnsurer — Ensure* DDL/MV при старте.
 type SchemaEnsurer interface {
+	EnsureHTTPSchema(ctx context.Context) error
 	EnsureTTLOnlyDropParts(ctx context.Context) error
-	EnsureTrafficLogsIPv4(ctx context.Context) error
 	EnsureTrafficLogsSuccess(ctx context.Context) error
 	EnsureEdgesAggSchema(ctx context.Context) error
-	EnsureGeoEdgesAggSchema(ctx context.Context) error
 	EnsureHourlyEdgesAggSchema(ctx context.Context) error
 	EnsureReputationRanges(ctx context.Context) error
 }

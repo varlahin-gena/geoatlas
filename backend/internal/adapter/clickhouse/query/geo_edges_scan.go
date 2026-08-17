@@ -146,16 +146,6 @@ func promoteMinutesToHours(tr model.TimeRange, prefer bool) model.TimeRange {
 	return model.TimeRange{Mode: "hours", Amount: tr.Amount / 60}
 }
 
-// promoteHoursToGeoDays: hours кратные суткам → days, если preferEdges.
-func promoteHoursToGeoDays(tr model.TimeRange, groupBy string, preferEdges bool) model.TimeRange {
-	switch groupBy {
-	case "city", "country", "ip", "subnet":
-		return promoteHoursToDays(tr, preferEdges)
-	default:
-		return tr
-	}
-}
-
 func scanGeoFromLogsSelect(logsTable, srcKey, dstKey, srcLabel, dstLabel, whereExtra string) string {
 	// Не использовать any(src_city) AS src_city: ClickHouse подставит алиас
 	// внутрь any(cityLabelExpr), получится вложенный aggregate (code 184).

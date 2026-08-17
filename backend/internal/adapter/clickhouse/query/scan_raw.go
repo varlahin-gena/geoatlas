@@ -8,24 +8,9 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
-	"network_monitor/internal/adapter/clickhouse/aggstate"
 	"network_monitor/internal/adapter/clickhouse/sqlclause"
 	"network_monitor/internal/model"
 )
-
-// ScanRawAggs читает предварительно агрегированные пары src/dst из
-// traffic_edges_daily только когда backfill помечен ready. Частичный
-// агрегат даёт дыры на карте — до готовности читаем сырой traffic_logs.
-func ScanRawAggs(ctx context.Context, ch clickhouse.Conn, days, limit int, filter string, timeout time.Duration) ([]model.RawAgg, error) {
-	if aggstate.AggFromContext(ctx).PreferDailyEdgesAgg() {
-		return scanEdgesAgg(ctx, ch, days, limit, filter, timeout)
-	}
-	return scanRawLogs(ctx, ch, days, limit, filter, timeout)
-}
-
-func scanEdgesAgg(ctx context.Context, ch clickhouse.Conn, days, limit int, filter string, timeout time.Duration) ([]model.RawAgg, error) {
-	return scanEdgesDailyAsRaw(ctx, ch, TablesOf(ctx).EdgesDaily, days, MapSelect{Limit: limit, Filter: filter}, timeout)
-}
 
 func scanEdgesDailyAsRaw(ctx context.Context, ch clickhouse.Conn, table string, days int, sel MapSelect, timeout time.Duration) ([]model.RawAgg, error) {
 	if days < 1 {
@@ -84,11 +69,6 @@ func scanEdgesDailyAsRaw(ctx context.Context, ch clickhouse.Conn, table string, 
 	return scanRawAggRows(rows)
 }
 
-func scanRawLogs(ctx context.Context, ch clickhouse.Conn, days, limit int, filter string, timeout time.Duration) ([]model.RawAgg, error) {
-	// Один GROUP BY + LIMIT в CH — без загрузки всех пар дня в Go map.
-	return scanRawLogsRelative(ctx, ch, "days", days, MapSelect{Limit: limit, Filter: filter}, timeout)
-}
-
 func scanRawAggRows(rows interface {
 	Next() bool
 	Scan(dest ...any) error
@@ -104,7 +84,7 @@ func scanRawAggRows(rows interface {
 			&r.SrcCity, &r.DstCity, &r.SrcLat, &r.SrcLon, &r.DstLat, &r.DstLon,
 			&r.BytesSent, &r.BytesRecv, &r.PacketsSent, &r.PacketsRecv,
 		); err != nil {
-			slog.Warn("ScanRawAggs: row scan failed, skipping row", "err", err)
+			slog.Warn("raw agg: row scan failed, skipping row", "err", err)
 			continue
 		}
 		out = append(out, r)

@@ -24,10 +24,11 @@ func TestScanGeoFromLogsSelectClauseOrder(t *testing.T) {
 }
 
 func TestScanGeoFromLogsSelectNoAliasShadowing(t *testing.T) {
+	srcKey, dstKey, srcLabel, dstLabel := sqlclause.GeoGroupExprs("city")
 	q := scanGeoFromLogsSelect(
 		"traffic_logs",
-		sqlclause.CityKeyExpr("src"), sqlclause.CityKeyExpr("dst"),
-		sqlclause.CityLabelExpr("src"), sqlclause.CityLabelExpr("dst"),
+		srcKey, dstKey,
+		srcLabel, dstLabel,
 		"timestamp >= now()",
 	)
 	// Alias matching the column name makes CH nest any(src_city) inside any(labelExpr).

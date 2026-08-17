@@ -34,8 +34,8 @@ func TestOpenAPIPathsMatchMux(t *testing.T) {
 		t.Fatal("openapi paths empty")
 	}
 
-	srv := NewServer(
-		config.Config{
+	srv := NewServer(Params{
+		Cfg: config.Config{
 			ListenAddr:              ":0",
 			APIAuthToken:            "test-token",
 			MaxLogUploadSize:        1 << 20,
@@ -44,19 +44,7 @@ func TestOpenAPIPathsMatchMux(t *testing.T) {
 			MaxReputationUploadSize: 1 << 20,
 			QueryTimeout:            0,
 		},
-		nil, // ingest
-		nil, // eventsUC
-		nil, // geoUC
-		nil, // reputationUC
-		nil, // parseErrorsUC
-		nil, // systemUC
-		nil, // systemPinger
-		nil, // parseTestUC
-		nil, // retentionUC
-		nil, // backupUC
-		nil, // authUC
-		nil, nil, nil, // users, sessions, apiTokens
-	)
+	})
 
 	muxRoutes := map[string]map[string]struct{}{} // path -> methods
 	for _, route := range srv.Routes() {

@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"path/filepath"
 	"strings"
 
+	"network_monitor/internal/fileatomic"
 	"network_monitor/internal/usecase/backup"
 )
 
@@ -63,19 +63,7 @@ func (s *Store) Save(st backup.Schedule) error {
 	out.LastRunAt = strings.TrimSpace(st.LastRunAt)
 	out.LastRunDate = strings.TrimSpace(st.LastRunDate)
 	out.UpdatedAt = strings.TrimSpace(st.UpdatedAt)
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
-		return err
-	}
-	data, err := json.MarshalIndent(out, "", "  ")
-	if err != nil {
-		return err
-	}
-	data = append(data, '\n')
-	tmp := s.path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, s.path)
+	return fileatomic.WriteJSON(s.path, out)
 }
 
 func (s *Store) seedOrDefault() backup.Schedule {

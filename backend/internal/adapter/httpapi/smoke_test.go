@@ -87,7 +87,18 @@ func TestPostCASmoke(t *testing.T) {
 		QueryTimeout:            time.Minute,
 		IngestFlushSec:          1,
 	}
-	srv := httpapi.NewServer(cfg, ingestSvc, eventsUC, geoUC, nil, nil, systemUC, pinger, parseTestUC, nil, nil, authUC, users, sessions, nil)
+	srv := httpapi.NewServer(httpapi.Params{
+		Cfg:          cfg,
+		Ingest:       ingestSvc,
+		EventsUC:     eventsUC,
+		GeoUC:        geoUC,
+		SystemUC:     systemUC,
+		SystemPinger: pinger,
+		ParseTestUC:  parseTestUC,
+		AuthUC:       authUC,
+		Users:        users,
+		Sessions:     sessions,
+	})
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(ts.Close)
 

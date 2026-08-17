@@ -13,12 +13,12 @@ func TestGeoKeyExprsContainValidUTF8Unknown(t *testing.T) {
 	}
 
 	exprs := []string{
-		CityKeyExpr("src"),
-		CityKeyExpr("dst"),
-		CityLabelExpr("src"),
-		CityLabelExpr("dst"),
-		CountryKeyExpr("src"),
-		CountryKeyExpr("dst"),
+		cityKeyExpr("src", ""),
+		cityKeyExpr("dst", ""),
+		cityLabelExpr("src", ""),
+		cityLabelExpr("dst", ""),
+		countryKeyExpr("src", ""),
+		countryKeyExpr("dst", ""),
 	}
 	for _, expr := range exprs {
 		if !utf8.ValidString(expr) {
@@ -33,19 +33,19 @@ func TestGeoKeyExprsContainValidUTF8Unknown(t *testing.T) {
 		}
 	}
 	// Без города/страны — ключ/лейбл по IP, не city:unknown.
-	ck := CityKeyExpr("src")
+	ck := cityKeyExpr("src", "")
 	if strings.Contains(ck, "city:unknown") {
-		t.Fatalf("CityKeyExpr still uses city:unknown: %s", ck)
+		t.Fatalf("cityKeyExpr still uses city:unknown: %s", ck)
 	}
 	if !strings.Contains(ck, "src_ip") {
-		t.Fatalf("CityKeyExpr should fall back to src_ip: %s", ck)
+		t.Fatalf("cityKeyExpr should fall back to src_ip: %s", ck)
 	}
 	if !strings.Contains(ck, "toString(") {
-		t.Fatalf("CityKeyExpr IP fallback must toString IPv4: %s", ck)
+		t.Fatalf("cityKeyExpr IP fallback must toString IPv4: %s", ck)
 	}
 	for _, bad := range []string{"unknown", "Reserved", "reserved"} {
 		if !strings.Contains(ck, bad) {
-			t.Fatalf("CityKeyExpr should treat %q as bad country: %s", bad, ck)
+			t.Fatalf("cityKeyExpr should treat %q as bad country: %s", bad, ck)
 		}
 	}
 }

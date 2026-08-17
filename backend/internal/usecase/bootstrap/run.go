@@ -26,17 +26,14 @@ func RunStartup(ctx context.Context, deps Dependencies, opts Options, warn WarnF
 		"skip_startup_backfill", opts.SkipStartupBackfill)
 
 	if deps.Schema != nil {
-		if err := deps.Schema.EnsureTrafficLogsIPv4(bctx); err != nil {
-			warn("traffic_logs ipv4 ensure failed", err)
+		if err := deps.Schema.EnsureHTTPSchema(bctx); err != nil {
+			warn("http schema ensure failed", err)
 		}
 		if err := deps.Schema.EnsureTrafficLogsSuccess(bctx); err != nil {
 			warn("traffic_logs success column ensure failed", err)
 		}
 		if err := deps.Schema.EnsureEdgesAggSchema(bctx); err != nil {
 			warn("edges agg schema ensure failed", err)
-		}
-		if err := deps.Schema.EnsureGeoEdgesAggSchema(bctx); err != nil {
-			warn("geo edges agg schema ensure failed", err)
 		}
 		if err := deps.Schema.EnsureHourlyEdgesAggSchema(bctx); err != nil {
 			warn("hourly edges agg schema ensure failed", err)

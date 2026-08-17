@@ -6,8 +6,6 @@ import (
 	"log/slog"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
-
-	"network_monitor/internal/model"
 )
 
 const (
@@ -30,8 +28,8 @@ func EnsureTrafficLogsSuccess(ctx context.Context, ch clickhouse.Conn) error {
 	ddl := fmt.Sprintf(`
 		ALTER TABLE traffic_logs
 		MODIFY COLUMN success UInt8 MATERIALIZED
-			if(lower(action) IN (%s), 1, 0)
-	`, model.AllowedInClause())
+			%s
+	`, trafficLogsSuccessExpr())
 	if err := execDDL(ctx, ch, ddl); err != nil {
 		return fmt.Errorf("modify success column: %w", err)
 	}

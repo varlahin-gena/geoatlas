@@ -10,12 +10,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"network_monitor/internal/fileatomic"
 )
 
 var (
@@ -274,15 +275,8 @@ func (s *TokenStore) persistUnlocked() error {
 	if err != nil {
 		return err
 	}
-	dir := filepath.Dir(s.path)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return err
-	}
-	tmp := s.path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, s.path)
+	data = append(data, '\n')
+	return fileatomic.WriteFile(s.path, data, 0o600)
 }
 
 func generateAPIToken() (string, error) {

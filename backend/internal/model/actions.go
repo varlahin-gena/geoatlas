@@ -15,7 +15,11 @@ import (
 //     empty/unknown counts as allowed (including unknown vendor verbs).
 //
 // Runtime SQL is built from these sets (sqlclause + migrate.Ensure*).
-// Ops fallback files under clickhouse/ are regenerated:
+// clickhouse/*.sql is generated from migrate:
+//
+//	go generate ./internal/adapter/clickhouse/migrate/...
+//
+// backfill_edges_agg.sh markers:
 //
 //	go generate ./internal/model/...
 var allowedActionSet = map[string]struct{}{
@@ -38,6 +42,7 @@ var blockedActionSet = map[string]struct{}{
 }
 
 //go:generate go run ./genactionsql
+//go:generate go run ../adapter/clickhouse/migrate/genschema
 
 func IsAllowedAction(a string) bool {
 	_, ok := allowedActionSet[strings.ToLower(strings.TrimSpace(a))]

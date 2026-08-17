@@ -45,14 +45,6 @@ func EnsureGeoEdgesAggSchema(ctx context.Context, ch clickhouse.Conn) error {
 	return nil
 }
 
-// EnsureGeoEdgesAgg — schema + backfill city/country.
-func EnsureGeoEdgesAgg(ctx context.Context, ch clickhouse.Conn) error {
-	if err := EnsureGeoEdgesAggSchema(ctx, ch); err != nil {
-		return err
-	}
-	return BackfillGeoEdgesAgg(ctx, ch)
-}
-
 // BackfillGeoEdgesAgg дозаполняет city/country daily-агрегаты и включает PreferGeoEdgesAgg.
 func BackfillGeoEdgesAgg(ctx context.Context, ch clickhouse.Conn) error {
 	if err := backfillGeoEdgesAgg(ctx, ch, "city"); err != nil {

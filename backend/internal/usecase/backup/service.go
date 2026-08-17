@@ -76,8 +76,8 @@ type Catalog struct {
 // Runner — native BACKUP / RESTORE / DROP в ClickHouse.
 type Runner interface {
 	BackupTables(ctx context.Context, name string, tables []string) error
-	RestoreTablesAs(ctx context.Context, name string, pairs [][2]string) error
-	DropTables(ctx context.Context, tables []string) error
+	RestoreMapShadow(ctx context.Context, name string) error
+	DropMapShadow(ctx context.Context) error
 	TableExists(ctx context.Context, name string) (bool, error)
 }
 
@@ -510,23 +510,10 @@ func (s *Service) runAttach(ctx context.Context, name string) {
 	defer s.job.Finish()
 	s.job.SetRunning(name, "RESTORE в nm_bak_*…")
 
-	pairs := [][2]string{
-		{"traffic_logs", "nm_bak_traffic_logs"},
-		{"traffic_edges_daily", "nm_bak_traffic_edges_daily"},
-		{"traffic_edges_hourly", "nm_bak_traffic_edges_hourly"},
-		{"traffic_edges_city_daily", "nm_bak_traffic_edges_city_daily"},
-		{"traffic_edges_country_daily", "nm_bak_traffic_edges_country_daily"},
-	}
-	if err := s.runner.RestoreTablesAs(ctx, name, pairs); err != nil {
+	if err := s.runner.RestoreMapShadow(ctx, name); err != nil {
 		_ = s.store.SetAttached("")
 		dropCtx, dropCancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
-		_ = s.runner.DropTables(dropCtx, []string{
-			"nm_bak_traffic_logs",
-			"nm_bak_traffic_edges_daily",
-			"nm_bak_traffic_edges_hourly",
-			"nm_bak_traffic_edges_city_daily",
-			"nm_bak_traffic_edges_country_daily",
-		})
+		_ = s.runner.DropMapShadow(dropCtx)
 		dropCancel()
 		if ctx.Err() != nil {
 			s.job.SetError(name, "canceled")
@@ -547,14 +534,7 @@ func (s *Service) runDetach(ctx context.Context, name string) {
 	defer s.job.Finish()
 	s.job.SetRunning(name, "DROP nm_bak_*…")
 
-	shadows := []string{
-		"nm_bak_traffic_logs",
-		"nm_bak_traffic_edges_daily",
-		"nm_bak_traffic_edges_hourly",
-		"nm_bak_traffic_edges_city_daily",
-		"nm_bak_traffic_edges_country_daily",
-	}
-	if err := s.runner.DropTables(ctx, shadows); err != nil {
+	if err := s.runner.DropMapShadow(ctx); err != nil {
 		s.job.SetError(name, "drop: "+err.Error())
 		return
 	}

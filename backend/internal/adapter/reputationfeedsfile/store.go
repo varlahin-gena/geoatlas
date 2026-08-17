@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"path/filepath"
 	"strings"
 
+	"network_monitor/internal/fileatomic"
 	usecasereputation "network_monitor/internal/usecase/reputation"
 )
 
@@ -48,23 +48,11 @@ func (s *Store) Save(feeds []usecasereputation.Feed) error {
 	if s == nil || s.path == "" {
 		return errors.New("reputation feeds file path is empty")
 	}
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
-		return err
-	}
 	doc := fileDoc{Feeds: normalizeFeeds(feeds)}
 	if doc.Feeds == nil {
 		doc.Feeds = []usecasereputation.Feed{}
 	}
-	data, err := json.MarshalIndent(doc, "", "  ")
-	if err != nil {
-		return err
-	}
-	data = append(data, '\n')
-	tmp := s.path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, s.path)
+	return fileatomic.WriteJSON(s.path, doc)
 }
 
 // LoadOrSeed: файл есть → его содержимое (даже пустой список);

@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
+
+	"network_monitor/internal/adapter/clickhouse/query"
 )
 
 // BackupRunner — native BACKUP TABLE … TO Disk('backups', name).
@@ -117,6 +119,16 @@ func (r *BackupRunner) RestoreTablesAs(ctx context.Context, name string, pairs [
 		return fmt.Errorf("restore: nothing restored from %s", name)
 	}
 	return nil
+}
+
+// RestoreMapShadow — RESTORE live-таблиц карты в nm_bak_* (имена из query.MapShadowPairs).
+func (r *BackupRunner) RestoreMapShadow(ctx context.Context, name string) error {
+	return r.RestoreTablesAs(ctx, name, query.MapShadowPairs())
+}
+
+// DropMapShadow удаляет shadow-таблицы карты (query.MapShadowNames).
+func (r *BackupRunner) DropMapShadow(ctx context.Context) error {
+	return r.DropTables(ctx, query.MapShadowNames())
 }
 
 // backupTablesSQL — CH 25: перед каждым объектом нужен keyword TABLE

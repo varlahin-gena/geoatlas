@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -14,6 +13,8 @@ import (
 	"unicode"
 
 	"golang.org/x/crypto/bcrypt"
+
+	"network_monitor/internal/fileatomic"
 )
 
 var (
@@ -574,28 +575,6 @@ func (s *UserStore) persistUnlocked() error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
-		return err
-	}
-	tmp := s.path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, s.path)
-}
-
-// BuildUserStoreFromEnv — совместимость со старыми тестами (только память).
-func BuildUserStoreFromEnv(adminUser, adminPass, operatorUser, operatorPass string) (*UserStore, error) {
-	users, err := SeedUsersFromEnv(adminUser, adminPass, operatorUser, operatorPass, false)
-	if err != nil {
-		return nil, err
-	}
-	if len(users) == 0 {
-		return nil, fmt.Errorf("no users configured: set AUTH_ADMIN_USER/AUTH_ADMIN_PASSWORD and/or AUTH_OPERATOR_USER/AUTH_OPERATOR_PASSWORD")
-	}
-	// для in-memory тестов снимаем must_reset, если не файловый store
-	for i := range users {
-		users[i].MustResetPassword = false
-	}
-	return NewUserStore(users...)
+	data = append(data, '\n')
+	return fileatomic.WriteFile(s.path, data, 0o600)
 }

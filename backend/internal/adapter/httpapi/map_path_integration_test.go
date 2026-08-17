@@ -81,7 +81,12 @@ func TestIntegrationMapPathLogToEvents(t *testing.T) {
 		QueryTimeout:       30 * time.Second,
 		IngestFlushSec:     1,
 	}
-	srv := httpapi.NewServer(cfg, ingestSvc, eventsUC, geoUC, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	srv := httpapi.NewServer(httpapi.Params{
+		Cfg:      cfg,
+		Ingest:   ingestSvc,
+		EventsUC: eventsUC,
+		GeoUC:    geoUC,
+	})
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(ts.Close)
 	client := &http.Client{Timeout: 20 * time.Second}

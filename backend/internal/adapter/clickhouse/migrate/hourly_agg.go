@@ -32,14 +32,6 @@ func EnsureHourlyEdgesAggSchema(ctx context.Context, ch clickhouse.Conn) error {
 	return nil
 }
 
-// EnsureHourlyEdgesAgg — schema + backfill закрытых дней.
-func EnsureHourlyEdgesAgg(ctx context.Context, ch clickhouse.Conn) error {
-	if err := EnsureHourlyEdgesAggSchema(ctx, ch); err != nil {
-		return err
-	}
-	return BackfillHourlyEdgesAgg(ctx, ch)
-}
-
 func applyHourlyEdgesSchema(ctx context.Context, ch clickhouse.Conn) error {
 	const table = sqlclause.IPEdgesHourlyTable
 	const next = "traffic_edges_hourly__next"

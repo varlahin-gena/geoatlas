@@ -29,28 +29,6 @@ type AuthDeps struct {
 	loginLimiter *loginthrottle.Limiter
 }
 
-// NewAuthDeps собирает auth bag; lim=nil → default limiter.
-func NewAuthDeps(
-	cfg config.Config,
-	authUC *usecaseauth.Service,
-	users UserDirectory,
-	sessions SessionParser,
-	apiTokens APITokenStore,
-	lim *loginthrottle.Limiter,
-) *AuthDeps {
-	if lim == nil {
-		lim = loginthrottle.New(10, time.Minute, 5*time.Minute)
-	}
-	return &AuthDeps{
-		cfg:          cfg,
-		authUC:       authUC,
-		users:        users,
-		sessions:     sessions,
-		apiTokens:    apiTokens,
-		loginLimiter: lim,
-	}
-}
-
 // SystemDeps — зависимости SystemHandler (system/retention/backup + shared loginLimiter).
 type SystemDeps struct {
 	cfg          config.Config
@@ -60,32 +38,10 @@ type SystemDeps struct {
 	loginLimiter *loginthrottle.Limiter
 }
 
-// NewSystemDeps собирает system bag; lim обычно shared с AuthDeps.
-func NewSystemDeps(
-	cfg config.Config,
-	systemUC *usecasesystem.Service,
-	retentionUC *usecaseretention.Service,
-	backupUC *usecasebackup.Service,
-	lim *loginthrottle.Limiter,
-) *SystemDeps {
-	return &SystemDeps{
-		cfg:          cfg,
-		systemUC:     systemUC,
-		retentionUC:  retentionUC,
-		backupUC:     backupUC,
-		loginLimiter: lim,
-	}
-}
-
 // HealthDeps — зависимости HealthHandler (Ready: systemUC + CH pinger).
 type HealthDeps struct {
 	systemUC     *usecasesystem.Service
 	systemPinger usecasesystem.ClickHousePinger
-}
-
-// NewHealthDeps собирает health bag.
-func NewHealthDeps(systemUC *usecasesystem.Service, systemPinger usecasesystem.ClickHousePinger) *HealthDeps {
-	return &HealthDeps{systemUC: systemUC, systemPinger: systemPinger}
 }
 
 // EventsDeps — зависимости EventsHandler (map/series + attached backup name).
@@ -95,29 +51,16 @@ type EventsDeps struct {
 	backupUC *usecasebackup.Service
 }
 
-// NewEventsDeps собирает events bag.
-func NewEventsDeps(cfg config.Config, eventsUC *usecaseevents.Service, backupUC *usecasebackup.Service) *EventsDeps {
-	return &EventsDeps{cfg: cfg, eventsUC: eventsUC, backupUC: backupUC}
-}
-
 // GeoDeps — зависимости GeoHandler.
 type GeoDeps struct {
 	cfg   config.Config
 	geoUC *usecasegeo.Service
 }
 
-func NewGeoDeps(cfg config.Config, geoUC *usecasegeo.Service) *GeoDeps {
-	return &GeoDeps{cfg: cfg, geoUC: geoUC}
-}
-
 // IngestDeps — зависимости IngestHandler.
 type IngestDeps struct {
 	cfg    config.Config
 	ingest Ingester
-}
-
-func NewIngestDeps(cfg config.Config, ingest Ingester) *IngestDeps {
-	return &IngestDeps{cfg: cfg, ingest: ingest}
 }
 
 // ParseDeps — зависимости ParseHandler (parse-errors + parse-test).
@@ -127,107 +70,52 @@ type ParseDeps struct {
 	parseTestUC   *parsetest.Service
 }
 
-func NewParseDeps(cfg config.Config, parseErrorsUC *parseerrors.Service, parseTestUC *parsetest.Service) *ParseDeps {
-	return &ParseDeps{cfg: cfg, parseErrorsUC: parseErrorsUC, parseTestUC: parseTestUC}
-}
-
 // ReputationDeps — зависимости ReputationHandler.
 type ReputationDeps struct {
 	reputationUC *usecasereputation.Service
-}
-
-func NewReputationDeps(reputationUC *usecasereputation.Service) *ReputationDeps {
-	return &ReputationDeps{reputationUC: reputationUC}
 }
 
 // SearchTemplatesDeps — зависимости SearchTemplatesHandler.
 type SearchTemplatesDeps struct {
 	cfg             config.Config
 	searchTemplates SearchTemplatesStore
-	sessions        SessionParser // shared с AuthDeps
+	sessions        SessionParser
 }
 
-func NewSearchTemplatesDeps(cfg config.Config, store SearchTemplatesStore, sessions SessionParser) *SearchTemplatesDeps {
-	return &SearchTemplatesDeps{cfg: cfg, searchTemplates: store, sessions: sessions}
+// Params — вход NewDeps / NewServer. SearchTemplates=nil → file store из Cfg.
+type Params struct {
+	Cfg             config.Config
+	Ingest          Ingester
+	EventsUC        *usecaseevents.Service
+	GeoUC           *usecasegeo.Service
+	ReputationUC    *usecasereputation.Service
+	ParseErrorsUC   *parseerrors.Service
+	SystemUC        *usecasesystem.Service
+	SystemPinger    usecasesystem.ClickHousePinger
+	ParseTestUC     *parsetest.Service
+	RetentionUC     *usecaseretention.Service
+	BackupUC        *usecasebackup.Service
+	AuthUC          *usecaseauth.Service
+	Users           UserDirectory
+	Sessions        SessionParser
+	APITokens       APITokenStore
+	SearchTemplates SearchTemplatesStore
 }
 
-// Deps — композитор HTTP-слоя: владеет domain bags (без плоских UC-полей).
-// Shared pointers: backupUC (system+events), systemUC (system+health), loginLimiter/sessions (auth+…).
+// Deps — композитор HTTP-слоя: domain bags без плоских UC-полей.
+// Shared pointers: BackupUC (system+events), SystemUC (system+health),
+// loginLimiter/Sessions (auth+templates+system).
 type Deps struct {
-	cfg         config.Config
-	auth        *AuthDeps
-	system      *SystemDeps
-	health      *HealthDeps
-	events      *EventsDeps
-	geo         *GeoDeps
-	ingest      *IngestDeps
-	parse       *ParseDeps
-	reputation  *ReputationDeps
-	templates   *SearchTemplatesDeps
-	prom        MetricsRecorder // optional Prometheus
-}
-
-func (d *Deps) Auth() *AuthDeps {
-	if d == nil {
-		return nil
-	}
-	return d.auth
-}
-
-func (d *Deps) System() *SystemDeps {
-	if d == nil {
-		return nil
-	}
-	return d.system
-}
-
-func (d *Deps) Health() *HealthDeps {
-	if d == nil {
-		return nil
-	}
-	return d.health
-}
-
-func (d *Deps) Events() *EventsDeps {
-	if d == nil {
-		return nil
-	}
-	return d.events
-}
-
-func (d *Deps) Geo() *GeoDeps {
-	if d == nil {
-		return nil
-	}
-	return d.geo
-}
-
-func (d *Deps) Ingest() *IngestDeps {
-	if d == nil {
-		return nil
-	}
-	return d.ingest
-}
-
-func (d *Deps) Parse() *ParseDeps {
-	if d == nil {
-		return nil
-	}
-	return d.parse
-}
-
-func (d *Deps) Reputation() *ReputationDeps {
-	if d == nil {
-		return nil
-	}
-	return d.reputation
-}
-
-func (d *Deps) SearchTemplates() *SearchTemplatesDeps {
-	if d == nil {
-		return nil
-	}
-	return d.templates
+	auth       *AuthDeps
+	system     *SystemDeps
+	health     *HealthDeps
+	events     *EventsDeps
+	geo        *GeoDeps
+	ingest     *IngestDeps
+	parse      *ParseDeps
+	reputation *ReputationDeps
+	templates  *SearchTemplatesDeps
+	prom       MetricsRecorder
 }
 
 // MetricsRecorder — HTTP + scrape handler (реализация: *metrics.Registry).
@@ -238,123 +126,36 @@ type MetricsRecorder interface {
 	DecInFlight()
 }
 
-func NewDeps(
-	cfg config.Config,
-	ingestSvc Ingester,
-	eventsUC *usecaseevents.Service,
-	geoUC *usecasegeo.Service,
-	reputationUC *usecasereputation.Service,
-	parseErrorsUC *parseerrors.Service,
-	systemUC *usecasesystem.Service,
-	systemPinger usecasesystem.ClickHousePinger,
-	parseTestUC *parsetest.Service,
-	retentionUC *usecaseretention.Service,
-	backupUC *usecasebackup.Service,
-) *Deps {
-	auth := NewAuthDeps(cfg, nil, nil, nil, nil, nil)
+func NewDeps(p Params) *Deps {
+	lim := loginthrottle.New(10, time.Minute, 5*time.Minute)
 	return &Deps{
-		cfg:        cfg,
-		auth:       auth,
-		system:     NewSystemDeps(cfg, systemUC, retentionUC, backupUC, auth.loginLimiter),
-		health:     NewHealthDeps(systemUC, systemPinger),
-		events:     NewEventsDeps(cfg, eventsUC, backupUC),
-		geo:        NewGeoDeps(cfg, geoUC),
-		ingest:     NewIngestDeps(cfg, ingestSvc),
-		parse:      NewParseDeps(cfg, parseErrorsUC, parseTestUC),
-		reputation: NewReputationDeps(reputationUC),
-		templates:  NewSearchTemplatesDeps(cfg, nil, nil),
+		auth: &AuthDeps{
+			cfg:          p.Cfg,
+			authUC:       p.AuthUC,
+			users:        p.Users,
+			sessions:     p.Sessions,
+			apiTokens:    p.APITokens,
+			loginLimiter: lim,
+		},
+		system: &SystemDeps{
+			cfg:          p.Cfg,
+			systemUC:     p.SystemUC,
+			retentionUC:  p.RetentionUC,
+			backupUC:     p.BackupUC,
+			loginLimiter: lim,
+		},
+		health:     &HealthDeps{systemUC: p.SystemUC, systemPinger: p.SystemPinger},
+		events:     &EventsDeps{cfg: p.Cfg, eventsUC: p.EventsUC, backupUC: p.BackupUC},
+		geo:        &GeoDeps{cfg: p.Cfg, geoUC: p.GeoUC},
+		ingest:     &IngestDeps{cfg: p.Cfg, ingest: p.Ingest},
+		parse:      &ParseDeps{cfg: p.Cfg, parseErrorsUC: p.ParseErrorsUC, parseTestUC: p.ParseTestUC},
+		reputation: &ReputationDeps{reputationUC: p.ReputationUC},
+		templates: &SearchTemplatesDeps{
+			cfg:             p.Cfg,
+			searchTemplates: p.SearchTemplates,
+			sessions:        p.Sessions,
+		},
 	}
-}
-
-func (d *Deps) ensureAuth() *AuthDeps {
-	if d == nil {
-		return nil
-	}
-	if d.auth == nil {
-		d.auth = NewAuthDeps(d.cfg, nil, nil, nil, nil, nil)
-	}
-	return d.auth
-}
-
-func (d *Deps) ensureSystem() *SystemDeps {
-	if d == nil {
-		return nil
-	}
-	if d.system == nil {
-		var lim *loginthrottle.Limiter
-		if a := d.ensureAuth(); a != nil {
-			lim = a.loginLimiter
-		}
-		d.system = NewSystemDeps(d.cfg, nil, nil, nil, lim)
-	}
-	return d.system
-}
-
-func (d *Deps) ensureTemplates() *SearchTemplatesDeps {
-	if d == nil {
-		return nil
-	}
-	if d.templates == nil {
-		d.templates = NewSearchTemplatesDeps(d.cfg, nil, nil)
-	}
-	return d.templates
-}
-
-func (d *Deps) WithAuth(authUC *usecaseauth.Service, users UserDirectory, sessions SessionParser, apiTokens APITokenStore) *Deps {
-	if d == nil {
-		return nil
-	}
-	a := d.ensureAuth()
-	a.cfg = d.cfg
-	a.authUC = authUC
-	a.users = users
-	a.sessions = sessions
-	a.apiTokens = apiTokens
-	if t := d.ensureTemplates(); t != nil {
-		t.sessions = sessions
-		t.cfg = d.cfg
-	}
-	if s := d.ensureSystem(); s != nil {
-		s.loginLimiter = a.loginLimiter
-		s.cfg = d.cfg
-	}
-	return d
-}
-
-func (d *Deps) WithSearchTemplates(store SearchTemplatesStore) *Deps {
-	if d == nil {
-		return nil
-	}
-	t := d.ensureTemplates()
-	t.searchTemplates = store
-	t.cfg = d.cfg
-	if d.auth != nil {
-		t.sessions = d.auth.sessions
-	}
-	return d
-}
-
-func (d *Deps) WithLoginLimiter(lim *loginthrottle.Limiter) *Deps {
-	if d == nil {
-		return nil
-	}
-	if lim == nil {
-		return d
-	}
-	a := d.ensureAuth()
-	a.loginLimiter = lim
-	if s := d.ensureSystem(); s != nil {
-		s.loginLimiter = lim
-	}
-	return d
-}
-
-func (d *Deps) WithMetrics(m MetricsRecorder) *Deps {
-	if d == nil {
-		return nil
-	}
-	d.prom = m
-	return d
 }
 
 type HealthHandler struct{ *HealthDeps }

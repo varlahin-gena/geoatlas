@@ -6,6 +6,7 @@
 ## [Unreleased]
 
 ### Added
+- Compact GeoIP snapshot на `/app/data/geo_index.snap`: карта после рестарта не ждёт полный скан `geo_ranges`; сверка stamp с ClickHouse, файл не входит в auth-tarball
 - Лицензия **Apache License 2.0** (`LICENSE`, `NOTICE`); продукт бесплатный, доработки через GitHub Issues
 - Политика уязвимостей: [`SECURITY.md`](SECURITY.md) (приватный GitHub advisory, ответ за 5 рабочих дней)
 - Контракт релизов: `scripts/check-release-contract.sh` (CI) — VERSION, CHANGELOG Notes и OpenAPI не разъезжаются
@@ -17,6 +18,8 @@
 - Playwright GeoIP wizard (Escape) + в CI `vite preview`, не только `vite dev`
 
 ### Changed
+- Schema SoT: базовые таблицы в `migrate.EnsureBaseSchema`; `clickhouse/init.sql` и `migrate_*.sql` генерируются из того же DDL (`go generate ./internal/adapter/clickhouse/migrate/...`). Пустой том без init.sql больше не оставляет `traffic_logs` несозданным.
+- JSON control plane: запись users/tokens/retention/feeds/templates/backup-schedule через общий `fileatomic` (tmp + fsync + rename)
 - HTTP API doc **1.5.0 → 1.11.0** (после v1.3.1, ещё не в продуктовом теге):
   - **1.7.0**: `GET /metrics` (Prometheus, Bearer≥ops), `POST /api/auth/logout-all` в спецификации, ingest SLO в `/api/system/stats`
   - **1.8.0**: `/api/events` — серверные `filter` / `limit` / `country` / `q`; live `pipeline.syslogng` в `/api/system/stats`

@@ -48,14 +48,6 @@ func EnsureEdgesAggSchema(ctx context.Context, ch clickhouse.Conn) error {
 	return nil
 }
 
-// EnsureEdgesAgg — schema + backfill (полный путь; startup по умолчанию / ops-скрипты).
-func EnsureEdgesAgg(ctx context.Context, ch clickhouse.Conn) error {
-	if err := EnsureEdgesAggSchema(ctx, ch); err != nil {
-		return err
-	}
-	return BackfillEdgesAgg(ctx, ch)
-}
-
 // RefreshEdgesAggReady помечает агрегаты ready без INSERT, если закрытые дни догнаны.
 // Сегодня пишет только MV. Иначе State=pending (карта читает traffic_logs).
 func RefreshEdgesAggReady(ctx context.Context, ch clickhouse.Conn) error {

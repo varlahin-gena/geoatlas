@@ -5,6 +5,7 @@ import (
 	"io"
 	"time"
 
+	"network_monitor/internal/geoip"
 	"network_monitor/internal/model"
 	"network_monitor/internal/mapagg"
 )
@@ -27,10 +28,14 @@ type MissingIPStore interface {
 // GeoIndex — in-memory GeoIP.
 type GeoIndex interface {
 	RangeCount() int
+	IndexReady() bool
+	ApproxBytes() uint64
 	Lookup(ipStr string) model.GeoLookup
 	LookupRange(ipStr string) (model.GeoRange, bool)
 	CollectRanges(limit int, q string) (items []model.GeoRange, total, filtered int, truncated bool)
 	ReplaceRanges(ranges []model.GeoRange)
+	ReplaceNormalizedRanges(ranges []model.GeoRange)
+	ReplaceBuiltSnapshot(built *geoip.BuiltSnapshot)
 }
 
 // GeoJobScheduler — фоновый reload/backfill.
@@ -41,6 +46,7 @@ type GeoJobScheduler interface {
 // RangeCodec — парсинг/нормализация CSV и CIDR (инфраструктурная обёртка над geoip).
 type RangeCodec interface {
 	ReadCSV(r io.Reader) ([]model.GeoRange, error)
+	ReadCSVSnapshot(r io.Reader) ([]model.GeoRange, *geoip.BuiltSnapshot, error)
 	WriteCSV(w io.Writer, ranges []model.GeoRange) error
 	Normalize(ranges []model.GeoRange) (clean []model.GeoRange, skipped int)
 	CheckNonOverlapping(ranges []model.GeoRange) error

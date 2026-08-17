@@ -11,6 +11,7 @@ import (
 	"network_monitor/internal/adapter/clickhouse/migrate"
 	"network_monitor/internal/adapter/clickhouse/repstore"
 	"network_monitor/internal/adapter/geojob"
+	"network_monitor/internal/adapter/reputationcodec"
 	"network_monitor/internal/adapter/reputationfeedsfile"
 	"network_monitor/internal/adapter/reputationjob"
 	"network_monitor/internal/adapter/retentionfile"
@@ -29,8 +30,13 @@ type backgroundParts struct {
 }
 
 func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backgroundParts {
-	geo := geostore.NewReloadableGeoIndex(a.pools.Background)
+	geo := geostore.NewReloadableGeoIndex(a.pools.Background, cfg.GeoSnapshotFile)
 	a.geoJobs = geojob.New(geo, chadapter.NewMaintenanceStore(a.pools.Background), cfg.GeoBackfillLookbackDays)
+	// Disk snapshot: карта работает сразу после рестарта. Полный Reload из CH
+	// сверяет stamp и при расхождении перечитывает таблицу.
+	if geo.LoadDisk() {
+		slog.Info("geo index: serving disk snapshot until clickhouse reload")
+	}
 	// Не блокируем старт HTTP на полной загрузке GeoIP (миллионы диапазонов → минуты).
 	// Иначе после OOM/рестарта nginx auth_request падает → клиенту 500 на всех страницах.
 	a.bgWg.Add(1)
@@ -43,11 +49,8 @@ func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backg
 
 	// Schema для /api/events до HTTP: иначе city/days бьётся о missing columns/tables.
 	// IP-тип логов — до geo MV/enrich JOIN (IPv4 = IPv4).
-	if err := migrate.EnsureTrafficLogsIPv4(ctx, a.pools.Background); err != nil {
-		slog.Warn("traffic_logs ipv4 ensure (early) failed", "err", err)
-	}
-	if err := migrate.EnsureGeoEdgesAggSchema(ctx, a.pools.Background); err != nil {
-		slog.Warn("geo edges agg schema ensure (early) failed", "err", err)
+	if err := migrate.EnsureHTTPSchema(ctx, a.pools.Background); err != nil {
+		slog.Warn("http schema ensure (early) failed", "err", err)
 	}
 
 	var repIdx *repstore.ReloadableReputationIndex
@@ -74,7 +77,7 @@ func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backg
 				slog.Info("reputation feeds: dropped retired upstream lists", "dropped", dropped, "remaining", len(repFeeds))
 			}
 		}
-		repUC = usecasereputation.New(repRepo, repIdx, usecasereputation.DefaultCodec{}, nil, repFeedStore)
+		repUC = usecasereputation.New(repRepo, repIdx, reputationcodec.New(), nil, repFeedStore)
 		a.repJobs = reputationjob.New(repFeeds, cfg.ReputationFetchInterval, true, repUC)
 		repUC.SetRefresher(a.repJobs)
 		if err := migrate.EnsureReputationRanges(ctx, a.pools.Background); err != nil {

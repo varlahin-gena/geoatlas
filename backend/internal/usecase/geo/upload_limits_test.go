@@ -30,6 +30,10 @@ func (c *uploadCodec) ReadCSV(r io.Reader) ([]model.GeoRange, error) {
 	copy(out, c.ranges)
 	return out, nil
 }
+func (c *uploadCodec) ReadCSVSnapshot(r io.Reader) ([]model.GeoRange, *geoip.BuiltSnapshot, error) {
+	ranges, err := c.ReadCSV(r)
+	return ranges, nil, err
+}
 func (*uploadCodec) WriteCSV(io.Writer, []model.GeoRange) error { return nil }
 func (*uploadCodec) Normalize(ranges []model.GeoRange) ([]model.GeoRange, int) {
 	return ranges, 0

@@ -48,11 +48,18 @@ func TestTrafficLogsCreateSQLLayout(t *testing.T) {
 	if strings.Contains(ddl, "raw") {
 		t.Fatal("raw column must be dropped")
 	}
+	if strings.Contains(ddl, "IF NOT EXISTS") {
+		t.Fatal("rebuild/EXCHANGE CREATE must not use IF NOT EXISTS")
+	}
 	if !strings.Contains(ddl, "ORDER BY (toStartOfHour(timestamp), src_ip, dst_ip)") {
 		t.Fatalf("unexpected ORDER BY:\n%s", ddl)
 	}
 	if !strings.Contains(ddl, "LowCardinality(String)") || !strings.Contains(ddl, "src_country") {
 		t.Fatal("expected LC geo columns")
+	}
+	ifNot := trafficLogsCreateSQL("traffic_logs", true)
+	if !strings.Contains(ifNot, "CREATE TABLE IF NOT EXISTS traffic_logs") {
+		t.Fatalf("bootstrap CREATE must be IF NOT EXISTS:\n%s", ifNot)
 	}
 }
 

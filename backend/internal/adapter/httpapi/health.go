@@ -8,13 +8,9 @@ import (
 )
 
 // Live — процесс жив. Без ClickHouse и ingest (docker/k8s liveness).
+// /health и /api/health тоже зовут Live.
 func (h *HealthHandler) Live(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "status": "live"})
-}
-
-// Health — alias Live. Исторический путь docker healthcheck.
-func (h *HealthHandler) Health(w http.ResponseWriter, r *http.Request) {
-	h.Live(w, r)
 }
 
 // Ready — ClickHouse ping + снимок ingest. HTTP 503 только если CH недоступен.

@@ -16,20 +16,17 @@ func (s *recSchema) rec(name string) error {
 	return nil
 }
 
+func (s *recSchema) EnsureHTTPSchema(context.Context) error {
+	return s.rec("http")
+}
 func (s *recSchema) EnsureTTLOnlyDropParts(context.Context) error {
 	return s.rec("ttl")
-}
-func (s *recSchema) EnsureTrafficLogsIPv4(context.Context) error {
-	return s.rec("ipv4")
 }
 func (s *recSchema) EnsureTrafficLogsSuccess(context.Context) error {
 	return s.rec("success")
 }
 func (s *recSchema) EnsureEdgesAggSchema(context.Context) error {
 	return s.rec("edges")
-}
-func (s *recSchema) EnsureGeoEdgesAggSchema(context.Context) error {
-	return s.rec("geo_edges")
 }
 func (s *recSchema) EnsureHourlyEdgesAggSchema(context.Context) error {
 	return s.rec("hourly")
@@ -100,6 +97,9 @@ func TestRunStartupSkipBackfillRefreshesReady(t *testing.T) {
 	}
 	if len(ready.calls) != 3 {
 		t.Fatalf("ready refreshes: got %v", ready.calls)
+	}
+	if schema.calls[0] != "http" {
+		t.Fatalf("EnsureHTTPSchema must run first, got %v", schema.calls)
 	}
 	if len(schema.calls) < 6 {
 		t.Fatalf("schema ensures: got %v", schema.calls)
@@ -198,15 +198,14 @@ func TestRunStartupWarnsOnSchemaError(t *testing.T) {
 
 type errSchema struct{}
 
+func (errSchema) EnsureHTTPSchema(context.Context) error {
+	return errors.New("http")
+}
 func (errSchema) EnsureTTLOnlyDropParts(context.Context) error {
 	return errors.New("ttl")
 }
-func (errSchema) EnsureTrafficLogsIPv4(context.Context) error {
-	return errors.New("ipv4")
-}
 func (errSchema) EnsureTrafficLogsSuccess(context.Context) error { return nil }
 func (errSchema) EnsureEdgesAggSchema(context.Context) error     { return nil }
-func (errSchema) EnsureGeoEdgesAggSchema(context.Context) error  { return nil }
 func (errSchema) EnsureHourlyEdgesAggSchema(context.Context) error {
 	return nil
 }

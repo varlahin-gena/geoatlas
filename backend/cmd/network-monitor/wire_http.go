@@ -69,9 +69,21 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 	schedStore := backupschedulefile.New(cfg.BackupScheduleFile, usecasebackup.DefaultsSchedule(opts))
 	backupUC := usecasebackup.New(opts, backupstore.NewBackupRunner(a.pools.Background), backupfs.New(cfg.BackupDir), schedStore)
 	a.backupJobs = backupjob.NewFromService(backupUC, time.Minute)
-	return httpapi.NewServer(
-		cfg, a.ingestSvc, eventsUC, geoUC, bg.repUC, parseErrorsUC, systemUC, systemRepo,
-		parseTestUC, bg.retentionUC, backupUC, authUC, auth.users, auth.sessions, auth.apiTokens,
-		httpapi.WithMetrics(a.prom),
-	)
+	return httpapi.NewServer(httpapi.Params{
+		Cfg:           cfg,
+		Ingest:        a.ingestSvc,
+		EventsUC:      eventsUC,
+		GeoUC:         geoUC,
+		ReputationUC:  bg.repUC,
+		ParseErrorsUC: parseErrorsUC,
+		SystemUC:      systemUC,
+		SystemPinger:  systemRepo,
+		ParseTestUC:   parseTestUC,
+		RetentionUC:   bg.retentionUC,
+		BackupUC:      backupUC,
+		AuthUC:        authUC,
+		Users:         auth.users,
+		Sessions:      auth.sessions,
+		APITokens:     auth.apiTokens,
+	}, httpapi.WithMetrics(a.prom))
 }

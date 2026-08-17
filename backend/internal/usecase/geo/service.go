@@ -50,32 +50,12 @@ func (s *Service) IndexRangeCount() int {
 	return s.index.RangeCount()
 }
 
-type indexReadiness interface {
-	IndexReady() bool
-}
-
-type normalizedRangeReplacer interface {
-	ReplaceNormalizedRanges(ranges []model.GeoRange)
-}
-
-type indexSizer interface {
-	ApproxBytes() uint64
-}
-
-type snapshotCSVReader interface {
-	ReadCSVSnapshot(r io.Reader) ([]model.GeoRange, *geoip.BuiltSnapshot, error)
-}
-
 // IndexReady — готовность in-memory индекса после стартового Reload.
-// Если индекс не реализует readiness (тесты/простые stubs) — считаем ready.
 func (s *Service) IndexReady() bool {
 	if s == nil || s.index == nil {
 		return true
 	}
-	if r, ok := s.index.(indexReadiness); ok {
-		return r.IndexReady()
-	}
-	return true
+	return s.index.IndexReady()
 }
 
 // PrecheckUpload отклоняет опасный full-replace до чтения тела (когда индекс уже крупный).
@@ -91,16 +71,7 @@ func (s *Service) UploadCSV(ctx context.Context, r io.Reader, dryRun bool) (Uplo
 	}
 
 	started := time.Now()
-	var (
-		ranges []model.GeoRange
-		built  *geoip.BuiltSnapshot
-		err    error
-	)
-	if codec, ok := s.codec.(snapshotCSVReader); ok {
-		ranges, built, err = codec.ReadCSVSnapshot(r)
-	} else {
-		ranges, err = s.codec.ReadCSV(r)
-	}
+	ranges, built, err := s.codec.ReadCSVSnapshot(r)
 	parseDur := time.Since(started)
 	if err != nil {
 		if isHTTPRequestBodyTooLarge(err) {
@@ -399,17 +370,9 @@ func (s *Service) persistRangesWithSnapshot(ctx context.Context, ranges []model.
 	}
 	if s.index != nil {
 		if built != nil {
-			if publish, ok := s.index.(interface{ ReplaceBuiltSnapshot(*geoip.BuiltSnapshot) }); ok {
-				publish.ReplaceBuiltSnapshot(built)
-			} else if fast, ok := s.index.(normalizedRangeReplacer); ok {
-				fast.ReplaceNormalizedRanges(clean)
-			} else {
-				s.index.ReplaceRanges(clean)
-			}
-		} else if fast, ok := s.index.(normalizedRangeReplacer); ok {
-			fast.ReplaceNormalizedRanges(clean)
+			s.index.ReplaceBuiltSnapshot(built)
 		} else {
-			s.index.ReplaceRanges(clean)
+			s.index.ReplaceNormalizedRanges(clean)
 		}
 		slog.Info("geo index updated from persisted ranges",
 			"ranges", len(clean),
@@ -426,10 +389,7 @@ func (s *Service) indexApproxBytes() uint64 {
 	if s == nil || s.index == nil {
 		return 0
 	}
-	if sized, ok := s.index.(indexSizer); ok {
-		return sized.ApproxBytes()
-	}
-	return 0
+	return s.index.ApproxBytes()
 }
 
 // --- Missing ---

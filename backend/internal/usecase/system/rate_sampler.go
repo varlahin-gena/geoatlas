@@ -120,15 +120,3 @@ func (r *RateSampler) HealthDropRates(droppedTotal, bufferDropsTotal int64) (dro
 	r.healthPrevDrop, r.healthPrevBufDrop, r.healthPrevTS = droppedTotal, bufferDropsTotal, now
 	return dropsPerSec, bufferDropsPerSec
 }
-
-// DropsPerSec — совместимость (только admission). Для Health используйте HealthDropRates.
-func (r *RateSampler) DropsPerSec(droppedTotal int64) float64 {
-	if r == nil {
-		return 0
-	}
-	r.mu.Lock()
-	bufPrev := r.healthPrevBufDrop
-	r.mu.Unlock()
-	d, _ := r.HealthDropRates(droppedTotal, bufPrev)
-	return d
-}

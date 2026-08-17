@@ -20,12 +20,12 @@ var (
 	_ bootstrap.AggReadyRefresher = (*Storage)(nil)
 )
 
-func (s *Storage) EnsureTTLOnlyDropParts(ctx context.Context) error {
-	return migrate.EnsureTTLOnlyDropParts(ctx, s.CH)
+func (s *Storage) EnsureHTTPSchema(ctx context.Context) error {
+	return migrate.EnsureHTTPSchema(ctx, s.CH)
 }
 
-func (s *Storage) EnsureTrafficLogsIPv4(ctx context.Context) error {
-	return migrate.EnsureTrafficLogsIPv4(ctx, s.CH)
+func (s *Storage) EnsureTTLOnlyDropParts(ctx context.Context) error {
+	return migrate.EnsureTTLOnlyDropParts(ctx, s.CH)
 }
 
 func (s *Storage) EnsureTrafficLogsSuccess(ctx context.Context) error {
@@ -34,10 +34,6 @@ func (s *Storage) EnsureTrafficLogsSuccess(ctx context.Context) error {
 
 func (s *Storage) EnsureEdgesAggSchema(ctx context.Context) error {
 	return migrate.EnsureEdgesAggSchema(ctx, s.CH)
-}
-
-func (s *Storage) EnsureGeoEdgesAggSchema(ctx context.Context) error {
-	return migrate.EnsureGeoEdgesAggSchema(ctx, s.CH)
 }
 
 func (s *Storage) EnsureHourlyEdgesAggSchema(ctx context.Context) error {

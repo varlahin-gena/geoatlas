@@ -62,7 +62,7 @@ func (f InsertErrorClassifyFunc) IsRetryableInsertError(err error) bool {
 	return f(err)
 }
 
-// Deps — зависимости Processor / sync ProcessReader.
+// Deps — зависимости Processor.
 type Deps struct {
 	Logs          TrafficLogInserter
 	Errors        ParseErrorInserter

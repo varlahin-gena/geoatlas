@@ -7,11 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"network_monitor/internal/fileatomic"
 )
 
 const (
@@ -255,17 +256,5 @@ func (s *Store) saveUnlocked(data fileData) error {
 	if total > MaxTemplatesAll {
 		return ErrLimitExceeded
 	}
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
-		return err
-	}
-	raw, err := json.MarshalIndent(data, "", "  ")
-	if err != nil {
-		return err
-	}
-	raw = append(raw, '\n')
-	tmp := s.path + ".tmp"
-	if err := os.WriteFile(tmp, raw, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, s.path)
+	return fileatomic.WriteJSON(s.path, data)
 }

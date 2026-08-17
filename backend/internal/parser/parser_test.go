@@ -165,31 +165,6 @@ func TestSampleCorpus(t *testing.T) {
 	}
 }
 
-func TestActionSetsMovedToModel(t *testing.T) {
-	if !IsBlockedAction("DENY") {
-		t.Error("IsBlockedAction(DENY) = false, want true")
-	}
-	if !IsBlockedAction("reset") {
-		t.Error("IsBlockedAction(reset) = false, want true")
-	}
-	if !IsAllowedAction("accept") {
-		t.Error("IsAllowedAction(accept) = false, want true")
-	}
-	if IsBlockedAction("allow") {
-		t.Error("IsBlockedAction(allow) = true, want false")
-	}
-	if !strings.Contains(BlockedInClause(), "'deny'") {
-		t.Errorf("BlockedInClause() = %q, want to contain 'deny'", BlockedInClause())
-	}
-	if !strings.Contains(AllowedInClause(), "'accept'") {
-		t.Errorf("AllowedInClause() = %q, want to contain 'accept'", AllowedInClause())
-	}
-	// parser wrappers делегируют в model (содержимое, не порядок ключей в map).
-	if !strings.Contains(model.BlockedInClause(), "'deny'") {
-		t.Fatal("model.BlockedInClause missing deny")
-	}
-}
-
 func TestMapProtoNumber(t *testing.T) {
 	cases := map[string]string{
 		"1": "ICMP", "6": "TCP", "17": "UDP", "47": "GRE",

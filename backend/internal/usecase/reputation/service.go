@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-	"time"
 
 	"network_monitor/internal/apperr"
 	"network_monitor/internal/model"
@@ -334,15 +333,4 @@ func uniqueLists(ranges []model.ReputationRange) []string {
 		out = append(out, r.ListName)
 	}
 	return out
-}
-
-// DefaultCodec — обёртка над package reputation.
-type DefaultCodec struct{}
-
-func (DefaultCodec) ReadCSV(r io.Reader) ([]model.ReputationRange, error) {
-	return reppkg.ReadCSV(r)
-}
-
-func (DefaultCodec) ParseNetset(r io.Reader, listName, category, source string) ([]model.ReputationRange, error) {
-	return reppkg.ParseNetset(r, listName, category, source, time.Now().UTC())
 }

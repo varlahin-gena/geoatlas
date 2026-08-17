@@ -97,8 +97,8 @@ func expectedAuthMatrix() map[string]authTier {
 func TestAuthMatrixCoversServerRoutes(t *testing.T) {
 	want := expectedAuthMatrix()
 
-	srv := NewServer(
-		config.Config{
+	srv := NewServer(Params{
+		Cfg: config.Config{
 			ListenAddr:              ":0",
 			APIAuthToken:            "test-token",
 			MaxLogUploadSize:        1 << 20,
@@ -106,17 +106,7 @@ func TestAuthMatrixCoversServerRoutes(t *testing.T) {
 			MaxGeoUploadRanges:      100_000,
 			MaxReputationUploadSize: 1 << 20,
 		},
-		nil,           // ingest
-		nil, nil, nil, // eventsUC, geoUC, reputationUC
-		nil,           // parseErrorsUC
-		nil,           // systemUC
-		nil,           // systemPinger
-		nil,           // parseTestUC
-		nil,           // retentionUC
-		nil,           // backupUC
-		nil,           // authUC
-		nil, nil, nil, // users, sessions, apiTokens
-	)
+	})
 
 	muxRoutes := map[string]struct{}{}
 	for _, route := range srv.Routes() {

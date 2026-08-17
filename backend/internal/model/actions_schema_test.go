@@ -10,7 +10,6 @@ import (
 
 func TestInitSQLDoesNotContainEdgesAggMV(t *testing.T) {
 	raw := readRepoFile(t, "clickhouse", "init.sql")
-	// Edges MV/table — SoT в migrate.Ensure*; init.sql только cold bootstrap базовых таблиц.
 	if strings.Contains(raw, "traffic_edges_daily_mv") {
 		t.Error("init.sql must not contain traffic_edges_daily_mv")
 	}
@@ -19,44 +18,28 @@ func TestInitSQLDoesNotContainEdgesAggMV(t *testing.T) {
 	}
 }
 
-func TestActionVocabAllowedExactInOpsSQL(t *testing.T) {
-	want := clauseTokenSet(t, AllowedInClause())
-	for _, name := range []string{"init.sql", "migrate_success.sql"} {
-		raw := readRepoFile(t, "clickhouse", name)
-		inners, err := ExtractMarkedInner(raw, markerAllowedBegin, markerAllowedEnd)
-		if err != nil {
-			t.Fatalf("%s: %v", name, err)
-		}
-		if len(inners) != 1 {
-			t.Fatalf("%s: want 1 ALLOWED region, got %d", name, len(inners))
-		}
-		got := clauseTokenSet(t, inners[0])
-		assertSameTokenSet(t, name+" ALLOWED", got, want)
-		// success list must not include blocked verbs
-		for tok := range clauseTokenSet(t, BlockedInClause()) {
-			if _, ok := got[tok]; ok {
-				t.Errorf("%s success list unexpectedly contains blocked %q", name, tok)
-			}
-		}
+func TestGeneratedSQLContainsActionVocab(t *testing.T) {
+	allowed := AllowedInClause()
+	blocked := BlockedInClause()
+	initSQL := readRepoFile(t, "clickhouse", "init.sql")
+	if !strings.Contains(initSQL, allowed) {
+		t.Error("init.sql must contain AllowedInClause (regenerate migrate schema)")
+	}
+	success := readRepoFile(t, "clickhouse", "migrate_success.sql")
+	if !strings.Contains(success, allowed) {
+		t.Error("migrate_success.sql must contain AllowedInClause")
+	}
+	edges := readRepoFile(t, "clickhouse", "migrate_edges_agg.sql")
+	if !strings.Contains(edges, blocked) {
+		t.Error("migrate_edges_agg.sql must contain BlockedInClause")
+	}
+	if n := strings.Count(edges, blocked); n < 2 {
+		t.Errorf("migrate_edges_agg.sql: blocked clause appears %d times, want >= 2", n)
 	}
 }
 
-func TestActionVocabBlockedExactInOps(t *testing.T) {
+func TestActionVocabBlockedExactInOpsShell(t *testing.T) {
 	want := clauseTokenSet(t, BlockedInClause())
-
-	edges := readRepoFile(t, "clickhouse", "migrate_edges_agg.sql")
-	inners, err := ExtractMarkedInner(edges, markerBlockedBegin, markerBlockedEnd)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(inners) != 2 {
-		t.Fatalf("migrate_edges_agg.sql: want 2 BLOCKED regions, got %d", len(inners))
-	}
-	for _, inner := range inners {
-		got := clauseTokenSet(t, inner)
-		assertSameTokenSet(t, "migrate_edges_agg.sql BLOCKED", got, want)
-	}
-
 	sh := readRepoFile(t, "clickhouse", "backfill_edges_agg.sh")
 	shInners, err := ExtractMarkedInner(sh, markerBlockedSHBegin, markerBlockedSHEnd)
 	if err != nil {

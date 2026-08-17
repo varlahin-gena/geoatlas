@@ -87,7 +87,7 @@ func (s *Store) PreferDailyEdgesAgg() bool {
 	return s.GetEdgesAggStatus().State == "ready"
 }
 
-// PreferGeoEdgesAgg — true после успешного EnsureGeoEdgesAgg (city+country).
+// PreferGeoEdgesAgg — true после успешного BackfillGeoEdgesAgg (city+country).
 func (s *Store) PreferGeoEdgesAgg() bool {
 	s.geoMu.RLock()
 	defer s.geoMu.RUnlock()

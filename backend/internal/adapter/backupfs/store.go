@@ -157,6 +157,9 @@ func (d *DirStore) WriteAuthTarball(name, dataDir string) error {
 			return nil
 		}
 		rel := filepath.ToSlash(path)
+		if skipAuthTarballName(filepath.Base(rel)) {
+			return nil
+		}
 		info, err := de.Info()
 		if err != nil {
 			return err
@@ -274,6 +277,14 @@ func (d *DirStore) Prune(keep int) error {
 		_ = os.Remove(filepath.Join(d.Root, e.Name+".source"))
 	}
 	return nil
+}
+
+func skipAuthTarballName(base string) bool {
+	switch base {
+	case "", ".", ".nm_backend.lock":
+		return true
+	}
+	return strings.HasSuffix(base, ".snap") || strings.HasSuffix(base, ".tmp")
 }
 
 func dirSize(root string) (int64, error) {

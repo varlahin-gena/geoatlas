@@ -45,16 +45,6 @@ func TestLiveDoesNotNeedClickHouse(t *testing.T) {
 	}
 }
 
-func TestHealthAliasesLive(t *testing.T) {
-	h := &HealthHandler{HealthDeps: &HealthDeps{}}
-	req := httptest.NewRequest(http.MethodGet, "/health", nil)
-	rec := httptest.NewRecorder()
-	h.Health(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200", rec.Code)
-	}
-}
-
 func TestReadyWithoutClickHouse(t *testing.T) {
 	h := &HealthHandler{HealthDeps: &HealthDeps{}}
 	req := httptest.NewRequest(http.MethodGet, "/ready", nil)

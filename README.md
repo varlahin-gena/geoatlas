@@ -112,7 +112,7 @@
 
 1. **Syslog**: МСЭ отправляет события на `<IP_сервера>:514` (TCP или UDP).
 2. **syslog-ng** принимает сообщения и пересылает их по TCP на `backend:1514` с маркерами транспорта (`@@nm/udp/@@` / `@@nm/tcp/@@`).
-3. **backend** снимает маркеры транспорта, парсит строки, обогащает GeoIP, пишет в ClickHouse; при старте `Ensure*` создаёт/обновляет агрегаты (`traffic_edges_*`, geo), применяет TTL из `retention.json` и при необходимости делает backfill. **Delivery contract — at-most-once / best-effort:** полная очередь ingest **не блокирует** TCP — лишние строки дропаются (`dropped_total`); при outage ClickHouse insert circuit ставит dequeue на паузу (очередь растёт → admission drops), а потери из processor-буфера учитываются отдельно (`buffer_drops_total`). Перед backend **syslog-ng уже буферизует** (см. ниже). Алерты и live-метрики drops — на `/system`.
+3. **backend** снимает маркеры транспорта, парсит строки, обогащает GeoIP, пишет в ClickHouse; при старте `EnsureBaseSchema` / `Ensure*` создаёт базовые таблицы и агрегаты (`traffic_edges_*`, geo), применяет TTL из `retention.json` и при необходимости делает backfill. **Delivery contract — at-most-once / best-effort:** полная очередь ingest **не блокирует** TCP — лишние строки дропаются (`dropped_total`); при outage ClickHouse insert circuit ставит dequeue на паузу (очередь растёт → admission drops), а потери из processor-буфера учитываются отдельно (`buffer_drops_total`). Перед backend **syslog-ng уже буферизует** (см. ниже). Алерты и live-метрики drops — на `/system`.
 4. **frontend** отдаёт статику и проксирует API-запросы на backend.
 5. **stats-collector** каждые 30 секунд собирает метрики CPU/RAM контейнеров и состояние пайплайна (включая разбивку UDP/TCP).
 
@@ -148,13 +148,13 @@ Runbook кратко: warn drops → проверить стадию Syslog-NG (
 
 | Таблица / объект                    | Срок по умолчанию | Источник дефолта                             |
 |-------------------------------------|-------------------|----------------------------------------------|
-| `traffic_logs`                      | 30 дней           | `init.sql` / retention `traffic_logs_days`   |
+| `traffic_logs`                      | 30 дней           | EnsureBaseSchema / retention `traffic_logs_days`   |
 | `traffic_edges_daily` (+ MV)        | 30 дней           | `EnsureEdgesAgg` / retention `edges_days`    |
 | `traffic_edges_city_daily` (+ MV)   | 30 дней           | `EnsureGeoEdgesAgg` / retention `edges_days` |
 | `traffic_edges_country_daily` (+ MV)| 30 дней           | `EnsureGeoEdgesAgg` / retention `edges_days` |
-| `parse_errors`                      | 7 дней            | `init.sql` / retention `parse_errors_days`   |
-| `system_metrics`                    | 7 дней            | `init.sql` / retention `system_metrics_days` |
-| `geo_ranges`                        | без TTL           | `init.sql` (не настраивается)                |
+| `parse_errors`                      | 7 дней            | EnsureBaseSchema / retention `parse_errors_days`   |
+| `system_metrics`                    | 7 дней            | EnsureBaseSchema / retention `system_metrics_days` |
+| `geo_ranges`                        | без TTL           | EnsureBaseSchema (не настраивается)                |
 | `nm_schema_version`                 | без TTL           | `Ensure*` (метаданные схемы)                 |
 
 Допустимый диапазон настраиваемых дней: **1…730**. На `traffic_logs` / `parse_errors` / `system_metrics` / `traffic_edges_*` включён `ttl_only_drop_parts` при **дневных** партициях: истечение удаляет дневную партицию целиком (без дорогих row-level TTL merges). Уменьшение TTL удалит старые партиции при следующем TTL merge/drop в ClickHouse.
@@ -558,7 +558,7 @@ curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1/api/system/install-pr
 
 ### Срок хранения (TTL / retention)
 
-TTL таблиц ClickHouse настраивается без правки `init.sql`. Настройки хранятся в JSON на томе `auth-users` (`RETENTION_FILE`, по умолчанию `/app/data/retention.json`) и применяются:
+TTL таблиц ClickHouse настраивается без правки сгенерированного `init.sql`. Настройки хранятся в JSON на томе `auth-users` (`RETENTION_FILE`, по умолчанию `/app/data/retention.json`) и применяются:
 
 1. при **старте backend** (после Ensure*, usecase `retention.ApplyFromStore`);
 2. сразу при **сохранении** из UI или `PUT /api/system/retention` (`ALTER TABLE … MODIFY TTL`).
@@ -586,7 +586,7 @@ Native `BACKUP` / `RESTORE` на отдельный Docker-том `clickhouse-ba
 | Том | `clickhouse-backups` (отдельно от `clickhouse-data`) |
 | Скрипты | `scripts/backup-clickhouse.sh`, `scripts/restore-clickhouse.sh` |
 | По умолчанию в бэкап | `traffic_logs`, `geo_ranges`, `reputation_ranges`, `parse_errors`, `system_metrics`, `traffic_edges_*` |
-| Рядом | `*.auth.tgz` — снимок `/app/data` (users, retention, reputation feeds) |
+| Рядом | `*.auth.tgz` — снимок `/app/data` (users, retention, feeds, schedule); без `geo_index.snap`, `.nm_backend.lock`, `*.tmp` |
 
 После добавления тома на уже установленном стенде:
 
@@ -880,7 +880,9 @@ docker compose logs backend --since=10m 2>&1 | grep -iE 'geo index loaded|geo cs
 
 В логах после reload: `geo index loaded` с `ranges`, `heap_alloc_mb`, `heap_delta_mb`. Лимиты также в `GET /api/geo-ranges` → `limits.upload_max_*`.
 
-После такого рестарта backend заново поднимает индекс из ClickHouse (это может занять 1–3 минуты). Пока идёт загрузка индекса, HTTP API (в т.ч. auth для страниц) уже доступен; на карте geo-обогащение появится, когда в логах будет `geo index loaded`.
+Compact-снимок индекса пишется в `/app/data/geo_index.snap` (том `auth-users`, не входит в `*.auth.tgz`). После рестарта backend сначала поднимает снимок с диска (карта сразу с координатами), затем сверяет отпечаток с ClickHouse и при расхождении перечитывает `geo_ranges`. Выключить: `GEOIP_SNAPSHOT_FILE=off`.
+
+Пока идёт полная загрузка из ClickHouse, HTTP API (в т.ч. auth) уже доступен. В логах: `geo index loaded from disk snapshot` и/или `geo index loaded`.
 
 - Если в ClickHouse уже есть нужное число строк (`SELECT count() FROM geo_ranges`) — **перезаливать не нужно**.
 - Одну строку меняйте в UI `/geo-ranges` (или API `PUT /api/geo-ranges`).
@@ -971,7 +973,7 @@ network_monitor/
 │       ├── ingest/                   # syslog TCP, очередь, batch INSERT
 │       ├── installprofile/           # чтение install-profile.json
 │       ├── logging/                  # slog setup
-│       ├── model/                    # доменные структуры; action vocab SoT (go generate → clickhouse ops)
+│       ├── model/                    # доменные структуры; action vocab SoT (go generate → backfill sh + schema SQL)
 │       ├── mapagg/                   # агрегация рёбер/узлов для карты
 │       └── parser/                   # парсеры вендоров
 ├── pkg/
@@ -981,8 +983,8 @@ network_monitor/
 │   ├── config.d/override.xml
 │   ├── config.d/backups.xml          # disk `backups` для BACKUP/RESTORE
 │   ├── users.d/query_limits.xml
-│   ├── init.sql                      # cold bootstrap базовых таблиц
-│   ├── migrate_*.sql                 # ops-fallback (не SoT; списки action — из model via go generate)
+│   ├── init.sql                      # generated: cold bootstrap базовых таблиц (SoT — migrate.Ensure*)
+│   ├── migrate_*.sql                 # generated: ops-fallback (не runtime SoT)
 │   ├── backfill_edges_agg.sh         # то же для BLOCKED=…
 │   └── reset_data.sql / reset_data.sh
 ├── scripts/

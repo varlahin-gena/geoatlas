@@ -141,12 +141,12 @@ func TestIntegrationInsertAndScan(t *testing.T) {
 		t.Fatalf("InsertTrafficLogs: %v", err)
 	}
 
-	raws, err := query.ScanRawAggs(ctx, conn, 1, 100, "all", time.Minute)
+	raws, err := query.ScanRawAggsForTimeRange(ctx, conn, model.TimeRange{Mode: "days", Amount: 1}, query.MapSelect{Limit: 100, Filter: "all"}, time.Minute)
 	if err != nil {
-		t.Fatalf("ScanRawAggs: %v", err)
+		t.Fatalf("ScanRawAggsForTimeRange: %v", err)
 	}
 	if len(raws) == 0 {
-		t.Fatal("ScanRawAggs: no rows")
+		t.Fatal("ScanRawAggsForTimeRange: no rows")
 	}
 	found := false
 	for _, r := range raws {

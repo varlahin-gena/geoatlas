@@ -34,8 +34,11 @@ func EnsureTrafficLogsIPv4(ctx context.Context, ch clickhouse.Conn) error {
 		return err
 	}
 	if !exists {
-		slog.Info("traffic_logs layout: table missing, skip")
-		return nil
+		slog.Info("traffic_logs layout: creating table")
+		if err := execDDL(ctx, ch, trafficLogsCreateSQL("traffic_logs", true)); err != nil {
+			return fmt.Errorf("create traffic_logs: %w", err)
+		}
+		return setSchemaVersion(ctx, ch, schemaComponentTrafficLogsIP, schemaVersionTrafficLogsIP)
 	}
 
 	if err := ensureTrafficLogGeoColumns(ctx, ch); err != nil {
@@ -114,9 +117,21 @@ func EnsureTrafficLogsIPv4(ctx context.Context, ch clickhouse.Conn) error {
 	return nil
 }
 
+func trafficLogsSuccessExpr() string {
+	return fmt.Sprintf("if(lower(action) IN (%s), 1, 0)", model.AllowedInClause())
+}
+
 func trafficLogsIPv4CreateSQL(table string) string {
+	return trafficLogsCreateSQL(table, false)
+}
+
+func trafficLogsCreateSQL(table string, ifNotExists bool) string {
+	kw := ""
+	if ifNotExists {
+		kw = "IF NOT EXISTS "
+	}
 	return fmt.Sprintf(`
-		CREATE TABLE %s
+		CREATE TABLE %s%s
 		(
 			timestamp     DateTime64(3),
 			parsed_at     DateTime64(3) DEFAULT now64(3),
@@ -129,7 +144,7 @@ func trafficLogsIPv4CreateSQL(table string) string {
 			dst_port      UInt32,
 			action        LowCardinality(String),
 			success       UInt8 MATERIALIZED
-			              if(lower(action) IN (%s), 1, 0),
+			              %s,
 			rule          String,
 			proto         LowCardinality(String),
 			src_zone      LowCardinality(String),
@@ -158,7 +173,7 @@ func trafficLogsIPv4CreateSQL(table string) string {
 		ORDER BY (toStartOfHour(timestamp), src_ip, dst_ip)
 		TTL toDateTime(timestamp) + INTERVAL 30 DAY DELETE
 		SETTINGS index_granularity = 8192, ttl_only_drop_parts = 1
-	`, table, model.AllowedInClause())
+	`, kw, table, trafficLogsSuccessExpr())
 }
 
 func trafficLogsNeedsRebuild(ctx context.Context, ch clickhouse.Conn) (bool, string, error) {

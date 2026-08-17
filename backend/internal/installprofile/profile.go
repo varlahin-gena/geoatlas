@@ -3,7 +3,6 @@ package installprofile
 import (
 	"encoding/json"
 	"os"
-	"time"
 )
 
 type HostInfo struct {
@@ -73,15 +72,4 @@ func Load(path string) (*Profile, error) {
 		return nil, err
 	}
 	return &p, nil
-}
-
-func GeneratedAtTime(p *Profile) (time.Time, bool) {
-	if p == nil || p.GeneratedAt == "" {
-		return time.Time{}, false
-	}
-	t, err := time.Parse(time.RFC3339, p.GeneratedAt)
-	if err != nil {
-		return time.Time{}, false
-	}
-	return t, true
 }

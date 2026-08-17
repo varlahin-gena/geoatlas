@@ -2,17 +2,7 @@ package reputation
 
 import "net"
 
-// IsNonPublicIPv4 — частные/спец. адреса, для которых репутация не имеет смысла.
-// RFC1918, loopback, link-local, multicast, unspecified, CGNAT 100.64/10.
-func IsNonPublicIPv4(ipStr string) bool {
-	ip := net.ParseIP(ipStr)
-	if ip == nil {
-		return true
-	}
-	return IsNonPublicIPv4IP(ip)
-}
-
-// IsNonPublicIPv4IP — тот же тест без повторного ParseIP (hot path Lookup).
+// IsNonPublicIPv4IP — частные/спец. адреса, для которых репутация не имеет смысла (hot path Lookup).
 func IsNonPublicIPv4IP(ip net.IP) bool {
 	ip4 := ip.To4()
 	if ip4 == nil {

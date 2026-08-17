@@ -113,12 +113,6 @@ func NormalizeAction(raw string) model.TrafficAction {
 	return model.TrafficAction(s)
 }
 
-// allowed/blocked словари и InClause живут в model — storage не зависит от parser.
-func IsAllowedAction(a string) bool { return model.IsAllowedAction(a) }
-func IsBlockedAction(a string) bool { return model.IsBlockedAction(a) }
-func AllowedInClause() string       { return model.AllowedInClause() }
-func BlockedInClause() string       { return model.BlockedInClause() }
-
 // parseUint32 — общая утилита для парсеров
 func parseUint32(s string) uint32 {
 	v, _ := strconv.ParseUint(strings.TrimSpace(s), 10, 32)

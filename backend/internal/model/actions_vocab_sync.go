@@ -8,19 +8,13 @@ import (
 )
 
 const (
-	markerAllowedBegin = "/* ACTION_VOCAB:ALLOWED_BEGIN */"
-	markerAllowedEnd   = "/* ACTION_VOCAB:ALLOWED_END */"
-	markerBlockedBegin = "/* ACTION_VOCAB:BLOCKED_BEGIN */"
-	markerBlockedEnd   = "/* ACTION_VOCAB:BLOCKED_END */"
 	markerBlockedSHBegin = "# ACTION_VOCAB:BLOCKED_BEGIN"
 	markerBlockedSHEnd   = "# ACTION_VOCAB:BLOCKED_END"
 )
 
 // ActionVocabOpsRelPaths — ops-артефакты с помеченными списками (не runtime SoT).
+// SQL под clickhouse/ генерируется целиком из migrate.Render* (go generate migrate).
 var ActionVocabOpsRelPaths = []string{
-	filepath.Join("clickhouse", "init.sql"),
-	filepath.Join("clickhouse", "migrate_success.sql"),
-	filepath.Join("clickhouse", "migrate_edges_agg.sql"),
 	filepath.Join("clickhouse", "backfill_edges_agg.sh"),
 }
 
@@ -28,10 +22,6 @@ var ActionVocabOpsRelPaths = []string{
 func ApplyActionVocabMarkers(relPath, content string) (string, error) {
 	base := filepath.Base(relPath)
 	switch base {
-	case "init.sql", "migrate_success.sql":
-		return replaceMarkedRegions(content, markerAllowedBegin, markerAllowedEnd, AllowedInClause())
-	case "migrate_edges_agg.sql":
-		return replaceMarkedRegions(content, markerBlockedBegin, markerBlockedEnd, BlockedInClause())
 	case "backfill_edges_agg.sh":
 		body := `BLOCKED="` + BlockedInClause() + `"`
 		return replaceMarkedRegions(content, markerBlockedSHBegin, markerBlockedSHEnd, body)

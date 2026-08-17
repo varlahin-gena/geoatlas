@@ -68,6 +68,28 @@ func CountGeoRanges(ctx context.Context, ch clickhouse.Conn) (int, error) {
 	return int(n), nil
 }
 
+// QuerySourceStamp — агрегаты geo_ranges без полного скана (сверка disk snapshot).
+func QuerySourceStamp(ctx context.Context, ch clickhouse.Conn) (geoip.SourceStamp, error) {
+	var st geoip.SourceStamp
+	if ch == nil {
+		return st, fmt.Errorf("clickhouse conn is nil")
+	}
+	err := ch.QueryRow(ctx, `
+		SELECT
+			toUInt64(count()),
+			toUInt32(coalesce(min(start_ip), 0)),
+			toUInt32(coalesce(max(end_ip), 0)),
+			toUInt64(coalesce(sum(toUInt64(start_ip)), 0)),
+			toUInt64(coalesce(sum(toUInt64(end_ip)), 0)),
+			toUInt64(coalesce(groupBitXor((toUInt64(start_ip) << 32) | toUInt64(end_ip)), 0))
+		FROM geo_ranges
+	`).Scan(&st.Count, &st.MinStart, &st.MaxEnd, &st.SumStart, &st.SumEnd, &st.XorSpan)
+	if err != nil {
+		return geoip.SourceStamp{}, fmt.Errorf("geo_ranges source stamp: %w", err)
+	}
+	return st, nil
+}
+
 // FindGeoRangeByIP — один покрывающий диапазон из CH (без полной загрузки таблицы).
 func FindGeoRangeByIP(ctx context.Context, ch clickhouse.Conn, ipStr string) (model.GeoRange, bool, error) {
 	if ch == nil {

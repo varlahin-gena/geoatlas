@@ -23,7 +23,7 @@ var (
 	ErrInvalidDays = apperr.InvalidInput("invalid retention days")
 )
 
-// Defaults — значения из init.sql / Ensure*.
+// Defaults — значения из EnsureBaseSchema / Ensure*.
 func Defaults() Settings {
 	return Settings{
 		TrafficLogsDays:   DefaultTrafficLogsDays,

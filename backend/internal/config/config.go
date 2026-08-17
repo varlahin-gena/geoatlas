@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -148,6 +149,8 @@ type Config struct {
 	AuthOperatorUser     string
 	AuthOperatorPassword string
 	AuthUsersFile        string
+	// GeoSnapshotFile — compact GeoIP snapshot рядом с users.json (пустая строка = выкл.).
+	GeoSnapshotFile string
 	// APITokensFile — JSON с именованными Bearer (scope read|ops|admin).
 	APITokensFile string
 	// RetentionFile — JSON с TTL таблиц CH (том /app/data рядом с users.json).
@@ -302,8 +305,25 @@ func FromEnv() Config {
 		LogLevel:                strings.ToLower(envOr("LOG_LEVEL", "info")),
 		LogFormat:               strings.ToLower(envOr("LOG_FORMAT", "text")),
 	}
+	cfg.GeoSnapshotFile = geoSnapshotFile(cfg.AuthUsersFile)
 	cfg.parseErrors = parser.errors
 	return cfg
+}
+
+func geoSnapshotFile(usersFile string) string {
+	raw := strings.TrimSpace(os.Getenv("GEOIP_SNAPSHOT_FILE"))
+	switch strings.ToLower(raw) {
+	case "off", "0", "-":
+		return ""
+	}
+	if raw != "" {
+		return raw
+	}
+	dir := filepath.Dir(usersFile)
+	if dir == "" || dir == "." {
+		return ""
+	}
+	return filepath.Join(dir, "geo_index.snap")
 }
 
 // ValidateConfig reports invalid safety-critical environment values collected

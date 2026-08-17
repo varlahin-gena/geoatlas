@@ -67,6 +67,67 @@ func TestWriteAuthTarballSkipsSymlinkEscape(t *testing.T) {
 	}
 }
 
+func TestWriteAuthTarballSkipsSnapLockTmp(t *testing.T) {
+	root := t.TempDir()
+	data := filepath.Join(root, "data")
+	backups := filepath.Join(root, "backups")
+	if err := os.MkdirAll(data, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(backups, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(data, "users.json"), []byte(`{"ok":true}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(data, "geo_index.snap"), []byte("SNAP"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(data, "users.json.tmp"), []byte("tmp"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(data, ".nm_backend.lock"), []byte("1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	store := New(backups)
+	name := "nm-20260101T000000Z"
+	if err := store.WriteAuthTarball(name, data); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.Open(filepath.Join(backups, name+".auth.tgz"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer gz.Close()
+	tr := tar.NewReader(gz)
+	seenUsers := false
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		base := filepath.Base(hdr.Name)
+		switch base {
+		case "geo_index.snap", "users.json.tmp", ".nm_backend.lock":
+			t.Fatalf("control-plane cache leaked into auth tarball: %s", hdr.Name)
+		case "users.json":
+			seenUsers = true
+		}
+	}
+	if !seenUsers {
+		t.Fatal("users.json missing from auth tarball")
+	}
+}
+
 func TestParseBackupNameTimeOffset(t *testing.T) {
 	tUTC, ok := parseBackupNameTime("nm-20260811T072119Z")
 	if !ok || !tUTC.Equal(time.Date(2026, 8, 11, 7, 21, 19, 0, time.UTC)) {

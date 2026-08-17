@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"network_monitor/internal/adapter/reputationcodec"
 	"network_monitor/internal/adapter/reputationfeedsfile"
 	"network_monitor/internal/model"
 	"network_monitor/internal/safeurl"
@@ -77,7 +78,7 @@ func TestAddRemoveFeed(t *testing.T) {
 		t.Fatal(err)
 	}
 	ref := &stubRefresher{}
-	svc := usecasereputation.New(&memStore{lists: map[string][]model.ReputationRange{}}, memIndex{}, usecasereputation.DefaultCodec{}, ref, store)
+	svc := usecasereputation.New(&memStore{lists: map[string][]model.ReputationRange{}}, memIndex{}, reputationcodec.New(), ref, store)
 
 	err := svc.AddFeed(context.Background(), usecasereputation.Feed{
 		Name: "dshield", URL: "https://example.com/dshield.netset", Category: "attacks", Format: "netset",
