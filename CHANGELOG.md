@@ -5,6 +5,20 @@
 
 ## [Unreleased]
 
+## [1.4.1] — 2026-08-18
+
+Патч-релиз: `update.sh` не падает на `docker compose down`, если в `.env` пустой `CLICKHOUSE_PASSWORD`.
+
+### Fixed
+- `update.sh` / `stop.sh`: `docker compose down` больше не падает на пустом `CLICKHOUSE_PASSWORD` (и других `${VAR:?}`). Compose всё равно интерполирует YAML при остановке; для `down`/`stop` подставляются заглушки только в процессе, `.env` не меняется. `./start.sh` по-прежнему fail-closed. `update.sh` останавливает стек через `compose.sh` из пакета (установленный `stop.sh` ещё старый) и не прерывает наложение, если стоп неполный.
+
+### Notes
+- OpenAPI API doc version: **1.11.0** (без изменений)
+- Продуктовая версия: **1.4.1**
+- После обновления: скачать `geoatlas-1.4.1.tar.gz` (+ `.sha256`) с GitHub Release и `sudo /opt/network-monitor/update.sh ./geoatlas-1.4.1.tar.gz` (если каталог другой: `--project-dir /opt/network_monitor`). Health: `/api/ready`.
+- Не экспортируйте фиктивный `CLICKHOUSE_PASSWORD` на весь `update.sh` — `./start.sh` подхватит его вместо `.env`.
+- 1 коммит с `v1.4.0`
+
 ## [1.4.0] — 2026-08-18
 
 Минорный релиз: обновление из установочного пакета без `git pull`, OpenAPI **1.11.0**, hardening и bootstrap схемы ClickHouse из `EnsureBaseSchema`.
@@ -311,6 +325,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[1.4.1]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.4.1
 [1.4.0]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.4.0
 [1.3.1]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.3.1
 [1.3.0]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.3.0

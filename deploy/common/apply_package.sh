@@ -2,7 +2,7 @@
 # Распаковка / наложение установочного пакета ГеоАтлас на каталог проекта.
 # Использование:
 #   source deploy/common/apply_package.sh
-#   nm_apply_install_payload /path/to/geoatlas-1.4.0.tar.gz /opt/network-monitor
+#   nm_apply_install_payload /path/to/geoatlas-1.4.1.tar.gz /opt/network-monitor
 #   nm_fetch_project /opt/network-monitor "$REPO_URL" "$BRANCH" "$NM_INSTALL_IS_TAG"
 #
 # Env:

@@ -25,7 +25,53 @@ _nm_compose_env_get() {
     local file="$1" key="$2" v=""
     [[ -f "$file" ]] || { echo ""; return 0; }
     v="$(grep -E "^[[:space:]]*${key}=" "$file" 2>/dev/null | tail -n1 | cut -d= -f2- || true)"
+    v="${v%%$'\r'}"
     echo "$v"
+}
+
+# Пустое / только пробелы / "" — не годится для ${VAR:?} в compose.
+_nm_compose_value_blank() {
+    local v="${1-}"
+    v="${v#"${v%%[![:space:]]*}"}"
+    v="${v%"${v##*[![:space:]]}"}"
+    if [[ "$v" == \"*\" ]]; then
+        v="${v#\"}"
+        v="${v%\"}"
+    elif [[ "$v" == \'*\' ]]; then
+        v="${v#\'}"
+        v="${v%\'}"
+    fi
+    v="${v#"${v%%[![:space:]]*}"}"
+    v="${v%"${v##*[![:space:]]}"}"
+    [[ -z "$v" ]]
+}
+
+# docker compose down/stop тоже парсит YAML и падает на ${CLICKHOUSE_PASSWORD:?},
+# даже если пароль для остановки не нужен. Заглушки только в текущем процессе;
+# в .env ничего не пишем. ./start.sh / up по-прежнему fail-closed.
+_nm_compose_fill_stop_placeholders() {
+    local root="$1"
+    local env_file="${root}/.env"
+    local key val
+    for key in CLICKHOUSE_PASSWORD INGEST_SHARED_SECRET API_AUTH_TOKEN SESSION_SECRET AUTH_ADMIN_PASSWORD; do
+        val="${!key-}"
+        if _nm_compose_value_blank "$val"; then
+            val="$(_nm_compose_env_get "$env_file" "$key")"
+        fi
+        if _nm_compose_value_blank "$val"; then
+            export "${key}=nm-compose-stop"
+        fi
+    done
+}
+
+_nm_compose_cmd_allows_placeholder_env() {
+    local a
+    for a in "$@"; do
+        case "$a" in
+            down|stop|kill|rm) return 0 ;;
+        esac
+    done
+    return 1
 }
 
 # $1 — корень проекта (по умолчанию cwd)
@@ -93,5 +139,8 @@ nm_compose() {
     while IFS= read -r line; do
         [[ -n "$line" ]] && files+=("$line")
     done < <(nm_compose_args "$root")
+    if _nm_compose_cmd_allows_placeholder_env "$@"; then
+        _nm_compose_fill_stop_placeholders "$root"
+    fi
     (cd "$root" && docker compose "${files[@]}" "$@")
 }

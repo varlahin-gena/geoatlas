@@ -31,6 +31,8 @@ jobs:
         run: bash scripts/shellcheck.sh
       - name: pack + apply-package smoke
         run: bash scripts/test-apply-package.sh
+      - name: compose stop placeholders
+        run: bash scripts/test-compose-stop-env.sh
 
   backend:
     name: backend (test + lint)

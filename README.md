@@ -744,6 +744,7 @@ docker compose exec clickhouse sh -c 'clickhouse-client --password "$CLICKHOUSE_
 | UDP/TCP EPS не разделяются       | Перезапустить `syslog-ng` (маркеры `@@nm/udp/@@` / `@@nm/tcp/@@`) |
 | syslog-ng: kernel refused SO_RCVBUF | `net.core.rmem_max` / `wmem_max` на хосте (см. буферы профиля) |
 | git pull: local changes (только chmod +x) | Предпочтительнее обновление из пакета (`./update.sh`). Иначе `git restore -- '*.sh'` затем `git pull --ff-only`; либо `git reset --hard origin/main` |
+| `update.sh`: `CLICKHOUSE_PASSWORD is missing` на остановке | Баг **1.4.0**: `compose down` требовал секреты. Берите пакет **1.4.1+**. Не экспортируйте фиктивный пароль на весь `update.sh` — `./start.sh` подхватит его вместо `.env`. |
 | syslog-ng ругается на `log-iw-size` / `flush_timeout` / нет `zz_profile.conf` | На сервере всё ещё старый `syslog-ng.conf`. `git log -1` и `grep flow-control-window-size syslog-ng.conf`; затем hard reset на `origin/main` и `./start.sh` |
 | GeoIP upload → 502 / OOM, backend перезапускается | Не заливать большой CSV поверх уже загруженного индекса через браузер; `dmesg`/`oom-kill`; см. [GeoIP](#geoip) |
 | GeoIP: `Failed to fetch` при смене страницы | Уход со страницы во время POST обрывает `fetch`; дождитесь окончания или `curl` с сервера |
@@ -772,7 +773,7 @@ docker compose exec clickhouse sh -c 'clickhouse-client --password "$CLICKHOUSE_
 ```bash
 # 1. Скачать архив релиза (на машине с интернетом или сразу на сервер)
 #    GitHub → Releases → Assets → geoatlas-X.Y.Z.tar.gz (+ .sha256)
-VER=1.4.0
+VER=1.4.1
 curl -fLO "https://github.com/varlahin-gena/network_monitor/releases/download/v${VER}/geoatlas-${VER}.tar.gz"
 curl -fLO "https://github.com/varlahin-gena/network_monitor/releases/download/v${VER}/geoatlas-${VER}.tar.gz.sha256"
 sha256sum -c "geoatlas-${VER}.tar.gz.sha256"
@@ -786,6 +787,8 @@ sudo /opt/network-monitor/update.sh ./geoatlas-${VER}.tar.gz
 ```bash
 tar -xzf geoatlas-${VER}.tar.gz
 sudo ./geoatlas-${VER}/update.sh --package "$PWD/geoatlas-${VER}.tar.gz"
+# если каталог не /opt/network-monitor:
+# sudo ./geoatlas-${VER}/update.sh --package "$PWD/geoatlas-${VER}.tar.gz" --project-dir /opt/network_monitor
 ```
 
 Скачать последний релиз с GitHub прямо на сервере:
@@ -795,6 +798,8 @@ sudo /opt/network-monitor/update.sh --download
 ```
 
 Полезные опции: `--no-start`, `--no-stop`, `--project-dir DIR`. Проверка суммы: рядом с tar.gz файл `.sha256` или `NM_INSTALL_PACKAGE_SHA256=<hex>`.
+
+Остановка при обновлении не требует реальных секретов (`compose down` с заглушками в процессе). `./start.sh` по-прежнему читает `.env` и не стартует без `CLICKHOUSE_PASSWORD` / токенов.
 
 Первичная установка из уже скачанного пакета (без git) — OS-скрипт из архива:
 
@@ -1066,6 +1071,7 @@ network_monitor/
 │   ├── check-release-contract.sh     # CI: VERSION / CHANGELOG / OpenAPI
 │   ├── pack-release.sh               # dist/geoatlas-X.Y.Z.tar.gz (+ sha256)
 │   ├── test-apply-package.sh         # CI: pack + наложение пакета
+│   ├── test-compose-stop-env.sh      # CI: заглушки для compose down без секретов
 │   ├── shellcheck.sh                 # CI: start/stop/update, scripts/, deploy/
 │   ├── backup-clickhouse.sh          # native BACKUP → том clickhouse-backups
 │   └── restore-clickhouse.sh         # RESTORE + optional auth tarball

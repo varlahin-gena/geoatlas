@@ -2,9 +2,9 @@
 # Обновление ГеоАтлас из локального пакета (tar.gz или распакованный каталог).
 # Не делает git pull. Тома Docker / .env / сертификаты / профиль сохраняются.
 #
-#   sudo ./update.sh /path/to/geoatlas-1.4.0.tar.gz
+#   sudo ./update.sh /path/to/geoatlas-1.4.1.tar.gz
 #   sudo ./update.sh --download
-#   tar -xzf geoatlas-1.4.0.tar.gz && sudo ./geoatlas-1.4.0/update.sh
+#   tar -xzf geoatlas-1.4.1.tar.gz && sudo ./geoatlas-1.4.1/update.sh
 #
 # Опции:
 #   --package PATH     пакет (.tar.gz или каталог)
@@ -119,6 +119,40 @@ parse_args() {
     done
 }
 
+# Остановка до наложения пакета. Берём compose.sh из *этого* архива:
+# установленный stop.sh ещё старый и падает на пустом CLICKHOUSE_PASSWORD.
+# Заглушки только в subshell — иначе docker compose up подхватит их вместо .env.
+nm_update_stop_stack() {
+    local dir="$1"
+    local compose="${SCRIPT_DIR}/deploy/common/compose.sh"
+    log "Остановка стека…"
+    if [[ -f "$compose" ]]; then
+        if (
+            # shellcheck source=deploy/common/compose.sh
+            source "$compose"
+            nm_compose "$dir" down --remove-orphans
+        ); then
+            return 0
+        fi
+        log "ВНИМАНИЕ: docker compose down не удался — пробуем установленный stop.sh."
+    fi
+    if [[ -x "${dir}/stop.sh" ]]; then
+        if (
+            # shellcheck source=deploy/common/compose.sh
+            [[ -f "$compose" ]] && source "$compose"
+            if declare -F _nm_compose_fill_stop_placeholders >/dev/null 2>&1; then
+                _nm_compose_fill_stop_placeholders "$dir"
+            fi
+            "${dir}/stop.sh"
+        ); then
+            return 0
+        fi
+        log "ВНИМАНИЕ: ${dir}/stop.sh не удался."
+    fi
+    log "ВНИМАНИЕ: стек может остаться запущенным — наложение пакета продолжается (start.sh пересоздаст контейнеры)."
+    return 0
+}
+
 resolve_default_package() {
     if [[ -n "$PACKAGE" || "$DO_DOWNLOAD" == "1" ]]; then
         return 0
@@ -183,9 +217,8 @@ main() {
         log "Версия пакета: ${ver}"
     fi
 
-    if [[ "$DO_STOP" == "1" && -x "${PROJECT_DIR}/stop.sh" ]]; then
-        log "Остановка стека…"
-        "${PROJECT_DIR}/stop.sh"
+    if [[ "$DO_STOP" == "1" ]]; then
+        nm_update_stop_stack "$PROJECT_DIR"
     fi
 
     nm_apply_install_payload "$payload" "$PROJECT_DIR"
