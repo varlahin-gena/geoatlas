@@ -18,6 +18,9 @@
 - Playwright GeoIP wizard (Escape) + в CI `vite preview`, не только `vite dev`
 
 ### Changed
+- Образы: `nginx:1.27-alpine` → `1.30.4-alpine` (stable; 1.27 EOL), runtime/`volume-perms` `alpine:3.20` → `3.23` (3.20 EOL). Без `apk upgrade`.
+- Toolchain: Go 1.24 → 1.25 (`go.mod` / `go.work` / CI `1.25.x` / `golang:1.25-alpine`); `golang.org/x/crypto` v0.31.0 → v0.55.0 (bcrypt). `clickhouse-go` пока 2.17.1.
+- ClickHouse LTS patch: `clickhouse/clickhouse-server:25.8.28.1` → `25.8.29.51` в compose, CI integration и image scan.
 - Schema SoT: базовые таблицы в `migrate.EnsureBaseSchema`; `clickhouse/init.sql` и `migrate_*.sql` генерируются из того же DDL (`go generate ./internal/adapter/clickhouse/migrate/...`). Пустой том без init.sql больше не оставляет `traffic_logs` несозданным.
 - JSON control plane: запись users/tokens/retention/feeds/templates/backup-schedule через общий `fileatomic` (tmp + fsync + rename)
 - HTTP API doc **1.5.0 → 1.11.0** (после v1.3.1, ещё не в продуктовом теге):

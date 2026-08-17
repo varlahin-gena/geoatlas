@@ -27,4 +27,4 @@ Legacy `*.html` URLs redirect to the routes above (nginx + React Router).
 
 ## Docker
 
-`frontend/Dockerfile` multi-stage: `npm ci && npm run build` → `nginx:1.27-alpine` with `dist/` and `nginx-app.inc`.
+`frontend/Dockerfile` multi-stage: `npm ci && npm run build` → `nginx:1.30.4-alpine` with `dist/` and `nginx-app.inc`.

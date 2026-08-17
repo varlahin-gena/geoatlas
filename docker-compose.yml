@@ -2,7 +2,7 @@ services:
   # Выровнять владельца томов под uid 101 (clickhouse + backend).
   # Нужно после смены backend с 10001→101 и для записи *.auth.tgz на clickhouse-backups.
   volume-perms:
-    image: alpine:3.20
+    image: alpine:3.23
     container_name: nm-volume-perms
     volumes:
       - clickhouse-backups:/var/lib/clickhouse-backups
@@ -17,7 +17,7 @@ services:
     restart: "no"
 
   clickhouse:
-    image: clickhouse/clickhouse-server:25.8.28.1
+    image: clickhouse/clickhouse-server:25.8.29.51
     container_name: clickhouse
     expose:
       - "8123"

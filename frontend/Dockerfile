@@ -8,7 +8,7 @@ COPY public ./public
 COPY src ./src
 RUN npm run build
 
-FROM nginx:1.27-alpine
+FROM nginx:1.30.4-alpine
 RUN mkdir -p /etc/nginx/includes
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx-app.inc /etc/nginx/includes/app.inc

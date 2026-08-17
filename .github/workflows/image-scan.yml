@@ -23,7 +23,7 @@ jobs:
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: image
-          image-ref: nginx:1.27-alpine
+          image-ref: nginx:1.30.4-alpine
           severity: CRITICAL
           ignore-unfixed: true
           format: sarif
@@ -33,7 +33,7 @@ jobs:
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: image
-          image-ref: alpine:3.20
+          image-ref: alpine:3.23
           severity: CRITICAL
           ignore-unfixed: true
           format: sarif
@@ -43,7 +43,7 @@ jobs:
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: image
-          image-ref: clickhouse/clickhouse-server:25.8.28.1
+          image-ref: clickhouse/clickhouse-server:25.8.29.51
           severity: CRITICAL
           ignore-unfixed: true
           format: sarif

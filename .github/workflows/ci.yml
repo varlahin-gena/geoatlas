@@ -5,8 +5,8 @@ on:
     branches: [main, develop]
   pull_request:
 
-# Isolate modules: a Dependabot bump that raises one go.mod to 1.25 must not
-# fail chconn/stats via go.work. GOTOOLCHAIN=local keeps CI on setup-go 1.24.x.
+# Isolate modules: a Dependabot bump that raises one go.mod language version
+# must not fail chconn/stats via go.work. GOTOOLCHAIN=local keeps CI on setup-go 1.25.x.
 env:
   GOWORK: "off"
   GOTOOLCHAIN: local
@@ -41,7 +41,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.24.x"
+          go-version: "1.25.x"
           cache-dependency-path: |
             backend/go.sum
             backend/go.mod
@@ -101,7 +101,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.24.x"
+          go-version: "1.25.x"
           cache-dependency-path: |
             pkg/chconn/go.sum
             pkg/chconn/go.mod
@@ -120,7 +120,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.24.x"
+          go-version: "1.25.x"
           cache-dependency-path: pkg/syslogngstats/go.mod
 
       - name: go test
@@ -134,7 +134,7 @@ jobs:
         working-directory: backend
     services:
       clickhouse:
-        image: clickhouse/clickhouse-server:25.8.28.1
+        image: clickhouse/clickhouse-server:25.8.29.51
         ports:
           - 9000:9000
           - 8123:8123
@@ -155,7 +155,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.24.x"
+          go-version: "1.25.x"
           cache-dependency-path: |
             backend/go.sum
             backend/go.mod
@@ -202,7 +202,7 @@ jobs:
               --data-urlencode "user=default" \
               --data-urlencode "password=ci_test" \
               --data-urlencode "query=SELECT name, engine FROM system.tables WHERE database = currentDatabase() ORDER BY name FORMAT Vertical" || true
-            container_id="$(docker ps -q --filter 'ancestor=clickhouse/clickhouse-server:25.8.28.1')"
+            container_id="$(docker ps -q --filter 'ancestor=clickhouse/clickhouse-server:25.8.29.51')"
             if [ -n "$container_id" ]; then
               docker logs --tail 200 "$container_id" || true
             fi
@@ -224,7 +224,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.24.x"
+          go-version: "1.25.x"
           cache-dependency-path: |
             stats-collector/go.sum
             stats-collector/go.mod

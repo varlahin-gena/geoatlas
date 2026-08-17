@@ -1,5 +1,5 @@
 version: 2
-# Appliance: pin runtime images, Go 1.24, and ClickHouse driver ourselves.
+# Appliance: pin runtime images, Go 1.25, and ClickHouse driver ourselves.
 # Group update-types only buckets matching PRs — unmatched versions still open
 # individually. Ignore minor/major at the ecosystem so they never open.
 updates:
