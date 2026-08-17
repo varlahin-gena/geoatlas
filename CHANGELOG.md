@@ -5,6 +5,20 @@
 
 ## [Unreleased]
 
+## [1.4.2] — 2026-08-18
+
+Патч-релиз: старт из `/opt/network_monitor` не создаёт пустые тома и не конфликтует с контейнерами проекта `network-monitor`.
+
+### Fixed
+- `nm_compose`: если контейнеры `clickhouse` / `nm-volume-perms` уже принадлежат проекту `network-monitor`, а каталог — `/opt/network_monitor`, берём `COMPOSE_PROJECT_NAME` с существующих контейнеров и при необходимости пишем его в `.env` (иначе `up` создаёт пустые тома и падает на занятом имени).
+
+### Notes
+- OpenAPI API doc version: **1.11.0** (без изменений)
+- Продуктовая версия: **1.4.2**
+- После обновления: скачать `geoatlas-1.4.2.tar.gz` (+ `.sha256`) с GitHub Release и `sudo /opt/network-monitor/update.sh ./geoatlas-1.4.2.tar.gz` (если каталог другой: `--project-dir /opt/network_monitor`). Health: `/api/ready`.
+- Не удаляйте тома `network-monitor_*`. Пустые `network_monitor_*`, если они уже появились при неудачном `up`, можно убрать после того, как стек снова работает на `network-monitor_*`.
+- 1 коммит с `v1.4.1`
+
 ## [1.4.1] — 2026-08-18
 
 Патч-релиз: `update.sh` не падает на `docker compose down`, если в `.env` пустой `CLICKHOUSE_PASSWORD`.
@@ -325,6 +339,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[1.4.2]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.4.2
 [1.4.1]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.4.1
 [1.4.0]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.4.0
 [1.3.1]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.3.1

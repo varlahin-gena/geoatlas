@@ -48,4 +48,18 @@ _nm_compose_fill_stop_placeholders "$tmpdir"
 [[ "${CLICKHOUSE_PASSWORD}" == "from-shell" ]] || fail "shell env не должен затираться"
 ok "shell env preserved"
 
+unset COMPOSE_PROJECT_NAME
+echo 'COMPOSE_PROJECT_NAME=network-monitor' >"${tmpdir}/.env"
+_nm_compose_adopt_existing_project "$tmpdir"
+[[ "${COMPOSE_PROJECT_NAME}" == "network-monitor" ]] || fail "должен взять COMPOSE_PROJECT_NAME из .env"
+cnt="$(grep -cE '^[[:space:]]*COMPOSE_PROJECT_NAME=' "${tmpdir}/.env" || true)"
+[[ "$cnt" == "1" ]] || fail ".env не должен дублировать COMPOSE_PROJECT_NAME"
+ok "adopt project from .env"
+
+unset COMPOSE_PROJECT_NAME
+echo '' >"${tmpdir}/.env"
+_nm_compose_adopt_existing_project "$tmpdir"
+[[ -z "${COMPOSE_PROJECT_NAME:-}" ]] || fail "без контейнеров и .env не должен выставлять project"
+ok "adopt no-op without docker containers"
+
 echo "test-compose-stop-env: all checks passed"

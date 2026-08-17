@@ -744,7 +744,7 @@ docker compose exec clickhouse sh -c 'clickhouse-client --password "$CLICKHOUSE_
 | UDP/TCP EPS не разделяются       | Перезапустить `syslog-ng` (маркеры `@@nm/udp/@@` / `@@nm/tcp/@@`) |
 | syslog-ng: kernel refused SO_RCVBUF | `net.core.rmem_max` / `wmem_max` на хосте (см. буферы профиля) |
 | git pull: local changes (только chmod +x) | Предпочтительнее обновление из пакета (`./update.sh`). Иначе `git restore -- '*.sh'` затем `git pull --ff-only`; либо `git reset --hard origin/main` |
-| `update.sh`: `CLICKHOUSE_PASSWORD is missing` на остановке | Баг **1.4.0**: `compose down` требовал секреты. Берите пакет **1.4.1+**. Не экспортируйте фиктивный пароль на весь `update.sh` — `./start.sh` подхватит его вместо `.env`. |
+| `container name "/nm-volume-perms" is already in use` / сеть `network-monitor` не от этого проекта | Два каталога: `/opt/network-monitor` и `/opt/network_monitor`. Не `docker volume rm`. Пакет **1.4.2+** подхватывает `COMPOSE_PROJECT_NAME` с живых контейнеров. Вручную: в `.env` `COMPOSE_PROJECT_NAME=network-monitor`, затем `./start.sh`. |
 | syslog-ng ругается на `log-iw-size` / `flush_timeout` / нет `zz_profile.conf` | На сервере всё ещё старый `syslog-ng.conf`. `git log -1` и `grep flow-control-window-size syslog-ng.conf`; затем hard reset на `origin/main` и `./start.sh` |
 | GeoIP upload → 502 / OOM, backend перезапускается | Не заливать большой CSV поверх уже загруженного индекса через браузер; `dmesg`/`oom-kill`; см. [GeoIP](#geoip) |
 | GeoIP: `Failed to fetch` при смене страницы | Уход со страницы во время POST обрывает `fetch`; дождитесь окончания или `curl` с сервера |
@@ -773,7 +773,7 @@ docker compose exec clickhouse sh -c 'clickhouse-client --password "$CLICKHOUSE_
 ```bash
 # 1. Скачать архив релиза (на машине с интернетом или сразу на сервер)
 #    GitHub → Releases → Assets → geoatlas-X.Y.Z.tar.gz (+ .sha256)
-VER=1.4.1
+VER=1.4.2
 curl -fLO "https://github.com/varlahin-gena/network_monitor/releases/download/v${VER}/geoatlas-${VER}.tar.gz"
 curl -fLO "https://github.com/varlahin-gena/network_monitor/releases/download/v${VER}/geoatlas-${VER}.tar.gz.sha256"
 sha256sum -c "geoatlas-${VER}.tar.gz.sha256"

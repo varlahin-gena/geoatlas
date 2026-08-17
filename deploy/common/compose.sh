@@ -74,6 +74,36 @@ _nm_compose_cmd_allows_placeholder_env() {
     return 1
 }
 
+# Каталог /opt/network_monitor даёт project=network_monitor, а сеть и контейнеры
+# часто уже созданы проектом network-monitor (/opt/network-monitor). Имена
+# clickhouse / nm-volume-perms зафиксированы в YAML — второй проект не стартует.
+# COMPOSE_PROJECT_NAME из окружения или .env не трогаем.
+_nm_compose_adopt_existing_project() {
+    local root="${1:-.}"
+    local n proj from_env=""
+    [[ -n "${COMPOSE_PROJECT_NAME:-}" ]] && return 0
+    from_env="$(_nm_compose_env_get "${root}/.env" COMPOSE_PROJECT_NAME)"
+    if [[ -n "$from_env" ]]; then
+        export COMPOSE_PROJECT_NAME="$from_env"
+        return 0
+    fi
+    command -v docker >/dev/null 2>&1 || return 0
+    for n in clickhouse nm-volume-perms backend frontend syslog-ng stats-collector; do
+        proj="$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project" }}' "$n" 2>/dev/null || true)"
+        case "$proj" in
+            network-monitor|network_monitor)
+                export COMPOSE_PROJECT_NAME="$proj"
+                echo "[compose] COMPOSE_PROJECT_NAME=${proj} (контейнер ${n} уже есть; тома не трогаем)" >&2
+                if [[ -f "${root}/.env" ]] && ! grep -qE '^[[:space:]]*COMPOSE_PROJECT_NAME=' "${root}/.env"; then
+                    printf '\nCOMPOSE_PROJECT_NAME=%s\n' "$proj" >>"${root}/.env"
+                    echo "[compose] записали COMPOSE_PROJECT_NAME=${proj} в ${root}/.env" >&2
+                fi
+                return 0
+                ;;
+        esac
+    done
+}
+
 # $1 — корень проекта (по умолчанию cwd)
 nm_https_active() {
     local root="${1:-.}"
@@ -139,6 +169,7 @@ nm_compose() {
     while IFS= read -r line; do
         [[ -n "$line" ]] && files+=("$line")
     done < <(nm_compose_args "$root")
+    _nm_compose_adopt_existing_project "$root"
     if _nm_compose_cmd_allows_placeholder_env "$@"; then
         _nm_compose_fill_stop_placeholders "$root"
     fi

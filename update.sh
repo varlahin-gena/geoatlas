@@ -2,9 +2,9 @@
 # Обновление ГеоАтлас из локального пакета (tar.gz или распакованный каталог).
 # Не делает git pull. Тома Docker / .env / сертификаты / профиль сохраняются.
 #
-#   sudo ./update.sh /path/to/geoatlas-1.4.1.tar.gz
+#   sudo ./update.sh /path/to/geoatlas-1.4.2.tar.gz
 #   sudo ./update.sh --download
-#   tar -xzf geoatlas-1.4.1.tar.gz && sudo ./geoatlas-1.4.1/update.sh
+#   tar -xzf geoatlas-1.4.2.tar.gz && sudo ./geoatlas-1.4.2/update.sh
 #
 # Опции:
 #   --package PATH     пакет (.tar.gz или каталог)
