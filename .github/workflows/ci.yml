@@ -80,9 +80,12 @@ jobs:
           exit "$fail"
 
       - name: go fuzz (smoke)
+        # Count-based budget: wall-clock -fuzztime=Ns can FAIL with
+        # "context deadline exceeded" when the coordinator timer fires
+        # (golang/go#75804). These targets do not use context.
         run: |
-          go test ./internal/parser/ -run=^$ -fuzz=FuzzParseVerbose -fuzztime=10s
-          go test ./internal/adapter/ingestnet/ -run=^$ -fuzz=FuzzFrameReader -fuzztime=10s
+          go test ./internal/parser/ -run=^$ -fuzz=FuzzParseVerbose -fuzztime=200000x
+          go test ./internal/adapter/ingestnet/ -run=^$ -fuzz=FuzzFrameReader -fuzztime=200000x
 
       - uses: golangci/golangci-lint-action@v9
         with:
