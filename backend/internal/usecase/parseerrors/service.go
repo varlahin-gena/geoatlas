@@ -57,8 +57,11 @@ type DeleteInput struct {
 	All bool
 }
 
+const maxDeleteIDs = 1000
+
 var (
-	ErrNoIDs = apperr.InvalidInput("no ids provided")
+	ErrNoIDs      = apperr.InvalidInput("no ids provided")
+	ErrTooManyIDs = apperr.InvalidInput("too many ids provided")
 )
 
 func (s *Service) Delete(ctx context.Context, in DeleteInput) error {
@@ -67,6 +70,9 @@ func (s *Service) Delete(ctx context.Context, in DeleteInput) error {
 	}
 	if len(in.IDs) == 0 {
 		return ErrNoIDs
+	}
+	if len(in.IDs) > maxDeleteIDs {
+		return ErrTooManyIDs
 	}
 	return s.repo.Delete(ctx, in.IDs)
 }

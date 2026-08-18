@@ -61,6 +61,22 @@ func TestDeleteRequiresIDs(t *testing.T) {
 	}
 }
 
+func TestDeleteRejectsTooManyIDs(t *testing.T) {
+	repo := &stubRepo{}
+	uc := New(repo)
+	ids := make([]string, maxDeleteIDs+1)
+	for i := range ids {
+		ids[i] = "id"
+	}
+	err := uc.Delete(context.Background(), DeleteInput{IDs: ids})
+	if !IsClientError(err) || !errors.Is(err, ErrTooManyIDs) {
+		t.Fatalf("err=%v", err)
+	}
+	if len(repo.deleted) != 0 {
+		t.Fatalf("unexpected delete call: %d ids", len(repo.deleted))
+	}
+}
+
 func TestDeleteAll(t *testing.T) {
 	repo := &stubRepo{}
 	uc := New(repo)

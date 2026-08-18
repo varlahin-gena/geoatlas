@@ -265,6 +265,9 @@ func (i *Index) CollectRanges(limit int, q string) (items []model.GeoRange, tota
 	if limit <= 0 {
 		limit = 2000
 	}
+	if limit > 10000 {
+		limit = 10000
+	}
 	q = strings.ToLower(strings.TrimSpace(q))
 	snap := i.loadSnapshot()
 	if snap == nil {

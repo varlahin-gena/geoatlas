@@ -2,6 +2,7 @@ package perrorstore
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
@@ -11,6 +12,12 @@ import (
 
 // ListParseErrors возвращает последние ошибки (с опциональным поиском по raw/reason).
 func ListParseErrors(ctx context.Context, ch clickhouse.Conn, limit int, search string) ([]model.ParseErrorRow, error) {
+	if limit < 1 {
+		limit = 1
+	}
+	if limit > 5000 {
+		limit = 5000
+	}
 	var (
 		sb   strings.Builder
 		args []any
@@ -44,6 +51,9 @@ func ListParseErrors(ctx context.Context, ch clickhouse.Conn, limit int, search 
 func DeleteParseErrors(ctx context.Context, ch clickhouse.Conn, ids []string) error {
 	if len(ids) == 0 {
 		return nil
+	}
+	if len(ids) > 1000 {
+		return fmt.Errorf("too many ids: %d", len(ids))
 	}
 	placeholders := make([]string, len(ids))
 	args := make([]any, len(ids))
