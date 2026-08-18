@@ -27,7 +27,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
 
@@ -56,10 +56,10 @@ jobs:
           GOWORK: "off"
           GOTOOLCHAIN: local
         run: |
-          go build ./backend/...
-          go build ./stats-collector/...
-          go build ./pkg/chconn/...
-          go build ./pkg/syslogngstats/...
+          (cd backend && go build ./...)
+          (cd stats-collector && go build ./...)
+          (cd pkg/chconn && go build ./...)
+          (cd pkg/syslogngstats && go build ./...)
 
       - name: Build frontend
         if: matrix.language == 'javascript-typescript'
@@ -67,6 +67,6 @@ jobs:
         run: npm run build
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{ matrix.language }}"
