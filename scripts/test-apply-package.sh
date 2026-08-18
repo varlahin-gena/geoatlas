@@ -55,6 +55,21 @@ grep -q 'FROMDIR=1' "${dest2}/.env" || fail "dir apply потерял .env"
 [[ -f "${dest2}/start.sh" ]] || fail "dir apply нет start.sh"
 ok "directory apply"
 
+dest3="$(mktemp -d "${TMPDIR:-/tmp}/nm-apply-dest3.XXXXXX")"
+export NM_INSTALL_PACKAGE="$pkg"
+nm_fetch_project "$dest3"
+[[ -f "${dest3}/start.sh" ]] || fail "nm_fetch_project не наложил пакет"
+ok "nm_fetch_project from NM_INSTALL_PACKAGE"
+
+# shellcheck source=deploy/common/select_source.sh
+source deploy/common/select_source.sh
+unset NM_INSTALL_PACKAGE BRANCH NM_INSTALL_SOURCE NM_INSTALL_IS_TAG
+export NM_INSTALL_PACKAGE="$pkg"
+confirm_install_source
+[[ "${NM_INSTALL_SOURCE}" == "package" ]] || fail "confirm_install_source source=${NM_INSTALL_SOURCE}"
+[[ -n "${BRANCH:-}" ]] || fail "confirm_install_source не выставил BRANCH"
+ok "confirm_install_source package"
+
 # Path traversal
 evil="$(mktemp -d "${TMPDIR:-/tmp}/nm-evil.XXXXXX")"
 mkdir -p "${evil}/safe"
@@ -69,5 +84,5 @@ else
     ok "skip unsafe-tar (tar --transform недоступен)"
 fi
 
-rm -rf "$dest" "$dest2" "$stage" "$evil"
+rm -rf "$dest" "$dest2" "$dest3" "$stage" "$evil"
 echo "test-apply-package: all checks passed"

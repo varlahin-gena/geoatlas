@@ -110,7 +110,7 @@ ensure_syslog_profile() {
 warn_old_syslog_conf() {
     local conf="${SCRIPT_DIR}/syslog-ng.conf"
     if grep -qE 'log_iw_size\(' "$conf" 2>/dev/null; then
-        log "ВНИМАНИЕ: ${conf} старый (global log_iw_size). На сервере: git fetch origin && git reset --hard origin/main"
+        log "ВНИМАНИЕ: ${conf} старый (global log_iw_size). Обновите пакетом geoatlas-X.Y.Z.tar.gz через ./update.sh"
     fi
 }
 

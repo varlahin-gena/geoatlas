@@ -9,7 +9,7 @@
 #   nm_full_auto_finish /opt/network-monitor   # после start.sh
 #
 # Включение: NM_FULL_AUTO=1 или argv --full-auto
-# Даёт: релиз, все модули, HTTP 8080, автопрофиль, старт стека,
+# Даёт: пакет с сервера, все модули, HTTP 8080, автопрофиль, старт стека,
 # host firewall ВКЛ с allowlist портов (HTTP/HTTPS/514).
 # Выключить firewall как раньше: NM_DISABLE_HOST_FIREWALL=1.
 # HTTPS не выключается: при TTY сначала select_https, затем HTTP-порт.
@@ -43,7 +43,7 @@ nm_apply_full_auto_preset() {
     export NM_FORCE=1
 
     if [[ -z "${NM_INSTALL_SOURCE:-}" ]]; then
-        export NM_INSTALL_SOURCE=release
+        export NM_INSTALL_SOURCE=package
     fi
 
     if [[ -z "${HTTP_PORT:-}" ]]; then
@@ -67,7 +67,7 @@ nm_apply_full_auto_preset() {
     fi
 
     # HTTPS: не трогаем HTTPS_ENABLED — select_https спросит первым (при TTY), затем HTTP-порт.
-    _nm_fa_log "режим «Сделай мне хорошо»: release=${NM_INSTALL_SOURCE}, HTTP_PORT=${HTTP_PORT}, автопрофиль, все модули, файрвол allowlist, запуск стека"
+    _nm_fa_log "режим «Сделай мне хорошо»: source=${NM_INSTALL_SOURCE}, HTTP_PORT=${HTTP_PORT}, автопрофиль, все модули, файрвол allowlist, запуск стека"
     _nm_fa_log "Сначала HTTPS (select_https), затем HTTP-порт — если есть TTY и HTTPS_ENABLED / NM_HTTPS_ENABLED ещё не заданы"
 }
 

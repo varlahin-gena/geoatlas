@@ -4,7 +4,7 @@
 
 | Ось | Где | Когда двигать |
 |-----|-----|----------------|
-| Продукт | `VERSION`, git tag `vX.Y.Z`, `install-meta.json` | Только в коммите релиза. На `main` до тега `VERSION` = прошлый релиз (UI пишет `main`). |
+| Продукт | `VERSION`, git tag `vX.Y.Z`, `install-meta.json` | Только в коммите релиза. На сервере UI показывает версию из пакета (`vX.Y.Z`). |
 | HTTP API | `openapi.yaml` → `info.version` | Новый путь / поле / breaking schema. Не за лицензию, баг парсера или описание. |
 | Схема CH | `nm_schema_version` (`Ensure*`) | Как сейчас, независимо. В Notes релиза — строка, если Ensure* менялся. |
 
@@ -53,7 +53,7 @@ git push origin "v$(tr -d '[:space:]' < VERSION)"
 2. создаёт GitHub Release из секции CHANGELOG (если релиза ещё нет);
 3. собирает **`geoatlas-X.Y.Z.tar.gz`** (+ `.sha256`) и прикрепляет к релизу.
 
-Ручной `gh release create` не нужен, пока job **github-release** зелёный. Один tar.gz — и для Ubuntu, и для Oracle Linux; операторы обновляют через `sudo /opt/network-monitor/update.sh geoatlas-X.Y.Z.tar.gz` (README, «Обновление системы»).
+Ручной `gh release create` не нужен, пока job **github-release** зелёный. Один tar.gz — и для Ubuntu, и для Oracle Linux; операторы на сервере **только** скачивают пакет и ставят/обновляют через install-скрипт или `./update.sh` (README, «Установка» / «Обновление системы»; без `git pull` на сервере).
 
 Проверьте Assets релиза: `geoatlas-X.Y.Z.tar.gz` и `geoatlas-X.Y.Z.tar.gz.sha256`.
 

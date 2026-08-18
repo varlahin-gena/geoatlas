@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
 # Обновление ГеоАтлас из локального пакета (tar.gz или распакованный каталог).
-# Не делает git pull. Тома Docker / .env / сертификаты / профиль сохраняются.
+# Тома Docker / .env / сертификаты / профиль сохраняются.
 #
 #   sudo ./update.sh /path/to/geoatlas-1.4.2.tar.gz
-#   sudo ./update.sh --download
 #   tar -xzf geoatlas-1.4.2.tar.gz && sudo ./geoatlas-1.4.2/update.sh
 #
 # Опции:
 #   --package PATH     пакет (.tar.gz или каталог)
-#   --download         скачать последний GitHub Release
 #   --project-dir DIR  каталог установки (по умолчанию /opt/network-monitor)
 #   --no-stop          не вызывать ./stop.sh
 #   --no-start         не вызывать ./start.sh после наложения
@@ -17,10 +15,8 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 
 PROJECT_DIR="${NM_PROJECT_DIR:-/opt/network-monitor}"
-REPO_URL="${REPO_URL:-https://github.com/varlahin-gena/network_monitor.git}"
 DO_STOP=1
 DO_START=1
-DO_DOWNLOAD=0
 PACKAGE="${NM_INSTALL_PACKAGE:-}"
 
 log() { echo "[$(date +'%F %T')] [update] $*"; }
@@ -29,22 +25,20 @@ trap 'log "ОШИБКА на строке ${LINENO} (код выхода $?)."' 
 
 usage() {
     cat <<'EOF'
-Обновление ГеоАтлас из установочного пакета (без git pull).
+Обновление ГеоАтлас из установочного пакета.
 
   sudo ./update.sh /path/to/geoatlas-X.Y.Z.tar.gz
   sudo ./update.sh --package /path/to/geoatlas-X.Y.Z
-  sudo ./update.sh --download
 
 Опции:
   --package PATH      tar.gz или распакованный каталог
-  --download          скачать последний релиз с GitHub
   --project-dir DIR   каталог установки (по умолчанию /opt/network-monitor)
   --no-stop           не останавливать стек
   --no-start          не запускать ./start.sh
   -h, --help          эта справка
 
 Первичная установка из пакета — через deploy/ubuntu/install_ubuntu.sh
-(или install_oraclelinux.sh) с NM_INSTALL_PACKAGE=PATH.
+(или install_oraclelinux.sh) из распакованного geoatlas-X.Y.Z.
 EOF
 }
 
@@ -80,10 +74,6 @@ parse_args() {
                 [[ $# -ge 2 ]] || { echo "--package требует путь" >&2; exit 1; }
                 PACKAGE="$2"
                 shift 2
-                ;;
-            --download)
-                DO_DOWNLOAD=1
-                shift
                 ;;
             --project-dir)
                 [[ $# -ge 2 ]] || { echo "--project-dir требует путь" >&2; exit 1; }
@@ -154,7 +144,7 @@ nm_update_stop_stack() {
 }
 
 resolve_default_package() {
-    if [[ -n "$PACKAGE" || "$DO_DOWNLOAD" == "1" ]]; then
+    if [[ -n "$PACKAGE" ]]; then
         return 0
     fi
     # Распакованный пакет: ./geoatlas-X.Y.Z/update.sh без аргументов.
@@ -167,7 +157,7 @@ resolve_default_package() {
             return 0
         fi
     fi
-    echo "Укажите пакет (.tar.gz) или --download. См. --help." >&2
+    echo "Укажите пакет (.tar.gz или каталог). См. --help." >&2
     exit 1
 }
 
@@ -183,34 +173,16 @@ main() {
 
     resolve_default_package
 
-    if [[ "$DO_DOWNLOAD" == "1" && -n "$PACKAGE" ]]; then
-        echo "Нельзя одновременно --download и путь к пакету." >&2
-        exit 1
-    fi
-
     if [[ ! -f "${PROJECT_DIR}/docker-compose.yml" ]]; then
         echo "В ${PROJECT_DIR} нет установленной системы (нет docker-compose.yml)." >&2
         echo "Первичная установка из пакета:" >&2
-        echo "  sudo NM_INSTALL_SOURCE=package NM_INSTALL_PACKAGE=<пакет> ./deploy/ubuntu/install_ubuntu.sh" >&2
+        echo "  tar -xzf geoatlas-X.Y.Z.tar.gz && cd geoatlas-X.Y.Z" >&2
+        echo "  sudo ./deploy/ubuntu/install_ubuntu.sh" >&2
         exit 1
     fi
 
     local payload="$PACKAGE"
-    local dl_tmp=""
-    local ver="" tag=""
-
-    if [[ "$DO_DOWNLOAD" == "1" ]]; then
-        if declare -F nm_latest_release_tag >/dev/null 2>&1; then
-            tag="$(nm_latest_release_tag "$REPO_URL" || true)"
-        fi
-        if [[ -z "$tag" ]]; then
-            echo "Не удалось определить последний релиз (git ls-remote / GitHub API)." >&2
-            exit 1
-        fi
-        dl_tmp="$(mktemp -d "${TMPDIR:-/tmp}/nm-update-dl.XXXXXX")"
-        payload="${dl_tmp}/geoatlas-release.tar.gz"
-        nm_download_release_tarball "$tag" "$payload"
-    fi
+    local ver=""
 
     ver="$(nm_package_read_version "$payload" || true)"
     if [[ -n "$ver" ]]; then
@@ -238,10 +210,6 @@ main() {
 
     if [[ -x "${PROJECT_DIR}/start.sh" ]]; then
         chmod +x "${PROJECT_DIR}/start.sh" "${PROJECT_DIR}/stop.sh" "${PROJECT_DIR}/update.sh" 2>/dev/null || true
-    fi
-
-    if [[ -n "$dl_tmp" ]]; then
-        rm -rf "$dl_tmp"
     fi
 
     if [[ "$DO_START" == "1" ]]; then

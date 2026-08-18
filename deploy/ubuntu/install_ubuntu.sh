@@ -2,15 +2,6 @@
 set -Eeuo pipefail
 
 PROJECT_DIR="/opt/network-monitor"
-REPO_URL="${REPO_URL:-https://github.com/varlahin-gena/network_monitor.git}"
-# BRANCH: если задан снаружи — не спрашиваем источник; иначе default main до confirm_install_source.
-if [[ -n "${BRANCH+x}" ]]; then
-    NM_BRANCH_FROM_ENV=1
-else
-    NM_BRANCH_FROM_ENV=0
-    BRANCH="main"
-fi
-
 # Firewall: если ENABLE_UFW задан снаружи до запуска — не спрашиваем.
 if [[ -n "${ENABLE_UFW+x}" ]]; then
     NM_FIREWALL_FROM_ENV=1
@@ -28,26 +19,24 @@ trap 'log "ОШИБКА на строке ${LINENO} (код выхода $?). С
 
 _nm_banner_text() {
     local src_line
-    if [[ -n "${NM_INSTALL_SOURCE:-}" ]]; then
-        src_line="Источник: ${NM_INSTALL_SOURCE} → ${BRANCH}"
+    if [[ -n "${NM_INSTALL_PACKAGE:-}" ]]; then
+        src_line="Пакет: ${NM_INSTALL_PACKAGE}"
     else
-        src_line="Ссылка: ${BRANCH} (выбор источника — после Docker)"
+        src_line="Пакет: каталог установщика (или NM_INSTALL_PACKAGE)"
     fi
     cat <<EOF
 Каталог: ${PROJECT_DIR}
 ${src_line}
-Репозиторий: ${REPO_URL}
 
 Шаги:
   1. Пакеты и Docker
-  2. Источник (релиз / main / пакет)
-  3. Получение исходников
-  4. Выбор модулей
-  5. HTTPS
-  6. Порт веб-интерфейса
-  7. Профиль производительности
-  8. Файрвол
-  9. Запуск стека
+  2. Наложение пакета
+  3. Выбор модулей
+  4. HTTPS
+  5. Порт веб-интерфейса
+  6. Профиль производительности
+  7. Файрвол
+  8. Запуск стека
 EOF
 }
 
@@ -83,13 +72,6 @@ _nm_run_gauge_fn() {
     fi
 }
 
-_nm_github_owner() {
-    local owner
-    owner="$(echo "$REPO_URL" | sed -E 's#.*github.com[:/]([^/]+/[^/.]+)(\.git)?$#\1#')"
-    [[ -n "$owner" ]] || owner="varlahin-gena/network_monitor"
-    echo "$owner"
-}
-
 _nm_source_common() {
     # $1 — имя файла в deploy/common (например ui.sh)
     local name="$1"
@@ -105,20 +87,6 @@ _nm_source_common() {
             return 0
         fi
     done
-    if command -v curl >/dev/null 2>&1; then
-        local tmp owner
-        owner="$(_nm_github_owner)"
-        tmp="$(mktemp)"
-        if curl -fsSL --connect-timeout 10 --max-time 30 \
-            "https://raw.githubusercontent.com/${owner}/main/deploy/common/${name}" \
-            -o "$tmp"; then
-            # shellcheck source=/dev/null
-            source "$tmp"
-            rm -f "$tmp"
-            return 0
-        fi
-        rm -f "$tmp"
-    fi
     return 1
 }
 
@@ -134,7 +102,7 @@ _source_full_auto_preset() {
     _nm_source_common full_auto_preset.sh
 }
 
-# Тёмная тема whiptail до появления ui.sh (curl-установка / welcome).
+# Тёмная тема whiptail до появления ui.sh (welcome).
 _ensure_dark_newt() {
     if [[ "${NM_UI_DARK:-1}" == "0" ]]; then
         return 0
@@ -180,9 +148,8 @@ _welcome_dialog() {
 "Добро пожаловать в мастер установки.
 
 Каталог: ${PROJECT_DIR}
-Репозиторий: ${REPO_URL}
 
-Далее: Docker, выбор релиза / main / пакета, модули и запуск." || true
+Далее: Docker, наложение пакета, модули и запуск." || true
         fi
         return 0
     fi
@@ -196,7 +163,7 @@ _welcome_dialog() {
     if ! mode="$(nm_ui_radiolist "Установка ГеоАтлас" \
 "Режим установки
 
-auto — релиз, модули, :8080, UFW ports
+auto — пакет, модули, :8080, UFW ports
 step — спросить каждый шаг
 
 ${PROJECT_DIR}" \
@@ -246,7 +213,6 @@ install_packages() {
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
         ca-certificates \
         curl \
-        git \
         gnupg \
         lsb-release \
         ufw \
@@ -352,39 +318,12 @@ configure_firewall() {
     fi
 }
 
-clone_or_update_repo() {
-    if declare -F nm_fetch_project >/dev/null 2>&1; then
-        nm_fetch_project "$PROJECT_DIR" "$REPO_URL" "$BRANCH" "${NM_INSTALL_IS_TAG:-0}"
-        return
+apply_install_package() {
+    if ! declare -F nm_fetch_project >/dev/null 2>&1; then
+        log "Нет apply_package.sh — запустите установщик из распакованного geoatlas-X.Y.Z."
+        exit 1
     fi
-    if declare -F nm_clone_or_update_repo >/dev/null 2>&1; then
-        nm_clone_or_update_repo "$PROJECT_DIR" "$REPO_URL" "$BRANCH" "${NM_INSTALL_IS_TAG:-0}"
-        return
-    fi
-    mkdir -p /opt
-
-    if [[ -d "$PROJECT_DIR/.git" ]]; then
-        log "Проект уже существует, обновляем..."
-        cd "$PROJECT_DIR"
-
-        if ! git diff --quiet || ! git diff --cached --quiet; then
-            log "Обнаружены локальные изменения — делаем stash перед обновлением."
-            git stash push -u -m "install-$(date +%s)" || true
-        fi
-
-        if [[ "${NM_INSTALL_IS_TAG:-0}" == "1" ]]; then
-            git fetch origin --tags --force
-            git checkout --force "$BRANCH"
-        else
-            git fetch origin
-            git checkout "$BRANCH"
-            git pull --ff-only origin "$BRANCH"
-        fi
-    else
-        log "Клонирование репозитория..."
-        git clone -b "$BRANCH" "$REPO_URL" "$PROJECT_DIR"
-        cd "$PROJECT_DIR"
-    fi
+    nm_fetch_project "$PROJECT_DIR"
 }
 
 _source_select_source() {
@@ -400,23 +339,6 @@ _source_select_source() {
             return 0
         fi
     done
-    # curl-установка одним файлом: подтянуть helper с main
-    local tmp owner
-    if ! command -v curl >/dev/null 2>&1; then
-        return 1
-    fi
-    owner="$(echo "$REPO_URL" | sed -E 's#.*github.com[:/]([^/]+/[^/.]+)(\.git)?$#\1#')"
-    [[ -n "$owner" ]] || owner="varlahin-gena/network_monitor"
-    tmp="$(mktemp)"
-    if curl -fsSL --connect-timeout 10 --max-time 30 \
-        "https://raw.githubusercontent.com/${owner}/main/deploy/common/select_source.sh" \
-        -o "$tmp"; then
-        # shellcheck source=/dev/null
-        source "$tmp"
-        rm -f "$tmp"
-        return 0
-    fi
-    rm -f "$tmp"
     return 1
 }
 
@@ -425,12 +347,10 @@ choose_install_source() {
     _source_ui || true
     if _source_select_source && declare -F confirm_install_source >/dev/null 2>&1; then
         confirm_install_source
-        # .env пишем ПОСЛЕ clone — иначе mkdir+/.env ломает git clone в непустой каталог
         return 0
     fi
-    log "select_source.sh недоступен — устанавливаем BRANCH=${BRANCH}."
-    NM_INSTALL_SOURCE="${NM_INSTALL_SOURCE:-main}"
-    NM_INSTALL_IS_TAG=0
+    log "select_source.sh недоступен. Запустите ./deploy/ubuntu/install_ubuntu.sh из распакованного пакета."
+    exit 1
 }
 
 find_module_helper() {
@@ -527,7 +447,7 @@ configure_resources() {
 prepare_project() {
     cd "$PROJECT_DIR"
 
-    [[ -f docker-compose.yml ]] || { log "docker-compose.yml не найден после получения исходников."; exit 1; }
+    [[ -f docker-compose.yml ]] || { log "docker-compose.yml не найден после наложения пакета."; exit 1; }
 
     log "Выставление прав на исполнение..."
     for f in start.sh stop.sh update.sh \
@@ -645,13 +565,8 @@ main() {
     _nm_run_gauge_fn "Docker" "Установка Docker Engine и Compose…" install_docker
     choose_install_source
     print_banner
-    local fetch_msg="Клонирование / обновление ${BRANCH}…"
-    case "${NM_INSTALL_SOURCE:-}" in
-        package) fetch_msg="Распаковка локального пакета…" ;;
-        release) fetch_msg="Пакет релиза ${BRANCH} (или git)…" ;;
-    esac
-    _nm_run_gauge_fn "Исходники" "$fetch_msg" clone_or_update_repo
-    # После clone — источник установки в .env + UI-слой из репозитория
+    _nm_run_gauge_fn "Пакет" "Наложение geoatlas-*.tar.gz…" apply_install_package
+    # После наложения — источник в .env + UI-слой из пакета
     if declare -F apply_install_source >/dev/null 2>&1; then
         apply_install_source "$PROJECT_DIR"
     elif [[ -f "${PROJECT_DIR}/deploy/common/select_source.sh" ]]; then

@@ -3,13 +3,11 @@
 # Использование:
 #   source deploy/common/apply_package.sh
 #   nm_apply_install_payload /path/to/geoatlas-1.4.2.tar.gz /opt/network-monitor
-#   nm_fetch_project /opt/network-monitor "$REPO_URL" "$BRANCH" "$NM_INSTALL_IS_TAG"
+#   nm_fetch_project /opt/network-monitor
 #
 # Env:
 #   NM_INSTALL_PACKAGE           — tar.gz или распакованный каталог
 #   NM_INSTALL_PACKAGE_SHA256    — ожидаемый hex SHA-256 (опционально)
-#   NM_INSTALL_PREFER_GIT=1      — для source=release не скачивать tar.gz, а git clone
-#   REPO_URL                     — для GitHub Releases / archive fallback
 
 set -Eeuo pipefail
 
@@ -292,120 +290,14 @@ nm_apply_install_payload() {
     return 0
 }
 
-nm_github_owner_repo_from_url() {
-    local u="${1:-${REPO_URL:-}}"
-    if declare -F nm_git_owner_repo >/dev/null 2>&1; then
-        nm_git_owner_repo "$u"
-        return
-    fi
-    u="${u%.git}"
-    u="${u%/}"
-    if [[ "$u" =~ github\.com[:/]([^/]+)/([^/]+)$ ]]; then
-        echo "${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
-        return 0
-    fi
-    echo "varlahin-gena/network_monitor"
-}
-
-# Скачать tar.gz релиза в dest_file. tag = vX.Y.Z.
-# Сначала asset geoatlas-X.Y.Z.tar.gz, иначе GitHub source archive.
-nm_download_release_tarball() {
-    local tag="${1:-}"
-    local dest_file="${2:-}"
-    local owner ver url
-    local sha_url=""
-
-    [[ -n "$tag" && -n "$dest_file" ]] || return 1
-    ver="${tag#v}"
-    owner="$(nm_github_owner_repo_from_url "${REPO_URL:-}")"
-    command -v curl >/dev/null 2>&1 || { _nm_pkg_log "Нужен curl, чтобы скачать пакет."; return 1; }
-
-    url="https://github.com/${owner}/releases/download/${tag}/geoatlas-${ver}.tar.gz"
-    _nm_pkg_log "Скачиваем пакет релиза ${tag}…"
-    if curl -fL --connect-timeout 15 --max-time 300 -o "$dest_file" "$url"; then
-        sha_url="${url}.sha256"
-        curl -fsSL --connect-timeout 10 --max-time 30 -o "${dest_file}.sha256" "$sha_url" 2>/dev/null || rm -f "${dest_file}.sha256"
-        _nm_pkg_log "Скачан asset ${url}"
-        return 0
-    fi
-    rm -f "$dest_file"
-
-    url="https://github.com/${owner}/archive/refs/tags/${tag}.tar.gz"
-    _nm_pkg_log "Asset geoatlas-${ver}.tar.gz нет — берём исходники тега ${tag}."
-    if curl -fL --connect-timeout 15 --max-time 300 -o "$dest_file" "$url"; then
-        return 0
-    fi
-    rm -f "$dest_file"
-    _nm_pkg_log "Не удалось скачать пакет для ${tag}."
-    return 1
-}
-
-# Скачать tar.gz релиза и наложить. rc=1 только если скачивание не удалось
-# (тогда вызывающий может уйти в git). Ошибка наложения — не маскируется git clone.
-nm_try_release_tarball() {
-    local dest="${1:-}"
-    local ref="${2:-${BRANCH:-}}"
-    local tmp pkg apply_rc
-
-    if [[ "${NM_INSTALL_PREFER_GIT:-0}" == "1" ]]; then
-        return 1
-    fi
-    [[ -n "$dest" && -n "$ref" ]] || return 1
-    if [[ "$ref" == "main" || "$ref" == "master" ]]; then
-        return 1
-    fi
-
-    tmp="$(mktemp -d "${TMPDIR:-/tmp}/nm-pkg-dl.XXXXXX")"
-    pkg="${tmp}/geoatlas-release.tar.gz"
-    if ! nm_download_release_tarball "$ref" "$pkg"; then
-        rm -rf "$tmp"
-        return 1
-    fi
-    apply_rc=0
-    nm_apply_install_payload "$pkg" "$dest" || apply_rc=$?
-    rm -rf "$tmp"
-    if [[ "$apply_rc" -ne 0 ]]; then
-        return 2
-    fi
-    return 0
-}
-
-# Единая точка: пакет / tarball релиза / git clone.
+# Наложить NM_INSTALL_PACKAGE (или $2) в каталог установки.
 nm_fetch_project() {
     local project_dir="${1:-${PROJECT_DIR:-/opt/network-monitor}}"
-    local repo_url="${2:-${REPO_URL:-}}"
-    local ref="${3:-${BRANCH:-main}}"
-    local is_tag="${4:-${NM_INSTALL_IS_TAG:-0}}"
-    local src="${NM_INSTALL_SOURCE:-}"
-    local try_rc=0
+    local payload="${2:-${NM_INSTALL_PACKAGE:-}}"
 
-    case "${src}" in
-        package)
-            if [[ -z "${NM_INSTALL_PACKAGE:-}" ]]; then
-                _nm_pkg_log "NM_INSTALL_SOURCE=package, но NM_INSTALL_PACKAGE пуст."
-                return 1
-            fi
-            nm_apply_install_payload "$NM_INSTALL_PACKAGE" "$project_dir"
-            return
-            ;;
-        release)
-            try_rc=0
-            nm_try_release_tarball "$project_dir" "$ref" || try_rc=$?
-            if [[ "$try_rc" -eq 0 ]]; then
-                return 0
-            fi
-            if [[ "$try_rc" -eq 2 ]]; then
-                _nm_pkg_log "Пакет скачан, но наложение не удалось — git clone не делаем."
-                return 1
-            fi
-            _nm_pkg_log "Пакет релиза недоступен — клонируем git (${ref})."
-            ;;
-    esac
-
-    if declare -F nm_clone_or_update_repo >/dev/null 2>&1; then
-        nm_clone_or_update_repo "$project_dir" "$repo_url" "$ref" "$is_tag"
-        return
+    if [[ -z "$payload" ]]; then
+        _nm_pkg_log "Не задан пакет (NM_INSTALL_PACKAGE). Скачайте geoatlas-X.Y.Z.tar.gz на сервер."
+        return 1
     fi
-    _nm_pkg_log "Нет nm_clone_or_update_repo и пакет не задан."
-    return 1
+    nm_apply_install_payload "$payload" "$project_dir"
 }
