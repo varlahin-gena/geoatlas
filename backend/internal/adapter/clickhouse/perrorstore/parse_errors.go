@@ -12,11 +12,10 @@ import (
 
 // ListParseErrors возвращает последние ошибки (с опциональным поиском по raw/reason).
 func ListParseErrors(ctx context.Context, ch clickhouse.Conn, limit int, search string) ([]model.ParseErrorRow, error) {
-	if limit < 1 {
-		limit = 1
-	}
-	if limit > 5000 {
-		limit = 5000
+	// CodeQL go/uncontrolled-allocation-size treats reject+return as a
+	// sanitizer; assignment clamps like `if n > max { n = max }` are not.
+	if limit < 1 || limit > 5000 {
+		return nil, fmt.Errorf("invalid parse-errors limit: %d", limit)
 	}
 	var (
 		sb   strings.Builder

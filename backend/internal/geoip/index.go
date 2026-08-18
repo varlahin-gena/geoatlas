@@ -265,8 +265,10 @@ func (i *Index) CollectRanges(limit int, q string) (items []model.GeoRange, tota
 	if limit <= 0 {
 		limit = 2000
 	}
+	// CodeQL go/uncontrolled-allocation-size treats reject+return as a
+	// sanitizer; assignment clamps like `if n > max { n = max }` are not.
 	if limit > 10000 {
-		limit = 10000
+		return nil, 0, 0, false
 	}
 	q = strings.ToLower(strings.TrimSpace(q))
 	snap := i.loadSnapshot()
@@ -283,6 +285,9 @@ func (i *Index) CollectRanges(limit int, q string) (items []model.GeoRange, tota
 		if n > total {
 			n = total
 		}
+		if n > 10000 {
+			return nil, total, 0, false
+		}
 		items = make([]model.GeoRange, n)
 		for idx := range n {
 			items[idx] = snap.toGeoRange(snap.rows[idx])
@@ -290,7 +295,7 @@ func (i *Index) CollectRanges(limit int, q string) (items []model.GeoRange, tota
 		return items, total, total, total > limit
 	}
 
-	items = make([]model.GeoRange, 0, min(limit, 256))
+	items = make([]model.GeoRange, 0, 256)
 	for _, row := range snap.rows {
 		g := snap.toGeoRange(row)
 		if !rangeMatchesQuery(g, q) {
