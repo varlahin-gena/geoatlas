@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"network_monitor/internal/auth"
@@ -12,12 +13,12 @@ import (
 
 // SetCookie пишет session + CSRF cookies.
 func SetCookie(w http.ResponseWriter, r *http.Request, token string, ttl time.Duration) {
-	http.SetCookie(w, appCookie(auth.CookieName, token, true, cookieMaxAge(ttl)))
+	http.SetCookie(w, appCookie(auth.CookieName, token, true, cookieMaxAge(ttl), r))
 	SetCSRFCookie(w, r, NewCSRFToken(), ttl)
 }
 
 func ClearCookie(w http.ResponseWriter, r *http.Request) {
-	http.SetCookie(w, appCookie(auth.CookieName, "", true, -1))
+	http.SetCookie(w, appCookie(auth.CookieName, "", true, -1, r))
 	ClearCSRFCookie(w, r)
 }
 
@@ -35,11 +36,11 @@ func SetCSRFCookie(w http.ResponseWriter, r *http.Request, token string, ttl tim
 	if token == "" {
 		token = NewCSRFToken()
 	}
-	http.SetCookie(w, appCookie(auth.CSRFCookieName, token, false, cookieMaxAge(ttl)))
+	http.SetCookie(w, appCookie(auth.CSRFCookieName, token, false, cookieMaxAge(ttl), r))
 }
 
 func ClearCSRFCookie(w http.ResponseWriter, r *http.Request) {
-	http.SetCookie(w, appCookie(auth.CSRFCookieName, "", false, -1))
+	http.SetCookie(w, appCookie(auth.CSRFCookieName, "", false, -1, r))
 }
 
 // EnsureCSRFCookie выдаёт CSRF cookie, если его ещё нет (миграция старых сессий).
@@ -57,10 +58,10 @@ func cookieMaxAge(ttl time.Duration) int {
 	return int((12 * time.Hour).Seconds())
 }
 
-// appCookie — session/CSRF cookie. Secure всегда true: CodeQL go/cookie-secure-not-set
-// требует константу; браузеры всё равно отправляют Secure-cookie на localhost/127.0.0.1.
-func appCookie(name, value string, httpOnly bool, maxAge int) *http.Cookie {
-	return &http.Cookie{
+// appCookie — session/CSRF cookie. Secure в литерале всегда true (go/cookie-secure-not-set),
+// затем снимается только для явного HTTP (локальные тесты и HTTP-only install).
+func appCookie(name, value string, httpOnly bool, maxAge int, r *http.Request) *http.Cookie {
+	c := &http.Cookie{
 		Name:     name,
 		Value:    value,
 		Path:     "/",
@@ -69,6 +70,20 @@ func appCookie(name, value string, httpOnly bool, maxAge int) *http.Cookie {
 		Secure:   true,
 		MaxAge:   maxAge,
 	}
+	if !cookieSecure(r) {
+		c.Secure = false
+	}
+	return c
+}
+
+func cookieSecure(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
+	if r.TLS != nil {
+		return true
+	}
+	return strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 }
 
 func SessionFromRequest(r *http.Request, m SessionParser) (auth.Session, error) {

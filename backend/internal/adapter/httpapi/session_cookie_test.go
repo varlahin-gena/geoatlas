@@ -52,10 +52,30 @@ func TestSessionCookieRoundTrip(t *testing.T) {
 	if sessCookie.SameSite != http.SameSiteStrictMode {
 		t.Fatalf("SameSite = %v, want Strict", sessCookie.SameSite)
 	}
-	if !sessCookie.Secure || !csrfCookie.Secure {
-		t.Fatal("session and CSRF cookies must set Secure=true")
+	if sessCookie.Secure || csrfCookie.Secure {
+		t.Fatal("HTTP requests must not set Secure (httptest / HTTP-only UI)")
 	}
 	if !sessCookie.HttpOnly {
 		t.Fatal("session cookie must be HttpOnly")
+	}
+}
+
+func TestSessionCookieSecureOnHTTPS(t *testing.T) {
+	mgr, err := auth.NewSessionManager("cookie-secret", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, _, err := mgr.Issue("operator", auth.RoleOperator, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("X-Forwarded-Proto", "https")
+	SetCookie(rec, req, token, mgr.TTL())
+	for _, c := range rec.Result().Cookies() {
+		if (c.Name == auth.CookieName || c.Name == auth.CSRFCookieName) && !c.Secure {
+			t.Fatalf("%s Secure=false on HTTPS", c.Name)
+		}
 	}
 }
