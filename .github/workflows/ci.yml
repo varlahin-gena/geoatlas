@@ -254,6 +254,30 @@ jobs:
           working-directory: stats-collector
           args: --timeout=3m
 
+  govulncheck:
+    name: govulncheck (Go modules)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.25.x"
+          cache-dependency-path: |
+            backend/go.sum
+            backend/go.mod
+            stats-collector/go.sum
+            stats-collector/go.mod
+            pkg/chconn/go.sum
+            pkg/chconn/go.mod
+            pkg/syslogngstats/go.mod
+
+      - name: install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
+
+      - name: govulncheck
+        run: bash scripts/ci-govulncheck.sh
+
   docker-images:
     name: docker (${{ matrix.image }})
     runs-on: ubuntu-latest

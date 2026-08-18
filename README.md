@@ -1027,6 +1027,7 @@ network_monitor/
 ├── scripts/
 │   ├── check-release-contract.sh     # CI: VERSION / CHANGELOG / OpenAPI
 │   ├── ci-docker-build.sh            # CI: docker build backend / frontend / stats
+│   ├── ci-govulncheck.sh             # CI: govulncheck по Go-модулям
 │   ├── pack-release.sh               # dist/geoatlas-X.Y.Z.tar.gz (+ sha256)
 │   ├── test-apply-package.sh         # CI: pack + наложение пакета
 │   ├── test-compose-stop-env.sh      # CI: заглушки для compose down без секретов
