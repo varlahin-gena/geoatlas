@@ -52,4 +52,10 @@ func TestSessionCookieRoundTrip(t *testing.T) {
 	if sessCookie.SameSite != http.SameSiteStrictMode {
 		t.Fatalf("SameSite = %v, want Strict", sessCookie.SameSite)
 	}
+	if !sessCookie.Secure || !csrfCookie.Secure {
+		t.Fatal("session and CSRF cookies must set Secure=true")
+	}
+	if !sessCookie.HttpOnly {
+		t.Fatal("session cookie must be HttpOnly")
+	}
 }

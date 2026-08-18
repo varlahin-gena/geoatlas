@@ -12,7 +12,7 @@ linters:
         - G104 # audited via errcheck
         - G304 # paths often from env/config
         - G115 # int conversions in metrics/limits
-        - G124 # Secure set via cookieSecure(r); CSRF cookie must be JS-readable
+        - G124 # CSRF cookie must be JS-readable (HttpOnly=false)
   exclusions:
     generated: lax
     presets:
