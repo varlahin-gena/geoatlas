@@ -49,9 +49,9 @@
 - Парсинг **UserGate, FortiGate, Cisco ASA, Cisco FTD (FirePower), Cowrie (honeypot)** и универсальный фолбэк (Generic KV)
 - **Осознанный пропуск** событий: распознанные, но несетевые строки (например, часть `cowrie.*`) не попадают в `parse_errors`
 - **Авторизация по умолчанию**: одна seed-учётка `admin`; роли `administrator` / `operator` (operator — через UI `/users`); cookie-сессии, CSRF, Bearer `API_AUTH_TOKEN` (+ `API_AUTH_PREVIOUS_TOKEN`); именованные API-токены со scopes `read`/`ops`/`admin` (UI `/api-tokens`); управление УЗ в UI
-- Веб-интерфейс — **React SPA** (Vite + TypeScript); clean paths, legacy `*.html` редиректятся
+- Веб-интерфейс — **React SPA** (Vite + TypeScript)
 - Опциональный **HTTPS** на nginx со своими PEM-сертификатами (редирект HTTP→HTTPS)
-- Загрузка и правка **GeoIP-базы** (CSV SIEM KUMA, `/geo-ranges`, IP без координат на `/geo-missing`); лимиты upload по профилю, очистка базы, большие CSV — с сервера через `curl` (см. [GeoIP](#geoip))
+- Загрузка и правка **GeoIP-базы** (CSV SIEM KUMA, `/geo-ranges`, IP без координат на `/geo-missing`)
 - Установка **«Сделай мне хорошо»** (`NM_FULL_AUTO` / `--full-auto`): релиз, все модули, порт 8080, автопрофиль, firewall allowlist (UI + :514)
 - **Один установочный пакет** `geoatlas-X.Y.Z.tar.gz` для Ubuntu и Oracle Linux / RHEL; обновление без `git pull` через `./update.sh`
 - Toast-уведомления без автоскрытия (крестик), сохраняются при смене страниц до ручного закрытия
@@ -124,23 +124,23 @@ syslog-ng **4.11** (`balabit/syslog-ng:4.11.0`): healthcheck `syslog-ng-ctl stat
 
 ### Product limits (appliance)
 
-| Ограничение | Суть |
-|-------------|------|
-| **IPv4-only** | Success path GeoIP / карта / lookup — IPv4. IPv6 не обогащается и не строится на карте. |
-| **Single-host control plane** | Учётки, API-токены, retention, reputation feeds, schedules — JSON на `/app/data`. Backend берёт exclusive lock (`/app/data/.nm_backend.lock`); второй процесс на том же томе не стартует. Обход только для стендов: `NM_ALLOW_MULTI_INSTANCE=1` (небезопасно при shared volume). |
+| Ограничение                   | Суть                                                                                                                                           |
+|-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
+| **IPv4-only**                 | Success path GeoIP / карта / lookup — IPv4. IPv6 не обогащается и не строится на карте.                                                        |
+| **Single-host control plane** | Учётки, API-токены, retention, reputation feeds, schedules — JSON на `/app/data`. Backend берёт exclusive lock (`/app/data/.nm_backend.lock`). |
 
-### Ingest SLO (at-most-once)
+### Ingest SLO
 
 Доставка — **best-effort / at-most-once** (очередь может дропать). Product SLO описывает, когда потери — инцидент (алёрты на `/system`, поле `ingest_slo` в `/api/system/stats`, метрики Prometheus):
 
-| Сигнал | Warn | Critical (error) |
-|--------|------|------------------|
-| Queue depth / byte budget | ≥ 75% capacity | ≥ 90% |
-| Processor buffer lines | > 10k | > 100k |
-| Admission / buffer / syslog-ng drops/s | любое > 0 | ≥ 100/s |
-| Insert circuit open | да (warn) | (эскалация через queue/drops) |
-| Pipeline lag (при ненулевом rate) | > 60s | > 300s |
-| EPS vs install profile max | > 105% | > 125% |
+| Сигнал                                 | Warn           | Critical (error)              |
+|----------------------------------------|----------------|-------------------------------|
+| Queue depth / byte budget              | ≥ 75% capacity | ≥ 90%                         |
+| Processor buffer lines                 | > 10k          | > 100k                        |
+| Admission / buffer / syslog-ng drops/s | любое > 0      | ≥ 100/s                       |
+| Insert circuit open                    | да (warn)      | (эскалация через queue/drops) |
+| Pipeline lag (при ненулевом rate)      | > 60s          | > 300s                        |
+| EPS vs install profile max             | > 105%         | > 125%                        |
 
 Runbook кратко: warn drops → проверить стадию Syslog-NG (queued/dropped) / syslog-ng buffer / profile / CH; critical → `tune-resources.sh` или снизить входной EPS; circuit open → здоровье ClickHouse.
 
@@ -148,16 +148,16 @@ Runbook кратко: warn drops → проверить стадию Syslog-NG (
 
 Дефолты ниже, менять можно в UI (`/system` → Pipeline → «Срок хранения»).
 
-| Таблица / объект                    | Срок по умолчанию | Источник дефолта                             |
-|-------------------------------------|-------------------|----------------------------------------------|
+| Таблица / объект                    | Срок по умолчанию | Источник дефолта                                   |
+|-------------------------------------|-------------------|----------------------------------------------------|
 | `traffic_logs`                      | 30 дней           | EnsureBaseSchema / retention `traffic_logs_days`   |
-| `traffic_edges_daily` (+ MV)        | 30 дней           | `EnsureEdgesAgg` / retention `edges_days`    |
-| `traffic_edges_city_daily` (+ MV)   | 30 дней           | `EnsureGeoEdgesAgg` / retention `edges_days` |
-| `traffic_edges_country_daily` (+ MV)| 30 дней           | `EnsureGeoEdgesAgg` / retention `edges_days` |
+| `traffic_edges_daily` (+ MV)        | 30 дней           | `EnsureEdgesAgg` / retention `edges_days`          |
+| `traffic_edges_city_daily` (+ MV)   | 30 дней           | `EnsureGeoEdgesAgg` / retention `edges_days`       |
+| `traffic_edges_country_daily` (+ MV)| 30 дней           | `EnsureGeoEdgesAgg` / retention `edges_days`       |
 | `parse_errors`                      | 7 дней            | EnsureBaseSchema / retention `parse_errors_days`   |
 | `system_metrics`                    | 7 дней            | EnsureBaseSchema / retention `system_metrics_days` |
 | `geo_ranges`                        | без TTL           | EnsureBaseSchema (не настраивается)                |
-| `nm_schema_version`                 | без TTL           | `Ensure*` (метаданные схемы)                 |
+| `nm_schema_version`                 | без TTL           | `Ensure*` (метаданные схемы)                       |
 
 Допустимый диапазон настраиваемых дней: **1…730**. На `traffic_logs` / `parse_errors` / `system_metrics` / `traffic_edges_*` включён `ttl_only_drop_parts` при **дневных** партициях: истечение удаляет дневную партицию целиком (без дорогих row-level TTL merges). Уменьшение TTL удалит старые партиции при следующем TTL merge/drop в ClickHouse.
 
@@ -200,12 +200,12 @@ Runbook кратко: warn drops → проверить стадию Syslog-NG (
 1. Положите PEM в `certs/fullchain.pem` и `certs/privkey.pem` (см. `certs/README.md`).
 2. Переменные в `.env`:
 
-| Переменная     | По умолчанию | Назначение |
-|----------------|--------------|------------|
+| Переменная     | По умолчанию | Назначение                                                      |
+|----------------|--------------|-----------------------------------------------------------------|
 | `HTTPS_ENABLED`| `auto`       | `1`/`true` — вкл.; `0` — выкл.; `auto` — вкл. если есть оба PEM |
-| `HTTPS_PORT`   | `443`        | Хостовый порт TLS |
-| `HTTP_REDIRECT`| `1`          | Редирект HTTP→HTTPS |
-| `HTTP_PORT`    | `80`         | HTTP (и редирект) |
+| `HTTPS_PORT`   | `443`        | Хостовый порт TLS                                               |
+| `HTTP_REDIRECT`| `1`          | Редирект HTTP→HTTPS                                             |
+| `HTTP_PORT`    | `80`         | HTTP (и редирект)                                               |
 
 ```env
 HTTPS_ENABLED=1
@@ -228,8 +228,6 @@ HTTP_REDIRECT=1
 3. Запуск через `./start.sh` / `./stop.sh` (или `deploy/common/compose.sh`) — подхватывает `docker-compose.https.yml` и публикует `:443`. Голый `docker compose` без `-f docker-compose.https.yml` порт `:443` не опубликует.
 4. UI: `https://<host>/`. HTTP при `HTTP_REDIRECT=1` уходит на HTTPS.
 
-Ключи не коммитятся (`.gitignore`). Syslog на `:514` по-прежнему без TLS.
-
 ---
 
 ## Быстрый старт
@@ -247,7 +245,7 @@ http://<IP_сервера>/
 - пошаговая установка спрашивает пароль (дважды, мин. 8 символов);
 - `--full-auto` / нет TTY / голый `./start.sh` — берут `AUTH_ADMIN_PASSWORD` из окружения или генерируют одноразовый и пишут его в `.admin_password_once` (права 600; удалите после входа).
 
-Если пароль сгенерирован, при входе его нужно сменить (`must_reset_password`). Operator с завода не создаётся — заведите в UI `/users`.
+Если пароль сгенерирован, при входе его нужно сменить (`must_reset_password`). Operator в процессе установки не создаётся — создайте в UI `/users`.
 `./start.sh` при необходимости генерирует `API_AUTH_TOKEN`, `SESSION_SECRET`, пароль admin и `CLICKHOUSE_PASSWORD` в `.env` (ключи без значений — [`.env.example`](.env.example)).
 Голый `docker compose up` без `AUTH_ADMIN_PASSWORD` / `CLICKHOUSE_PASSWORD` в `.env` не стартует (fail-closed).
 
@@ -261,15 +259,13 @@ http://<IP_сервера>/
 
 Один архив **`geoatlas-X.Y.Z.tar.gz`** (плюс `.sha256`) с GitHub Release — это исходники стека, **оба** установщика (`deploy/ubuntu/…` и `deploy/oracle_linux/…`) и `update.sh`. Это не `.deb`/`.rpm`: пакет Docker и файрвол хоста по-прежнему ставит OS-скрипт.
 
-| Задача | Что запускать | Пакет |
-|--------|----------------|-------|
-| Первая установка, Ubuntu | `deploy/ubuntu/install_ubuntu.sh` | тот же tar.gz (или скачать релиз с GitHub) |
-| Первая установка, Oracle Linux / RHEL | `deploy/oracle_linux/install_oraclelinux.sh` | тот же tar.gz |
-| Обновление уже стоящей системы | `/opt/network-monitor/update.sh` | тот же tar.gz |
+| Задача                                | Что запускать                                | Пакет                                      |
+|---------------------------------------|----------------------------------------------|--------------------------------------------|
+| Первая установка, Ubuntu              | `deploy/ubuntu/install_ubuntu.sh`            | тот же tar.gz (или скачать релиз с GitHub) |
+| Первая установка, Oracle Linux / RHEL | `deploy/oracle_linux/install_oraclelinux.sh` | тот же tar.gz                              |
+| Обновление уже стоящей системы        | `/opt/network-monitor/update.sh`             | тот же tar.gz                              |
 
 Источник в TUI установщика: **релиз** (скачать tar.gz с GitHub), **`main`** (git) или **локальный пакет**. Режим `release` без локального файла сам берёт `geoatlas-X.Y.Z.tar.gz` с Releases; если asset ещё нет — `git clone` тега.
-
-Локально собрать архив (для проверки, не вместо CI на теге): `bash scripts/pack-release.sh` → `dist/geoatlas-<VERSION>.tar.gz`.
 
 ### Ubuntu (автоматическая)
 
@@ -287,7 +283,7 @@ chmod +x install_ubuntu.sh
 sudo ./install_ubuntu.sh
 ```
 
-**«Сделай мне хорошо» (полный авто):** без вопросов ставит последний релиз, все модули, порт **8080**, автопрофиль по ресурсам, **включает** host firewall с allowlist портов (UI и при syslog `:514/tcp+udp`) и запускает стек. `:514` без TLS/auth — ограничьте источником МСЭ или `NM_SYSLOG_ALLOW_FROM=CIDR`. Выключить firewall как раньше: `NM_DISABLE_HOST_FIREWALL=1`. HTTPS при TTY спрашивается первым среди сетевых шагов (или задайте `NM_HTTPS_ENABLED` / сертификаты через env).
+**«Сделай мне хорошо» (полный авто):** без вопросов ставит последний релиз, все модули, порт **8080**, автопрофиль по ресурсам, **включает** host firewall с allowlist портов (UI и при syslog `:514/tcp+udp`) и запускает стек. Выключить firewall как раньше: `NM_DISABLE_HOST_FIREWALL=1`. HTTPS при TTY спрашивается первым среди сетевых шагов (или задайте `NM_HTTPS_ENABLED` / сертификаты через env).
 
 ```bash
 sudo NM_FULL_AUTO=1 ./install_ubuntu.sh
@@ -313,25 +309,25 @@ sudo ./install_ubuntu.sh --full-auto
 
 **TUI / неинтерактивный режим:**
 
-| Переменная | Назначение |
-|------------|------------|
-| `NM_UI=whiptail\|dialog\|text` | принудительный бэкенд диалогов |
+| Переменная                       | Назначение                                                                                      |
+|----------------------------------|-------------------------------------------------------------------------------------------------|
+| `NM_UI=whiptail\|dialog\|text`   | принудительный бэкенд диалогов                                                                  |
 | `NM_FULL_AUTO=1` / `--full-auto` | «Сделай мне хорошо»: релиз, все модули, порт 8080, автопрофиль, firewall allowlist, старт стека |
-| `NM_DISABLE_HOST_FIREWALL=1` | full-auto: выключить UFW/firewalld (как раньше; небезопасно на публичном IP) |
-| `NM_SYSLOG_ALLOW_FROM` | CIDR/IP: открыть `:514` только с этого источника (UFW/firewalld) |
-| `AUTH_ADMIN_PASSWORD` | пароль admin для full-auto / без TTY; иначе установщик спросит или сгенерирует |
-| `NM_AUTO_MODULES=1` | без вопросов: модули по умолчанию, порт 80, стабильный релиз |
-| `NM_INSTALL_PACKAGE` | путь к `.tar.gz` или распакованному каталогу (источник `package`) |
-| нет TTY (CI/pipe) | то же, что авто-режим; gauge пишет прогресс в лог |
+| `NM_DISABLE_HOST_FIREWALL=1`     | full-auto: выключить UFW/firewalld (как раньше; небезопасно на публичном IP)                    |
+| `NM_SYSLOG_ALLOW_FROM`           | CIDR/IP: открыть `:514` только с этого источника (UFW/firewalld)                                |
+| `AUTH_ADMIN_PASSWORD`            | пароль admin для full-auto / без TTY; иначе установщик спросит или сгенерирует                  |
+| `NM_AUTO_MODULES=1`              | без вопросов: модули по умолчанию, порт 80, стабильный релиз                                    |
+| `NM_INSTALL_PACKAGE`             | путь к `.tar.gz` или распакованному каталогу (источник `package`)                               |
+| нет TTY (CI/pipe)                | то же, что авто-режим; gauge пишет прогресс в лог                                               |
 
 **Источник кода (интерактивно или через env):**
 
-| Режим | Env | Что ставится |
-|-------|-----|--------------|
-| Последний релиз (по умолчанию в UI) | `NM_INSTALL_SOURCE=release` | пакет `geoatlas-X.Y.Z.tar.gz` с GitHub Releases; если asset ещё нет — `git clone` тега |
-| Ветка main | `NM_INSTALL_SOURCE=main` | `main` — последние изменения (`git clone` / `git pull`) |
-| Локальный пакет | `NM_INSTALL_SOURCE=package` + `NM_INSTALL_PACKAGE=/path/to/geoatlas-X.Y.Z.tar.gz` | архив или распакованный каталог, без git |
-| Явный ref | `BRANCH=v1.1.4` | указанная ветка/тег без вопроса |
+| Режим                               | Env                                                                               | Что ставится                                                                           |
+|-------------------------------------|-----------------------------------------------------------------------------------|----------------------------------------------------------------------------------------|
+| Последний релиз (по умолчанию в UI) | `NM_INSTALL_SOURCE=release`                                                       | пакет `geoatlas-X.Y.Z.tar.gz` с GitHub Releases; если asset ещё нет — `git clone` тега |
+| Ветка main                          | `NM_INSTALL_SOURCE=main`                                                          | `main` — последние изменения (`git clone` / `git pull`)                                |
+| Локальный пакет                     | `NM_INSTALL_SOURCE=package` + `NM_INSTALL_PACKAGE=/path/to/geoatlas-X.Y.Z.tar.gz` | архив или распакованный каталог, без git                                               |
+| Явный ref                           | `BRANCH=v1.1.4`                                                                   | указанная ветка/тег без вопроса                                                        |
 
 `NM_INSTALL_PREFER_GIT=1` — для `release` не скачивать tar.gz, а клонировать тег. `NM_INSTALL_PACKAGE_SHA256=<hex>` — проверить контрольную сумму пакета.
 
@@ -339,12 +335,12 @@ sudo ./install_ubuntu.sh --full-auto
 
 **Выбор модулей (интерактивно или через env):**
 
-| Модуль           | По умолчанию | Что даёт                                                |
-|------------------|--------------|---------------------------------------------------------|
-| UI-авторизация   | вкл.         | логин, роли admin/operator (`AUTH_DISABLED` при отказе) |
-| API Bearer-токен | вкл.         | защита мутирующих API (`API_AUTH_DISABLED` при отказе)  |
-| syslog-ng        | вкл.         | приём syslog на `:514` (Compose profile `syslog`)       |
-| stats-collector  | вкл.         | метрики / `/system` (Compose profile `stats`)       |
+| Модуль           | По умолчанию | Что даёт                                                                        |
+|------------------|--------------|---------------------------------------------------------------------------------|
+| UI-авторизация   | вкл.         | логин, роли admin/operator (`AUTH_DISABLED` при отказе)                         |
+| API Bearer-токен | вкл.         | защита мутирующих API (`API_AUTH_DISABLED` при отказе)                          |
+| syslog-ng        | вкл.         | приём syslog на `:514` (Compose profile `syslog`)                               |
+| stats-collector  | вкл.         | метрики / `/system` (Compose profile `stats`)                                   |
 | Репутация IP     | вкл.         | модуль целиком; при отказе `REPUTATION_FETCH_ENABLED=false` (API/UI/фиды выкл.) |
 
 Ядро (ClickHouse + Backend + Frontend) ставится всегда.
@@ -371,55 +367,6 @@ sudo ./install_oraclelinux.sh
 2. Устанавливает Docker CE из официального репозитория
 3. Настраивает SELinux (`container_manage_cgroup`) или переводит в permissive (опционально)
 4. Спрашивает источник (релиз / `main` / локальный пакет), получает исходники, предлагает модули, HTTPS, HTTP-порт, профиль, настраивает firewalld и запускает стек
-
----
-
-### Ручная установка
-
-Если автоматические скрипты не подходят:
-
-```bash
-# 1. Установить Docker и compose plugin (см. docs.docker.com)
-
-# 2a. Из пакета релиза (без git; Ubuntu и Oracle Linux одинаково)
-#     tar -xzf geoatlas-X.Y.Z.tar.gz && sudo mkdir -p /opt
-#     sudo cp -a geoatlas-X.Y.Z /opt/network-monitor
-# 2b. Или клонировать репозиторий
-sudo mkdir -p /opt
-sudo git clone -b main https://github.com/varlahin-gena/network_monitor.git /opt/network-monitor
-cd /opt/network-monitor
-
-# 3. Права на скрипты
-chmod +x start.sh stop.sh update.sh scripts/tune-resources.sh \
-  deploy/common/detect_resources.sh deploy/common/select_modules.sh deploy/common/ui.sh \
-  deploy/common/admin_auth.sh
-
-# 4. (Рекомендуется) Выбрать модули и профиль производительности
-./deploy/common/select_modules.sh .
-./scripts/tune-resources.sh
-# или неинтерактивно:
-# NM_ENABLE_AUTH=0 NM_AUTO_MODULES=1 ./deploy/common/select_modules.sh .
-# NM_AUTO_PROFILE=1 ./deploy/common/detect_resources.sh .
-# 5. Запуск
-./start.sh
-```
-
-Открыть порты вручную:
-
-```bash
-# Ubuntu (UFW)
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp   # если HTTPS
-sudo ufw allow 514/tcp
-sudo ufw allow 514/udp
-
-# Oracle Linux / RHEL (firewalld)
-sudo firewall-cmd --permanent --add-port=80/tcp
-sudo firewall-cmd --permanent --add-port=443/tcp   # если HTTPS
-sudo firewall-cmd --permanent --add-port=514/tcp
-sudo firewall-cmd --permanent --add-port=514/udp
-sudo firewall-cmd --reload
-```
 
 ---
 
@@ -516,13 +463,13 @@ docker compose restart clickhouse
 
 При установке скрипт `deploy/common/detect_resources.sh` анализирует CPU, RAM и диск, затем генерирует:
 
-| Файл                                       | Назначение                                              |
-|--------------------------------------------|---------------------------------------------------------|
+| Файл                                       | Назначение                                                     |
+|--------------------------------------------|----------------------------------------------------------------|
 | `docker-compose.override.yml`              | Лимиты CPU/RAM контейнеров, параметры ingest, `CH_MAX_THREADS` |
-| `.env`                                     | Переменные для compose (`SYSLOG_STATS_URL` при модуле syslog) |
-| `clickhouse/users.d/zz_install_limits.xml` | Лимиты памяти и `max_threads` запросов ClickHouse       |
-| `syslog-ng.d/zz_profile.conf`              | `@define` буферов syslog-ng (fifo / window / disk)      |
-| `install-profile.json`                     | Сводка профиля (отображается в UI «Система»)            |
+| `.env`                                     | Переменные для compose (`SYSLOG_STATS_URL` при модуле syslog)  |
+| `clickhouse/users.d/zz_install_limits.xml` | Лимиты памяти и `max_threads` запросов ClickHouse              |
+| `syslog-ng.d/zz_profile.conf`              | `@define` буферов syslog-ng (fifo / window / disk)             |
+| `install-profile.json`                     | Сводка профиля (отображается в UI «Система»)                   |
 
 **Буферы syslog-ng по профилю** (на каждое из двух назначений UDP/TCP; `reliable(no)`; TCP `max-connections(64)`, `log-iw-size` ≥ 6400):
 
@@ -559,7 +506,7 @@ sysctl -w net.core.wmem_max=16777216
 cd /opt/network-monitor
 
 # Интерактивный выбор
-./scripts/tune-resources.sh
+./scripts/tune-resources.sh 
 
 # Автоматически — рекомендованный профиль
 NM_AUTO_PROFILE=1 ./scripts/tune-resources.sh
@@ -606,22 +553,13 @@ TTL таблиц ClickHouse настраивается без правки сг�
 
 Native `BACKUP` / `RESTORE` на отдельный Docker-том `clickhouse-backups` (disk `backups` → `/var/lib/clickhouse-backups`). Это **не** замена HA: single-node appliance, бэкап защищает от потери `clickhouse-data` / ошибок оператора.
 
-| Что | Детали |
-|-----|--------|
-| Конфиг disk | `clickhouse/config.d/backups.xml` |
-| Том | `clickhouse-backups` (отдельно от `clickhouse-data`) |
-| Скрипты | `scripts/backup-clickhouse.sh`, `scripts/restore-clickhouse.sh` |
-| По умолчанию в бэкап | `traffic_logs`, `geo_ranges`, `reputation_ranges`, `parse_errors`, `system_metrics`, `traffic_edges_*` |
-| Рядом | `*.auth.tgz` — снимок `/app/data` (users, retention, feeds, schedule); без `geo_index.snap`, `.nm_backend.lock`, `*.tmp` |
-
-После добавления тома на уже установленном стенде:
-
-```bash
-cd /opt/network-monitor
-docker compose up -d --build   # volume-perms (uid 101) + mount + backups.xml + backend
-chmod +x scripts/backup-clickhouse.sh scripts/restore-clickhouse.sh
-./scripts/backup-clickhouse.sh
-```
+| Что                  | Детали                                                                                                                   |
+|----------------------|--------------------------------------------------------------------------------------------------------------------------|
+| Конфиг disk          | `clickhouse/config.d/backups.xml`                                                                                        |
+| Том                  | `clickhouse-backups` (отдельно от `clickhouse-data`)                                                                     |
+| Скрипты              | `scripts/backup-clickhouse.sh`, `scripts/restore-clickhouse.sh`                                                          |
+| По умолчанию в бэкап | `traffic_logs`, `geo_ranges`, `reputation_ranges`, `parse_errors`, `system_metrics`, `traffic_edges_*`                   |
+| Рядом                | `*.auth.tgz` — снимок `/app/data` (users, retention, feeds, schedule); без `geo_index.snap`, `.nm_backend.lock`, `*.tmp` |
 
 Backend и ClickHouse пишут в `clickhouse-backups` под **одним uid 101**. Сервис `volume-perms` при старте делает `chown 101:101` на томах `clickhouse-backups` и `auth-users` (миграция со старого backend uid 10001). Если снова `permission denied` на `*.auth.tgz`:
 
@@ -632,13 +570,13 @@ docker compose up -d backend
 
 **Env (backup):**
 
-| Переменная | Дефолт | Смысл |
-|------------|--------|--------|
-| `BACKUP_ENABLED` | `1` | kill-switch: `0` запрещает ручное и автосоздание |
-| `BACKUP_KEEP` | `7` | дефолт глубины, пока не сохранён schedule из UI |
-| `BACKUP_INCLUDE_EDGES` | `1` | дефолт состава |
-| `BACKUP_INCLUDE_AUTH` | `1` | дефолт auth tarball |
-| `BACKUP_SCHEDULE_FILE` | `/app/data/backup_schedule.json` | расписание + политика (том auth-users) |
+| Переменная             | Дефолт                           | Смысл                                            |
+|------------------------|----------------------------------|--------------------------------------------------|
+| `BACKUP_ENABLED`       | `1`                              | kill-switch: `0` запрещает ручное и автосоздание |
+| `BACKUP_KEEP`          | `7`                              | дефолт глубины, пока не сохранён schedule из UI  |
+| `BACKUP_INCLUDE_EDGES` | `1`                              | дефолт состава                                   |
+| `BACKUP_INCLUDE_AUTH`  | `1`                              | дефолт auth tarball                              |
+| `BACKUP_SCHEDULE_FILE` | `/app/data/backup_schedule.json` | расписание + политика (том auth-users)           |
 
 **Расписание (UI):** `/system` → **Резервное копирование** — ежедневно `hour:minute` + IANA timezone, keep (1…90), edges/auth. API: `GET/PUT /api/system/backup-schedule`. При включённом автобэкапе host-cron `backup-clickhouse.sh` не обязателен (не дублируйте оба без нужды).
 
@@ -730,26 +668,37 @@ docker compose exec clickhouse sh -c 'clickhouse-client --password "$CLICKHOUSE_
 
 **Типичные проблемы и куда смотреть:**
 
-| Симптом                        | Куда смотреть                                      |
-|--------------------------------|----------------------------------------------------|
-| Нет событий на карте           | `docker compose logs syslog-ng`, `/api/ingest/stats` |
-| Ошибки парсинга                | UI → «Ошибки парсинга», таблица `parse_errors`     |
-| Backend не стартует            | `docker compose logs backend`, healthcheck         |
-| ClickHouse OOM / медленные запросы | `install-profile.json`, увеличить профиль; для карты предпочтительнее период `1d+` + groupBy city/country (daily geo-agg) |
+| Симптом                                    | Куда смотреть                                                                                                                                                   |
+|--------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Нет событий на карте                       | `docker compose logs syslog-ng`, `/api/ingest/stats`                                                                                                            |
+| Ошибки парсинга                            | UI → «Ошибки парсинга», таблица `parse_errors`                                                                                                                  |
+| Backend не стартует                        | `docker compose logs backend`, healthcheck                                                                                                                      |
+| ClickHouse OOM / медленные запросы         | `install-profile.json`, увеличить профиль; для карты предпочтительнее период `1d+` + groupBy city/country (daily geo-agg)                                       |
 | ClickHouse CPU скачет при обновлении карты | abort предыдущих `/api/events`; `CH_MAX_THREADS` / `max_threads` в профиле; логи backend `geo edges agg: ready`; периоды `1h`/`6h` всегда читают `traffic_logs` |
-| ClickHouse idle CPU высокий, мало данных | `system.trace_log`/`text_log` — см. `config.d/z_system_logs.xml`; `TRUNCATE`/`DROP` старых system-логов |
-| Нет метрик на странице «Система» | `docker compose logs stats-collector`, cgroup, `/proc` и `/sys/fs/cgroup` на хосте |
-| Превышена расчётная ёмкость      | `/system` → алёрты `capacity_high` / `capacity_exceeded`, пересчёт профиля |
-| Drops под нагрузкой / очередь полная | `/system` (плитка Drops, стадии Syslog-NG и Backend Ingest); `pipeline.syslogng.dropped_total` / `queued`; `/api/ingest/stats` → `dropped_total`, `buffer_drops_total`; алёрты `syslogng_dropping*`, `ingest_dropping*`; `./scripts/watch-ingest.sh` |
-| UDP/TCP EPS не разделяются       | Перезапустить `syslog-ng` (маркеры `@@nm/udp/@@` / `@@nm/tcp/@@`) |
-| syslog-ng: kernel refused SO_RCVBUF | `net.core.rmem_max` / `wmem_max` на хосте (см. буферы профиля) |
-| git pull: local changes (только chmod +x) | Предпочтительнее обновление из пакета (`./update.sh`). Иначе `git restore -- '*.sh'` затем `git pull --ff-only`; либо `git reset --hard origin/main` |
-| `container name "/nm-volume-perms" is already in use` / сеть `network-monitor` не от этого проекта | Два каталога: `/opt/network-monitor` и `/opt/network_monitor`. Не `docker volume rm`. Пакет **1.4.2+** подхватывает `COMPOSE_PROJECT_NAME` с живых контейнеров. Вручную: в `.env` `COMPOSE_PROJECT_NAME=network-monitor`, затем `./start.sh`. |
-| syslog-ng ругается на `log-iw-size` / `flush_timeout` / нет `zz_profile.conf` | На сервере всё ещё старый `syslog-ng.conf`. `git log -1` и `grep flow-control-window-size syslog-ng.conf`; затем hard reset на `origin/main` и `./start.sh` |
-| GeoIP upload → 502 / OOM, backend перезапускается | Не заливать большой CSV поверх уже загруженного индекса через браузер; `dmesg`/`oom-kill`; см. [GeoIP](#geoip) |
-| GeoIP: `Failed to fetch` при смене страницы | Уход со страницы во время POST обрывает `fetch`; дождитесь окончания или `curl` с сервера |
-| После рестарта backend страницы 500 (auth) | Обновить до ≥1.1.3 (индекс GeoIP грузится асинхронно); дождаться `geo index loaded` |
-| TTL не применился / старые данные остаются | `/api/system/retention`, логи backend `retention:`, том `auth-users` (`retention.json`) |
+| ClickHouse idle CPU высокий, мало данных   | `system.trace_log`/`text_log` — см. `config.d/z_system_logs.xml`; `TRUNCATE`/`DROP` старых system-логов                                                         |
+| Нет метрик на странице «Система»           | `docker compose logs stats-collector`, cgroup, `/proc` и `/sys/fs/cgroup` на хосте                                                                              |
+| Превышена расчётная ёмкость                | `/system` → алёрты `capacity_high` / `capacity_exceeded`, пересчёт профиля                                                                                      |
+|--------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Drops под нагрузкой / очередь полная       | `/system` (плитка Drops, стадии Syslog-NG и Backend Ingest); `pipeline.syslogng.dropped_total` / `queued`; `/api/ingest/stats` → `dropped_total`,               |
+|                                            | `buffer_drops_total`; алёрты `syslogng_dropping*`, `ingest_dropping*`; `./scripts/watch-ingest.sh`                                                              |
+|--------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| UDP/TCP EPS не разделяются                 | Перезапустить `syslog-ng` (маркеры `@@nm/udp/@@` / `@@nm/tcp/@@`)                                                                                               |
+| syslog-ng: kernel refused SO_RCVBUF        | `net.core.rmem_max` / `wmem_max` на хосте (см. буферы профиля)                                                                                                  |
+| git pull: local changes (только chmod +x)  | Предпочтительнее обновление из пакета (`./update.sh`). Иначе `git restore -- '*.sh'` затем `git pull --ff-only`; либо `git reset --hard origin/main`            |
+|--------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `container name "/nm-volume-perms"         | Два каталога: `/opt/network-monitor` и `/opt/network_monitor`. Не `docker volume rm`. Пакет **1.4.2+** подхватывает `COMPOSE_PROJECT_NAME` с живых контейнеров. |
+| is already in use` / сеть                  | Вручную: в | `.env` `COMPOSE_PROJECT_NAME=network-monitor`, затем `./start.sh`.                                                                                 |
+| `network-monitor` не от этого проекта      |                                                                                                                                                                 |
+|--------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| syslog-ng ругается на `log-iw-size`        | На сервере всё ещё старый `syslog-ng.conf`. `git log -1` и `grep flow-control-window-size syslog-ng.conf`; затем hard reset на `origin/main` и `./start.sh`     |
+| / `flush_timeout` / нет `zz_profile.conf`  |                                                                                                                                                                 |
+|--------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| GeoIP upload → 502 / OOM, backend          | Не заливать большой CSV поверх уже загруженного индекса через браузер; `dmesg`/`oom-kill`; см. [GeoIP](#geoip)                                                  |
+| перезапускается                            |                                                                                                                                                                 |
+|--------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| GeoIP: `Failed to fetch` при смене страницы| Уход со страницы во время POST обрывает `fetch`; дождитесь окончания или `curl` с сервера                                                                       |
+| После рестарта backend страницы 500 (auth) | Обновить до ≥1.1.3 (индекс GeoIP грузится асинхронно); дождаться `geo index loaded`                                                                             |
+| TTL не применился / старые данные остаются | `/api/system/retention`, логи backend `retention:`, том `auth-users` (`retention.json`)                                                                         |
 
 ---
 
@@ -817,20 +766,6 @@ sudo ./deploy/ubuntu/install_ubuntu.sh
 # или
 sudo ./deploy/oracle_linux/install_oraclelinux.sh
 ```
-
-**Вручную через git** (ветка `main` или если пакета нет):
-
-```bash
-cd /opt/network-monitor
-./stop.sh
-git fetch origin --tags
-# chmod +x на скриптах 100644 блокирует pull — сбросить только бит исполнения:
-git restore --worktree --staged -- '*.sh' 'clickhouse/*.sh' 'deploy/**/*.sh' 'scripts/*.sh' 2>/dev/null || true
-git pull --ff-only origin main   # на ветке; на теге обычно checkout нового тега (см. ниже)
-./start.sh
-```
-
-Проверка, что syslog-ng 4.11 на месте: `git log -1 --oneline` (ожидается коммит с `flow-control-window-size`), `grep flow-control-window-size syslog-ng.conf`, `ls syslog-ng.d/zz_profile.conf`. Если `git pull` всё ещё ругается на локальные правки, а своих изменений в tracked-файлах нет: `git reset --hard origin/main` (`.env`, `docker-compose.override.yml`, `install-profile.json` в git не входят).
 
 #### Переключение: релиз → `main`
 
@@ -947,11 +882,11 @@ docker compose logs backend --since=10m 2>&1 | grep -iE 'geo index loaded|geo cs
 
 **Сервер теперь режет опасные upload до OOM:**
 
-| Ограничение | Env | Откуда дефолт |
-|-------------|-----|----------------|
-| Размер тела `/upload-geo` | `GEOIP_UPLOAD_MAX_BYTES` (или `MAX_GEO_UPLOAD_SIZE`) | `install-profile.json` → `limits.backend.memory_gb` (small≈512 MiB, medium≈1 GiB, …) |
-| Число диапазонов в CSV | `GEOIP_UPLOAD_MAX_RANGES` | тот же профиль (small≈4 M) |
-| Replace поверх крупного индекса | — | **409 до чтения body**, если индекс уже ≥ половины лимита ranges |
+| Ограничение                     | Env                                                  | Откуда дефолт                                                                        |
+|---------------------------------|------------------------------------------------------|--------------------------------------------------------------------------------------|
+| Размер тела `/upload-geo`       | `GEOIP_UPLOAD_MAX_BYTES` (или `MAX_GEO_UPLOAD_SIZE`) | `install-profile.json` → `limits.backend.memory_gb` (small≈512 MiB, medium≈1 GiB, …) |
+| Число диапазонов в CSV          | `GEOIP_UPLOAD_MAX_RANGES`                            | тот же профиль (small≈4 M)                                                           |
+| Replace поверх крупного индекса | —                                                    | **409 до чтения body**, если индекс уже ≥ половины лимита ranges                     |
 
 Ответы: **413** (файл/число ranges слишком велики), **409** (опасный replace — сразу, без парсинга CSV). `?dry_run=1` по-прежнему проверяет CSV, но не пишет в CH и не делает early replace-gate (лимит ranges после parse всё равно действует).
 
@@ -975,17 +910,17 @@ Compact-снимок индекса пишется в `/app/data/geo_index.snap`
 
 | URL                    | Страница              | Основные возможности                                                                                                                                 |
 |------------------------|-----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `/login`          | Вход                  | Логин (роли admin / operator); смена пароля при `must_reset_password`                                                                                |
+| `/login`               | Вход                  | Логин (роли admin / operator); смена пароля при `must_reset_password`                                                                                |
 | `/`                    | Карта / глобус        | 2D/3D, группировка, фильтры status/репутации, конструктор поиска и шаблоны, порог событий, mono-дуги, экспорт PNG, загрузка логов/GeoIP, health pill |
-| `/reputation`     | Репутация IP          | Списки и URL-фиды, каталог источников, refresh по расписанию, ручная загрузка; модуль можно отключить при установке                                  |
-| `/parse-errors`   | Журнал ошибок парсинга| Поиск, удаление выбранных / всех, отправка в тест парсеров                                                                                           |
-| `/geo-missing`    | IP без GeoIP          | Адреса без координат; добавление в GeoIP; выгрузка CSV; мгновенная перефильтрация списка                                                             |
-| `/geo-ranges`     | База GeoIP            | Просмотр/правка диапазонов, выгрузка CSV                                                                                                             |
-| `/parser-test`    | Тест парсеров         | До 200 строк за запрос, пресеты по вендорам, статусы parsed/skipped/error                                                                            |
-| `/system`         | Системный мониторинг  | Обзор / Pipeline (Syslog-NG queued/drops + ingest EPS) / Безопасность / Графики / Резервное копирование; алёрты, ёмкость, профиль установки |
-| `/users`          | Учётные записи        | Список/создание УЗ (скрыто, если UI-auth выключен)                                                                                                   |
-| `/api-tokens`     | API-токены            | Именованные Bearer со scope read/ops/admin; секрет показывается один раз                                                                             |
-| `/change-password`| Смена пароля          | Смена своего пароля                                                                                                                                  |
+| `/reputation`          | Репутация IP          | Списки и URL-фиды, каталог источников, refresh по расписанию, ручная загрузка; модуль можно отключить при установке                                  |
+| `/parse-errors`        | Журнал ошибок парсинга| Поиск, удаление выбранных / всех, отправка в тест парсеров                                                                                           |
+| `/geo-missing`         | IP без GeoIP          | Адреса без координат; добавление в GeoIP; выгрузка CSV; мгновенная перефильтрация списка                                                             |
+| `/geo-ranges`          | База GeoIP            | Просмотр/правка диапазонов, выгрузка CSV                                                                                                             |
+| `/parser-test`         | Тест парсеров         | До 200 строк за запрос, пресеты по вендорам, статусы parsed/skipped/error                                                                            |
+| `/system`              | Системный мониторинг  | Обзор / Pipeline (Syslog-NG queued/drops + ingest EPS) / Безопасность / Графики / Резервное копирование; алёрты, ёмкость, профиль установки          |
+| `/users`               | Учётные записи        | Список/создание УЗ (скрыто, если UI-auth выключен)                                                                                                   |
+| `/api-tokens`          | API-токены            | Именованные Bearer со scope read/ops/admin; секрет показывается один раз                                                                             |
+| `/change-password`     | Смена пароля          | Смена своего пароля                                                                                                                                  |
 
 SPA (React Router): page-auth в UI; nginx `auth_request` для `/api/*`. Карта и смена пароля — любой залогиненный; system / parsers / geo / reputation / users / api-tokens — только **administrator**. Legacy `*.html` редиректятся на clean paths.
 
