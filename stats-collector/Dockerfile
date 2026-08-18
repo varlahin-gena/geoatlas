@@ -13,7 +13,7 @@ COPY stats-collector/ .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/stats-collector .
 
 FROM alpine:3.23
-RUN apk add --no-cache ca-certificates tzdata && \
+RUN apk add --no-cache ca-certificates=20260611-r0 tzdata=2026c-r0 && \
     addgroup -g 10001 app && \
     adduser -D -u 10001 -G app app
 USER app
