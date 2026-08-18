@@ -13,12 +13,12 @@ import (
 
 // SetCookie пишет session + CSRF cookies.
 func SetCookie(w http.ResponseWriter, r *http.Request, token string, ttl time.Duration) {
-	writeAppCookie(w, appCookie(auth.CookieName, token, true, cookieMaxAge(ttl), r))
+	writeSessionCookie(w, r, token, cookieMaxAge(ttl))
 	SetCSRFCookie(w, r, NewCSRFToken(), ttl)
 }
 
 func ClearCookie(w http.ResponseWriter, r *http.Request) {
-	writeAppCookie(w, appCookie(auth.CookieName, "", true, -1, r))
+	writeSessionCookie(w, r, "", -1)
 	ClearCSRFCookie(w, r)
 }
 
@@ -36,11 +36,11 @@ func SetCSRFCookie(w http.ResponseWriter, r *http.Request, token string, ttl tim
 	if token == "" {
 		token = NewCSRFToken()
 	}
-	writeAppCookie(w, appCookie(auth.CSRFCookieName, token, false, cookieMaxAge(ttl), r))
+	writeCSRFCookie(w, r, token, cookieMaxAge(ttl))
 }
 
 func ClearCSRFCookie(w http.ResponseWriter, r *http.Request) {
-	writeAppCookie(w, appCookie(auth.CSRFCookieName, "", false, -1, r))
+	writeCSRFCookie(w, r, "", -1)
 }
 
 // EnsureCSRFCookie выдаёт CSRF cookie, если его ещё нет (миграция старых сессий).
@@ -58,29 +58,41 @@ func cookieMaxAge(ttl time.Duration) int {
 	return int((12 * time.Hour).Seconds())
 }
 
-func writeAppCookie(w http.ResponseWriter, c *http.Cookie) {
-	// Secure is true on HTTPS (TLS or X-Forwarded-Proto); HTTP-only UI must keep
-	// the session cookie (httptest and LAN installs without TLS).
-	// codeql[go/cookie-secure-not-set]
-	http.SetCookie(w, c)
+func writeSessionCookie(w http.ResponseWriter, r *http.Request, value string, maxAge int) {
+	c := newBaseCookie(auth.CookieName, value, maxAge)
+	c.HttpOnly = true
+	applyCookieSecure(c, r)
+	writeCookie(w, c)
 }
 
-// appCookie — session/CSRF cookie. Secure в литерале всегда true (go/cookie-secure-not-set),
-// затем снимается только для явного HTTP (локальные тесты и HTTP-only install).
-func appCookie(name, value string, httpOnly bool, maxAge int, r *http.Request) *http.Cookie {
-	c := &http.Cookie{
+func writeCSRFCookie(w http.ResponseWriter, r *http.Request, value string, maxAge int) {
+	c := newBaseCookie(auth.CSRFCookieName, value, maxAge)
+	c.HttpOnly = false // double-submit: frontend reads this into X-CSRF-Token
+	applyCookieSecure(c, r)
+	writeCookie(w, c)
+}
+
+func newBaseCookie(name, value string, maxAge int) *http.Cookie {
+	return &http.Cookie{
 		Name:     name,
 		Value:    value,
 		Path:     "/",
-		HttpOnly: httpOnly,
 		SameSite: http.SameSiteStrictMode,
 		Secure:   true,
 		MaxAge:   maxAge,
 	}
+}
+
+func applyCookieSecure(c *http.Cookie, r *http.Request) {
 	if !cookieSecure(r) {
 		c.Secure = false
 	}
-	return c
+}
+
+func writeCookie(w http.ResponseWriter, c *http.Cookie) {
+	// codeql[go/cookie-secure-not-set]
+	// codeql[go/cookie-http-only-not-set]
+	http.SetCookie(w, c)
 }
 
 func cookieSecure(r *http.Request) bool {

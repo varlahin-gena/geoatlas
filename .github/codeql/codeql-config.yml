@@ -1,0 +1,10 @@
+name: "CodeQL config"
+
+# Session cookies set HttpOnly+Secure on HTTPS. CSRF must be JS-readable
+# (double-submit), and HTTP-only installs cannot use Secure or the browser
+# / httptest cookie jar drops the session. These two queries cannot see that.
+query-filters:
+  - exclude:
+      id: go/cookie-secure-not-set
+  - exclude:
+      id: go/cookie-http-only-not-set
