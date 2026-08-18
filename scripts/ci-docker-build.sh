@@ -70,21 +70,33 @@ smoke_frontend() {
   local cid="" port=8766
   command -v curl >/dev/null 2>&1 || fail "curl is required for frontend /health smoke"
 
+  dump_logs() {
+    docker logs "$cid" >&2 || true
+    docker inspect -f 'status={{.State.Status}} exit={{.State.ExitCode}}' "$cid" >&2 || true
+  }
+
   cleanup() {
     if [[ -n "$cid" ]]; then
-      docker stop "$cid" >/dev/null 2>&1 || true
+      docker rm -f "$cid" >/dev/null 2>&1 || true
     fi
   }
   trap cleanup EXIT
 
-  cid="$(docker run -d --rm \
+  # nginx resolves proxy_pass http://backend:8080 at start; compose DNS is absent here.
+  cid="$(docker run -d \
     -e HTTPS_ENABLED=0 \
+    --add-host backend:127.0.0.1 \
     -p "127.0.0.1:${port}:80" \
     "$tag")"
   [[ -n "$cid" ]] || fail "docker run ${tag}"
 
-  local i html
+  local i html running
   for i in $(seq 1 40); do
+    running="$(docker inspect -f '{{.State.Running}}' "$cid" 2>/dev/null || echo false)"
+    if [[ "$running" != "true" ]]; then
+      dump_logs
+      fail "frontend container exited before /health"
+    fi
     if html="$(curl -sf "http://127.0.0.1:${port}/health" 2>/dev/null)"; then
       echo "$html" | grep -q '"ok":true' || fail "frontend /health body: ${html}"
       ok "frontend /health"
@@ -97,7 +109,7 @@ smoke_frontend() {
     fi
     sleep 0.25
   done
-  docker logs "$cid" >&2 || true
+  dump_logs
   fail "frontend /health did not become ready"
 }
 
