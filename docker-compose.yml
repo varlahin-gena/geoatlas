@@ -17,7 +17,7 @@ services:
     restart: "no"
 
   clickhouse:
-    image: clickhouse/clickhouse-server:25.8.29.51
+    image: clickhouse/clickhouse-server:25.8.30.16
     container_name: clickhouse
     expose:
       - "8123"

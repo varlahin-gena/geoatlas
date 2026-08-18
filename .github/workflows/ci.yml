@@ -141,7 +141,7 @@ jobs:
         working-directory: backend
     services:
       clickhouse:
-        image: clickhouse/clickhouse-server:25.8.29.51
+        image: clickhouse/clickhouse-server:25.8.30.16
         ports:
           - 9000:9000
           - 8123:8123
@@ -209,7 +209,7 @@ jobs:
               --data-urlencode "user=default" \
               --data-urlencode "password=ci_test" \
               --data-urlencode "query=SELECT name, engine FROM system.tables WHERE database = currentDatabase() ORDER BY name FORMAT Vertical" || true
-            container_id="$(docker ps -q --filter 'ancestor=clickhouse/clickhouse-server:25.8.29.51')"
+            container_id="$(docker ps -q --filter 'ancestor=clickhouse/clickhouse-server:25.8.30.16')"
             if [ -n "$container_id" ]; then
               docker logs --tail 200 "$container_id" || true
             fi
