@@ -1,21 +1,12 @@
-# This workflow uses actions that are not certified by GitHub.
-# They are provided by a third-party and are governed by
-# separate terms of service, privacy policy, and support
-# documentation.
-# hadoint is a Dockerfile linter written in Haskell
-# that helps you build best practice Docker images.
-# More details at https://github.com/hadolint/hadolint
-
 name: Hadolint
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    # The branches below must be a subset of the branches above
-    branches: [ "main" ]
+    branches: ["main"]
   schedule:
-    - cron: '15 7 * * 0'
+    - cron: "15 7 * * 0"
 
 permissions:
   contents: read
@@ -25,23 +16,55 @@ jobs:
     name: Run hadolint scanning
     runs-on: ubuntu-latest
     permissions:
-      contents: read # for actions/checkout to fetch code
-      security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
-      actions: read # only required for a private repository by github/codeql-action/upload-sarif to get the Action run status
+      contents: read
+      security-events: write
+      actions: read
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Run hadolint
+      - name: Run hadolint backend dockerfile
         uses: hadolint/hadolint-action@f988afea3da57ee48710a9795b6bb677cc901183
         with:
-          dockerfile: ./Dockerfile
+          dockerfile: backend/Dockerfile
           format: sarif
-          output-file: hadolint-results.sarif
+          output-file: hadolint-backend.sarif
           no-fail: true
 
-      - name: Upload analysis results to GitHub
+      - name: Run hadolint frontend dockerfile
+        uses: hadolint/hadolint-action@f988afea3da57ee48710a9795b6bb677cc901183
+        with:
+          dockerfile: frontend/Dockerfile
+          format: sarif
+          output-file: hadolint-frontend.sarif
+          no-fail: true
+
+      - name: Run hadolint stats-collector dockerfile
+        uses: hadolint/hadolint-action@f988afea3da57ee48710a9795b6bb677cc901183
+        with:
+          dockerfile: stats-collector/Dockerfile
+          format: sarif
+          output-file: hadolint-stats-collector.sarif
+          no-fail: true
+
+      - name: Upload backend analysis results
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: hadolint-results.sarif
+          sarif_file: hadolint-backend.sarif
+          category: hadolint-backend
+          wait-for-processing: true
+
+      - name: Upload frontend analysis results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: hadolint-frontend.sarif
+          category: hadolint-frontend
+          wait-for-processing: true
+
+      - name: Upload stats-collector analysis results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: hadolint-stats-collector.sarif
+          category: hadolint-stats-collector
           wait-for-processing: true
