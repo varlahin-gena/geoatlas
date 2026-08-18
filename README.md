@@ -1026,6 +1026,7 @@ network_monitor/
 │   └── reset_data.sql / reset_data.sh
 ├── scripts/
 │   ├── check-release-contract.sh     # CI: VERSION / CHANGELOG / OpenAPI
+│   ├── ci-docker-build.sh            # CI: docker build backend / frontend / stats
 │   ├── pack-release.sh               # dist/geoatlas-X.Y.Z.tar.gz (+ sha256)
 │   ├── test-apply-package.sh         # CI: pack + наложение пакета
 │   ├── test-compose-stop-env.sh      # CI: заглушки для compose down без секретов
@@ -1058,7 +1059,7 @@ network_monitor/
 ├── LICENSE / NOTICE                  # Apache License 2.0
 ├── SECURITY.md                       # как сообщать об уязвимостях
 ├── VERSION / CHANGELOG.md / RELEASING.md
-├── .github/workflows/ci.yml
+├── .github/workflows/ci.yml          # тесты + docker build образов compose
 ├── .github/workflows/release-tag.yml # тег v*: Release + geoatlas-X.Y.Z.tar.gz
 ├── start.sh / stop.sh / update.sh    # update.sh — наложение geoatlas-*.tar.gz
 ├── syslog-ng.conf

@@ -44,6 +44,7 @@ grep -q 'uplot' frontend/package.json || fail "package.json: uplot"
 grep -q '"vitest"' frontend/package.json || fail "package.json: vitest"
 grep -q '"knip"' frontend/package.json || fail "package.json: knip"
 grep -q 'npm run knip' .github/workflows/ci.yml || fail "ci: knip"
+grep -q 'scripts/ci-docker-build.sh' .github/workflows/ci.yml || fail "ci: docker image build"
 grep -q 'npm ci' frontend/Dockerfile || fail "Dockerfile: npm ci"
 ok "dependencies"
 

@@ -254,6 +254,25 @@ jobs:
           working-directory: stats-collector
           args: --timeout=3m
 
+  docker-images:
+    name: docker (${{ matrix.image }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [backend, stats-collector, frontend]
+    steps:
+      - uses: actions/checkout@v5
+
+      # docker-container driver: type=gha cache + --load for /health smoke.
+      - uses: docker/setup-buildx-action@v3
+
+      - name: build image
+        env:
+          NM_DOCKER_CACHE: gha
+        run: bash scripts/ci-docker-build.sh ${{ matrix.image }}
+
   frontend-smoke:
     name: frontend (SPA contract smoke)
     runs-on: ubuntu-latest
