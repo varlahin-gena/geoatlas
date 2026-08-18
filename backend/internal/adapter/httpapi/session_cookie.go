@@ -13,12 +13,12 @@ import (
 
 // SetCookie пишет session + CSRF cookies.
 func SetCookie(w http.ResponseWriter, r *http.Request, token string, ttl time.Duration) {
-	http.SetCookie(w, appCookie(auth.CookieName, token, true, cookieMaxAge(ttl), r))
+	writeAppCookie(w, appCookie(auth.CookieName, token, true, cookieMaxAge(ttl), r))
 	SetCSRFCookie(w, r, NewCSRFToken(), ttl)
 }
 
 func ClearCookie(w http.ResponseWriter, r *http.Request) {
-	http.SetCookie(w, appCookie(auth.CookieName, "", true, -1, r))
+	writeAppCookie(w, appCookie(auth.CookieName, "", true, -1, r))
 	ClearCSRFCookie(w, r)
 }
 
@@ -36,11 +36,11 @@ func SetCSRFCookie(w http.ResponseWriter, r *http.Request, token string, ttl tim
 	if token == "" {
 		token = NewCSRFToken()
 	}
-	http.SetCookie(w, appCookie(auth.CSRFCookieName, token, false, cookieMaxAge(ttl), r))
+	writeAppCookie(w, appCookie(auth.CSRFCookieName, token, false, cookieMaxAge(ttl), r))
 }
 
 func ClearCSRFCookie(w http.ResponseWriter, r *http.Request) {
-	http.SetCookie(w, appCookie(auth.CSRFCookieName, "", false, -1, r))
+	writeAppCookie(w, appCookie(auth.CSRFCookieName, "", false, -1, r))
 }
 
 // EnsureCSRFCookie выдаёт CSRF cookie, если его ещё нет (миграция старых сессий).
@@ -56,6 +56,13 @@ func cookieMaxAge(ttl time.Duration) int {
 		return int(ttl.Seconds())
 	}
 	return int((12 * time.Hour).Seconds())
+}
+
+func writeAppCookie(w http.ResponseWriter, c *http.Cookie) {
+	// Secure is true on HTTPS (TLS or X-Forwarded-Proto); HTTP-only UI must keep
+	// the session cookie (httptest and LAN installs without TLS).
+	// codeql[go/cookie-secure-not-set]
+	http.SetCookie(w, c)
 }
 
 // appCookie — session/CSRF cookie. Secure в литерале всегда true (go/cookie-secure-not-set),
