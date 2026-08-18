@@ -50,6 +50,17 @@ jobs:
           output: trivy-clickhouse.sarif
           exit-code: "0"
 
+      # Public ingest path :514 — pin must match docker-compose.yml.
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: balabit/syslog-ng:4.11.0
+          severity: CRITICAL
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-syslog-ng.sarif
+          exit-code: "0"
+
       - uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
@@ -67,3 +78,9 @@ jobs:
         with:
           sarif_file: trivy-clickhouse.sarif
           category: trivy-clickhouse
+
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-syslog-ng.sarif
+          category: trivy-syslog-ng
