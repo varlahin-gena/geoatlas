@@ -46,6 +46,7 @@ grep -q '"knip"' frontend/package.json || fail "package.json: knip"
 grep -q 'npm run knip' .github/workflows/ci.yml || fail "ci: knip"
 grep -q 'scripts/ci-docker-build.sh' .github/workflows/ci.yml || fail "ci: docker image build"
 grep -q 'scripts/ci-govulncheck.sh' .github/workflows/ci.yml || fail "ci: govulncheck"
+grep -q 'scripts/ci-sbom.sh' .github/workflows/release-tag.yml || fail "release: SBOM"
 grep -q 'npm ci' frontend/Dockerfile || fail "Dockerfile: npm ci"
 ok "dependencies"
 

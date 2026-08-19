@@ -257,7 +257,7 @@ http://<IP_сервера>/
 
 ### Установочный пакет
 
-Один архив **`geoatlas-X.Y.Z.tar.gz`** (плюс `.sha256`) с [GitHub Releases](https://github.com/varlahin-gena/network_monitor/releases) — исходники стека, **оба** установщика (`deploy/ubuntu/…`, `deploy/oracle_linux/…`) и `update.sh`. Это не `.deb`/`.rpm`: Docker и файрвол хоста ставит OS-скрипт из пакета.
+Один архив **`geoatlas-X.Y.Z.tar.gz`** (плюс `.sha256`; SBOM `.cdx.json` / `.spdx.json` — для аудита, не для установки) с [GitHub Releases](https://github.com/varlahin-gena/network_monitor/releases) — исходники стека, **оба** установщика (`deploy/ubuntu/…`, `deploy/oracle_linux/…`) и `update.sh`. Это не `.deb`/`.rpm`: Docker и файрвол хоста ставит OS-скрипт из пакета.
 
 | Задача | Что запускать |
 |--------|----------------|
@@ -1028,6 +1028,7 @@ network_monitor/
 │   ├── check-release-contract.sh     # CI: VERSION / CHANGELOG / OpenAPI
 │   ├── ci-docker-build.sh            # CI: docker build backend / frontend / stats
 │   ├── ci-govulncheck.sh             # CI: govulncheck по Go-модулям
+│   ├── ci-sbom.sh                    # релиз: CycloneDX + SPDX из geoatlas-*.tar.gz
 │   ├── pack-release.sh               # dist/geoatlas-X.Y.Z.tar.gz (+ sha256)
 │   ├── test-apply-package.sh         # CI: pack + наложение пакета
 │   ├── test-compose-stop-env.sh      # CI: заглушки для compose down без секретов
@@ -1061,7 +1062,7 @@ network_monitor/
 ├── SECURITY.md                       # как сообщать об уязвимостях
 ├── VERSION / CHANGELOG.md / RELEASING.md
 ├── .github/workflows/ci.yml          # тесты + docker build образов compose
-├── .github/workflows/release-tag.yml # тег v*: Release + geoatlas-X.Y.Z.tar.gz
+├── .github/workflows/release-tag.yml # тег v*: Release + tar.gz + SBOM
 ├── start.sh / stop.sh / update.sh    # update.sh — наложение geoatlas-*.tar.gz
 ├── syslog-ng.conf
 └── syslog-ng.d/                      # 00-keep.conf + zz_profile.conf.example; zz_profile.conf генерируется

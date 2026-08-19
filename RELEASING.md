@@ -51,11 +51,12 @@ git push origin "v$(tr -d '[:space:]' < VERSION)"
 
 1. проверяет контракт (`VERSION` / CHANGELOG / OpenAPI);
 2. создаёт GitHub Release из секции CHANGELOG (если релиза ещё нет);
-3. собирает **`geoatlas-X.Y.Z.tar.gz`** (+ `.sha256`) и прикрепляет к релизу.
+3. собирает **`geoatlas-X.Y.Z.tar.gz`** (+ `.sha256`) и прикрепляет к релизу;
+4. сканирует архив Syft и прикрепляет **`geoatlas-X.Y.Z.cdx.json`** (CycloneDX) и **`.spdx.json`** (SPDX).
 
 Ручной `gh release create` не нужен, пока job **github-release** зелёный. Один tar.gz — и для Ubuntu, и для Oracle Linux; операторы на сервере **только** скачивают пакет и ставят/обновляют через install-скрипт или `./update.sh` (README, «Установка» / «Обновление системы»; без `git pull` на сервере).
 
-Проверьте Assets релиза: `geoatlas-X.Y.Z.tar.gz` и `geoatlas-X.Y.Z.tar.gz.sha256`.
+Проверьте Assets релиза: `geoatlas-X.Y.Z.tar.gz`, `.sha256`, `.cdx.json`, `.spdx.json`.
 
 ## После релиза
 
