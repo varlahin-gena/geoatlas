@@ -212,6 +212,52 @@ func (r *Repository) RecentSuppressionKeys(ctx context.Context, code string, key
 	if r == nil || r.ch == nil || len(keys) == 0 {
 		return out, nil
 	}
+
+	// Special-case: new_country_dst repeat guard should not depend on anomaly_events.suppression_key
+	// being filled (e.g. after schema migration/backfill). We can use dst_country directly.
+	if code == usecaseanomaly.CodeNewCountryDst {
+		countries := make([]string, 0, len(keys))
+		for _, k := range keys {
+			s := strings.TrimSpace(string(k))
+			const needle = "|country|"
+			if idx := strings.LastIndex(s, needle); idx >= 0 {
+				c := strings.TrimSpace(s[idx+len(needle):])
+				if c != "" {
+					countries = append(countries, c)
+				}
+			}
+		}
+		if len(countries) == 0 {
+			return out, nil
+		}
+		placeholders := make([]string, 0, len(countries))
+		args := make([]any, 0, len(countries)+2)
+		args = append(args, code, since.UTC())
+		for _, c := range countries {
+			placeholders = append(placeholders, "?")
+			args = append(args, c)
+		}
+		q := `SELECT dst_country FROM anomaly_events
+			WHERE code = ? AND detected_at >= ? AND dst_country IN (` + strings.Join(placeholders, ",") + `)
+			GROUP BY dst_country`
+		rows, err := r.ch.Query(ctx, q, args...)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var c string
+			if err := rows.Scan(&c); err != nil {
+				return nil, err
+			}
+			if c != "" {
+				k := usecaseanomaly.SuppressionKey(code + "|country|" + c)
+				out[k] = struct{}{}
+			}
+		}
+		return out, rows.Err()
+	}
+
 	placeholders := make([]string, 0, len(keys))
 	args := make([]any, 0, len(keys)+2)
 	args = append(args, code, since.UTC())
@@ -254,25 +300,53 @@ func (r *Repository) Ack(ctx context.Context, fingerprint, by string, suppressFo
 	if suppressFor <= 0 {
 		return nil
 	}
+	// Compute suppression key from stored fields if anomaly_events.suppression_key is empty
+	// (e.g. events created before migration/backfill).
 	var (
 		code string
 		key  string
+		src  string
+		dst  string
+		city string
 	)
 	err := r.ch.QueryRow(ctx, `
-		SELECT code, suppression_key
+		SELECT
+			code,
+			suppression_key,
+			toString(src_ip),
+			toString(dst_ip),
+			dst_country
 		FROM anomaly_events
 		WHERE fingerprint = ?
 		ORDER BY detected_at DESC
 		LIMIT 1
-	`, fingerprint).Scan(&code, &key)
-	if err != nil || strings.TrimSpace(key) == "" {
+	`, fingerprint).Scan(&code, &key, &src, &dst, &city)
+	if err != nil {
 		return err
+	}
+
+	trimKey := strings.TrimSpace(key)
+	if trimKey == "" {
+		// mirror the suppressionKeyForEvent logic from the usecase layer.
+		switch code {
+		case usecaseanomaly.CodeNewCountryDst:
+			trimKey = code + "|country|" + strings.TrimSpace(city)
+		case usecaseanomaly.CodePortScan, usecaseanomaly.CodeHorizontalScan:
+			trimKey = code + "|src|" + strings.TrimSpace(src)
+		case usecaseanomaly.CodeRepNewDst:
+			trimKey = code + "|pair|" + strings.TrimSpace(src) + "|" + strings.TrimSpace(dst)
+		case usecaseanomaly.CodeBlockedSurge:
+			trimKey = code + "|global"
+		}
+	}
+	if strings.TrimSpace(trimKey) == "" {
+		return nil
 	}
 	return r.ch.Exec(ctx, `
 		INSERT INTO anomaly_suppressions
 		(suppression_key, code, source_fingerprint, suppressed_at, suppressed_until, suppressed_by)
 		VALUES (?, ?, ?, ?, ?, ?)
-	`, key, code, fingerprint, now, now.Add(suppressFor), by)
+	`, trimKey, code, fingerprint, now, now.Add(suppressFor), by)
 }
 
 func (r *Repository) CountSummary(ctx context.Context, since time.Time) (usecaseanomaly.Summary, error) {
