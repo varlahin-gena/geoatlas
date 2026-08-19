@@ -234,14 +234,14 @@ func (s *Service) GetSchedule() (Schedule, error) {
 	return normalized, nil
 }
 
-func (s *Service) UpdateSchedule(in Schedule, actor string) (Schedule, error) {
+func (s *Service) UpdateSchedule(ctx context.Context, in Schedule, actor string) (Schedule, error) {
 	if s == nil || s.schedule == nil {
 		return Schedule{}, ErrUnavailable
 	}
 	prev, _ := s.GetSchedule()
 	out, err := ValidateSchedule(in)
 	if err != nil {
-		s.logBackupMutation(actor, "backup.schedule.update", "backup_schedule", "schedule", "failed", map[string]any{
+		s.logBackupMutation(ctx, actor, "backup.schedule.update", "backup_schedule", "schedule", "failed", map[string]any{
 			"error": err.Error(),
 		})
 		return Schedule{}, err
@@ -255,12 +255,12 @@ func (s *Service) UpdateSchedule(in Schedule, actor string) (Schedule, error) {
 	}
 	out.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 	if err := s.schedule.Save(out); err != nil {
-		s.logBackupMutation(actor, "backup.schedule.update", "backup_schedule", "schedule", "failed", map[string]any{
+		s.logBackupMutation(ctx, actor, "backup.schedule.update", "backup_schedule", "schedule", "failed", map[string]any{
 			"error": err.Error(),
 		})
 		return Schedule{}, err
 	}
-	s.logDREvent(context.Background(), usecaseaudit.DREvent{
+	s.logDREvent(ctx, usecaseaudit.DREvent{
 		Actor:   safeActor(actor),
 		Action:  "backup.schedule.update",
 		Target:  "schedule",
@@ -276,7 +276,7 @@ func (s *Service) UpdateSchedule(in Schedule, actor string) (Schedule, error) {
 			"include_auth":  out.IncludeAuth,
 		},
 	})
-	s.logBackupMutation(actor, "backup.schedule.update", "backup_schedule", "schedule", "succeeded", map[string]any{
+	s.logBackupMutation(ctx, actor, "backup.schedule.update", "backup_schedule", "schedule", "succeeded", map[string]any{
 		"enabled":       out.Enabled,
 		"hour":          out.Hour,
 		"minute":        out.Minute,
@@ -440,7 +440,7 @@ func (s *Service) ScheduleDetach(parent context.Context, name string, actor stri
 }
 
 // DeleteBackup удаляет файлы бэкапа с тома (нельзя, если он подключён).
-func (s *Service) DeleteBackup(name string, actor string) error {
+func (s *Service) DeleteBackup(ctx context.Context, name string, actor string) error {
 	if s == nil || s.store == nil {
 		return ErrUnavailable
 	}
@@ -464,24 +464,24 @@ func (s *Service) DeleteBackup(name string, actor string) error {
 		return ErrNotFound
 	}
 	if err := s.store.Delete(name); err != nil {
-		s.logDREvent(context.Background(), usecaseaudit.DREvent{
+		s.logDREvent(ctx, usecaseaudit.DREvent{
 			Actor:   safeActor(actor),
 			Action:  "backup.delete",
 			Target:  name,
 			Status:  "failed",
 			Message: err.Error(),
 		})
-		s.logBackupMutation(actor, "backup.delete", "backup", name, "failed", map[string]any{"error": err.Error()})
+		s.logBackupMutation(ctx, actor, "backup.delete", "backup", name, "failed", map[string]any{"error": err.Error()})
 		return err
 	}
-	s.logDREvent(context.Background(), usecaseaudit.DREvent{
+	s.logDREvent(ctx, usecaseaudit.DREvent{
 		Actor:   safeActor(actor),
 		Action:  "backup.delete",
 		Target:  name,
 		Status:  "succeeded",
 		Message: "backup deleted",
 	})
-	s.logBackupMutation(actor, "backup.delete", "backup", name, "succeeded", nil)
+	s.logBackupMutation(ctx, actor, "backup.delete", "backup", name, "succeeded", nil)
 	return nil
 }
 
@@ -594,7 +594,7 @@ func (s *Service) runCreate(ctx context.Context, source string, actor string) {
 			"tables":        tables,
 		},
 	})
-	s.logBackupMutation(actor, "backup.create", "backup", name, "succeeded", map[string]any{
+	s.logBackupMutation(ctx, actor, "backup.create", "backup", name, "succeeded", map[string]any{
 		"source":        source,
 		"keep":          keep,
 		"include_edges": includeEdges,
@@ -641,7 +641,7 @@ func (s *Service) runAttach(ctx context.Context, name string, actor string) {
 		Status:  "succeeded",
 		Message: "backup attached",
 	})
-	s.logBackupMutation(actor, "backup.attach", "backup", name, "succeeded", nil)
+	s.logBackupMutation(ctx, actor, "backup.attach", "backup", name, "succeeded", nil)
 }
 
 func (s *Service) runDetach(ctx context.Context, name string, actor string) {
@@ -673,7 +673,7 @@ func (s *Service) runDetach(ctx context.Context, name string, actor string) {
 		Status:  "succeeded",
 		Message: "backup detached",
 	})
-	s.logBackupMutation(actor, "backup.detach", "backup", name, "succeeded", nil)
+	s.logBackupMutation(ctx, actor, "backup.detach", "backup", name, "succeeded", nil)
 }
 
 func safeActor(actor string) string {
@@ -693,11 +693,11 @@ func (s *Service) logDREvent(ctx context.Context, e usecaseaudit.DREvent) {
 	}
 }
 
-func (s *Service) logBackupMutation(actor, action, resourceType, resourceID, result string, details map[string]any) {
+func (s *Service) logBackupMutation(ctx context.Context, actor, action, resourceType, resourceID, result string, details map[string]any) {
 	if s == nil || s.auditLog == nil {
 		return
 	}
-	if err := s.auditLog.WriteAudit(context.Background(), usecaseaudit.AuditEvent{
+	if err := s.auditLog.WriteAudit(ctx, usecaseaudit.AuditEvent{
 		Actor:        safeActor(actor),
 		Action:       action,
 		ResourceType: resourceType,
@@ -717,7 +717,7 @@ func (s *Service) logBackupFailure(ctx context.Context, actor, action, target st
 		Status:  "failed",
 		Message: err.Error(),
 	})
-	s.logBackupMutation(actor, action, "backup", target, "failed", map[string]any{"error": err.Error()})
+	s.logBackupMutation(ctx, actor, action, "backup", target, "failed", map[string]any{"error": err.Error()})
 }
 
 func (s *Service) resolveTables(ctx context.Context, includeEdges bool) ([]string, error) {

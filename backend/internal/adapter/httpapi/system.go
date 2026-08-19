@@ -252,7 +252,7 @@ func (h *SystemHandler) DeleteBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := strings.TrimSpace(r.PathValue("name"))
-	if err := h.backupUC.DeleteBackup(name, actorFromRequest(r)); err != nil {
+	if err := h.backupUC.DeleteBackup(r.Context(), name, actorFromRequest(r)); err != nil {
 		writeDomainError(w, "backup delete failed", err)
 		return
 	}
@@ -316,7 +316,7 @@ func (h *SystemHandler) PutBackupSchedule(w http.ResponseWriter, r *http.Request
 	if body.IncludeAuth != nil {
 		cur.IncludeAuth = *body.IncludeAuth
 	}
-	out, err := h.backupUC.UpdateSchedule(cur, actorFromRequest(r))
+	out, err := h.backupUC.UpdateSchedule(r.Context(), cur, actorFromRequest(r))
 	if err != nil {
 		writeDomainError(w, "backup schedule update failed", err)
 		return
