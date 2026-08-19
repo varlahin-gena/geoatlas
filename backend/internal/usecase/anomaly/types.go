@@ -28,28 +28,31 @@ type MapLink struct {
 	Country string `json:"country,omitempty"`
 }
 
+type SuppressionKey string
+
 // Event — запись журнала аномалий.
 type Event struct {
-	DetectedAt   time.Time      `json:"detected_at"`
-	WindowStart  time.Time      `json:"window_start"`
-	WindowEnd    time.Time      `json:"window_end"`
-	Code         string         `json:"code"`
-	Severity     string         `json:"severity"`
-	Score        float32        `json:"score"`
-	Title        string         `json:"title"`
-	Detail       map[string]any `json:"detail,omitempty"`
-	SrcIP        string         `json:"src_ip,omitempty"`
-	DstIP        string         `json:"dst_ip,omitempty"`
-	SrcCountry   string         `json:"src_country,omitempty"`
-	DstCountry   string         `json:"dst_country,omitempty"`
-	SrcCity      string         `json:"src_city,omitempty"`
-	DstCity      string         `json:"dst_city,omitempty"`
-	Device       string         `json:"device,omitempty"`
-	EventCount   uint64         `json:"event_count"`
-	Fingerprint  string         `json:"fingerprint"`
-	ExpiresAt    time.Time      `json:"expires_at"`
-	Acknowledged bool           `json:"acknowledged"`
-	Map          MapLink        `json:"map"`
+	DetectedAt     time.Time      `json:"detected_at"`
+	WindowStart    time.Time      `json:"window_start"`
+	WindowEnd      time.Time      `json:"window_end"`
+	Code           string         `json:"code"`
+	Severity       string         `json:"severity"`
+	Score          float32        `json:"score"`
+	Title          string         `json:"title"`
+	Detail         map[string]any `json:"detail,omitempty"`
+	SrcIP          string         `json:"src_ip,omitempty"`
+	DstIP          string         `json:"dst_ip,omitempty"`
+	SrcCountry     string         `json:"src_country,omitempty"`
+	DstCountry     string         `json:"dst_country,omitempty"`
+	SrcCity        string         `json:"src_city,omitempty"`
+	DstCity        string         `json:"dst_city,omitempty"`
+	Device         string         `json:"device,omitempty"`
+	EventCount     uint64         `json:"event_count"`
+	Fingerprint    string         `json:"fingerprint"`
+	ExpiresAt      time.Time      `json:"expires_at"`
+	Acknowledged   bool           `json:"acknowledged"`
+	Map            MapLink        `json:"map"`
+	SuppressionKey SuppressionKey `json:"-"`
 }
 
 // ListQuery — фильтр GET /api/anomalies.

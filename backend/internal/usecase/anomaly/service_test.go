@@ -9,10 +9,15 @@ import (
 )
 
 type fakeStore struct {
-	inserted []Event
-	exist    map[string]struct{}
-	list     []Event
-	summary  Summary
+	inserted         []Event
+	exist            map[string]struct{}
+	list             []Event
+	summary          Summary
+	activeSuppressed map[SuppressionKey]struct{}
+	recentSuppressed map[SuppressionKey]struct{}
+	ackedFingerprint string
+	ackedBy          string
+	ackedSuppressFor time.Duration
 }
 
 func (f *fakeStore) Insert(_ context.Context, events []Event) error {
@@ -31,23 +36,41 @@ func (f *fakeStore) ExistingFingerprints(_ context.Context, fps []string) (map[s
 	}
 	return out, nil
 }
-func (f *fakeStore) Ack(context.Context, string, string) error { return nil }
+func (f *fakeStore) ActiveSuppressions(context.Context, []SuppressionKey, time.Time) (map[SuppressionKey]struct{}, error) {
+	if f.activeSuppressed == nil {
+		return map[SuppressionKey]struct{}{}, nil
+	}
+	return f.activeSuppressed, nil
+}
+func (f *fakeStore) RecentSuppressionKeys(context.Context, string, []SuppressionKey, time.Time) (map[SuppressionKey]struct{}, error) {
+	if f.recentSuppressed == nil {
+		return map[SuppressionKey]struct{}{}, nil
+	}
+	return f.recentSuppressed, nil
+}
+func (f *fakeStore) Ack(_ context.Context, fingerprint, by string, suppressFor time.Duration) error {
+	f.ackedFingerprint = fingerprint
+	f.ackedBy = by
+	f.ackedSuppressFor = suppressFor
+	return nil
+}
 func (f *fakeStore) CountSummary(context.Context, time.Time) (Summary, error) {
 	return f.summary, nil
 }
 
 type fakeScan struct {
-	oldest      time.Time
-	now         time.Time
-	ports       []PortScanHit
-	horiz       []HorizontalScanHit
-	blockedCurr uint64
-	blockedPrev uint64
-	hasBlocked  bool
-	countries   []CountryCount
-	baseline    map[string]struct{}
-	edges       []EdgeRow
-	knownPairs  map[string]struct{}
+	oldest       time.Time
+	now          time.Time
+	ports        []PortScanHit
+	horiz        []HorizontalScanHit
+	blockedCurr  uint64
+	blockedPrev  uint64
+	hasBlocked   bool
+	countries    []CountryCount
+	countryTotal uint64
+	baseline     map[string]struct{}
+	edges        []EdgeRow
+	knownPairs   map[string]struct{}
 }
 
 func (f *fakeScan) OldestLogTime(context.Context) (time.Time, error) { return f.oldest, nil }
@@ -73,6 +96,9 @@ func (f *fakeScan) BlockedCount(_ context.Context, start, end time.Time) (uint64
 }
 func (f *fakeScan) CurrentCountries(context.Context, time.Duration, uint64) ([]CountryCount, error) {
 	return f.countries, nil
+}
+func (f *fakeScan) CurrentCountryTotal(context.Context, time.Duration) (uint64, error) {
+	return f.countryTotal, nil
 }
 func (f *fakeScan) BaselineCountries(context.Context, int, uint64) (map[string]struct{}, error) {
 	if f.baseline == nil {
@@ -102,7 +128,10 @@ func (f fakeRep) Lookup(ip string) []model.ReputationHit {
 }
 
 func newSvc(store *fakeStore, scan *fakeScan, rep ReputationLookuper) *Service {
-	return New(Config{Enabled: true, LearningDays: 3, InstallProfile: "medium"}, store, scan, rep, nil, nil)
+	return New(Config{
+		Enabled: true, LearningDays: 3, InstallProfile: "medium",
+		SuppressHours: 24, NewCountryMinShare: 0.05, NewCountryRepeatCooldownHours: 24,
+	}, store, scan, rep, nil, nil)
 }
 
 func TestFingerprintStable(t *testing.T) {
@@ -224,9 +253,10 @@ func TestNewCountryEmits(t *testing.T) {
 	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
 	store := &fakeStore{exist: map[string]struct{}{}}
 	scan := &fakeScan{
-		oldest:    now.Add(-30 * 24 * time.Hour),
-		countries: []CountryCount{{Country: "CN", N: 20}},
-		baseline:  map[string]struct{}{"RU": {}},
+		oldest:       now.Add(-30 * 24 * time.Hour),
+		countries:    []CountryCount{{Country: "CN", N: 20}},
+		countryTotal: 100,
+		baseline:     map[string]struct{}{"RU": {}},
 	}
 	res := newSvc(store, scan, nil).Scan(context.Background(), now)
 	found := false
@@ -270,6 +300,72 @@ func TestRepNewDst(t *testing.T) {
 		}
 	}
 	_ = res2
+}
+
+func TestAckCreatesSuppressionWindow(t *testing.T) {
+	store := &fakeStore{}
+	scan := &fakeScan{oldest: time.Now().Add(-30 * 24 * time.Hour)}
+	svc := newSvc(store, scan, nil)
+	if err := svc.Ack(context.Background(), "deadbeef", "alice"); err != nil {
+		t.Fatal(err)
+	}
+	if store.ackedFingerprint != "deadbeef" || store.ackedBy != "alice" {
+		t.Fatalf("ack not forwarded: %+v", store)
+	}
+	if store.ackedSuppressFor != 24*time.Hour {
+		t.Fatalf("suppressFor=%v", store.ackedSuppressFor)
+	}
+}
+
+func TestNewCountryMinShareSkipsNoise(t *testing.T) {
+	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
+	store := &fakeStore{exist: map[string]struct{}{}}
+	scan := &fakeScan{
+		oldest:       now.Add(-30 * 24 * time.Hour),
+		countries:    []CountryCount{{Country: "CN", N: 20}},
+		countryTotal: 1000,
+		baseline:     map[string]struct{}{"RU": {}},
+	}
+	res := newSvc(store, scan, nil).Scan(context.Background(), now)
+	if res.Inserted != 0 {
+		t.Fatalf("expected low-share country to skip, got %d", res.Inserted)
+	}
+}
+
+func TestNewCountryRepeatCooldownSkipsRecentRepeat(t *testing.T) {
+	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
+	key := suppressionKeyForCodeCountry(CodeNewCountryDst, "CN")
+	store := &fakeStore{
+		exist:            map[string]struct{}{},
+		recentSuppressed: map[SuppressionKey]struct{}{key: {}},
+	}
+	scan := &fakeScan{
+		oldest:       now.Add(-30 * 24 * time.Hour),
+		countries:    []CountryCount{{Country: "CN", N: 20}},
+		countryTotal: 100,
+		baseline:     map[string]struct{}{"RU": {}},
+	}
+	res := newSvc(store, scan, nil).Scan(context.Background(), now)
+	if res.Inserted != 0 {
+		t.Fatalf("expected repeat cooldown to skip, got %d", res.Inserted)
+	}
+}
+
+func TestSuppressedPatternNotInserted(t *testing.T) {
+	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
+	key := SuppressionKey(CodePortScan + "|src|203.0.113.5")
+	store := &fakeStore{
+		exist:            map[string]struct{}{},
+		activeSuppressed: map[SuppressionKey]struct{}{key: {}},
+	}
+	scan := &fakeScan{
+		oldest: now.Add(-30 * 24 * time.Hour),
+		ports:  []PortScanHit{{SrcIP: "203.0.113.5", Ports: 80, Events: 200}},
+	}
+	res := newSvc(store, scan, nil).Scan(context.Background(), now)
+	if res.Inserted != 0 {
+		t.Fatalf("expected active suppression to skip insert, got %d", res.Inserted)
+	}
 }
 
 func TestDedupSameFingerprint(t *testing.T) {

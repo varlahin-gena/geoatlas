@@ -151,6 +151,7 @@ CREATE TABLE IF NOT EXISTS anomaly_events
     device        LowCardinality(String) DEFAULT '',
     event_count   UInt64,
     fingerprint   String,
+    suppression_key String DEFAULT '',
     expires_at    DateTime64(3)
 )
 ENGINE = MergeTree()
@@ -158,6 +159,11 @@ PARTITION BY toYYYYMMDD(detected_at)
 ORDER BY (detected_at, code, fingerprint)
 TTL toDateTime(detected_at) + INTERVAL 30 DAY DELETE
 SETTINGS index_granularity = 8192, ttl_only_drop_parts = 1;
+
+-- ============================================================
+-- anomaly_events suppression_key: ключ подавления повтора
+-- ============================================================
+ALTER TABLE anomaly_events ADD COLUMN IF NOT EXISTS suppression_key String DEFAULT '';
 
 -- ============================================================
 -- anomaly_acks: подтверждения аномалий
@@ -170,3 +176,19 @@ CREATE TABLE IF NOT EXISTS anomaly_acks
 )
 ENGINE = ReplacingMergeTree(ack_at)
 ORDER BY fingerprint;
+
+-- ============================================================
+-- anomaly_suppressions: подавление повторов аномалий
+-- ============================================================
+CREATE TABLE IF NOT EXISTS anomaly_suppressions
+(
+    suppression_key   String,
+    code              LowCardinality(String),
+    source_fingerprint String,
+    suppressed_at     DateTime64(3),
+    suppressed_until  DateTime64(3),
+    suppressed_by     String
+)
+ENGINE = ReplacingMergeTree(suppressed_at)
+ORDER BY suppression_key
+TTL toDateTime(suppressed_until) + INTERVAL 1 DAY DELETE;

@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS anomaly_events
     device        LowCardinality(String) DEFAULT '',
     event_count   UInt64,
     fingerprint   String,
+    suppression_key String DEFAULT '',
     expires_at    DateTime64(3)
 )
 ENGINE = MergeTree()
@@ -38,4 +39,19 @@ CREATE TABLE IF NOT EXISTS anomaly_acks
 )
 ENGINE = ReplacingMergeTree(ack_at)
 ORDER BY fingerprint
+`
+
+const anomalySuppressionsDDL = `
+CREATE TABLE IF NOT EXISTS anomaly_suppressions
+(
+    suppression_key   String,
+    code              LowCardinality(String),
+    source_fingerprint String,
+    suppressed_at     DateTime64(3),
+    suppressed_until  DateTime64(3),
+    suppressed_by     String
+)
+ENGINE = ReplacingMergeTree(suppressed_at)
+ORDER BY suppression_key
+TTL toDateTime(suppressed_until) + INTERVAL 1 DAY DELETE
 `

@@ -27,10 +27,13 @@ const (
 
 // Config — флаги модуля.
 type Config struct {
-	Enabled        bool
-	IncludePrivate bool
-	LearningDays   int
-	InstallProfile string
+	Enabled                       bool
+	IncludePrivate                bool
+	LearningDays                  int
+	InstallProfile                string
+	SuppressHours                 int
+	NewCountryMinShare            float64
+	NewCountryRepeatCooldownHours int
 }
 
 func (c Config) learningPeriod() time.Duration {
@@ -39,6 +42,22 @@ func (c Config) learningPeriod() time.Duration {
 		d = 3
 	}
 	return time.Duration(d) * 24 * time.Hour
+}
+
+func (c Config) suppressPeriod() time.Duration {
+	h := c.SuppressHours
+	if h < 1 {
+		h = 24
+	}
+	return time.Duration(h) * time.Hour
+}
+
+func (c Config) newCountryRepeatCooldown() time.Duration {
+	h := c.NewCountryRepeatCooldownHours
+	if h < 1 {
+		h = 24
+	}
+	return time.Duration(h) * time.Hour
 }
 
 // Service — application use case аномалий.
@@ -144,7 +163,7 @@ func (s *Service) Ack(ctx context.Context, fingerprint, by string) error {
 	if by == "" {
 		by = "unknown"
 	}
-	return s.store.Ack(ctx, fp, by)
+	return s.store.Ack(ctx, fp, by, s.cfg.suppressPeriod())
 }
 
 func (s *Service) Scan(ctx context.Context, now time.Time) ScanResult {
@@ -174,6 +193,9 @@ func (s *Service) Scan(ctx context.Context, now time.Time) ScanResult {
 	learning := s.isLearning(tctx, now)
 	res.Learning = learning
 	th := ThresholdsForProfile(s.cfg.InstallProfile)
+	if s.cfg.NewCountryMinShare > 0 {
+		th.NewCountryMinShare = s.cfg.NewCountryMinShare
+	}
 
 	var candidates []Event
 	run := func(code string, fn func(context.Context) ([]Event, error)) {
@@ -254,6 +276,30 @@ func (s *Service) observe(d time.Duration, inserted int, skip string) {
 	}
 }
 
+func suppressionKeyForCodeCountry(code, country string) SuppressionKey {
+	return SuppressionKey(code + "|country|" + strings.TrimSpace(country))
+}
+
+func suppressionKeyForEvent(e Event) SuppressionKey {
+	switch e.Code {
+	case CodeNewCountryDst:
+		if e.DstCountry != "" {
+			return suppressionKeyForCodeCountry(e.Code, e.DstCountry)
+		}
+	case CodePortScan, CodeHorizontalScan:
+		if e.SrcIP != "" {
+			return SuppressionKey(e.Code + "|src|" + e.SrcIP)
+		}
+	case CodeRepNewDst:
+		if e.SrcIP != "" && e.DstIP != "" {
+			return SuppressionKey(e.Code + "|pair|" + e.SrcIP + "|" + e.DstIP)
+		}
+	case CodeBlockedSurge:
+		return SuppressionKey(e.Code + "|global")
+	}
+	return ""
+}
+
 func (s *Service) isLearning(ctx context.Context, now time.Time) bool {
 	if s.scan == nil {
 		return true
@@ -276,6 +322,9 @@ func (s *Service) dedupAndCap(ctx context.Context, in []Event, now time.Time) []
 		if e.Fingerprint == "" {
 			continue
 		}
+		if e.SuppressionKey == "" {
+			e.SuppressionKey = suppressionKeyForEvent(e)
+		}
 		if _, ok := seen[e.Fingerprint]; ok {
 			continue
 		}
@@ -288,10 +337,30 @@ func (s *Service) dedupAndCap(ctx context.Context, in []Event, now time.Time) []
 		slog.Warn("anomaly fingerprint lookup failed", "err", err)
 		exist = map[string]struct{}{}
 	}
+	keys := make([]SuppressionKey, 0, len(uniq))
+	keySeen := map[SuppressionKey]struct{}{}
+	for _, e := range uniq {
+		if e.SuppressionKey == "" {
+			continue
+		}
+		if _, ok := keySeen[e.SuppressionKey]; ok {
+			continue
+		}
+		keySeen[e.SuppressionKey] = struct{}{}
+		keys = append(keys, e.SuppressionKey)
+	}
+	suppressed, err := s.store.ActiveSuppressions(ctx, keys, now)
+	if err != nil {
+		slog.Warn("anomaly suppression lookup failed", "err", err)
+		suppressed = map[SuppressionKey]struct{}{}
+	}
 	perCode := map[string]int{}
 	out := make([]Event, 0, len(uniq))
 	for _, e := range uniq {
 		if _, ok := exist[e.Fingerprint]; ok {
+			continue
+		}
+		if _, ok := suppressed[e.SuppressionKey]; ok {
 			continue
 		}
 		if perCode[e.Code] >= maxPerCode {
@@ -427,7 +496,23 @@ func (s *Service) detectNewCountry(ctx context.Context, now time.Time, th Thresh
 	if err != nil {
 		return nil, err
 	}
+	total, err := s.scan.CurrentCountryTotal(ctx, countryWindow)
+	if err != nil {
+		return nil, err
+	}
 	base, err := s.scan.BaselineCountries(ctx, countryBaselineDays, th.NewCountryBaseline)
+	if err != nil {
+		return nil, err
+	}
+	candidateKeys := make([]SuppressionKey, 0, len(cur))
+	for _, c := range cur {
+		cc := strings.TrimSpace(c.Country)
+		if cc == "" {
+			continue
+		}
+		candidateKeys = append(candidateKeys, suppressionKeyForCodeCountry(CodeNewCountryDst, cc))
+	}
+	recent, err := s.store.RecentSuppressionKeys(ctx, CodeNewCountryDst, candidateKeys, now.Add(-s.cfg.newCountryRepeatCooldown()))
 	if err != nil {
 		return nil, err
 	}
@@ -440,6 +525,17 @@ func (s *Service) detectNewCountry(ctx context.Context, now time.Time, th Thresh
 		if _, ok := base[cc]; ok {
 			continue
 		}
+		key := suppressionKeyForCodeCountry(CodeNewCountryDst, cc)
+		if _, ok := recent[key]; ok {
+			continue
+		}
+		share := 0.0
+		if total > 0 {
+			share = float64(c.N) / float64(total)
+		}
+		if th.NewCountryMinShare > 0 && share < th.NewCountryMinShare {
+			continue
+		}
 		sev := SeverityWarn
 		out = append(out, Event{
 			DetectedAt:  now,
@@ -449,10 +545,11 @@ func (s *Service) detectNewCountry(ctx context.Context, now time.Time, th Thresh
 			Severity:    sev,
 			Score:       scoreAgainst(float64(c.N), float64(th.NewCountryMin), sev),
 			Title:       fmt.Sprintf("Новая страна назначения: %s (%d событий за час)", cc, c.N),
-			Detail:      map[string]any{"dst_country": cc, "events": c.N, "baseline_days": countryBaselineDays},
+			Detail:      map[string]any{"dst_country": cc, "events": c.N, "baseline_days": countryBaselineDays, "share": share},
 			DstCountry:  cc, EventCount: c.N,
-			Fingerprint: fingerprint(CodeNewCountryDst, "", "", cc, now),
-			Map:         MapLink{Period: "1h", Group: "country", Filter: "all", Query: "dst:" + cc, Country: cc},
+			Fingerprint:    fingerprint(CodeNewCountryDst, "", "", cc, now),
+			SuppressionKey: key,
+			Map:            MapLink{Period: "1h", Group: "country", Filter: "all", Query: "dst:" + cc, Country: cc},
 		})
 	}
 	return out, nil

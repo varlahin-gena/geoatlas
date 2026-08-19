@@ -87,10 +87,13 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 			profileName = p.Profile
 		}
 		anomalyUC = usecaseanomaly.New(usecaseanomaly.Config{
-			Enabled:        true,
-			IncludePrivate: cfg.AnomalyIncludePrivate,
-			LearningDays:   cfg.AnomalyLearningDays,
-			InstallProfile: profileName,
+			Enabled:                       true,
+			IncludePrivate:                cfg.AnomalyIncludePrivate,
+			LearningDays:                  cfg.AnomalyLearningDays,
+			InstallProfile:                profileName,
+			SuppressHours:                 cfg.AnomalySuppressHours,
+			NewCountryMinShare:            cfg.AnomalyNewCountryMinShare,
+			NewCountryRepeatCooldownHours: cfg.AnomalyNewCountryRepeatCooldownHours,
 		}, apiRepo, bgRepo, anomRep, anomalyjob.Gate{Ingest: a.ingestSvc}, a.prom)
 		a.anomalyJobs = anomalyjob.New(anomalyUC, cfg.AnomalyScanInterval, time.Minute)
 	}

@@ -177,15 +177,15 @@ type Config struct {
 	// IngestAllowFrom — CSV hostnames/CIDRs peer для Accept (дефолт syslog-ng).
 	IngestAllowFrom string
 	// TrustedProxies — CSV hostnames/CIDRs для X-Real-IP (login throttle); дефолт frontend.
-	TrustedProxies string
-	QueryTimeout   time.Duration
-	CHMaxMemoryUsage     int64
-	CHExternalGroupBy    int64
-	CHExternalSort       int64
-	CHMaxThreads         int
-	InstallProfilePath   string
-	InstallMetaPath      string
-	SyslogStatsURL       string // SYSLOG_STATS_URL; empty = do not scrape syslog-ng
+	TrustedProxies     string
+	QueryTimeout       time.Duration
+	CHMaxMemoryUsage   int64
+	CHExternalGroupBy  int64
+	CHExternalSort     int64
+	CHMaxThreads       int
+	InstallProfilePath string
+	InstallMetaPath    string
+	SyslogStatsURL     string // SYSLOG_STATS_URL; empty = do not scrape syslog-ng
 
 	// Размеры пулов ClickHouse (отдельные Conn на write/read/background).
 	CHIngestMaxOpen     int
@@ -222,10 +222,13 @@ type Config struct {
 	ReputationFeedsFile     string           // REPUTATION_FEEDS_FILE
 
 	// Anomaly engine (карта): детерминированные детекторы + журнал.
-	AnomalyEnabled        bool
-	AnomalyScanInterval   time.Duration
-	AnomalyIncludePrivate bool
-	AnomalyLearningDays   int
+	AnomalyEnabled                       bool
+	AnomalyScanInterval                  time.Duration
+	AnomalyIncludePrivate                bool
+	AnomalyLearningDays                  int
+	AnomalySuppressHours                 int
+	AnomalyNewCountryMinShare            float64
+	AnomalyNewCountryRepeatCooldownHours int
 
 	LogLevel  string // debug|info|warn|error
 	LogFormat string // text|json
@@ -290,30 +293,33 @@ func FromEnv() Config {
 		InstallMetaPath:      envOr("INSTALL_META_PATH", "/app/install-meta.json"),
 		SyslogStatsURL:       strings.TrimSpace(os.Getenv("SYSLOG_STATS_URL")),
 
-		CHIngestMaxOpen:         parser.int("CH_INGEST_MAX_OPEN_CONNS", 4),
-		CHAPIMaxOpen:            parser.int("CH_API_MAX_OPEN_CONNS", 8),
-		CHBackgroundMaxOpen:     parser.int("CH_BACKGROUND_MAX_OPEN_CONNS", 2),
-		CHIngestAsyncInsert:     parser.bool("CH_INGEST_ASYNC_INSERT", true),
-		GeoEnrichOnIngest:       parser.bool("GEO_ENRICH_ON_INGEST", true),
-		GeoBackfillLookbackDays: parser.int("GEO_BACKFILL_LOOKBACK_DAYS", 7),
-		SkipStartupBackfill:     parser.bool("SKIP_STARTUP_BACKFILL", false),
-		BackupEnabled:           parser.bool("BACKUP_ENABLED", true),
-		BackupDir:               envOr("BACKUP_DIR", "/var/lib/clickhouse-backups"),
-		BackupKeep:              parser.int("BACKUP_KEEP", 7),
-		BackupIncludeEdges:      parser.bool("BACKUP_INCLUDE_EDGES", true),
-		BackupIncludeAuth:       parser.bool("BACKUP_INCLUDE_AUTH", true),
-		BackupScheduleFile:      envOr("BACKUP_SCHEDULE_FILE", "/app/data/backup_schedule.json"),
-		MaxReputationUploadSize: parser.int64("MAX_REPUTATION_UPLOAD_SIZE", 1<<30),
-		ReputationFetchEnabled:  parser.bool("REPUTATION_FETCH_ENABLED", true),
-		ReputationFetchInterval: parser.durationFlexible("REPUTATION_FETCH_INTERVAL", 6*time.Hour),
-		ReputationFeeds:         parseReputationFeeds(os.Getenv("REPUTATION_FEEDS")),
-		ReputationFeedsFile:     envOr("REPUTATION_FEEDS_FILE", "/app/data/reputation_feeds.json"),
-		AnomalyEnabled:          parser.bool("ANOMALY_ENABLED", true),
-		AnomalyScanInterval:     parser.durationFlexible("ANOMALY_SCAN_INTERVAL", 5*time.Minute),
-		AnomalyIncludePrivate:   parser.bool("ANOMALY_INCLUDE_PRIVATE", false),
-		AnomalyLearningDays:     parser.int("ANOMALY_LEARNING_DAYS", 3),
-		LogLevel:                strings.ToLower(envOr("LOG_LEVEL", "info")),
-		LogFormat:               strings.ToLower(envOr("LOG_FORMAT", "text")),
+		CHIngestMaxOpen:                      parser.int("CH_INGEST_MAX_OPEN_CONNS", 4),
+		CHAPIMaxOpen:                         parser.int("CH_API_MAX_OPEN_CONNS", 8),
+		CHBackgroundMaxOpen:                  parser.int("CH_BACKGROUND_MAX_OPEN_CONNS", 2),
+		CHIngestAsyncInsert:                  parser.bool("CH_INGEST_ASYNC_INSERT", true),
+		GeoEnrichOnIngest:                    parser.bool("GEO_ENRICH_ON_INGEST", true),
+		GeoBackfillLookbackDays:              parser.int("GEO_BACKFILL_LOOKBACK_DAYS", 7),
+		SkipStartupBackfill:                  parser.bool("SKIP_STARTUP_BACKFILL", false),
+		BackupEnabled:                        parser.bool("BACKUP_ENABLED", true),
+		BackupDir:                            envOr("BACKUP_DIR", "/var/lib/clickhouse-backups"),
+		BackupKeep:                           parser.int("BACKUP_KEEP", 7),
+		BackupIncludeEdges:                   parser.bool("BACKUP_INCLUDE_EDGES", true),
+		BackupIncludeAuth:                    parser.bool("BACKUP_INCLUDE_AUTH", true),
+		BackupScheduleFile:                   envOr("BACKUP_SCHEDULE_FILE", "/app/data/backup_schedule.json"),
+		MaxReputationUploadSize:              parser.int64("MAX_REPUTATION_UPLOAD_SIZE", 1<<30),
+		ReputationFetchEnabled:               parser.bool("REPUTATION_FETCH_ENABLED", true),
+		ReputationFetchInterval:              parser.durationFlexible("REPUTATION_FETCH_INTERVAL", 6*time.Hour),
+		ReputationFeeds:                      parseReputationFeeds(os.Getenv("REPUTATION_FEEDS")),
+		ReputationFeedsFile:                  envOr("REPUTATION_FEEDS_FILE", "/app/data/reputation_feeds.json"),
+		AnomalyEnabled:                       parser.bool("ANOMALY_ENABLED", true),
+		AnomalyScanInterval:                  parser.durationFlexible("ANOMALY_SCAN_INTERVAL", 5*time.Minute),
+		AnomalyIncludePrivate:                parser.bool("ANOMALY_INCLUDE_PRIVATE", false),
+		AnomalyLearningDays:                  parser.int("ANOMALY_LEARNING_DAYS", 3),
+		AnomalySuppressHours:                 parser.int("ANOMALY_SUPPRESS_HOURS", 24),
+		AnomalyNewCountryMinShare:            parser.float("ANOMALY_NEW_COUNTRY_MIN_SHARE", 0.05),
+		AnomalyNewCountryRepeatCooldownHours: parser.int("ANOMALY_NEW_COUNTRY_REPEAT_COOLDOWN_HOURS", 24),
+		LogLevel:                             strings.ToLower(envOr("LOG_LEVEL", "info")),
+		LogFormat:                            strings.ToLower(envOr("LOG_FORMAT", "text")),
 	}
 	cfg.GeoSnapshotFile = geoSnapshotFile(cfg.AuthUsersFile)
 	cfg.parseErrors = parser.errors
@@ -406,6 +412,18 @@ func (p *envParser) int(key string, def int) int {
 		return def
 	}
 	if n, err := strconv.Atoi(strings.TrimSpace(raw)); err == nil {
+		return n
+	}
+	p.invalid(key)
+	return def
+}
+
+func (p *envParser) float(key string, def float64) float64 {
+	raw, ok := os.LookupEnv(key)
+	if !ok {
+		return def
+	}
+	if n, err := strconv.ParseFloat(strings.TrimSpace(raw), 64); err == nil && n >= 0 {
 		return n
 	}
 	p.invalid(key)

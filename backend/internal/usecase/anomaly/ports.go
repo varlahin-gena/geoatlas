@@ -12,7 +12,9 @@ type EventStore interface {
 	Insert(ctx context.Context, events []Event) error
 	List(ctx context.Context, q ListQuery) ([]Event, error)
 	ExistingFingerprints(ctx context.Context, fps []string) (map[string]struct{}, error)
-	Ack(ctx context.Context, fingerprint, by string) error
+	ActiveSuppressions(ctx context.Context, keys []SuppressionKey, now time.Time) (map[SuppressionKey]struct{}, error)
+	RecentSuppressionKeys(ctx context.Context, code string, keys []SuppressionKey, since time.Time) (map[SuppressionKey]struct{}, error)
+	Ack(ctx context.Context, fingerprint, by string, suppressFor time.Duration) error
 	CountSummary(ctx context.Context, since time.Time) (Summary, error)
 }
 
@@ -23,6 +25,7 @@ type TrafficScanner interface {
 	HorizontalScan(ctx context.Context, window time.Duration, hostsTh, eventsTh int, includePrivate bool) ([]HorizontalScanHit, error)
 	BlockedCount(ctx context.Context, start, end time.Time) (uint64, error)
 	CurrentCountries(ctx context.Context, window time.Duration, minN uint64) ([]CountryCount, error)
+	CurrentCountryTotal(ctx context.Context, window time.Duration) (uint64, error)
 	BaselineCountries(ctx context.Context, days int, minN uint64) (map[string]struct{}, error)
 	RecentEdges(ctx context.Context, window time.Duration, limit int) ([]EdgeRow, error)
 	KnownPairs(ctx context.Context, pairs [][2]string, lookback time.Duration) (map[string]struct{}, error)

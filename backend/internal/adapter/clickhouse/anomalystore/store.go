@@ -39,7 +39,7 @@ func (r *Repository) Insert(ctx context.Context, events []usecaseanomaly.Event) 
 		INSERT INTO anomaly_events (
 			detected_at, window_start, window_end, code, severity, score, title, detail,
 			src_ip, dst_ip, src_country, dst_country, src_city, dst_city, device,
-			event_count, fingerprint, expires_at
+			event_count, fingerprint, suppression_key, expires_at
 		)
 	`)
 	if err != nil {
@@ -64,7 +64,7 @@ func (r *Repository) Insert(ctx context.Context, events []usecaseanomaly.Event) 
 		if err := batch.Append(
 			e.DetectedAt, e.WindowStart, e.WindowEnd, e.Code, e.Severity, e.Score, e.Title, detail,
 			src, dst, e.SrcCountry, e.DstCountry, e.SrcCity, e.DstCity, e.Device,
-			e.EventCount, e.Fingerprint, e.ExpiresAt,
+			e.EventCount, e.Fingerprint, string(e.SuppressionKey), e.ExpiresAt,
 		); err != nil {
 			return err
 		}
@@ -173,13 +173,106 @@ func (r *Repository) ExistingFingerprints(ctx context.Context, fps []string) (ma
 	return out, rows.Err()
 }
 
-func (r *Repository) Ack(ctx context.Context, fingerprint, by string) error {
+func (r *Repository) ActiveSuppressions(ctx context.Context, keys []usecaseanomaly.SuppressionKey, now time.Time) (map[usecaseanomaly.SuppressionKey]struct{}, error) {
+	out := map[usecaseanomaly.SuppressionKey]struct{}{}
+	if r == nil || r.ch == nil || len(keys) == 0 {
+		return out, nil
+	}
+	placeholders := make([]string, 0, len(keys))
+	args := make([]any, 0, len(keys)+1)
+	for _, key := range keys {
+		if key == "" {
+			continue
+		}
+		placeholders = append(placeholders, "?")
+		args = append(args, string(key))
+	}
+	if len(placeholders) == 0 {
+		return out, nil
+	}
+	args = append(args, now.UTC())
+	q := `SELECT suppression_key FROM anomaly_suppressions WHERE suppression_key IN (` + strings.Join(placeholders, ",") + `) AND suppressed_until > ? GROUP BY suppression_key`
+	rows, err := r.ch.Query(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			return nil, err
+		}
+		out[usecaseanomaly.SuppressionKey(key)] = struct{}{}
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) RecentSuppressionKeys(ctx context.Context, code string, keys []usecaseanomaly.SuppressionKey, since time.Time) (map[usecaseanomaly.SuppressionKey]struct{}, error) {
+	out := map[usecaseanomaly.SuppressionKey]struct{}{}
+	if r == nil || r.ch == nil || len(keys) == 0 {
+		return out, nil
+	}
+	placeholders := make([]string, 0, len(keys))
+	args := make([]any, 0, len(keys)+2)
+	args = append(args, code, since.UTC())
+	for _, key := range keys {
+		if key == "" {
+			continue
+		}
+		placeholders = append(placeholders, "?")
+		args = append(args, string(key))
+	}
+	if len(placeholders) == 0 {
+		return out, nil
+	}
+	q := `SELECT suppression_key FROM anomaly_events WHERE code = ? AND detected_at >= ? AND suppression_key IN (` + strings.Join(placeholders, ",") + `) GROUP BY suppression_key`
+	rows, err := r.ch.Query(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			return nil, err
+		}
+		out[usecaseanomaly.SuppressionKey(key)] = struct{}{}
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) Ack(ctx context.Context, fingerprint, by string, suppressFor time.Duration) error {
 	if r == nil || r.ch == nil {
 		return fmt.Errorf("clickhouse not configured")
 	}
-	return r.ch.Exec(ctx, `
+	now := time.Now().UTC()
+	if err := r.ch.Exec(ctx, `
 		INSERT INTO anomaly_acks (fingerprint, ack_at, ack_by) VALUES (?, ?, ?)
-	`, fingerprint, time.Now().UTC(), by)
+	`, fingerprint, now, by); err != nil {
+		return err
+	}
+	if suppressFor <= 0 {
+		return nil
+	}
+	var (
+		code string
+		key  string
+	)
+	err := r.ch.QueryRow(ctx, `
+		SELECT code, suppression_key
+		FROM anomaly_events
+		WHERE fingerprint = ?
+		ORDER BY detected_at DESC
+		LIMIT 1
+	`, fingerprint).Scan(&code, &key)
+	if err != nil || strings.TrimSpace(key) == "" {
+		return err
+	}
+	return r.ch.Exec(ctx, `
+		INSERT INTO anomaly_suppressions
+		(suppression_key, code, source_fingerprint, suppressed_at, suppressed_until, suppressed_by)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, key, code, fingerprint, now, now.Add(suppressFor), by)
 }
 
 func (r *Repository) CountSummary(ctx context.Context, since time.Time) (usecaseanomaly.Summary, error) {
@@ -318,6 +411,19 @@ func (r *Repository) CurrentCountries(ctx context.Context, window time.Duration,
 		out = append(out, c)
 	}
 	return out, rows.Err()
+}
+
+func (r *Repository) CurrentCountryTotal(ctx context.Context, window time.Duration) (uint64, error) {
+	q := fmt.Sprintf(`
+		SELECT count()
+		FROM traffic_logs
+		WHERE timestamp >= now() - INTERVAL %d SECOND
+		  AND dst_country != ''
+		  AND dst_country NOT IN ('Неизвестно', 'Unknown', 'unknown', 'Reserved', 'reserved')
+	`, int(window.Seconds()))
+	var total uint64
+	err := r.ch.QueryRow(ctx, q).Scan(&total)
+	return total, err
 }
 
 func (r *Repository) BaselineCountries(ctx context.Context, days int, minN uint64) (map[string]struct{}, error) {
