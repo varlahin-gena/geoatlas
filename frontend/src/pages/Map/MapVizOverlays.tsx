@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { fmtNumber } from '@/lib/format';
 
 export function MapVizOverlays({
@@ -9,6 +10,7 @@ export function MapVizOverlays({
   repColorArcs,
   showStats,
   stats,
+  endDock,
 }: {
   truncHint: string;
   emptyOverlay: { title: string; text: string } | null;
@@ -26,6 +28,7 @@ export function MapVizOverlays({
     countries: number;
     cities: number;
   };
+  endDock?: ReactNode;
 }) {
   return (
     <>
@@ -47,35 +50,40 @@ export function MapVizOverlays({
         <span>Загрузка данных…</span>
       </div>
 
-      {showLegend ? (
-        <div className="legend">
-          <div className="legend-title">Статус трафика</div>
-          {monoArcs ? (
-            <div className="legend-row">
-              <span className="legend-line" style={{ background: 'var(--accent)' }} /> Связь
-            </div>
-          ) : (
-            <>
-              <div className="legend-row">
-                <span className="legend-line" style={{ background: 'var(--green)' }} /> Разрешённый
-              </div>
-              <div className="legend-row">
-                <span className="legend-line" style={{ background: 'var(--red)' }} /> Заблокированный
-              </div>
-              {repColorArcs ? (
+      {showLegend || endDock ? (
+        <div className="map-end-dock">
+          {showLegend ? (
+            <div className="legend">
+              <div className="legend-title">Статус трафика</div>
+              {monoArcs ? (
                 <div className="legend-row">
-                  <span className="legend-line" style={{ background: 'var(--orange)' }} />{' '}
-                  Репутационный хит
+                  <span className="legend-line" style={{ background: 'var(--accent)' }} /> Связь
                 </div>
-              ) : null}
-            </>
-          )}
-          <div
-            className="legend-row"
-            style={{ marginTop: 6, color: 'var(--text-muted)', fontSize: 11 }}
-          >
-            Толщина линии / размер точки — кол-во событий
-          </div>
+              ) : (
+                <>
+                  <div className="legend-row">
+                    <span className="legend-line" style={{ background: 'var(--green)' }} /> Разрешённый
+                  </div>
+                  <div className="legend-row">
+                    <span className="legend-line" style={{ background: 'var(--red)' }} /> Заблокированный
+                  </div>
+                  {repColorArcs ? (
+                    <div className="legend-row">
+                      <span className="legend-line" style={{ background: 'var(--orange)' }} />{' '}
+                      Репутационный хит
+                    </div>
+                  ) : null}
+                </>
+              )}
+              <div
+                className="legend-row"
+                style={{ marginTop: 6, color: 'var(--text-muted)', fontSize: 11 }}
+              >
+                Толщина линии / размер точки — кол-во событий
+              </div>
+            </div>
+          ) : null}
+          {endDock}
         </div>
       ) : null}
 

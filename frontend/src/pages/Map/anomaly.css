@@ -33,17 +33,20 @@
   font-weight: 600;
 }
 .anomaly-panel {
-  position: absolute;
-  top: 52px;
-  right: 12px;
-  width: min(360px, calc(100% - 24px));
+  width: min(360px, calc(100vw - 24px));
   max-height: min(70vh, 520px);
   overflow: auto;
-  z-index: 7;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 10px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+}
+.map-end-dock:has(.anomaly-panel) .anomaly-panel {
+  flex: 1 1 auto;
+  max-height: none;
+}
+.viz-area:has(.anomaly-strip).has-viz-hint .viz-hint {
+  top: 52px;
 }
 .anomaly-panel-head {
   display: flex;

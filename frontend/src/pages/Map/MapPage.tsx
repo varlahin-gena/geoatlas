@@ -401,22 +401,9 @@ export default function MapPage() {
         >
           <div ref={mapContainer} id="map-host" className="viz-host" />
 
-          <AnomalyStrip summary={anomalies.summary} onOpen={() => anomalies.setOpen(true)} />
-          <AnomalyPanel
-            open={anomalies.open}
-            items={anomalies.items}
-            onClose={() => anomalies.setOpen(false)}
-            onShow={(item) => {
-              anomalies.setActive(item);
-              applyView(anomalyMapToView(item.map));
-              anomalies.setOpen(false);
-            }}
-            onAck={(fp) => {
-              void anomalies.ack(fp).catch(() => {
-                toast('Не удалось скрыть аномалию', 'error');
-              });
-            }}
-          />
+          {anomalies.open ? null : (
+            <AnomalyStrip summary={anomalies.summary} onOpen={() => anomalies.setOpen(true)} />
+          )}
 
           {showGeoEmptyBanner ? (
             <div className="geo-wizard-banner" role="status">
@@ -436,6 +423,23 @@ export default function MapPage() {
             repColorArcs={repColorArcs}
             showStats={showStats}
             stats={stats}
+            endDock={
+              <AnomalyPanel
+                open={anomalies.open}
+                items={anomalies.items}
+                onClose={() => anomalies.setOpen(false)}
+                onShow={(item) => {
+                  anomalies.setActive(item);
+                  applyView(anomalyMapToView(item.map));
+                  anomalies.setOpen(false);
+                }}
+                onAck={(fp) => {
+                  void anomalies.ack(fp).catch(() => {
+                    toast('Не удалось скрыть аномалию', 'error');
+                  });
+                }}
+              />
+            }
           />
 
           <MapDetailPanel detail={detail} onClose={closeDetail} />

@@ -490,6 +490,28 @@ body.page-map {
 .viz-host { position: absolute; inset: 0; }
 .viz-host.hidden { display: none; }
 
+.map-end-dock {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 51;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    width: max-content;
+    max-width: min(360px, calc(100% - 24px));
+    max-height: calc(100% - 24px);
+    pointer-events: none;
+}
+.map-end-dock > * {
+    pointer-events: auto;
+    min-height: 0;
+}
+.map-end-dock:has(.anomaly-panel) {
+    width: min(360px, calc(100% - 24px));
+    align-items: stretch;
+}
 .legend, .stats-floating {
     position: absolute; background: var(--floating-bg);
     border: 1px solid var(--border); border-radius: 8px; color: var(--text);
@@ -497,6 +519,19 @@ body.page-map {
     backdrop-filter: blur(6px); z-index: 50;
 }
 .legend { top: 16px; right: 16px; padding: 10px 12px; min-width: 200px; }
+.map-end-dock .legend {
+    position: static;
+    top: auto;
+    right: auto;
+    z-index: auto;
+    min-width: 200px;
+    width: auto;
+    box-sizing: border-box;
+    flex-shrink: 0;
+}
+.map-end-dock:has(.anomaly-panel) .legend {
+    width: 100%;
+}
 .stats-floating {
     bottom: 16px; left: 16px; padding: 10px 14px;
     display: flex; gap: 14px; flex-wrap: wrap; max-width: calc(100% - 32px);
