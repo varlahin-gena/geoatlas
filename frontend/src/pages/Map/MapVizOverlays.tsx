@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import { fmtNumber } from '@/lib/format';
 
 export function MapVizOverlays({
-  truncHint,
   emptyOverlay,
   loading,
   showLegend,
@@ -12,7 +11,6 @@ export function MapVizOverlays({
   stats,
   endDock,
 }: {
-  truncHint: string;
   emptyOverlay: { title: string; text: string } | null;
   loading: boolean;
   showLegend: boolean;
@@ -32,8 +30,6 @@ export function MapVizOverlays({
 }) {
   return (
     <>
-      {truncHint ? <div className="viz-hint warn">{truncHint}</div> : null}
-
       <div className={`viz-overlay${emptyOverlay ? ' visible' : ''}`}>
         <div className="viz-overlay-card">
           <h4>{emptyOverlay?.title || 'Нет данных'}</h4>

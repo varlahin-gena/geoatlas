@@ -532,6 +532,34 @@ body.page-map {
 .map-end-dock:has(.anomaly-panel) .legend {
     width: 100%;
 }
+.map-top-stack {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 55;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: max-content;
+    max-width: min(560px, calc(100% - 24px));
+    pointer-events: none;
+}
+.map-top-stack:empty {
+    display: none;
+}
+.map-top-stack > * {
+    pointer-events: auto;
+}
+.map-top-stack .anomaly-strip,
+.map-top-stack .viz-hint {
+    position: static;
+    top: auto;
+    left: auto;
+    transform: none;
+    max-width: 100%;
+}
 .stats-floating {
     bottom: 16px; left: 16px; padding: 10px 14px;
     display: flex; gap: 14px; flex-wrap: wrap; max-width: calc(100% - 32px);

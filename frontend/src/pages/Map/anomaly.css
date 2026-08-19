@@ -1,9 +1,4 @@
 .anomaly-strip {
-  position: absolute;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 6;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -44,9 +39,6 @@
 .map-end-dock:has(.anomaly-panel) .anomaly-panel {
   flex: 1 1 auto;
   max-height: none;
-}
-.viz-area:has(.anomaly-strip).has-viz-hint .viz-hint {
-  top: 52px;
 }
 .anomaly-panel-head {
   display: flex;

@@ -401,9 +401,12 @@ export default function MapPage() {
         >
           <div ref={mapContainer} id="map-host" className="viz-host" />
 
-          {anomalies.open ? null : (
-            <AnomalyStrip summary={anomalies.summary} onOpen={() => anomalies.setOpen(true)} />
-          )}
+          <div className="map-top-stack">
+            {!anomalies.open ? (
+              <AnomalyStrip summary={anomalies.summary} onOpen={() => anomalies.setOpen(true)} />
+            ) : null}
+            {truncHint ? <div className="viz-hint warn">{truncHint}</div> : null}
+          </div>
 
           {showGeoEmptyBanner ? (
             <div className="geo-wizard-banner" role="status">
@@ -415,7 +418,6 @@ export default function MapPage() {
           ) : null}
 
           <MapVizOverlays
-            truncHint={truncHint}
             emptyOverlay={displayEmptyOverlay}
             loading={loading}
             showLegend={showLegend}

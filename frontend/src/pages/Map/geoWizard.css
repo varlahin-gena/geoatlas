@@ -166,7 +166,7 @@
   pointer-events: auto;
 }
 
-.viz-area.has-geo-empty-banner.has-viz-hint .viz-hint {
+.viz-area.has-geo-empty-banner .map-top-stack {
   top: 56px;
 }
 
@@ -178,8 +178,8 @@
   top: 116px;
 }
 
-.viz-area.has-geo-empty-banner:has(.anomaly-strip) .anomaly-strip {
-  top: 56px;
+.viz-area.has-geo-empty-banner.has-viz-hint:has(.map-top-stack .anomaly-strip) .map-end-dock {
+  top: 148px;
 }
 
 .geo-wizard-banner p {
@@ -202,10 +202,10 @@
   .viz-area.has-geo-empty-banner .map-end-dock {
     top: 76px;
   }
-  .viz-area.has-geo-empty-banner.has-viz-hint .viz-hint {
-    top: 72px;
-  }
   .viz-area.has-geo-empty-banner.has-viz-hint .map-end-dock {
     top: 116px;
+  }
+  .viz-area.has-geo-empty-banner.has-viz-hint:has(.map-top-stack .anomaly-strip) .map-end-dock {
+    top: 148px;
   }
 }

@@ -13,6 +13,7 @@
 - Релиз: SBOM установочного пакета — CycloneDX + SPDX (`scripts/ci-sbom.sh`, Syft v1.51.0) в Assets вместе с `geoatlas-X.Y.Z.tar.gz`
 
 ### Fixed
+- Карта: полоска аномалий и подсказка о лимите связей не перекрывают друг друга — общая колонка сверху
 - Карта: легенда «Статус трафика» не перекрывает панель аномалий — оба блока в правой колонке
 - CI: frontend image smoke — nginx стартует без compose DNS (`--add-host backend:127.0.0.1`); раньше `host not found in upstream "backend"`
 - CI / образы: Go **1.25.13** (stdlib `net/url`, `crypto/tls`, `net/http`, `encoding/asn1`); `setup-go` `check-latest: true`, `golang:1.25.13-alpine`
