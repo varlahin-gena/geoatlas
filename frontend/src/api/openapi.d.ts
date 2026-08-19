@@ -3330,7 +3330,8 @@ export interface paths {
         };
         /**
          * Audit log admin/security действий
-         * @description Только administrator или Bearer. Возвращает append-only журнал login/users/tokens/ retention/backup действий.
+         * @description Только administrator или Bearer. Возвращает append-only журнал login/users/tokens/
+         *     retention/backup действий.
          */
         get: {
             parameters: {
@@ -3553,38 +3554,6 @@ export interface components {
              * @description Время последнего сохранения (UTC)
              */
             updated_at?: string;
-        };
-        DREvent: {
-            /** Format: date-time */
-            timestamp?: string;
-            actor?: string;
-            action?: string;
-            target?: string;
-            /** @enum {string} */
-            status?: "started" | "succeeded" | "failed";
-            message?: string;
-            meta?: {
-                [key: string]: unknown;
-            };
-        };
-        DRHistoryList: {
-            items?: components["schemas"]["DREvent"][];
-        };
-        AuditEvent: {
-            /** Format: date-time */
-            timestamp?: string;
-            actor?: string;
-            action?: string;
-            resource_type?: string;
-            resource_id?: string;
-            result?: string;
-            ip?: string;
-            details?: {
-                [key: string]: unknown;
-            };
-        };
-        AuditLogList: {
-            items?: components["schemas"]["AuditEvent"][];
         };
         /** @description Liveness. HTTP 200, если процесс отвечает. */
         LiveResponse: {
@@ -3815,6 +3784,38 @@ export interface components {
             failed_logins?: components["schemas"]["SystemFailedLogin"][];
         } & {
             [key: string]: unknown;
+        };
+        DREvent: {
+            /** Format: date-time */
+            timestamp?: string;
+            actor?: string;
+            action?: string;
+            target?: string;
+            /** @enum {string} */
+            status?: "started" | "succeeded" | "failed";
+            message?: string;
+            meta?: {
+                [key: string]: unknown;
+            };
+        };
+        DRHistoryList: {
+            items?: components["schemas"]["DREvent"][];
+        };
+        AuditEvent: {
+            /** Format: date-time */
+            timestamp?: string;
+            actor?: string;
+            action?: string;
+            resource_type?: string;
+            resource_id?: string;
+            result?: string;
+            ip?: string;
+            details?: {
+                [key: string]: unknown;
+            };
+        };
+        AuditLogList: {
+            items?: components["schemas"]["AuditEvent"][];
         };
         MapPoint: {
             lat: number;
