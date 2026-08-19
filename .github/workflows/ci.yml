@@ -12,7 +12,157 @@ env:
   GOWORK: "off"
   GOTOOLCHAIN: local
 
+# Drop superseded runs on the same PR or branch (Playwright, ClickHouse, fuzz, images).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  changes:
+    name: detect changed paths
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      backend: ${{ steps.gates.outputs.backend }}
+      frontend: ${{ steps.gates.outputs.frontend }}
+      stats: ${{ steps.gates.outputs.stats }}
+      chconn: ${{ steps.gates.outputs.chconn }}
+      syslogngstats: ${{ steps.gates.outputs.syslogngstats }}
+      govulncheck: ${{ steps.gates.outputs.govulncheck }}
+      integration: ${{ steps.gates.outputs.integration }}
+      shell: ${{ steps.gates.outputs.shell }}
+      docker_any: ${{ steps.gates.outputs.docker_any }}
+      docker_images: ${{ steps.gates.outputs.docker_images }}
+    steps:
+      - uses: actions/checkout@v5
+
+      # PRs only: skip Playwright / ClickHouse / fuzz / docker when those trees did not change.
+      # Push to main/develop still runs every job (gates force true below).
+      - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4
+        id: filter
+        if: github.event_name == 'pull_request'
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - 'pkg/**'
+              - 'openapi.yaml'
+              - 'go.work'
+              - 'go.work.sum'
+              - '.github/workflows/ci.yml'
+            frontend:
+              - 'frontend/**'
+              - 'openapi.yaml'
+              - '.github/workflows/ci.yml'
+            stats:
+              - 'stats-collector/**'
+              - 'pkg/**'
+              - '.github/workflows/ci.yml'
+            chconn:
+              - 'pkg/chconn/**'
+              - '.github/workflows/ci.yml'
+            syslogngstats:
+              - 'pkg/syslogngstats/**'
+              - '.github/workflows/ci.yml'
+            govulncheck:
+              - '**/*.go'
+              - '**/go.mod'
+              - '**/go.sum'
+              - 'go.work'
+              - 'go.work.sum'
+              - 'scripts/ci-govulncheck.sh'
+              - '.github/workflows/ci.yml'
+            integration:
+              - 'backend/**'
+              - 'pkg/chconn/**'
+              - 'pkg/syslogngstats/**'
+              - 'docker-compose.yml'
+              - 'clickhouse/**'
+              - '.github/workflows/ci.yml'
+            shell:
+              - 'start.sh'
+              - 'stop.sh'
+              - 'update.sh'
+              - 'scripts/**'
+              - 'deploy/**'
+              - 'docker-compose*.yml'
+              - 'syslog-ng.conf'
+              - 'syslog-ng.d/**'
+              - '.github/workflows/ci.yml'
+            docker_backend:
+              - 'backend/Dockerfile'
+              - 'backend/**'
+              - 'pkg/**'
+              - '.dockerignore'
+              - 'scripts/ci-docker-build.sh'
+              - 'docker-compose.yml'
+              - '.github/workflows/ci.yml'
+            docker_stats:
+              - 'stats-collector/Dockerfile'
+              - 'stats-collector/**'
+              - 'pkg/**'
+              - '.dockerignore'
+              - 'scripts/ci-docker-build.sh'
+              - 'docker-compose.yml'
+              - '.github/workflows/ci.yml'
+            docker_frontend:
+              - 'frontend/Dockerfile'
+              - 'frontend/**'
+              - '.dockerignore'
+              - 'scripts/ci-docker-build.sh'
+              - 'docker-compose.yml'
+              - '.github/workflows/ci.yml'
+
+      - name: set job gates
+        id: gates
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BACKEND: ${{ steps.filter.outputs.backend }}
+          FRONTEND: ${{ steps.filter.outputs.frontend }}
+          STATS: ${{ steps.filter.outputs.stats }}
+          CHCONN: ${{ steps.filter.outputs.chconn }}
+          SYSLOGNGSTATS: ${{ steps.filter.outputs.syslogngstats }}
+          GOVULNCHECK: ${{ steps.filter.outputs.govulncheck }}
+          INTEGRATION: ${{ steps.filter.outputs.integration }}
+          SHELL: ${{ steps.filter.outputs.shell }}
+          DOCKER_BACKEND: ${{ steps.filter.outputs.docker_backend }}
+          DOCKER_STATS: ${{ steps.filter.outputs.docker_stats }}
+          DOCKER_FRONTEND: ${{ steps.filter.outputs.docker_frontend }}
+        run: |
+          set -euo pipefail
+          emit() { printf '%s=%s\n' "$1" "$2" >> "$GITHUB_OUTPUT"; }
+          if [[ "$EVENT_NAME" != "pull_request" ]]; then
+            for k in backend frontend stats chconn syslogngstats govulncheck integration shell; do
+              emit "$k" true
+            done
+            emit docker_any true
+            emit docker_images '["backend","stats-collector","frontend"]'
+            exit 0
+          fi
+          emit backend "${BACKEND:-false}"
+          emit frontend "${FRONTEND:-false}"
+          emit stats "${STATS:-false}"
+          emit chconn "${CHCONN:-false}"
+          emit syslogngstats "${SYSLOGNGSTATS:-false}"
+          emit govulncheck "${GOVULNCHECK:-false}"
+          emit integration "${INTEGRATION:-false}"
+          emit shell "${SHELL:-false}"
+          imgs=()
+          [[ "${DOCKER_BACKEND:-false}" == "true" ]] && imgs+=("backend")
+          [[ "${DOCKER_STATS:-false}" == "true" ]] && imgs+=("stats-collector")
+          [[ "${DOCKER_FRONTEND:-false}" == "true" ]] && imgs+=("frontend")
+          if ((${#imgs[@]} == 0)); then
+            # Dummy matrix: GHA still parses fromJSON when the job is skipped.
+            emit docker_any false
+            emit docker_images '["backend"]'
+          else
+            json=$(printf '"%s",' "${imgs[@]}")
+            emit docker_any true
+            emit docker_images "[${json%,}]"
+          fi
+
   release-contract:
     name: release contract (VERSION / OpenAPI / CHANGELOG)
     runs-on: ubuntu-latest
@@ -23,6 +173,8 @@ jobs:
 
   shellcheck:
     name: shellcheck (deploy / start / scripts)
+    needs: changes
+    if: needs.changes.outputs.shell == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -37,6 +189,8 @@ jobs:
 
   backend:
     name: backend (test + lint)
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -101,6 +255,8 @@ jobs:
 
   chconn:
     name: pkg/chconn (test)
+    needs: changes
+    if: needs.changes.outputs.chconn == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -121,6 +277,8 @@ jobs:
 
   syslogngstats:
     name: pkg/syslogngstats (test)
+    needs: changes
+    if: needs.changes.outputs.syslogngstats == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -139,6 +297,8 @@ jobs:
 
   backend-integration:
     name: backend (clickhouse integration)
+    needs: changes
+    if: needs.changes.outputs.integration == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -227,6 +387,8 @@ jobs:
 
   stats-collector:
     name: stats-collector (test + lint)
+    needs: changes
+    if: needs.changes.outputs.stats == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -262,6 +424,8 @@ jobs:
 
   govulncheck:
     name: govulncheck (Go modules)
+    needs: changes
+    if: needs.changes.outputs.govulncheck == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -287,12 +451,14 @@ jobs:
 
   docker-images:
     name: docker (${{ matrix.image }})
+    needs: changes
+    if: needs.changes.outputs.docker_any == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
-        image: [backend, stats-collector, frontend]
+        image: ${{ fromJSON(needs.changes.outputs.docker_images) }}
     steps:
       - uses: actions/checkout@v5
 
@@ -341,6 +507,8 @@ jobs:
 
   frontend:
     name: frontend (build + test)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:

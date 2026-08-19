@@ -3,10 +3,20 @@ name: Hadolint
 on:
   push:
     branches: ["main"]
+    paths:
+      - "**/Dockerfile"
+      - ".github/workflows/hadolint.yml"
   pull_request:
     branches: ["main"]
+    paths:
+      - "**/Dockerfile"
+      - ".github/workflows/hadolint.yml"
   schedule:
     - cron: "15 7 * * 0"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
