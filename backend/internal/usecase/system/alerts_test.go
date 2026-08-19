@@ -128,6 +128,53 @@ func TestComputeAlertsQueueBytes(t *testing.T) {
 	}
 }
 
+func TestComputeAlertsBufferHighNeedsPressureSignal(t *testing.T) {
+	base := SystemStatsResponse{
+		Pipeline: map[string]map[string]float64{
+			"ingest": {
+				"buffered_lines": 25000,
+				"queue_depth":     2500,
+				"queue_capacity":  200000,
+				"lag_sec":         12,
+				"dropped_total":   0,
+			},
+			"rate": {"drops_per_sec": 0, "buffer_drops_per_sec": 0},
+		},
+		Health: map[string]map[string]any{}, Containers: map[string]map[string]float64{}, Storage: map[string]map[string]float64{},
+	}
+	if alerts := computeAlerts(base); hasAlertCode(alerts, "ingest_buffer_high") || hasAlertCode(alerts, "ingest_buffer_critical") {
+		t.Fatalf("buffer-only backlog should not alert, got %#v", alerts)
+	}
+
+	base.Pipeline["ingest"]["lag_sec"] = 20
+	if alerts := computeAlerts(base); !hasAlertCode(alerts, "ingest_buffer_high") {
+		t.Fatalf("expected ingest_buffer_high with lag pressure, got %#v", alerts)
+	}
+}
+
+func TestComputeAlertsBufferCriticalNeedsPressureSignal(t *testing.T) {
+	base := SystemStatsResponse{
+		Pipeline: map[string]map[string]float64{
+			"ingest": {
+				"buffered_lines": 120000,
+				"queue_depth":     5000,
+				"queue_capacity":  200000,
+				"lag_sec":         10,
+			},
+			"rate": {"drops_per_sec": 0, "buffer_drops_per_sec": 0},
+		},
+		Health: map[string]map[string]any{}, Containers: map[string]map[string]float64{}, Storage: map[string]map[string]float64{},
+	}
+	if alerts := computeAlerts(base); hasAlertCode(alerts, "ingest_buffer_critical") {
+		t.Fatalf("buffer-only critical backlog should not alert, got %#v", alerts)
+	}
+
+	base.Pipeline["ingest"]["queue_depth"] = 25000
+	if alerts := computeAlerts(base); !hasAlertCode(alerts, "ingest_buffer_critical") {
+		t.Fatalf("expected ingest_buffer_critical with queue pressure, got %#v", alerts)
+	}
+}
+
 func TestClassifyIngestHealthy(t *testing.T) {
 	st, reasons, _ := classifyIngest(IngestSnapshot{
 		State: "running", QueueDepth: 10, QueueCapacity: 1000,

@@ -2,6 +2,22 @@ package system
 
 import "strconv"
 
+func ingestBufferPressure(buffered, depth, capacity, lag, dropsPerSec, bufferDropsPerSec, circuitOpen float64, slo IngestSLO) string {
+	queueRatio := 0.0
+	if capacity > 0 {
+		queueRatio = depth / capacity
+	}
+
+	switch {
+	case buffered > slo.BufferCriticalLines && (queueRatio >= 0.10 || lag >= slo.LagWarnSec/2 || dropsPerSec > 0 || bufferDropsPerSec > 0 || circuitOpen >= 1):
+		return "critical"
+	case buffered > slo.BufferWarnLines && (queueRatio >= 0.05 || lag >= slo.LagWarnSec/4 || dropsPerSec > 0 || bufferDropsPerSec > 0 || circuitOpen >= 1):
+		return "warn"
+	default:
+		return ""
+	}
+}
+
 func alertLevel(alerts []Alert) string {
 	level := "ok"
 	for _, alert := range alerts {
@@ -47,9 +63,25 @@ func computeAlertsWithSLO(stats SystemStatsResponse, slo IngestSLO) []Alert {
 		}
 	}
 	if pipeline, ok := stats.Pipeline["ingest"]; ok {
-		if buffered := pipeline["buffered_lines"]; buffered > slo.BufferCriticalLines {
+		dropsPerSec := 0.0
+		bufferDropsPerSec := 0.0
+		if rate, ok := stats.Pipeline["rate"]; ok {
+			dropsPerSec = rate["drops_per_sec"]
+			bufferDropsPerSec = rate["buffer_drops_per_sec"]
+		}
+		switch ingestBufferPressure(
+			pipeline["buffered_lines"],
+			pipeline["queue_depth"],
+			pipeline["queue_capacity"],
+			pipeline["lag_sec"],
+			dropsPerSec,
+			bufferDropsPerSec,
+			pipeline["circuit_open"],
+			slo,
+		) {
+		case "critical":
 			alerts = append(alerts, Alert{Level: "error", Code: "ingest_buffer_critical", Target: "ingest", Message: "Ingest buffer is critically full"})
-		} else if buffered > slo.BufferWarnLines {
+		case "warn":
 			alerts = append(alerts, Alert{Level: "warn", Code: "ingest_buffer_high", Target: "ingest", Message: "Ingest buffer is filling up"})
 		}
 		depth, capacity := pipeline["queue_depth"], pipeline["queue_capacity"]
@@ -69,12 +101,6 @@ func computeAlertsWithSLO(stats SystemStatsResponse, slo IngestSLO) []Alert {
 			} else if br >= slo.QueueWarnRatio {
 				alerts = append(alerts, Alert{Level: "warn", Code: "ingest_queue_bytes_high", Target: "ingest", Message: "Ingest queue byte budget filling up (approaching SLO)"})
 			}
-		}
-		dropsPerSec := 0.0
-		bufferDropsPerSec := 0.0
-		if rate, ok := stats.Pipeline["rate"]; ok {
-			dropsPerSec = rate["drops_per_sec"]
-			bufferDropsPerSec = rate["buffer_drops_per_sec"]
 		}
 		switch {
 		case dropsPerSec >= slo.DropsCriticalPerSec:

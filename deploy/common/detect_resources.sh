@@ -89,7 +89,8 @@ profile_params() {
         tiny)
             CH_MEM_GB=2; CH_CPUS=1
             BE_MEM_GB=1; BE_CPUS=1
-            BE_WORKERS=1; BE_QUEUE=50000; BE_BATCH=3000; BE_FLUSH=3
+            # Tiny: минимизируем churn частей; пусть ingest буферизует короткие bursts.
+            BE_WORKERS=1; BE_QUEUE=50000; BE_BATCH=5000; BE_FLUSH=5
             BE_CH_CONNS=1
             # 2×fifo сообщений в RAM (flow-control-window) + ~80 MiB процесс.
             SYSLOG_MEM_MB=512; SYSLOG_CPUS=1
@@ -97,11 +98,11 @@ profile_params() {
             SYSLOG_UDP_RCVBUF=16777216; SYSLOG_IW_SIZE=1000
             ;;
         small)
-            # 4 CPU / 8 GiB: ClickHouse — узкое место INSERT.
-            # Меньше concurrent INSERT + крупнее batch; raw не пишем (см. InsertTrafficLogs).
+            # 4 CPU / 8 GiB: CH чаще упирается в inserts/merges, чем ingest.
+            # Держим умеренный параллелизм и более редкие flush, чтобы не плодить мелкие parts.
             CH_MEM_GB=3; CH_CPUS=3
             BE_MEM_GB=2; BE_CPUS=2
-            BE_WORKERS=2; BE_QUEUE=200000; BE_BATCH=20000; BE_FLUSH=1
+            BE_WORKERS=2; BE_QUEUE=200000; BE_BATCH=20000; BE_FLUSH=5
             BE_CH_CONNS=2
             # 2×fifo сообщений в RAM (flow-control-window) + ~80 MiB процесс.
             SYSLOG_MEM_MB=768; SYSLOG_CPUS=1
@@ -111,8 +112,8 @@ profile_params() {
         medium)
             CH_MEM_GB=6; CH_CPUS=4
             BE_MEM_GB=4; BE_CPUS=3
-            BE_WORKERS=3; BE_QUEUE=300000; BE_BATCH=20000; BE_FLUSH=1
-            BE_CH_CONNS=3
+            BE_WORKERS=2; BE_QUEUE=300000; BE_BATCH=25000; BE_FLUSH=4
+            BE_CH_CONNS=2
             SYSLOG_MEM_MB=1024; SYSLOG_CPUS=2
             SYSLOG_FIFO=50000; SYSLOG_MEM_BUF=100663296; SYSLOG_DISK_BUF=1073741824
             SYSLOG_UDP_RCVBUF=67108864; SYSLOG_IW_SIZE=4000
@@ -120,8 +121,8 @@ profile_params() {
         large)
             CH_MEM_GB=12; CH_CPUS=8
             BE_MEM_GB=8; BE_CPUS=6
-            BE_WORKERS=4; BE_QUEUE=500000; BE_BATCH=30000; BE_FLUSH=1
-            BE_CH_CONNS=4
+            BE_WORKERS=3; BE_QUEUE=500000; BE_BATCH=30000; BE_FLUSH=3
+            BE_CH_CONNS=3
             SYSLOG_MEM_MB=2048; SYSLOG_CPUS=3
             SYSLOG_FIFO=100000; SYSLOG_MEM_BUF=201326592; SYSLOG_DISK_BUF=2147483648
             SYSLOG_UDP_RCVBUF=134217728; SYSLOG_IW_SIZE=8000
@@ -129,8 +130,8 @@ profile_params() {
         xlarge)
             CH_MEM_GB=24; CH_CPUS=16
             BE_MEM_GB=16; BE_CPUS=12
-            BE_WORKERS=6; BE_QUEUE=750000; BE_BATCH=40000; BE_FLUSH=1
-            BE_CH_CONNS=6
+            BE_WORKERS=4; BE_QUEUE=750000; BE_BATCH=40000; BE_FLUSH=2
+            BE_CH_CONNS=4
             SYSLOG_MEM_MB=4096; SYSLOG_CPUS=4
             SYSLOG_FIFO=200000; SYSLOG_MEM_BUF=402653184; SYSLOG_DISK_BUF=4294967296
             SYSLOG_UDP_RCVBUF=134217728; SYSLOG_IW_SIZE=16000
