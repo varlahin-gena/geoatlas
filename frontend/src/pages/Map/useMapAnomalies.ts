@@ -5,11 +5,57 @@ import { usePolling } from '@/lib/usePolling';
 import type { AnomalyMapLink } from '@/api/anomalies';
 import type { MapActionFilter, MapViewState } from './mapQuery';
 
-export function anomalyMapToView(link: AnomalyMapLink | undefined): Partial<MapViewState> {
+const PERIOD_TO_MS: Record<string, number> = {
+  '15m': 15 * 60_000,
+  '30m': 30 * 60_000,
+  '1h': 60 * 60_000,
+  '3h': 3 * 60 * 60_000,
+  '6h': 6 * 60 * 60_000,
+  '12h': 12 * 60 * 60_000,
+  '1d': 24 * 60 * 60_000,
+  '3d': 3 * 24 * 60 * 60_000,
+  '7d': 7 * 24 * 60 * 60_000,
+  '14d': 14 * 24 * 60 * 60_000,
+  '30d': 30 * 24 * 60 * 60_000,
+};
+
+function pickPeriodAtLeast(ms: number): string {
+  for (const [period, size] of Object.entries(PERIOD_TO_MS)) {
+    if (size >= ms) return period;
+  }
+  return '30d';
+}
+
+function resolveAnomalyPeriod(item: AnomalyEvent | undefined, currentPeriod: string | undefined): string {
+  const linkedPeriod = item?.map?.period || '1h';
+  if (currentPeriod === 'custom') return 'custom';
+  const linkedMs = PERIOD_TO_MS[linkedPeriod] || PERIOD_TO_MS['1h'];
+  const currentMs = PERIOD_TO_MS[currentPeriod || ''] || 0;
+  const detectedAt = Date.parse(item?.detected_at || '');
+  const windowStart = Date.parse(item?.window_start || '');
+  const windowEnd = Date.parse(item?.window_end || '');
+  let requiredMs = linkedMs;
+
+  if (Number.isFinite(windowStart) && Number.isFinite(windowEnd) && windowEnd > windowStart) {
+    requiredMs = Math.max(requiredMs, windowEnd - windowStart);
+  }
+  if (Number.isFinite(detectedAt)) {
+    const ageMs = Math.max(0, Date.now() - detectedAt);
+    requiredMs = Math.max(requiredMs, ageMs + linkedMs);
+  }
+
+  return pickPeriodAtLeast(Math.max(currentMs, requiredMs));
+}
+
+export function anomalyMapToView(
+  item: AnomalyEvent | undefined,
+  currentPeriod?: string,
+): Partial<MapViewState> {
+  const link = item?.map;
   if (!link) return {};
   const filter = (link.filter || 'all') as MapActionFilter;
   return {
-    period: link.period || '1h',
+    period: resolveAnomalyPeriod(item, currentPeriod),
     groupBy: link.group || 'ip',
     filter: filter === 'allowed' || filter === 'blocked' ? filter : 'all',
     search: link.q || '',

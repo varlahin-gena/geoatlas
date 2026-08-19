@@ -432,7 +432,7 @@ export default function MapPage() {
                 onClose={() => anomalies.setOpen(false)}
                 onShow={(item) => {
                   anomalies.setActive(item);
-                  applyView(anomalyMapToView(item.map));
+                  applyView(anomalyMapToView(item, period));
                   anomalies.setOpen(false);
                 }}
                 onAck={(fp) => {
