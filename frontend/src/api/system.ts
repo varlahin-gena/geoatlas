@@ -2,16 +2,20 @@ import { apiDelete, apiFetch, apiGet, apiGetQuery, apiPath, apiPost, apiPut } fr
 import type { SystemVersion } from './types';
 import type { components } from './openapi';
 import type {
+  AuditEvent,
   BackupCatalog,
   BackupSchedule,
+  DREvent,
   HistoryPayload,
   Retention,
   SystemStats,
 } from './systemTypes';
 
 export type {
+  AuditEvent,
   BackupCatalog,
   BackupSchedule,
+  DREvent,
   HistoryPayload,
   Retention,
   SystemStats,
@@ -46,6 +50,26 @@ export function fetchSystemHistory(period: string): Promise<HistoryPayload> {
 
 export function fetchBackups(): Promise<BackupCatalog> {
   return apiGet('/api/system/backups') as Promise<BackupCatalog>;
+}
+
+export function fetchDRHistory(query?: {
+  since?: string;
+  limit?: number;
+  action?: string;
+  status?: string;
+  actor?: string;
+}): Promise<{ items?: DREvent[] }> {
+  return apiGetQuery('/api/dr/history', query || {}) as Promise<{ items?: DREvent[] }>;
+}
+
+export function fetchAuditLog(query?: {
+  since?: string;
+  limit?: number;
+  action?: string;
+  result?: string;
+  actor?: string;
+}): Promise<{ items?: AuditEvent[] }> {
+  return apiGetQuery('/api/audit', query || {}) as Promise<{ items?: AuditEvent[] }>;
 }
 
 export function createBackup(): Promise<unknown> {

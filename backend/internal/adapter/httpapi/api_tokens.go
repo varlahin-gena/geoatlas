@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"network_monitor/internal/auth"
+	usecaseaudit "network_monitor/internal/usecase/auditlog"
 )
 
 // APITokensHandler — CRUD именованных Bearer-токенов со scope.
@@ -36,9 +37,27 @@ func (h *APITokensHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	pub, plain, err := h.apiTokens.Create(body.Name, body.Scope)
 	if err != nil {
+		writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
+			Actor:        actorFromRequest(r),
+			Action:       "auth.token.create",
+			ResourceType: "api_token",
+			ResourceID:   body.Name,
+			Result:       "failed",
+			IP:           clientIPFromRequest(r),
+			Details:      map[string]any{"error": err.Error(), "scope": body.Scope},
+		})
 		writeTokenStoreError(w, err)
 		return
 	}
+	writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
+		Actor:        actorFromRequest(r),
+		Action:       "auth.token.create",
+		ResourceType: "api_token",
+		ResourceID:   pub.ID,
+		Result:       "succeeded",
+		IP:           clientIPFromRequest(r),
+		Details:      map[string]any{"name": pub.Name, "scope": pub.Scope},
+	})
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"token":  pub,
 		"secret": plain, // plaintext только при создании
@@ -52,9 +71,26 @@ func (h *APITokensHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 	}
 	id := r.PathValue("id")
 	if err := h.apiTokens.Revoke(id); err != nil {
+		writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
+			Actor:        actorFromRequest(r),
+			Action:       "auth.token.revoke",
+			ResourceType: "api_token",
+			ResourceID:   id,
+			Result:       "failed",
+			IP:           clientIPFromRequest(r),
+			Details:      map[string]any{"error": err.Error()},
+		})
 		writeTokenStoreError(w, err)
 		return
 	}
+	writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
+		Actor:        actorFromRequest(r),
+		Action:       "auth.token.revoke",
+		ResourceType: "api_token",
+		ResourceID:   id,
+		Result:       "succeeded",
+		IP:           clientIPFromRequest(r),
+	})
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 

@@ -8,6 +8,7 @@ import (
 	"network_monitor/internal/adapter/backupfs"
 	"network_monitor/internal/adapter/backupjob"
 	"network_monitor/internal/adapter/backupschedulefile"
+	"network_monitor/internal/adapter/clickhouse/auditstore"
 	"network_monitor/internal/adapter/clickhouse/anomalystore"
 	"network_monitor/internal/adapter/clickhouse/backupstore"
 	"network_monitor/internal/adapter/clickhouse/geostore"
@@ -22,6 +23,7 @@ import (
 	"network_monitor/internal/installprofile"
 	"network_monitor/internal/parser"
 	usecaseanomaly "network_monitor/internal/usecase/anomaly"
+	usecaseaudit "network_monitor/internal/usecase/auditlog"
 	usecaseauth "network_monitor/internal/usecase/auth"
 	usecasebackup "network_monitor/internal/usecase/backup"
 	usecaseevents "network_monitor/internal/usecase/events"
@@ -46,6 +48,8 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 	parseTestAdapter := parseradapter.NewParseTest(parsers)
 	parseTestUC := parsetest.New(parseTestAdapter, bg.geo, parseTestAdapter)
 	systemRepo := sysstore.NewSystemRepository(a.pools.API)
+	logRepo := auditstore.New(a.pools.API)
+	logsUC := usecaseaudit.New(logRepo)
 	systemUC := usecasesystem.New(usecasesystem.Dependencies{
 		Metrics:            systemRepo,
 		Edges:              systemRepo,
@@ -72,6 +76,7 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 	}
 	schedStore := backupschedulefile.New(cfg.BackupScheduleFile, usecasebackup.DefaultsSchedule(opts))
 	backupUC := usecasebackup.New(opts, backupstore.NewBackupRunner(a.pools.Background), backupfs.New(cfg.BackupDir), schedStore)
+	backupUC.SetLogService(logsUC)
 	a.backupJobs = backupjob.NewFromService(backupUC, time.Minute)
 
 	var anomalyUC *usecaseanomaly.Service
@@ -115,5 +120,6 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 		Sessions:      auth.sessions,
 		APITokens:     auth.apiTokens,
 		AnomalyUC:     anomalyUC,
+		Logs:          logsUC,
 	}, httpapi.WithMetrics(a.prom))
 }

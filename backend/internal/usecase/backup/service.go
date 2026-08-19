@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
 
 	"network_monitor/internal/apperr"
+	usecaseaudit "network_monitor/internal/usecase/auditlog"
 )
 
 var (
@@ -111,6 +113,8 @@ type Service struct {
 	store    Store
 	schedule ScheduleStore
 	job      *Job
+	drLog    *usecaseaudit.Service
+	auditLog *usecaseaudit.Service
 
 	mu           sync.Mutex
 	lastFireDate string // in-memory dedupe на случай гонки тика
@@ -127,6 +131,14 @@ func New(opts Options, runner Runner, store Store, schedule ScheduleStore) *Serv
 		schedule: schedule,
 		job:      NewJob(),
 	}
+}
+
+func (s *Service) SetLogService(logs *usecaseaudit.Service) {
+	if s == nil {
+		return
+	}
+	s.drLog = logs
+	s.auditLog = logs
 }
 
 func (s *Service) Catalog() (Catalog, error) {
@@ -222,15 +234,18 @@ func (s *Service) GetSchedule() (Schedule, error) {
 	return normalized, nil
 }
 
-func (s *Service) UpdateSchedule(in Schedule) (Schedule, error) {
+func (s *Service) UpdateSchedule(in Schedule, actor string) (Schedule, error) {
 	if s == nil || s.schedule == nil {
 		return Schedule{}, ErrUnavailable
 	}
+	prev, _ := s.GetSchedule()
 	out, err := ValidateSchedule(in)
 	if err != nil {
+		s.logBackupMutation(actor, "backup.schedule.update", "backup_schedule", "schedule", "failed", map[string]any{
+			"error": err.Error(),
+		})
 		return Schedule{}, err
 	}
-	prev, _ := s.GetSchedule()
 	out.LastRunAt = prev.LastRunAt
 	out.LastRunDate = prev.LastRunDate
 	// Смена слота — разрешить новый прогон сегодня (иначе «Последний авто» блокирует догон).
@@ -240,8 +255,36 @@ func (s *Service) UpdateSchedule(in Schedule) (Schedule, error) {
 	}
 	out.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 	if err := s.schedule.Save(out); err != nil {
+		s.logBackupMutation(actor, "backup.schedule.update", "backup_schedule", "schedule", "failed", map[string]any{
+			"error": err.Error(),
+		})
 		return Schedule{}, err
 	}
+	s.logDREvent(context.Background(), usecaseaudit.DREvent{
+		Actor:   safeActor(actor),
+		Action:  "backup.schedule.update",
+		Target:  "schedule",
+		Status:  "succeeded",
+		Message: "backup schedule updated",
+		Meta: map[string]any{
+			"enabled":       out.Enabled,
+			"hour":          out.Hour,
+			"minute":        out.Minute,
+			"timezone":      out.Timezone,
+			"keep":          out.Keep,
+			"include_edges": out.IncludeEdges,
+			"include_auth":  out.IncludeAuth,
+		},
+	})
+	s.logBackupMutation(actor, "backup.schedule.update", "backup_schedule", "schedule", "succeeded", map[string]any{
+		"enabled":       out.Enabled,
+		"hour":          out.Hour,
+		"minute":        out.Minute,
+		"timezone":      out.Timezone,
+		"keep":          out.Keep,
+		"include_edges": out.IncludeEdges,
+		"include_auth":  out.IncludeAuth,
+	})
 	return out, nil
 }
 
@@ -266,7 +309,7 @@ func (s *Service) TickAutoCreate(parent context.Context, now time.Time) {
 	s.lastFireDate = dateKey
 	s.mu.Unlock()
 
-	if err := s.ScheduleCreate(parent, SourceSchedule); err != nil {
+		if err := s.ScheduleCreate(parent, SourceSchedule, "scheduler"); err != nil {
 		// ErrBusy / недоступность — снимем dedupe, чтобы тикер догнал позже сегодня.
 		s.clearLastFireDate()
 		return
@@ -332,7 +375,7 @@ func (s *Service) persistScheduleRun(now time.Time) {
 
 // ScheduleCreate ставит полный бэкап в очередь (не блокирует HTTP).
 // source: manual | schedule.
-func (s *Service) ScheduleCreate(parent context.Context, source string) error {
+func (s *Service) ScheduleCreate(parent context.Context, source string, actor string) error {
 	if err := s.readyForJob(); err != nil {
 		return err
 	}
@@ -349,13 +392,13 @@ func (s *Service) ScheduleCreate(parent context.Context, source string) error {
 	ctx, cancel := detachContext(parent, 2*time.Hour)
 	go func() {
 		defer cancel()
-		s.runCreate(ctx, src)
+		s.runCreate(ctx, src, actor)
 	}()
 	return nil
 }
 
 // ScheduleAttach: RESTORE map-таблиц в nm_bak_* (live не трогаем).
-func (s *Service) ScheduleAttach(parent context.Context, name string) error {
+func (s *Service) ScheduleAttach(parent context.Context, name string, actor string) error {
 	if err := s.readyForJob(); err != nil {
 		return err
 	}
@@ -368,13 +411,13 @@ func (s *Service) ScheduleAttach(parent context.Context, name string) error {
 	ctx, cancel := detachContext(parent, 2*time.Hour)
 	go func() {
 		defer cancel()
-		s.runAttach(ctx, name)
+		s.runAttach(ctx, name, actor)
 	}()
 	return nil
 }
 
 // ScheduleDetach: DROP nm_bak_*; бэкап на диске и live остаются.
-func (s *Service) ScheduleDetach(parent context.Context, name string) error {
+func (s *Service) ScheduleDetach(parent context.Context, name string, actor string) error {
 	if err := s.readyForJob(); err != nil {
 		return err
 	}
@@ -391,13 +434,13 @@ func (s *Service) ScheduleDetach(parent context.Context, name string) error {
 	ctx, cancel := detachContext(parent, 30*time.Minute)
 	go func() {
 		defer cancel()
-		s.runDetach(ctx, name)
+		s.runDetach(ctx, name, actor)
 	}()
 	return nil
 }
 
 // DeleteBackup удаляет файлы бэкапа с тома (нельзя, если он подключён).
-func (s *Service) DeleteBackup(name string) error {
+func (s *Service) DeleteBackup(name string, actor string) error {
 	if s == nil || s.store == nil {
 		return ErrUnavailable
 	}
@@ -420,7 +463,26 @@ func (s *Service) DeleteBackup(name string) error {
 	if !s.store.Exists(name) {
 		return ErrNotFound
 	}
-	return s.store.Delete(name)
+	if err := s.store.Delete(name); err != nil {
+		s.logDREvent(context.Background(), usecaseaudit.DREvent{
+			Actor:   safeActor(actor),
+			Action:  "backup.delete",
+			Target:  name,
+			Status:  "failed",
+			Message: err.Error(),
+		})
+		s.logBackupMutation(actor, "backup.delete", "backup", name, "failed", map[string]any{"error": err.Error()})
+		return err
+	}
+	s.logDREvent(context.Background(), usecaseaudit.DREvent{
+		Actor:   safeActor(actor),
+		Action:  "backup.delete",
+		Target:  name,
+		Status:  "succeeded",
+		Message: "backup deleted",
+	})
+	s.logBackupMutation(actor, "backup.delete", "backup", name, "succeeded", nil)
+	return nil
 }
 
 func (s *Service) readyForJob() error {
@@ -445,7 +507,7 @@ func (s *Service) effectivePolicy() (keep int, includeEdges, includeAuth bool) {
 	return sch.Keep, sch.IncludeEdges, sch.IncludeAuth
 }
 
-func (s *Service) runCreate(ctx context.Context, source string) {
+func (s *Service) runCreate(ctx context.Context, source string, actor string) {
 	defer s.job.Finish()
 	succeeded := false
 	defer func() {
@@ -464,16 +526,26 @@ func (s *Service) runCreate(ctx context.Context, source string) {
 		name = FormatBackupName(time.Now(), sch.Timezone)
 	}
 	s.job.SetRunning(name, "backup started")
+	s.logDREvent(ctx, usecaseaudit.DREvent{
+		Actor:   safeActor(actor),
+		Action:  "backup.create",
+		Target:  name,
+		Status:  "started",
+		Message: "backup started",
+		Meta:    map[string]any{"source": source},
+	})
 
 	keep, includeEdges, includeAuth := s.effectivePolicy()
 
 	tables, err := s.resolveTables(ctx, includeEdges)
 	if err != nil {
 		s.job.SetError(name, err.Error())
+		s.logBackupFailure(ctx, actor, "backup.create", name, err)
 		return
 	}
 	if len(tables) == 0 {
 		s.job.SetError(name, "no tables to back up")
+		s.logBackupFailure(ctx, actor, "backup.create", name, errors.New("no tables to back up"))
 		return
 	}
 
@@ -481,9 +553,11 @@ func (s *Service) runCreate(ctx context.Context, source string) {
 	if err := s.runner.BackupTables(ctx, name, tables); err != nil {
 		if ctx.Err() != nil {
 			s.job.SetError(name, "canceled")
+			s.logBackupFailure(ctx, actor, "backup.create", name, errors.New("canceled"))
 			return
 		}
 		s.job.SetError(name, err.Error())
+		s.logBackupFailure(ctx, actor, "backup.create", name, err)
 		return
 	}
 
@@ -491,6 +565,7 @@ func (s *Service) runCreate(ctx context.Context, source string) {
 		s.job.SetRunning(name, "auth tarball…")
 		if err := s.store.WriteAuthTarball(name, s.opts.DataDir); err != nil {
 			s.job.SetError(name, "auth tarball: "+err.Error())
+			s.logBackupFailure(ctx, actor, "backup.create", name, err)
 			return
 		}
 	}
@@ -501,14 +576,42 @@ func (s *Service) runCreate(ctx context.Context, source string) {
 
 	if err := s.store.Prune(keep); err != nil {
 		s.job.SetError(name, "prune: "+err.Error())
+		s.logBackupFailure(ctx, actor, "backup.create", name, err)
 		return
 	}
 	s.job.SetOK(name, "done")
+	s.logDREvent(ctx, usecaseaudit.DREvent{
+		Actor:   safeActor(actor),
+		Action:  "backup.create",
+		Target:  name,
+		Status:  "succeeded",
+		Message: "backup created",
+		Meta: map[string]any{
+			"source":        source,
+			"keep":          keep,
+			"include_edges": includeEdges,
+			"include_auth":  includeAuth,
+			"tables":        tables,
+		},
+	})
+	s.logBackupMutation(actor, "backup.create", "backup", name, "succeeded", map[string]any{
+		"source":        source,
+		"keep":          keep,
+		"include_edges": includeEdges,
+		"include_auth":  includeAuth,
+	})
 }
 
-func (s *Service) runAttach(ctx context.Context, name string) {
+func (s *Service) runAttach(ctx context.Context, name string, actor string) {
 	defer s.job.Finish()
 	s.job.SetRunning(name, "RESTORE в nm_bak_*…")
+	s.logDREvent(ctx, usecaseaudit.DREvent{
+		Actor:   safeActor(actor),
+		Action:  "backup.attach",
+		Target:  name,
+		Status:  "started",
+		Message: "backup attach started",
+	})
 
 	if err := s.runner.RestoreMapShadow(ctx, name); err != nil {
 		_ = s.store.SetAttached("")
@@ -517,32 +620,104 @@ func (s *Service) runAttach(ctx context.Context, name string) {
 		dropCancel()
 		if ctx.Err() != nil {
 			s.job.SetError(name, "canceled")
+			s.logBackupFailure(ctx, actor, "backup.attach", name, errors.New("canceled"))
 			return
 		}
 		s.job.SetError(name, err.Error())
+		s.logBackupFailure(ctx, actor, "backup.attach", name, err)
 		return
 	}
 
 	if err := s.store.SetAttached(name); err != nil {
 		s.job.SetError(name, "marker: "+err.Error())
+		s.logBackupFailure(ctx, actor, "backup.attach", name, err)
 		return
 	}
 	s.job.SetOK(name, "подключён — смотрите на карте источник «Бэкап»; live не изменён")
+	s.logDREvent(ctx, usecaseaudit.DREvent{
+		Actor:   safeActor(actor),
+		Action:  "backup.attach",
+		Target:  name,
+		Status:  "succeeded",
+		Message: "backup attached",
+	})
+	s.logBackupMutation(actor, "backup.attach", "backup", name, "succeeded", nil)
 }
 
-func (s *Service) runDetach(ctx context.Context, name string) {
+func (s *Service) runDetach(ctx context.Context, name string, actor string) {
 	defer s.job.Finish()
 	s.job.SetRunning(name, "DROP nm_bak_*…")
+	s.logDREvent(ctx, usecaseaudit.DREvent{
+		Actor:   safeActor(actor),
+		Action:  "backup.detach",
+		Target:  name,
+		Status:  "started",
+		Message: "backup detach started",
+	})
 
 	if err := s.runner.DropMapShadow(ctx); err != nil {
 		s.job.SetError(name, "drop: "+err.Error())
+		s.logBackupFailure(ctx, actor, "backup.detach", name, err)
 		return
 	}
 	if err := s.store.SetAttached(""); err != nil {
 		s.job.SetError(name, "marker: "+err.Error())
+		s.logBackupFailure(ctx, actor, "backup.detach", name, err)
 		return
 	}
 	s.job.SetOK(name, "отключён — shadow удалены, live и бэкап на диске на месте")
+	s.logDREvent(ctx, usecaseaudit.DREvent{
+		Actor:   safeActor(actor),
+		Action:  "backup.detach",
+		Target:  name,
+		Status:  "succeeded",
+		Message: "backup detached",
+	})
+	s.logBackupMutation(actor, "backup.detach", "backup", name, "succeeded", nil)
+}
+
+func safeActor(actor string) string {
+	actor = strings.TrimSpace(actor)
+	if actor == "" {
+		return "system"
+	}
+	return actor
+}
+
+func (s *Service) logDREvent(ctx context.Context, e usecaseaudit.DREvent) {
+	if s == nil || s.drLog == nil {
+		return
+	}
+	if err := s.drLog.WriteDR(ctx, e); err != nil {
+		slog.Warn("backup dr log failed", "action", e.Action, "target", e.Target, "err", err)
+	}
+}
+
+func (s *Service) logBackupMutation(actor, action, resourceType, resourceID, result string, details map[string]any) {
+	if s == nil || s.auditLog == nil {
+		return
+	}
+	if err := s.auditLog.WriteAudit(context.Background(), usecaseaudit.AuditEvent{
+		Actor:        safeActor(actor),
+		Action:       action,
+		ResourceType: resourceType,
+		ResourceID:   resourceID,
+		Result:       result,
+		Details:      details,
+	}); err != nil {
+		slog.Warn("backup audit log failed", "action", action, "resource_id", resourceID, "err", err)
+	}
+}
+
+func (s *Service) logBackupFailure(ctx context.Context, actor, action, target string, err error) {
+	s.logDREvent(ctx, usecaseaudit.DREvent{
+		Actor:   safeActor(actor),
+		Action:  action,
+		Target:  target,
+		Status:  "failed",
+		Message: err.Error(),
+	})
+	s.logBackupMutation(actor, action, "backup", target, "failed", map[string]any{"error": err.Error()})
 }
 
 func (s *Service) resolveTables(ctx context.Context, includeEdges bool) ([]string, error) {

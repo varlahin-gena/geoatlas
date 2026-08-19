@@ -1501,6 +1501,74 @@ paths:
         "400":
           description: Невалидные поля
 
+  /api/dr/history:
+    get:
+      tags: [system]
+      summary: DR-history backup и restore операций
+      description: |
+        Только administrator или Bearer. Возвращает append-only журнал backup.create,
+        backup.attach, backup.detach, backup.delete и backup.schedule.update.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: since
+          in: query
+          schema: { type: string, format: date-time }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 100, maximum: 200 }
+        - name: action
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: actor
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: История DR-операций
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DRHistoryList'
+
+  /api/audit:
+    get:
+      tags: [system]
+      summary: Audit log admin/security действий
+      description: |
+        Только administrator или Bearer. Возвращает append-only журнал login/users/tokens/
+        retention/backup действий.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: since
+          in: query
+          schema: { type: string, format: date-time }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 100, maximum: 200 }
+        - name: action
+          in: query
+          schema: { type: string }
+        - name: result
+          in: query
+          schema: { type: string }
+        - name: actor
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Audit log
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogList'
+
   /api/parse-errors:
     get:
       tags: [parse]
@@ -1895,6 +1963,49 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/SystemFailedLogin"
+
+    DREvent:
+      type: object
+      properties:
+        timestamp: { type: string, format: date-time }
+        actor: { type: string }
+        action: { type: string }
+        target: { type: string }
+        status: { type: string, enum: [started, succeeded, failed] }
+        message: { type: string }
+        meta:
+          type: object
+          additionalProperties: true
+
+    DRHistoryList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DREvent"
+
+    AuditEvent:
+      type: object
+      properties:
+        timestamp: { type: string, format: date-time }
+        actor: { type: string }
+        action: { type: string }
+        resource_type: { type: string }
+        resource_id: { type: string }
+        result: { type: string }
+        ip: { type: string }
+        details:
+          type: object
+          additionalProperties: true
+
+    AuditLogList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEvent"
 
     MapPoint:
       type: object

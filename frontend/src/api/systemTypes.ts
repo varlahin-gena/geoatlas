@@ -79,6 +79,27 @@ export interface BackupCatalog {
   hint?: string;
 }
 
+export interface DREvent {
+  timestamp?: string;
+  actor?: string;
+  action?: string;
+  target?: string;
+  status?: 'started' | 'succeeded' | 'failed' | string;
+  message?: string;
+  meta?: Record<string, unknown>;
+}
+
+export interface AuditEvent {
+  timestamp?: string;
+  actor?: string;
+  action?: string;
+  resource_type?: string;
+  resource_id?: string;
+  result?: 'succeeded' | 'failed' | string;
+  ip?: string;
+  details?: Record<string, unknown>;
+}
+
 export interface HistoryPoint {
   t: string;
   v: number;

@@ -9,6 +9,7 @@ import (
 
 	"network_monitor/internal/adapter/httpapi/loginthrottle"
 	"network_monitor/internal/auth"
+	usecaseaudit "network_monitor/internal/usecase/auditlog"
 	usecaseauth "network_monitor/internal/usecase/auth"
 )
 
@@ -122,6 +123,15 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	if !lim.Allow(ip) {
 		lim.RecordFailure(ip, req.Username)
+		writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
+			Actor:        req.Username,
+			Action:       "auth.login.failed",
+			ResourceType: "session",
+			ResourceID:   req.Username,
+			Result:       "failed",
+			IP:           ip,
+			Details:      map[string]any{"reason": "rate_limited"},
+		})
 		writeJSON(w, http.StatusTooManyRequests, map[string]any{"error": "too many attempts"})
 		return
 	}
@@ -129,6 +139,15 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	out, err := h.authUC.Login(req.Username, req.Password)
 	if errors.Is(err, usecaseauth.ErrInvalidCredentials) {
 		lim.RecordFailure(ip, req.Username)
+		writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
+			Actor:        req.Username,
+			Action:       "auth.login.failed",
+			ResourceType: "session",
+			ResourceID:   req.Username,
+			Result:       "failed",
+			IP:           ip,
+			Details:      map[string]any{"reason": "invalid_credentials"},
+		})
 		time.Sleep(200 * time.Millisecond)
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "invalid credentials"})
 		return
@@ -142,6 +161,15 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	lim.RecordSuccess(ip)
+	writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
+		Actor:        out.User.Username,
+		Action:       "auth.login.success",
+		ResourceType: "session",
+		ResourceID:   out.User.Username,
+		Result:       "succeeded",
+		IP:           ip,
+		Details:      map[string]any{"role": out.User.Role},
+	})
 
 	if h.sessions != nil {
 		SetCookie(w, r, out.Token, h.sessions.TTL())
@@ -229,12 +257,29 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	out, err := h.authUC.ChangePassword(sess.Username, req.OldPassword, req.NewPassword)
 	if err != nil {
+		writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
+			Actor:        sess.Username,
+			Action:       "auth.password.change",
+			ResourceType: "user",
+			ResourceID:   sess.Username,
+			Result:       "failed",
+			IP:           clientIPFromRequest(r),
+			Details:      map[string]any{"error": err.Error()},
+		})
 		writeUserStoreError(w, err)
 		return
 	}
 	if h.sessions != nil {
 		SetCookie(w, r, out.Token, h.sessions.TTL())
 	}
+	writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
+		Actor:        sess.Username,
+		Action:       "auth.password.change",
+		ResourceType: "user",
+		ResourceID:   sess.Username,
+		Result:       "succeeded",
+		IP:           clientIPFromRequest(r),
+	})
 	writeJSON(w, http.StatusOK, userPublicResponse(out.User))
 }
 
@@ -264,6 +309,14 @@ func (h *AuthHandler) LogoutAll(w http.ResponseWriter, r *http.Request) {
 		writeUserStoreError(w, err)
 		return
 	}
+	writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
+		Actor:        live.Username,
+		Action:       "auth.session.revoke_all",
+		ResourceType: "user",
+		ResourceID:   live.Username,
+		Result:       "succeeded",
+		IP:           clientIPFromRequest(r),
+	})
 	ClearCookie(w, r)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
@@ -459,9 +512,27 @@ func (h *UsersHandler) Create(w http.ResponseWriter, r *http.Request) {
 		MustResetPassword: *req.MustResetPassword,
 	})
 	if err != nil {
+		writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
+			Actor:        actorFromRequest(r),
+			Action:       "auth.user.create",
+			ResourceType: "user",
+			ResourceID:   req.Username,
+			Result:       "failed",
+			IP:           clientIPFromRequest(r),
+			Details:      map[string]any{"error": err.Error()},
+		})
 		writeUserStoreError(w, err)
 		return
 	}
+	writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
+		Actor:        actorFromRequest(r),
+		Action:       "auth.user.create",
+		ResourceType: "user",
+		ResourceID:   pub.Username,
+		Result:       "succeeded",
+		IP:           clientIPFromRequest(r),
+		Details:      map[string]any{"role": pub.Role, "must_reset_password": pub.MustResetPassword},
+	})
 	writeJSON(w, http.StatusCreated, pub)
 }
 
@@ -483,9 +554,27 @@ func (h *UsersHandler) SetRole(w http.ResponseWriter, r *http.Request) {
 	}
 	pub, err := h.authUC.SetRole(username, req.Role)
 	if err != nil {
+		writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
+			Actor:        actorFromRequest(r),
+			Action:       "auth.user.role_change",
+			ResourceType: "user",
+			ResourceID:   username,
+			Result:       "failed",
+			IP:           clientIPFromRequest(r),
+			Details:      map[string]any{"error": err.Error(), "role": req.Role},
+		})
 		writeUserStoreError(w, err)
 		return
 	}
+	writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
+		Actor:        actorFromRequest(r),
+		Action:       "auth.user.role_change",
+		ResourceType: "user",
+		ResourceID:   pub.Username,
+		Result:       "succeeded",
+		IP:           clientIPFromRequest(r),
+		Details:      map[string]any{"role": pub.Role},
+	})
 	writeJSON(w, http.StatusOK, pub)
 }
 
@@ -507,9 +596,26 @@ func (h *UsersHandler) SetFullName(w http.ResponseWriter, r *http.Request) {
 	}
 	pub, err := h.authUC.SetFullName(username, req.FullName)
 	if err != nil {
+		writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
+			Actor:        actorFromRequest(r),
+			Action:       "auth.user.update",
+			ResourceType: "user",
+			ResourceID:   username,
+			Result:       "failed",
+			IP:           clientIPFromRequest(r),
+			Details:      map[string]any{"error": err.Error()},
+		})
 		writeUserStoreError(w, err)
 		return
 	}
+	writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
+		Actor:        actorFromRequest(r),
+		Action:       "auth.user.update",
+		ResourceType: "user",
+		ResourceID:   pub.Username,
+		Result:       "succeeded",
+		IP:           clientIPFromRequest(r),
+	})
 	writeJSON(w, http.StatusOK, pub)
 }
 
@@ -539,9 +645,27 @@ func (h *UsersHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		MustResetPassword: *req.MustResetPassword,
 	})
 	if err != nil {
+		writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
+			Actor:        actorFromRequest(r),
+			Action:       "auth.password.reset",
+			ResourceType: "user",
+			ResourceID:   username,
+			Result:       "failed",
+			IP:           clientIPFromRequest(r),
+			Details:      map[string]any{"error": err.Error()},
+		})
 		writeUserStoreError(w, err)
 		return
 	}
+	writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
+		Actor:        actorFromRequest(r),
+		Action:       "auth.password.reset",
+		ResourceType: "user",
+		ResourceID:   pub.Username,
+		Result:       "succeeded",
+		IP:           clientIPFromRequest(r),
+		Details:      map[string]any{"must_reset_password": pub.MustResetPassword},
+	})
 	writeJSON(w, http.StatusOK, pub)
 }
 
@@ -561,9 +685,26 @@ func (h *UsersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		actor = sess.Username
 	}
 	if err := h.authUC.DeleteUser(username, actor); err != nil {
+		writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
+			Actor:        actorFromRequest(r),
+			Action:       "auth.user.delete",
+			ResourceType: "user",
+			ResourceID:   username,
+			Result:       "failed",
+			IP:           clientIPFromRequest(r),
+			Details:      map[string]any{"error": err.Error()},
+		})
 		writeUserStoreError(w, err)
 		return
 	}
+	writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
+		Actor:        actorFromRequest(r),
+		Action:       "auth.user.delete",
+		ResourceType: "user",
+		ResourceID:   username,
+		Result:       "succeeded",
+		IP:           clientIPFromRequest(r),
+	})
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 

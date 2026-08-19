@@ -8,6 +8,7 @@ import (
 
 	"network_monitor/internal/adapter/httpapi/loginthrottle"
 	"network_monitor/internal/config"
+	usecaseaudit "network_monitor/internal/usecase/auditlog"
 	usecaseauth "network_monitor/internal/usecase/auth"
 	usecasebackup "network_monitor/internal/usecase/backup"
 	usecaseevents "network_monitor/internal/usecase/events"
@@ -28,6 +29,7 @@ type AuthDeps struct {
 	sessions     SessionParser
 	apiTokens    APITokenStore
 	loginLimiter *loginthrottle.Limiter
+	logs         *usecaseaudit.Service
 }
 
 // SystemDeps — зависимости SystemHandler (system/retention/backup + shared loginLimiter).
@@ -37,6 +39,7 @@ type SystemDeps struct {
 	retentionUC  *usecaseretention.Service
 	backupUC     *usecasebackup.Service
 	loginLimiter *loginthrottle.Limiter
+	logs         *usecaseaudit.Service
 }
 
 // HealthDeps — зависимости HealthHandler (Ready: systemUC + CH pinger).
@@ -108,6 +111,7 @@ type Params struct {
 	APITokens       APITokenStore
 	SearchTemplates SearchTemplatesStore
 	AnomalyUC       *usecaseanomaly.Service
+	Logs            *usecaseaudit.Service
 }
 
 // Deps — композитор HTTP-слоя: domain bags без плоских UC-полей.
@@ -145,6 +149,7 @@ func NewDeps(p Params) *Deps {
 			sessions:     p.Sessions,
 			apiTokens:    p.APITokens,
 			loginLimiter: lim,
+			logs:         p.Logs,
 		},
 		system: &SystemDeps{
 			cfg:          p.Cfg,
@@ -152,6 +157,7 @@ func NewDeps(p Params) *Deps {
 			retentionUC:  p.RetentionUC,
 			backupUC:     p.BackupUC,
 			loginLimiter: lim,
+			logs:         p.Logs,
 		},
 		health:     &HealthDeps{systemUC: p.SystemUC, systemPinger: p.SystemPinger},
 		events:     &EventsDeps{cfg: p.Cfg, eventsUC: p.EventsUC, backupUC: p.BackupUC},

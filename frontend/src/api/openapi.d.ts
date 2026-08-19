@@ -3275,6 +3275,97 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dr/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * DR-history backup и restore операций
+         * @description Только administrator или Bearer. Возвращает append-only журнал backup.create,
+         *     backup.attach, backup.detach, backup.delete и backup.schedule.update.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    since?: string;
+                    limit?: number;
+                    action?: string;
+                    status?: string;
+                    actor?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description История DR-операций */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DRHistoryList"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Audit log admin/security действий
+         * @description Только administrator или Bearer. Возвращает append-only журнал login/users/tokens/ retention/backup действий.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    since?: string;
+                    limit?: number;
+                    action?: string;
+                    result?: string;
+                    actor?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Audit log */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AuditLogList"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/parse-errors": {
         parameters: {
             query?: never;
@@ -3462,6 +3553,38 @@ export interface components {
              * @description Время последнего сохранения (UTC)
              */
             updated_at?: string;
+        };
+        DREvent: {
+            /** Format: date-time */
+            timestamp?: string;
+            actor?: string;
+            action?: string;
+            target?: string;
+            /** @enum {string} */
+            status?: "started" | "succeeded" | "failed";
+            message?: string;
+            meta?: {
+                [key: string]: unknown;
+            };
+        };
+        DRHistoryList: {
+            items?: components["schemas"]["DREvent"][];
+        };
+        AuditEvent: {
+            /** Format: date-time */
+            timestamp?: string;
+            actor?: string;
+            action?: string;
+            resource_type?: string;
+            resource_id?: string;
+            result?: string;
+            ip?: string;
+            details?: {
+                [key: string]: unknown;
+            };
+        };
+        AuditLogList: {
+            items?: components["schemas"]["AuditEvent"][];
         };
         /** @description Liveness. HTTP 200, если процесс отвечает. */
         LiveResponse: {

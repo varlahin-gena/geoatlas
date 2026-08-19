@@ -5,13 +5,14 @@ import {
   deleteBackup,
   detachBackup,
   fetchBackups,
+  fetchDRHistory,
   putBackupSchedule,
 } from '@/api/system';
 import { useToast } from '@/components/Toast';
 import { fmtDate, fmtNumber } from '@/lib/format';
 import { usePolling } from '@/lib/usePolling';
 import { fmtBytes } from './systemFormat';
-import type { BackupCatalog, BackupEntry, BackupSchedule } from './systemTypes';
+import type { BackupCatalog, BackupEntry, BackupSchedule, DREvent } from './systemTypes';
 
 const TZ_PRESETS = ['Europe/Moscow', 'UTC', 'Europe/Berlin', 'Asia/Yekaterinburg'];
 
@@ -60,11 +61,14 @@ export function SystemBackupTab() {
   const [savedSched, setSavedSched] = useState<BackupSchedule>(normalizeSched(null));
   const [sched, setSched] = useState<BackupSchedule>(normalizeSched(null));
   const [tzCustom, setTzCustom] = useState(false);
+  const [history, setHistory] = useState<DREvent[]>([]);
 
   const load = useCallback(async () => {
     try {
       const data = await fetchBackups();
+      const historyRes = await fetchDRHistory({ limit: 50 });
       setCat(data);
+      setHistory(historyRes.items || []);
       const next = normalizeSched(data.schedule);
       setSavedSched(next);
       setSched(next);
@@ -596,6 +600,53 @@ export function SystemBackupTab() {
                     </tr>
                   );
                 })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="card card-compact">
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            flexWrap: 'wrap',
+          }}
+        >
+          <h3 className="card-title" style={{ margin: 0 }}>
+            DR-history
+          </h3>
+          <span className="hint">Последние 50 backup/attach/detach/delete/schedule событий</span>
+        </div>
+        {!history.length ? (
+          <p className="auth-fails-empty empty">Событий пока нет</p>
+        ) : (
+          <div className="table-wrap">
+            <table className="auth-fails-table">
+              <thead>
+                <tr>
+                  <th scope="col">Время</th>
+                  <th scope="col">Actor</th>
+                  <th scope="col">Action</th>
+                  <th scope="col">Target</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Message</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((item, idx) => (
+                  <tr key={`${item.timestamp || 't'}-${item.action || 'a'}-${idx}`}>
+                    <td>{fmtDate(item.timestamp, savedSched.timezone || sched.timezone)}</td>
+                    <td>{item.actor || 'system'}</td>
+                    <td className="mono">{item.action || '—'}</td>
+                    <td>{item.target || '—'}</td>
+                    <td>{item.status || '—'}</td>
+                    <td>{item.message || '—'}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

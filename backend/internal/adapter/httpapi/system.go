@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"network_monitor/internal/adapter/httpapi/loginthrottle"
+	usecaseaudit "network_monitor/internal/usecase/auditlog"
 	usecasebackup "network_monitor/internal/usecase/backup"
 	usecaseretention "network_monitor/internal/usecase/retention"
 	"network_monitor/internal/usecase/system"
@@ -155,9 +157,32 @@ func (h *SystemHandler) PutRetention(w http.ResponseWriter, r *http.Request) {
 
 	out, err := h.retentionUC.Update(ctx, req)
 	if err != nil {
+		writeAuditEvent(ctx, h.logs, usecaseaudit.AuditEvent{
+			Actor:        actorFromRequest(r),
+			Action:       "system.retention.update",
+			ResourceType: "retention",
+			ResourceID:   "system",
+			Result:       "failed",
+			IP:           clientIPFromRequest(r),
+			Details:      map[string]any{"error": err.Error()},
+		})
 		writeDomainError(w, "retention update failed", err)
 		return
 	}
+	writeAuditEvent(ctx, h.logs, usecaseaudit.AuditEvent{
+		Actor:        actorFromRequest(r),
+		Action:       "system.retention.update",
+		ResourceType: "retention",
+		ResourceID:   "system",
+		Result:       "succeeded",
+		IP:           clientIPFromRequest(r),
+		Details: map[string]any{
+			"traffic_logs_days": out.TrafficLogsDays,
+			"edges_days":        out.EdgesDays,
+			"parse_errors_days": out.ParseErrorsDays,
+			"system_metrics_days": out.SystemMetricsDays,
+		},
+	})
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "retention": out})
 }
 
@@ -179,7 +204,7 @@ func (h *SystemHandler) PostBackup(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "backup service unavailable"})
 		return
 	}
-	err := h.backupUC.ScheduleCreate(r.Context(), usecasebackup.SourceManual)
+	err := h.backupUC.ScheduleCreate(r.Context(), usecasebackup.SourceManual, actorFromRequest(r))
 	if err != nil {
 		writeDomainError(w, "backup schedule failed", err)
 		return
@@ -195,7 +220,7 @@ func (h *SystemHandler) PostBackupAttach(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	name := strings.TrimSpace(r.PathValue("name"))
-	err := h.backupUC.ScheduleAttach(r.Context(), name)
+	err := h.backupUC.ScheduleAttach(r.Context(), name, actorFromRequest(r))
 	if err != nil {
 		writeDomainError(w, "backup attach failed", err)
 		return
@@ -211,7 +236,7 @@ func (h *SystemHandler) PostBackupDetach(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	name := strings.TrimSpace(r.PathValue("name"))
-	err := h.backupUC.ScheduleDetach(r.Context(), name)
+	err := h.backupUC.ScheduleDetach(r.Context(), name, actorFromRequest(r))
 	if err != nil {
 		writeDomainError(w, "backup detach failed", err)
 		return
@@ -227,7 +252,7 @@ func (h *SystemHandler) DeleteBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := strings.TrimSpace(r.PathValue("name"))
-	if err := h.backupUC.DeleteBackup(name); err != nil {
+	if err := h.backupUC.DeleteBackup(name, actorFromRequest(r)); err != nil {
 		writeDomainError(w, "backup delete failed", err)
 		return
 	}
@@ -291,12 +316,86 @@ func (h *SystemHandler) PutBackupSchedule(w http.ResponseWriter, r *http.Request
 	if body.IncludeAuth != nil {
 		cur.IncludeAuth = *body.IncludeAuth
 	}
-	out, err := h.backupUC.UpdateSchedule(cur)
+	out, err := h.backupUC.UpdateSchedule(cur, actorFromRequest(r))
 	if err != nil {
 		writeDomainError(w, "backup schedule update failed", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "schedule": out})
+}
+
+func (h *SystemHandler) GetDRHistory(w http.ResponseWriter, r *http.Request) {
+	if h.logs == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "history service unavailable"})
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), h.cfg.QueryTimeout)
+	defer cancel()
+	items, err := h.listDRHistory(ctx, r)
+	if err != nil {
+		writeInternalError(w, "dr history failed", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+func (h *SystemHandler) GetAuditLog(w http.ResponseWriter, r *http.Request) {
+	if h.logs == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "audit service unavailable"})
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), h.cfg.QueryTimeout)
+	defer cancel()
+	items, err := h.listAuditLog(ctx, r)
+	if err != nil {
+		writeInternalError(w, "audit log failed", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+func parseSince(raw string) time.Time {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return time.Time{}
+	}
+	if ts, err := time.Parse(time.RFC3339, raw); err == nil {
+		return ts
+	}
+	return time.Time{}
+}
+
+func parseLimit(raw string) int {
+	if raw == "" {
+		return 100
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil {
+		return 100
+	}
+	return n
+}
+
+func (h *SystemHandler) listDRHistory(ctx context.Context, r *http.Request) ([]usecaseaudit.DREvent, error) {
+	q := r.URL.Query()
+	return h.logs.ListDR(ctx, usecaseaudit.DRQuery{
+		Since:  parseSince(q.Get("since")),
+		Limit:  parseLimit(q.Get("limit")),
+		Action: q.Get("action"),
+		Status: q.Get("status"),
+		Actor:  q.Get("actor"),
+	})
+}
+
+func (h *SystemHandler) listAuditLog(ctx context.Context, r *http.Request) ([]usecaseaudit.AuditEvent, error) {
+	q := r.URL.Query()
+	return h.logs.ListAudit(ctx, usecaseaudit.AuditQuery{
+		Since:  parseSince(q.Get("since")),
+		Limit:  parseLimit(q.Get("limit")),
+		Action: q.Get("action"),
+		Result: q.Get("result"),
+		Actor:  q.Get("actor"),
+	})
 }
 
 func (h *SystemHandler) failedLoginsSnapshot() []loginthrottle.FailedLoginEvent {

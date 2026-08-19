@@ -250,6 +250,12 @@ func NewServer(p Params, opts ...ServerOption) *Server {
 	rr.Handle("GET", "/api/system/backups",
 		withTimeout(chain(http.HandlerFunc(system.GetBackups), adminMW), healthTimeout),
 	)
+	rr.Handle("GET", "/api/dr/history",
+		withTimeout(chain(http.HandlerFunc(system.GetDRHistory), adminMW), readTimeout),
+	)
+	rr.Handle("GET", "/api/audit",
+		withTimeout(chain(http.HandlerFunc(system.GetAuditLog), adminMW), readTimeout),
+	)
 	rr.Handle("POST", "/api/system/backups",
 		chain(http.HandlerFunc(system.PostBackup), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
 	)

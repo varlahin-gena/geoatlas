@@ -35,6 +35,7 @@ import {
   type Tab,
 } from './systemTypes';
 import { SystemBackupTab } from './SystemBackupTab';
+import { SystemAuditTab } from './SystemAuditTab';
 import { SystemChartsTab } from './SystemChartsTab';
 import { SystemOverviewTab } from './SystemOverviewTab';
 import { SystemPipelineTab } from './SystemPipelineTab';
@@ -423,6 +424,7 @@ export default function SystemPage() {
                   ['pipeline', 'Pipeline'],
                   ['backup', 'Резервное копирование'],
                   ['security', 'Безопасность'],
+                  ['audit', 'Audit log'],
                   ['charts', 'Графики'],
                 ] as const
               ).map(([id, label]) => (
@@ -495,6 +497,8 @@ export default function SystemPage() {
             {tab === 'backup' ? <SystemBackupTab /> : null}
 
             {tab === 'security' ? <SystemSecurityTab failed={failed} /> : null}
+
+            {tab === 'audit' ? <SystemAuditTab /> : null}
 
             {tab === 'charts' ? (
               <SystemChartsTab

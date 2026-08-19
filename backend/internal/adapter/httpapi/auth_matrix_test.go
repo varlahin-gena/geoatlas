@@ -71,6 +71,8 @@ func expectedAuthMatrix() map[string]authTier {
 		"GET /api/system/retention":                 tierAdmin,
 		"PUT /api/system/retention":                 tierAdmin,
 		"GET /api/system/backups":                   tierAdmin,
+		"GET /api/dr/history":                       tierAdmin,
+		"GET /api/audit":                            tierAdmin,
 		"POST /api/system/backups":                  tierAdmin,
 		"POST /api/system/backups/{name}/attach":    tierAdmin,
 		"POST /api/system/backups/{name}/detach":    tierAdmin,
