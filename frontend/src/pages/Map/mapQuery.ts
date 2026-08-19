@@ -178,6 +178,13 @@ export function useMapViewQuery() {
     },
     [patchView],
   );
+  const applyView = useCallback(
+    (partial: Partial<MapViewState>) => {
+      if (partial.search != null) setSearchState(partial.search);
+      patchView(partial);
+    },
+    [patchView],
+  );
 
   return {
     period: parsed.period,
@@ -204,5 +211,6 @@ export function useMapViewQuery() {
     setFocusedCountry,
     clearFocusedCountry,
     applySearchFilter,
+    applyView,
   };
 }

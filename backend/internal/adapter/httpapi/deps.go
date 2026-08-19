@@ -14,6 +14,7 @@ import (
 	usecasegeo "network_monitor/internal/usecase/geo"
 	"network_monitor/internal/usecase/parseerrors"
 	"network_monitor/internal/usecase/parsetest"
+	usecaseanomaly "network_monitor/internal/usecase/anomaly"
 	usecasereputation "network_monitor/internal/usecase/reputation"
 	usecaseretention "network_monitor/internal/usecase/retention"
 	usecasesystem "network_monitor/internal/usecase/system"
@@ -82,6 +83,12 @@ type SearchTemplatesDeps struct {
 	sessions        SessionParser
 }
 
+// AnomalyDeps — зависимости AnomalyHandler.
+type AnomalyDeps struct {
+	cfg       config.Config
+	anomalyUC *usecaseanomaly.Service
+}
+
 // Params — вход NewDeps / NewServer. SearchTemplates=nil → file store из Cfg.
 type Params struct {
 	Cfg             config.Config
@@ -100,6 +107,7 @@ type Params struct {
 	Sessions        SessionParser
 	APITokens       APITokenStore
 	SearchTemplates SearchTemplatesStore
+	AnomalyUC       *usecaseanomaly.Service
 }
 
 // Deps — композитор HTTP-слоя: domain bags без плоских UC-полей.
@@ -115,6 +123,7 @@ type Deps struct {
 	parse      *ParseDeps
 	reputation *ReputationDeps
 	templates  *SearchTemplatesDeps
+	anomaly    *AnomalyDeps
 	prom       MetricsRecorder
 }
 
@@ -155,6 +164,7 @@ func NewDeps(p Params) *Deps {
 			searchTemplates: p.SearchTemplates,
 			sessions:        p.Sessions,
 		},
+		anomaly: &AnomalyDeps{cfg: p.Cfg, anomalyUC: p.AnomalyUC},
 	}
 }
 

@@ -1320,6 +1320,183 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/anomalies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Журнал аномалий карты
+         * @description Детерминированные детекторы (port_scan, horizontal_scan, blocked_surge,
+         *     new_country_dst, rep_new_dst). Сессия или Bearer≥read. По умолчанию — незакрытые
+         *     за 24 часа.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    since?: string;
+                    severity?: "warn" | "high" | "info";
+                    code?: string;
+                    include_acked?: "0" | "1" | "true" | "false";
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description items + summary */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AnomalyList"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/anomalies/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Сводка аномалий для badge на карте */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description counts */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AnomalySummary"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/anomalies/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Состояние сканера аномалий
+         * @description administrator или Bearer≥ops
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description scanner status */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AnomalyScanStatus"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/anomalies/{fingerprint}/ack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Скрыть аномалию (acknowledge) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    fingerprint: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            ok?: boolean;
+                            fingerprint?: string;
+                        };
+                    };
+                };
+                /** @description Невалидный fingerprint */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Модуль выключен */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/geo-missing": {
         parameters: {
             query?: never;
@@ -3345,6 +3522,65 @@ export interface components {
             reputation_facets?: {
                 [key: string]: string[];
             };
+        };
+        AnomalyMapLink: {
+            period?: string;
+            group?: string;
+            filter?: string;
+            q?: string;
+            country?: string;
+        };
+        AnomalyEvent: {
+            fingerprint?: string;
+            code?: string;
+            /** @enum {string} */
+            severity?: "info" | "warn" | "high";
+            /** Format: float */
+            score?: number;
+            title?: string;
+            detail?: {
+                [key: string]: unknown;
+            };
+            src_ip?: string;
+            dst_ip?: string;
+            src_country?: string;
+            dst_country?: string;
+            src_city?: string;
+            dst_city?: string;
+            device?: string;
+            event_count?: number;
+            /** Format: date-time */
+            detected_at?: string;
+            /** Format: date-time */
+            window_start?: string;
+            /** Format: date-time */
+            window_end?: string;
+            acknowledged?: boolean;
+            map?: components["schemas"]["AnomalyMapLink"];
+        };
+        AnomalySummary: {
+            high?: number;
+            warn?: number;
+            total?: number;
+            acked?: number;
+            learning?: boolean;
+            enabled?: boolean;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        AnomalyList: {
+            items?: components["schemas"]["AnomalyEvent"][];
+            summary?: components["schemas"]["AnomalySummary"];
+        };
+        AnomalyScanStatus: {
+            enabled?: boolean;
+            learning?: boolean;
+            /** Format: date-time */
+            last_ok?: string;
+            last_error?: string;
+            last_duration?: string;
+            last_inserted?: number;
+            last_skip?: string;
         };
         AuthUser: {
             username: string;

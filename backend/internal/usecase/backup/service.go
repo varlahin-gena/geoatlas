@@ -552,6 +552,8 @@ func (s *Service) resolveTables(ctx context.Context, includeEdges bool) ([]strin
 		"reputation_ranges",
 		"parse_errors",
 		"system_metrics",
+		"anomaly_events",
+		"anomaly_acks",
 	}
 	if includeEdges {
 		base = append(base,

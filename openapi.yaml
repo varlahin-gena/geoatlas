@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: ГеоАтлас API
-  version: "1.11.0"
+  version: "1.12.0"
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
@@ -10,7 +10,7 @@ info:
 
     Локальная авторизация (cookie `nm_session` после `POST /api/auth/login`):
     - **administrator** — полный доступ (карта, загрузки, система, парсеры, УЗ, API-токены);
-    - **operator** — только карта (`GET /api/events`); без загрузок, мониторинга и парсеров.
+    - **operator** — карта (`GET /api/events`) и аномалии (`GET /api/anomalies*`); без загрузок, мониторинга и парсеров.
     - Cookie содержит `session_version`; смена пароля / `logout-all` / admin reset инвалидируют
       все ранее выданные сессии пользователя.
 
@@ -36,6 +36,7 @@ tags:
   - name: health
   - name: auth
   - name: events
+  - name: anomalies
   - name: ingest
   - name: system
   - name: parse
@@ -547,6 +548,99 @@ paths:
           description: points [{t, allowed, blocked, total}] + bucket_sec
         "400":
           description: Нет country или невалидный диапазон
+
+  /api/anomalies:
+    get:
+      tags: [anomalies]
+      summary: Журнал аномалий карты
+      description: |
+        Детерминированные детекторы (port_scan, horizontal_scan, blocked_surge,
+        new_country_dst, rep_new_dst). Сессия или Bearer≥read. По умолчанию — незакрытые
+        за 24 часа.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: since
+          in: query
+          schema: { type: string, format: date-time }
+        - name: severity
+          in: query
+          schema: { type: string, enum: [warn, high, info] }
+        - name: code
+          in: query
+          schema: { type: string }
+        - name: include_acked
+          in: query
+          schema: { type: string, enum: ["0", "1", "true", "false"] }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: items + summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnomalyList"
+
+  /api/anomalies/summary:
+    get:
+      tags: [anomalies]
+      summary: Сводка аномалий для badge на карте
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: counts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnomalySummary"
+
+  /api/anomalies/status:
+    get:
+      tags: [anomalies]
+      summary: Состояние сканера аномалий
+      description: administrator или Bearer≥ops
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: scanner status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnomalyScanStatus"
+
+  /api/anomalies/{fingerprint}/ack:
+    post:
+      tags: [anomalies]
+      summary: Скрыть аномалию (acknowledge)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: fingerprint
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  fingerprint: { type: string }
+        "400":
+          description: Невалидный fingerprint
+        "503":
+          description: Модуль выключен
 
   /api/geo-missing:
     get:
@@ -1598,6 +1692,71 @@ components:
             type: array
             items: { type: string }
           description: Категория → списки (до фильтра репутации), для меню на карте.
+
+    AnomalyMapLink:
+      type: object
+      properties:
+        period: { type: string }
+        group: { type: string }
+        filter: { type: string }
+        q: { type: string }
+        country: { type: string }
+
+    AnomalyEvent:
+      type: object
+      properties:
+        fingerprint: { type: string }
+        code: { type: string }
+        severity: { type: string, enum: [info, warn, high] }
+        score: { type: number, format: float }
+        title: { type: string }
+        detail: { type: object, additionalProperties: true }
+        src_ip: { type: string }
+        dst_ip: { type: string }
+        src_country: { type: string }
+        dst_country: { type: string }
+        src_city: { type: string }
+        dst_city: { type: string }
+        device: { type: string }
+        event_count: { type: integer }
+        detected_at: { type: string, format: date-time }
+        window_start: { type: string, format: date-time }
+        window_end: { type: string, format: date-time }
+        acknowledged: { type: boolean }
+        map:
+          $ref: "#/components/schemas/AnomalyMapLink"
+
+    AnomalySummary:
+      type: object
+      properties:
+        high: { type: integer }
+        warn: { type: integer }
+        total: { type: integer }
+        acked: { type: integer }
+        learning: { type: boolean }
+        enabled: { type: boolean }
+        updated_at: { type: string, format: date-time }
+
+    AnomalyList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnomalyEvent"
+        summary:
+          $ref: "#/components/schemas/AnomalySummary"
+
+    AnomalyScanStatus:
+      type: object
+      properties:
+        enabled: { type: boolean }
+        learning: { type: boolean }
+        last_ok: { type: string, format: date-time }
+        last_error: { type: string }
+        last_duration: { type: string }
+        last_inserted: { type: integer }
+        last_skip: { type: string }
 
     AuthUser:
       type: object

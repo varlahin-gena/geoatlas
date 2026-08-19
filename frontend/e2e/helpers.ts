@@ -127,6 +127,22 @@ export async function installSessionMocks(
     await fulfillJson(route, 200, { templates: [] });
   });
 
+  await page.route('**/api/anomalies/summary', async (route) => {
+    await fulfillJson(route, 200, { high: 0, warn: 0, total: 0, enabled: true, learning: false });
+  });
+  await page.route(/\/api\/anomalies(\/|\?|$)/, async (route) => {
+    const url = route.request().url();
+    if (url.includes('/ack')) {
+      await fulfillJson(route, 200, { ok: true });
+      return;
+    }
+    if (url.includes('/summary')) {
+      await fulfillJson(route, 200, { high: 0, warn: 0, total: 0, enabled: true, learning: false });
+      return;
+    }
+    await fulfillJson(route, 200, { items: [], summary: { high: 0, warn: 0, total: 0, enabled: true } });
+  });
+
   await page.route('https://basemaps.cartocdn.com/**', async (route) => {
     await route.abort();
   });

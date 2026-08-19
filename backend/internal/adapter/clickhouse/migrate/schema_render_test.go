@@ -46,6 +46,12 @@ func TestColdBootstrapSQLHasNoEdgesAgg(t *testing.T) {
 	if !strings.Contains(raw, "CREATE TABLE IF NOT EXISTS traffic_logs") {
 		t.Fatal("missing traffic_logs")
 	}
+	if !strings.Contains(raw, "CREATE TABLE IF NOT EXISTS anomaly_events") {
+		t.Fatal("missing anomaly_events")
+	}
+	if !strings.Contains(raw, "CREATE TABLE IF NOT EXISTS anomaly_acks") {
+		t.Fatal("missing anomaly_acks")
+	}
 	if !strings.Contains(raw, "ttl_only_drop_parts = 1;") {
 		t.Fatal("bootstrap statements must end with semicolon for clickhouse-client --multiquery")
 	}

@@ -30,6 +30,12 @@ type Registry struct {
 	insertDuration *prometheus.HistogramVec
 	insertRows     *prometheus.CounterVec
 
+	anomalyScanDuration prometheus.Histogram
+	anomalyDetected     *prometheus.CounterVec
+	anomalyScanErrors   *prometheus.CounterVec
+	anomalySkippedTick  *prometheus.CounterVec
+	anomalyInsert       prometheus.Counter
+
 	ingest *ingestCollector
 }
 
@@ -63,9 +69,36 @@ func New(ingestSrc IngestStats) *Registry {
 			Name:      "ingest_insert_rows_total",
 			Help:      "Rows inserted into traffic_logs (by result).",
 		}, []string{"result"}),
+		anomalyScanDuration: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespace,
+			Name:      "anomaly_scan_duration_seconds",
+			Help:      "Anomaly scanner tick duration.",
+			Buckets:   []float64{.05, .1, .25, .5, 1, 2.5, 5, 10, 25},
+		}),
+		anomalyDetected: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "anomaly_detected_total",
+			Help:      "Anomaly events inserted (by code and severity).",
+		}, []string{"code", "severity"}),
+		anomalyScanErrors: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "anomaly_scan_errors_total",
+			Help:      "Anomaly detector/insert errors (by code).",
+		}, []string{"code"}),
+		anomalySkippedTick: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "anomaly_skipped_tick_total",
+			Help:      "Anomaly scanner ticks skipped (circuit/rebuild/disabled).",
+		}, []string{"reason"}),
+		anomalyInsert: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "anomaly_insert_total",
+			Help:      "Rows inserted into anomaly_events.",
+		}),
 		ingest: newIngestCollector(ingestSrc),
 	}
-	reg.MustRegister(r.httpRequests, r.httpInflight, r.insertDuration, r.insertRows, r.ingest)
+	reg.MustRegister(r.httpRequests, r.httpInflight, r.insertDuration, r.insertRows,
+		r.anomalyScanDuration, r.anomalyDetected, r.anomalyScanErrors, r.anomalySkippedTick, r.anomalyInsert, r.ingest)
 	return r
 }
 
@@ -119,4 +152,33 @@ func (r *Registry) ObserveInsert(d time.Duration, rows int, success bool) {
 	if rows > 0 {
 		r.insertRows.WithLabelValues(result).Add(float64(rows))
 	}
+}
+
+// ObserveScan implements usecase/anomaly.Metrics.
+func (r *Registry) ObserveScan(d time.Duration, inserted int, skipReason string) {
+	if r == nil {
+		return
+	}
+	if skipReason != "" {
+		r.anomalySkippedTick.WithLabelValues(skipReason).Inc()
+		return
+	}
+	r.anomalyScanDuration.Observe(d.Seconds())
+	if inserted > 0 {
+		r.anomalyInsert.Add(float64(inserted))
+	}
+}
+
+func (r *Registry) IncDetected(code, severity string) {
+	if r == nil {
+		return
+	}
+	r.anomalyDetected.WithLabelValues(code, severity).Inc()
+}
+
+func (r *Registry) IncScanError(code string) {
+	if r == nil {
+		return
+	}
+	r.anomalyScanErrors.WithLabelValues(code).Inc()
 }

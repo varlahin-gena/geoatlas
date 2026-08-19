@@ -57,6 +57,7 @@ func NewServer(p Params, opts ...ServerOption) *Server {
 	usersH := &UsersHandler{authDeps}
 	tokensH := &APITokensHandler{authDeps}
 	tplH := &SearchTemplatesHandler{deps.templates}
+	anomH := &AnomalyHandler{deps.anomaly}
 
 	cfg := p.Cfg
 	envTokens := cfg.APIAuthTokens()
@@ -161,6 +162,18 @@ func NewServer(p Params, opts ...ServerOption) *Server {
 	)
 	rr.Handle("GET", "/api/events/series",
 		withTimeout(chain(http.HandlerFunc(events.GetEventsSeries), loginMW), readTimeout),
+	)
+	rr.Handle("GET", "/api/anomalies/summary",
+		withTimeout(chain(http.HandlerFunc(anomH.Summary), loginMW), healthTimeout),
+	)
+	rr.Handle("GET", "/api/anomalies/status",
+		withTimeout(chain(http.HandlerFunc(anomH.Status), opsMW), healthTimeout),
+	)
+	rr.Handle("GET", "/api/anomalies",
+		withTimeout(chain(http.HandlerFunc(anomH.List), loginMW), readTimeout),
+	)
+	rr.Handle("POST", "/api/anomalies/{fingerprint}/ack",
+		chain(http.HandlerFunc(anomH.Ack), loginMW, csrf, maxBytesMW(maxJSONBodySize)),
 	)
 	rr.Handle("GET", "/api/system/status",
 		withTimeout(chain(http.HandlerFunc(system.GetSystemStatus), loginMW), readTimeout),

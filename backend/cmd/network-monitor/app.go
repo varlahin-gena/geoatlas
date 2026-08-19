@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"network_monitor/internal/adapter/anomalyjob"
 	"network_monitor/internal/adapter/backupjob"
 	chadapter "network_monitor/internal/adapter/clickhouse"
 	"network_monitor/internal/adapter/datalock"
@@ -18,20 +19,21 @@ import (
 )
 
 type app struct {
-	pools      *chadapter.Pools
-	ingestSvc  *ingestnet.Service
-	prom       *appmetrics.Registry
-	srv        *httpapi.Server
-	geoJobs    *geojob.Scheduler
-	repJobs    *reputationjob.Scheduler
-	backupJobs *backupjob.Scheduler
-	dataLock   *datalock.Lock
-	bgCancel   context.CancelFunc
-	bgWg       sync.WaitGroup
-	ingestDone chan error
-	ctx        context.Context
-	cancel     context.CancelFunc
-	listenAddr string
+	pools       *chadapter.Pools
+	ingestSvc   *ingestnet.Service
+	prom        *appmetrics.Registry
+	srv         *httpapi.Server
+	geoJobs     *geojob.Scheduler
+	repJobs     *reputationjob.Scheduler
+	backupJobs  *backupjob.Scheduler
+	anomalyJobs *anomalyjob.Scheduler
+	dataLock    *datalock.Lock
+	bgCancel    context.CancelFunc
+	bgWg        sync.WaitGroup
+	ingestDone  chan error
+	ctx         context.Context
+	cancel      context.CancelFunc
+	listenAddr  string
 }
 
 func buildApp(ctx context.Context, cfg config.Config) (*app, error) {
@@ -91,6 +93,9 @@ func buildApp(ctx context.Context, cfg config.Config) (*app, error) {
 	}
 	if a.backupJobs != nil {
 		a.backupJobs.Start(bgCtx)
+	}
+	if a.anomalyJobs != nil {
+		a.anomalyJobs.Start(bgCtx)
 	}
 	return a, nil
 }

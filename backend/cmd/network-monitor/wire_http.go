@@ -4,9 +4,11 @@ import (
 	"path/filepath"
 	"time"
 
+	"network_monitor/internal/adapter/anomalyjob"
 	"network_monitor/internal/adapter/backupfs"
 	"network_monitor/internal/adapter/backupjob"
 	"network_monitor/internal/adapter/backupschedulefile"
+	"network_monitor/internal/adapter/clickhouse/anomalystore"
 	"network_monitor/internal/adapter/clickhouse/backupstore"
 	"network_monitor/internal/adapter/clickhouse/geostore"
 	"network_monitor/internal/adapter/clickhouse/perrorstore"
@@ -17,7 +19,9 @@ import (
 	"network_monitor/internal/adapter/parseradapter"
 	"network_monitor/internal/adapter/systemlive"
 	"network_monitor/internal/config"
+	"network_monitor/internal/installprofile"
 	"network_monitor/internal/parser"
+	usecaseanomaly "network_monitor/internal/usecase/anomaly"
 	usecaseauth "network_monitor/internal/usecase/auth"
 	usecasebackup "network_monitor/internal/usecase/backup"
 	usecaseevents "network_monitor/internal/usecase/events"
@@ -69,6 +73,28 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 	schedStore := backupschedulefile.New(cfg.BackupScheduleFile, usecasebackup.DefaultsSchedule(opts))
 	backupUC := usecasebackup.New(opts, backupstore.NewBackupRunner(a.pools.Background), backupfs.New(cfg.BackupDir), schedStore)
 	a.backupJobs = backupjob.NewFromService(backupUC, time.Minute)
+
+	var anomalyUC *usecaseanomaly.Service
+	if cfg.AnomalyEnabled {
+		apiRepo := anomalystore.New(a.pools.API)
+		bgRepo := anomalystore.New(a.pools.Background)
+		var anomRep usecaseanomaly.ReputationLookuper
+		if bg.repIdx != nil {
+			anomRep = bg.repIdx
+		}
+		profileName := "medium"
+		if p, err := installprofile.Load(cfg.InstallProfilePath); err == nil && p != nil && p.Profile != "" {
+			profileName = p.Profile
+		}
+		anomalyUC = usecaseanomaly.New(usecaseanomaly.Config{
+			Enabled:        true,
+			IncludePrivate: cfg.AnomalyIncludePrivate,
+			LearningDays:   cfg.AnomalyLearningDays,
+			InstallProfile: profileName,
+		}, apiRepo, bgRepo, anomRep, anomalyjob.Gate{Ingest: a.ingestSvc}, a.prom)
+		a.anomalyJobs = anomalyjob.New(anomalyUC, cfg.AnomalyScanInterval, time.Minute)
+	}
+
 	return httpapi.NewServer(httpapi.Params{
 		Cfg:           cfg,
 		Ingest:        a.ingestSvc,
@@ -85,5 +111,6 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 		Users:         auth.users,
 		Sessions:      auth.sessions,
 		APITokens:     auth.apiTokens,
+		AnomalyUC:     anomalyUC,
 	}, httpapi.WithMetrics(a.prom))
 }

@@ -11,7 +11,7 @@ import (
 
 const (
 	schemaComponentTTLDropParts        = "ttl_only_drop_parts"
-	schemaVersionTTLDropParts   uint32 = 3 // + traffic_edges_hourly
+	schemaVersionTTLDropParts   uint32 = 4 // + anomaly_events
 )
 
 // EnsureTTLOnlyDropParts включает ttl_only_drop_parts на таблицах с дневными
@@ -33,6 +33,7 @@ func EnsureTTLOnlyDropParts(ctx context.Context, ch clickhouse.Conn) error {
 		"traffic_edges_hourly",
 		"traffic_edges_city_daily",
 		"traffic_edges_country_daily",
+		"anomaly_events",
 	}
 	for _, table := range tables {
 		ok, err := ttlTableExists(ctx, ch, table)

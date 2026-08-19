@@ -221,6 +221,12 @@ type Config struct {
 	ReputationFeeds         []ReputationFeed // seed, если файла ещё нет
 	ReputationFeedsFile     string           // REPUTATION_FEEDS_FILE
 
+	// Anomaly engine (карта): детерминированные детекторы + журнал.
+	AnomalyEnabled        bool
+	AnomalyScanInterval   time.Duration
+	AnomalyIncludePrivate bool
+	AnomalyLearningDays   int
+
 	LogLevel  string // debug|info|warn|error
 	LogFormat string // text|json
 }
@@ -302,6 +308,10 @@ func FromEnv() Config {
 		ReputationFetchInterval: parser.durationFlexible("REPUTATION_FETCH_INTERVAL", 6*time.Hour),
 		ReputationFeeds:         parseReputationFeeds(os.Getenv("REPUTATION_FEEDS")),
 		ReputationFeedsFile:     envOr("REPUTATION_FEEDS_FILE", "/app/data/reputation_feeds.json"),
+		AnomalyEnabled:          parser.bool("ANOMALY_ENABLED", true),
+		AnomalyScanInterval:     parser.durationFlexible("ANOMALY_SCAN_INTERVAL", 5*time.Minute),
+		AnomalyIncludePrivate:   parser.bool("ANOMALY_INCLUDE_PRIVATE", false),
+		AnomalyLearningDays:     parser.int("ANOMALY_LEARNING_DAYS", 3),
 		LogLevel:                strings.ToLower(envOr("LOG_LEVEL", "info")),
 		LogFormat:               strings.ToLower(envOr("LOG_FORMAT", "text")),
 	}

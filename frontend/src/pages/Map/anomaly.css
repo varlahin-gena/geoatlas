@@ -1,0 +1,97 @@
+.anomaly-strip {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  max-width: min(560px, calc(100% - 24px));
+}
+.anomaly-strip.is-high {
+  border-color: color-mix(in srgb, var(--red) 55%, var(--border));
+}
+.anomaly-strip.is-warn {
+  border-color: color-mix(in srgb, var(--orange) 55%, var(--border));
+}
+.anomaly-strip.is-learning {
+  cursor: default;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.anomaly-strip-action {
+  color: var(--accent, #58a6ff);
+  font-weight: 600;
+}
+.anomaly-panel {
+  position: absolute;
+  top: 52px;
+  right: 12px;
+  width: min(360px, calc(100% - 24px));
+  max-height: min(70vh, 520px);
+  overflow: auto;
+  z-index: 7;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+}
+.anomaly-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--panel);
+}
+.anomaly-panel-empty {
+  padding: 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.anomaly-panel-list {
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+}
+.anomaly-item {
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+.anomaly-item.sev-high {
+  border-color: color-mix(in srgb, var(--red) 45%, var(--border));
+}
+.anomaly-item-title {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.anomaly-item-meta {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.anomaly-item-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.btn.sm {
+  font-size: 12px;
+  padding: 4px 8px;
+}

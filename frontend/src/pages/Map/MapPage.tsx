@@ -11,7 +11,11 @@ import { MapSidebar } from './MapSidebar';
 import { MapTopbar } from './MapTopbar';
 import { MapVizOverlays } from './MapVizOverlays';
 import { GeoWizardModal } from './GeoWizardModal';
+import { AnomalyStrip } from './AnomalyStrip';
+import { AnomalyPanel } from './AnomalyPanel';
 import { useGeoWizard } from './useGeoWizard';
+import { useMapAnomalies, anomalyMapToView } from './useMapAnomalies';
+import { highlightFromAnomaly } from './mapAnomalyOverlay';
 import { useMapDetail } from './useMapDetail';
 import { useMapEvents } from './useMapEvents';
 import { useMapFilters } from './useMapFilters';
@@ -22,6 +26,7 @@ import { useMapUploads } from './useMapUploads';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import '@/styles/index.css';
 import './geoWizard.css';
+import './anomaly.css';
 
 export default function MapPage() {
   const { isAdmin, reputationEnabled, uiAuthEnabled, theme, user, refresh } = useAuth();
@@ -50,6 +55,7 @@ export default function MapPage() {
     setFocusedCountry,
     clearFocusedCountry,
     applySearchFilter,
+    applyView,
   } = view;
 
   const {
@@ -172,6 +178,12 @@ export default function MapPage() {
     fetchData,
   });
 
+  const anomalies = useMapAnomalies();
+  const highlight = useMemo(
+    () => highlightFromAnomaly(anomalies.active, points, visibleLines, groupBy),
+    [anomalies.active, points, visibleLines, groupBy],
+  );
+
   const { detail, closeDetail, openLineDetail, openPointDetail, openCountryDetail } = useMapDetail({
     groupBy,
     lines,
@@ -230,6 +242,8 @@ export default function MapPage() {
         onLineClick: openLineDetail,
         onPointClick: openPointDetail,
         onCountryClick: (key, feature) => openCountryDetail(key, feature),
+        highlightNodeKeys: highlight.nodeKeys,
+        highlightEdgeKeys: highlight.edgeKeys,
       });
       overlay.setProps({ layers: result.layers as never[] });
       setArcCountInfo({ shown: result.shown, total: result.total });
@@ -259,6 +273,8 @@ export default function MapPage() {
     openCountryDetail,
     overlayRef,
     layersRefreshBusy,
+    highlight.nodeKeys,
+    highlight.edgeKeys,
   ]);
 
   const adminLinks = filterNav(PAGE_NAV, {
@@ -384,6 +400,23 @@ export default function MapPage() {
           className={`viz-area${loading ? ' is-loading' : ''}${showGeoEmptyBanner ? ' has-geo-empty-banner' : ''}${truncHint ? ' has-viz-hint' : ''}${showLegend ? ' has-map-legend' : ''}`}
         >
           <div ref={mapContainer} id="map-host" className="viz-host" />
+
+          <AnomalyStrip summary={anomalies.summary} onOpen={() => anomalies.setOpen(true)} />
+          <AnomalyPanel
+            open={anomalies.open}
+            items={anomalies.items}
+            onClose={() => anomalies.setOpen(false)}
+            onShow={(item) => {
+              anomalies.setActive(item);
+              applyView(anomalyMapToView(item.map));
+              anomalies.setOpen(false);
+            }}
+            onAck={(fp) => {
+              void anomalies.ack(fp).catch(() => {
+                toast('Не удалось скрыть аномалию', 'error');
+              });
+            }}
+          />
 
           {showGeoEmptyBanner ? (
             <div className="geo-wizard-banner" role="status">

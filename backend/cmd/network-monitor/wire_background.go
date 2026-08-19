@@ -16,9 +16,9 @@ import (
 	"network_monitor/internal/adapter/reputationjob"
 	"network_monitor/internal/adapter/retentionfile"
 	"network_monitor/internal/config"
+	"network_monitor/internal/usecase/bootstrap"
 	usecasereputation "network_monitor/internal/usecase/reputation"
 	usecaseretention "network_monitor/internal/usecase/retention"
-	"network_monitor/internal/usecase/bootstrap"
 )
 
 // backgroundParts — индексы/UC, нужные ingest и HTTP после wireBackground.

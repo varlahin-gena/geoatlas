@@ -1,0 +1,528 @@
+package anomaly
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"strings"
+	"sync"
+	"time"
+
+	"network_monitor/internal/model"
+)
+
+const (
+	portScanWindow       = 5 * time.Minute
+	horizontalScanWindow = 5 * time.Minute
+	blockedWindow        = 15 * time.Minute
+	countryWindow        = time.Hour
+	repWindow            = 15 * time.Minute
+	repLookback          = 7 * 24 * time.Hour
+	countryBaselineDays  = 7
+	detectorTimeout      = 8 * time.Second
+	tickTimeout          = 25 * time.Second
+	eventTTL             = 30 * 24 * time.Hour
+	summarySince         = 24 * time.Hour
+)
+
+// Config — флаги модуля.
+type Config struct {
+	Enabled        bool
+	IncludePrivate bool
+	LearningDays   int
+	InstallProfile string
+}
+
+func (c Config) learningPeriod() time.Duration {
+	d := c.LearningDays
+	if d < 1 {
+		d = 3
+	}
+	return time.Duration(d) * 24 * time.Hour
+}
+
+// Service — application use case аномалий.
+type Service struct {
+	cfg      Config
+	store    EventStore
+	scan     TrafficScanner
+	rep      ReputationLookuper
+	gate     Gate
+	metric   Metrics
+	statusMu sync.Mutex
+	status   ScanStatus
+}
+
+func New(cfg Config, store EventStore, scan TrafficScanner, rep ReputationLookuper, gate Gate, metric Metrics) *Service {
+	if cfg.LearningDays < 1 {
+		cfg.LearningDays = 3
+	}
+	s := &Service{cfg: cfg, store: store, scan: scan, rep: rep, gate: gate, metric: metric}
+	s.status = ScanStatus{Enabled: cfg.Enabled}
+	return s
+}
+
+func (s *Service) Enabled() bool {
+	return s != nil && s.cfg.Enabled && s.store != nil && s.scan != nil
+}
+
+func (s *Service) Status() ScanStatus {
+	if s == nil {
+		return ScanStatus{Enabled: false}
+	}
+	s.statusMu.Lock()
+	defer s.statusMu.Unlock()
+	out := s.status
+	out.Enabled = s.cfg.Enabled
+	return out
+}
+
+func (s *Service) setStatus(mut func(*ScanStatus)) {
+	s.statusMu.Lock()
+	defer s.statusMu.Unlock()
+	mut(&s.status)
+}
+
+func (s *Service) List(ctx context.Context, q ListQuery) (ListResult, error) {
+	if !s.Enabled() {
+		return ListResult{Items: []Event{}, Summary: Summary{Enabled: false}}, nil
+	}
+	now := time.Now().UTC()
+	if q.Since.IsZero() {
+		q.Since = now.Add(-summarySince)
+	}
+	if now.Sub(q.Since) > 7*24*time.Hour {
+		q.Since = now.Add(-7 * 24 * time.Hour)
+	}
+	if q.Limit < 1 {
+		q.Limit = 50
+	}
+	if q.Limit > 200 {
+		q.Limit = 200
+	}
+	items, err := s.store.List(ctx, q)
+	if err != nil {
+		return ListResult{}, err
+	}
+	if items == nil {
+		items = []Event{}
+	}
+	sum, err := s.store.CountSummary(ctx, q.Since)
+	if err != nil {
+		return ListResult{}, err
+	}
+	sum.Learning = s.isLearning(ctx, now)
+	sum.Enabled = true
+	sum.UpdatedAt = now
+	return ListResult{Items: items, Summary: sum}, nil
+}
+
+func (s *Service) Summary(ctx context.Context) (Summary, error) {
+	if !s.Enabled() {
+		return Summary{Enabled: false, UpdatedAt: time.Now().UTC()}, nil
+	}
+	now := time.Now().UTC()
+	sum, err := s.store.CountSummary(ctx, now.Add(-summarySince))
+	if err != nil {
+		return Summary{}, err
+	}
+	sum.Learning = s.isLearning(ctx, now)
+	sum.Enabled = true
+	sum.UpdatedAt = now
+	return sum, nil
+}
+
+func (s *Service) Ack(ctx context.Context, fingerprint, by string) error {
+	if !s.Enabled() {
+		return fmt.Errorf("anomaly module disabled")
+	}
+	fp := strings.TrimSpace(fingerprint)
+	if fp == "" || len(fp) > 64 {
+		return fmt.Errorf("invalid fingerprint")
+	}
+	by = strings.TrimSpace(by)
+	if by == "" {
+		by = "unknown"
+	}
+	return s.store.Ack(ctx, fp, by)
+}
+
+func (s *Service) Scan(ctx context.Context, now time.Time) ScanResult {
+	res := ScanResult{}
+	if !s.Enabled() {
+		res.Skipped = "disabled"
+		s.observe(0, 0, res.Skipped)
+		return res
+	}
+	if s.gate != nil {
+		if reason := s.gate.SkipReason(); reason != "" {
+			res.Skipped = reason
+			s.setStatus(func(st *ScanStatus) { st.LastSkip = reason })
+			s.observe(0, 0, reason)
+			return res
+		}
+	}
+	if now.IsZero() {
+		now = time.Now().UTC()
+	} else {
+		now = now.UTC()
+	}
+	tctx, cancel := context.WithTimeout(ctx, tickTimeout)
+	defer cancel()
+	start := time.Now()
+
+	learning := s.isLearning(tctx, now)
+	res.Learning = learning
+	th := ThresholdsForProfile(s.cfg.InstallProfile)
+
+	var candidates []Event
+	run := func(code string, fn func(context.Context) ([]Event, error)) {
+		if tctx.Err() != nil {
+			return
+		}
+		dctx, dcancel := context.WithTimeout(tctx, detectorTimeout)
+		hits, err := fn(dctx)
+		dcancel()
+		if err != nil {
+			slog.Warn("anomaly detector failed", "code", code, "err", err)
+			if s.metric != nil {
+				s.metric.IncScanError(code)
+			}
+			res.Error = code + ": " + err.Error()
+			return
+		}
+		candidates = append(candidates, hits...)
+	}
+
+	run(CodeBlockedSurge, func(c context.Context) ([]Event, error) {
+		return s.detectBlockedSurge(c, now, th)
+	})
+	run(CodeNewCountryDst, func(c context.Context) ([]Event, error) {
+		if learning {
+			return nil, nil
+		}
+		return s.detectNewCountry(c, now, th)
+	})
+	run(CodePortScan, func(c context.Context) ([]Event, error) {
+		return s.detectPortScan(c, now, th)
+	})
+	run(CodeHorizontalScan, func(c context.Context) ([]Event, error) {
+		return s.detectHorizontalScan(c, now, th)
+	})
+	run(CodeRepNewDst, func(c context.Context) ([]Event, error) {
+		return s.detectRepNewDst(c, now, th)
+	})
+
+	kept := s.dedupAndCap(tctx, candidates, now)
+	if len(kept) > 0 {
+		if err := s.store.Insert(tctx, kept); err != nil {
+			res.Error = "insert: " + err.Error()
+			slog.Warn("anomaly insert failed", "err", err)
+			if s.metric != nil {
+				s.metric.IncScanError("insert")
+			}
+		} else {
+			res.Inserted = len(kept)
+			if s.metric != nil {
+				for _, e := range kept {
+					s.metric.IncDetected(e.Code, e.Severity)
+				}
+			}
+		}
+	}
+
+	dur := time.Since(start)
+	s.setStatus(func(st *ScanStatus) {
+		st.Learning = learning
+		st.LastDuration = dur.Truncate(time.Millisecond).String()
+		st.LastInserted = res.Inserted
+		st.LastSkip = ""
+		if res.Error != "" {
+			st.LastError = res.Error
+		} else {
+			st.LastError = ""
+			st.LastOK = now
+		}
+	})
+	s.observe(dur, res.Inserted, "")
+	return res
+}
+
+func (s *Service) observe(d time.Duration, inserted int, skip string) {
+	if s.metric != nil {
+		s.metric.ObserveScan(d, inserted, skip)
+	}
+}
+
+func (s *Service) isLearning(ctx context.Context, now time.Time) bool {
+	if s.scan == nil {
+		return true
+	}
+	oldest, err := s.scan.OldestLogTime(ctx)
+	if err != nil || oldest.IsZero() {
+		return true
+	}
+	return now.Sub(oldest) < s.cfg.learningPeriod()
+}
+
+func (s *Service) dedupAndCap(ctx context.Context, in []Event, now time.Time) []Event {
+	if len(in) == 0 {
+		return nil
+	}
+	fps := make([]string, 0, len(in))
+	seen := map[string]struct{}{}
+	uniq := make([]Event, 0, len(in))
+	for _, e := range in {
+		if e.Fingerprint == "" {
+			continue
+		}
+		if _, ok := seen[e.Fingerprint]; ok {
+			continue
+		}
+		seen[e.Fingerprint] = struct{}{}
+		uniq = append(uniq, e)
+		fps = append(fps, e.Fingerprint)
+	}
+	exist, err := s.store.ExistingFingerprints(ctx, fps)
+	if err != nil {
+		slog.Warn("anomaly fingerprint lookup failed", "err", err)
+		exist = map[string]struct{}{}
+	}
+	perCode := map[string]int{}
+	out := make([]Event, 0, len(uniq))
+	for _, e := range uniq {
+		if _, ok := exist[e.Fingerprint]; ok {
+			continue
+		}
+		if perCode[e.Code] >= maxPerCode {
+			continue
+		}
+		if len(out) >= maxInsertPerTick {
+			break
+		}
+		if e.DetectedAt.IsZero() {
+			e.DetectedAt = now
+		}
+		if e.ExpiresAt.IsZero() {
+			e.ExpiresAt = now.Add(eventTTL)
+		}
+		perCode[e.Code]++
+		out = append(out, e)
+	}
+	return out
+}
+
+func (s *Service) detectPortScan(ctx context.Context, now time.Time, th Thresholds) ([]Event, error) {
+	hits, err := s.scan.PortScan(ctx, portScanWindow, th.PortScanPorts, th.PortScanEvents, s.cfg.IncludePrivate)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Event, 0, len(hits))
+	for _, h := range hits {
+		src := displayIP(h.SrcIP)
+		if src == "" {
+			continue
+		}
+		sev := SeverityHigh
+		e := Event{
+			DetectedAt:  now,
+			WindowStart: now.Add(-portScanWindow),
+			WindowEnd:   now,
+			Code:        CodePortScan,
+			Severity:    sev,
+			Score:       scoreAgainst(float64(h.Ports), float64(th.PortScanPorts), sev),
+			Title:       fmt.Sprintf("Сканирование портов с %s (%d портов за 5 мин)", src, h.Ports),
+			Detail: map[string]any{
+				"src_ip": src, "unique_ports": h.Ports, "events": h.Events,
+				"window_minutes": 5, "threshold_ports": th.PortScanPorts,
+			},
+			SrcIP: src, SrcCountry: h.SrcCountry, EventCount: h.Events,
+			Fingerprint: fingerprint(CodePortScan, src, "", "", now),
+			Map:         MapLink{Period: "15m", Group: "ip", Filter: "all", Query: "src:" + src},
+		}
+		out = append(out, e)
+	}
+	return out, nil
+}
+
+func (s *Service) detectHorizontalScan(ctx context.Context, now time.Time, th Thresholds) ([]Event, error) {
+	hits, err := s.scan.HorizontalScan(ctx, horizontalScanWindow, th.HorizontalHosts, th.HorizontalEvents, s.cfg.IncludePrivate)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Event, 0, len(hits))
+	for _, h := range hits {
+		src := displayIP(h.SrcIP)
+		if src == "" || h.Net24 == "" {
+			continue
+		}
+		sev := SeverityHigh
+		e := Event{
+			DetectedAt:  now,
+			WindowStart: now.Add(-horizontalScanWindow),
+			WindowEnd:   now,
+			Code:        CodeHorizontalScan,
+			Severity:    sev,
+			Score:       scoreAgainst(float64(h.Hosts), float64(th.HorizontalHosts), sev),
+			Title:       fmt.Sprintf("Сканирование подсети %s с %s (%d хостов)", h.Net24, src, h.Hosts),
+			Detail: map[string]any{
+				"src_ip": src, "net24": h.Net24, "hosts": h.Hosts, "events": h.Events,
+				"window_minutes": 5, "threshold_hosts": th.HorizontalHosts,
+			},
+			SrcIP: src, EventCount: h.Events,
+			Fingerprint: fingerprint(CodeHorizontalScan, src, "", h.Net24, now),
+			Map:         MapLink{Period: "15m", Group: "ip", Filter: "all", Query: "src:" + src},
+		}
+		out = append(out, e)
+	}
+	return out, nil
+}
+
+func (s *Service) detectBlockedSurge(ctx context.Context, now time.Time, th Thresholds) ([]Event, error) {
+	currStart := now.Add(-blockedWindow)
+	prevStart := currStart.Add(-blockedWindow)
+	curr, err := s.scan.BlockedCount(ctx, currStart, now)
+	if err != nil {
+		return nil, err
+	}
+	prev, err := s.scan.BlockedCount(ctx, prevStart, currStart)
+	if err != nil {
+		return nil, err
+	}
+	if prev < th.SurgeFloor {
+		return nil, nil
+	}
+	need := uint64(float64(prev) * th.SurgeRatio)
+	if need < th.SurgeAbsMin {
+		need = th.SurgeAbsMin
+	}
+	if curr < need {
+		return nil, nil
+	}
+	sev := SeverityWarn
+	if curr >= th.SurgeAbsMin*5 {
+		sev = SeverityHigh
+	}
+	e := Event{
+		DetectedAt:  now,
+		WindowStart: currStart,
+		WindowEnd:   now,
+		Code:        CodeBlockedSurge,
+		Severity:    sev,
+		Score:       scoreAgainst(float64(curr), float64(need), sev),
+		Title:       fmt.Sprintf("Всплеск блокировок: %d за 15 мин (было %d)", curr, prev),
+		Detail: map[string]any{
+			"blocked_current": curr, "blocked_previous": prev,
+			"ratio": th.SurgeRatio, "abs_min": th.SurgeAbsMin, "window_minutes": 15,
+		},
+		EventCount:  curr,
+		Fingerprint: fingerprint(CodeBlockedSurge, "", "", "*", now),
+		Map:         MapLink{Period: "1h", Group: "country", Filter: "blocked"},
+	}
+	return []Event{e}, nil
+}
+
+func (s *Service) detectNewCountry(ctx context.Context, now time.Time, th Thresholds) ([]Event, error) {
+	cur, err := s.scan.CurrentCountries(ctx, countryWindow, th.NewCountryMin)
+	if err != nil {
+		return nil, err
+	}
+	base, err := s.scan.BaselineCountries(ctx, countryBaselineDays, th.NewCountryBaseline)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Event, 0)
+	for _, c := range cur {
+		cc := strings.TrimSpace(c.Country)
+		if cc == "" {
+			continue
+		}
+		if _, ok := base[cc]; ok {
+			continue
+		}
+		sev := SeverityWarn
+		out = append(out, Event{
+			DetectedAt:  now,
+			WindowStart: now.Add(-countryWindow),
+			WindowEnd:   now,
+			Code:        CodeNewCountryDst,
+			Severity:    sev,
+			Score:       scoreAgainst(float64(c.N), float64(th.NewCountryMin), sev),
+			Title:       fmt.Sprintf("Новая страна назначения: %s (%d событий за час)", cc, c.N),
+			Detail:      map[string]any{"dst_country": cc, "events": c.N, "baseline_days": countryBaselineDays},
+			DstCountry:  cc, EventCount: c.N,
+			Fingerprint: fingerprint(CodeNewCountryDst, "", "", cc, now),
+			Map:         MapLink{Period: "1h", Group: "country", Filter: "all", Query: "dst:" + cc, Country: cc},
+		})
+	}
+	return out, nil
+}
+
+func (s *Service) detectRepNewDst(ctx context.Context, now time.Time, th Thresholds) ([]Event, error) {
+	if s.rep == nil {
+		return nil, nil
+	}
+	edges, err := s.scan.RecentEdges(ctx, repWindow, 2000)
+	if err != nil {
+		return nil, err
+	}
+	type cand struct {
+		EdgeRow
+		Hits []model.ReputationHit
+	}
+	var cands []cand
+	pairs := make([][2]string, 0)
+	for _, e := range edges {
+		src, dst := displayIP(e.SrcIP), displayIP(e.DstIP)
+		if src == "" || dst == "" || e.Count < th.RepMinEvents {
+			continue
+		}
+		if isPrivateOrLocal(dst) {
+			continue
+		}
+		hits := s.rep.Lookup(dst)
+		if len(hits) == 0 {
+			continue
+		}
+		cands = append(cands, cand{EdgeRow: EdgeRow{SrcIP: src, DstIP: dst, Count: e.Count, SrcCountry: e.SrcCountry, DstCountry: e.DstCountry}, Hits: hits})
+		pairs = append(pairs, [2]string{src, dst})
+	}
+	if len(cands) == 0 {
+		return nil, nil
+	}
+	known, err := s.scan.KnownPairs(ctx, pairs, repLookback)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Event, 0)
+	for _, c := range cands {
+		if _, ok := known[pairKey(c.SrcIP, c.DstIP)]; ok {
+			continue
+		}
+		list := ""
+		if len(c.Hits) > 0 {
+			list = c.Hits[0].List
+			if list == "" {
+				list = c.Hits[0].Category
+			}
+		}
+		sev := SeverityHigh
+		out = append(out, Event{
+			DetectedAt:  now,
+			WindowStart: now.Add(-repWindow),
+			WindowEnd:   now,
+			Code:        CodeRepNewDst,
+			Severity:    sev,
+			Score:       scoreAgainst(float64(c.Count), float64(th.RepMinEvents), sev),
+			Title:       fmt.Sprintf("Репутационный dst %s с %s (%s)", c.DstIP, c.SrcIP, list),
+			Detail: map[string]any{
+				"src_ip": c.SrcIP, "dst_ip": c.DstIP, "events": c.Count, "reputation": c.Hits,
+			},
+			SrcIP: c.SrcIP, DstIP: c.DstIP,
+			SrcCountry: c.SrcCountry, DstCountry: c.DstCountry, EventCount: c.Count,
+			Fingerprint: fingerprint(CodeRepNewDst, c.SrcIP, c.DstIP, "", now),
+			Map:         MapLink{Period: "1h", Group: "ip", Filter: "all", Query: "src:" + c.SrcIP + " dst:" + c.DstIP},
+		})
+	}
+	return out, nil
+}

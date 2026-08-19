@@ -6,7 +6,7 @@
 //	clickhouse/trafficstore  — TrafficRepository (events / missing-IP scans via query)
 //	clickhouse/geostore      — GeoRepository, ReloadableGeoIndex, ranges, EnrichLogsMissingGeo
 //	clickhouse/repstore      — ReputationRepository, ReloadableReputationIndex, ranges
-//	clickhouse/sysstore      — SystemRepository, metrics, CountTableRows
+//	clickhouse/anomalystore  — AnomalyRepository (events journal + detector scans)
 //	clickhouse/backupstore   — BackupRunner (BACKUP/RESTORE)
 //	clickhouse/aggstate      — EdgesAggStatus, PreferDailyEdgesAgg, PreferGeoEdgesAgg, PreferHourlyEdgesAgg
 //	clickhouse/sqlclause     — actionWhere / sumBlocked / geo key exprs

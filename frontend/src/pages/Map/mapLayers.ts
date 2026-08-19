@@ -10,6 +10,7 @@ import {
   type GeoFeatureCollection,
 } from './mapHeatmap';
 import { lineHasReputationHits } from './mapReputation';
+import { edgeKey } from './mapAnomalyOverlay';
 import type {
   CountryCentroid,
   MapLine,
@@ -205,6 +206,8 @@ export interface BuildLayersOpts {
   onLineClick: (line: MapLine) => void;
   onPointClick: (point: MapPointEntry) => void;
   onCountryClick: (countryKey: string, feature: GeoFeature) => void;
+  highlightNodeKeys?: string[];
+  highlightEdgeKeys?: string[];
 }
 
 export interface BuildLayersResult {
@@ -380,8 +383,11 @@ export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
         ...arcRGB(d.status, d, opts.monoArcColor, opts.repColorArcs),
         d._flowAlpha || 210,
       ],
-      getWidth: (d: MapLine) =>
-        Math.max(1.2, Math.min(7, 1.2 + Math.log2((d.count || 1) + 1) * 0.9)),
+      getWidth: (d: MapLine) => {
+        const base = Math.max(1.2, Math.min(7, 1.2 + Math.log2((d.count || 1) + 1) * 0.9));
+        if (opts.highlightEdgeKeys?.includes(edgeKey(d.src, d.dst))) return base + 2.5;
+        return base;
+      },
       widthUnits: 'pixels',
       getHeight: (d: MapLine) =>
         isGlobe ? globeArcHeight(d, opts.points) : mapArcHeight(d, opts.points),
@@ -389,6 +395,10 @@ export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
       autoHighlight: true,
       highlightColor: [255, 255, 255, 140],
       parameters: isGlobe ? { cullMode: 'none' } : { depthTest: false },
+      updateTriggers: {
+        getWidth: [opts.highlightEdgeKeys],
+        getSourceColor: [opts.monoArcColor, opts.repColorArcs],
+      },
       onClick: (info: { object?: MapLine }) => {
         if (info.object) opts.onLineClick(info.object);
       },
@@ -404,14 +414,29 @@ export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
       filled: true,
       radiusUnits: 'pixels',
       getPosition: (d: MapPointEntry) => [d.lon, d.lat],
-      getRadius: (d: MapPointEntry) =>
-        Math.max(1.5, Math.min(8, 1.5 + Math.sqrt(d.count || 1) * 0.6)),
-      getFillColor: [88, 166, 255, nodeOpacity],
-      getLineColor: outlineSoft,
+      getRadius: (d: MapPointEntry) => {
+        const base = Math.max(1.5, Math.min(8, 1.5 + Math.sqrt(d.count || 1) * 0.6));
+        if (opts.highlightNodeKeys?.includes(d.key)) return base + 4;
+        return base;
+      },
+      getFillColor: (d: MapPointEntry) =>
+        opts.highlightNodeKeys?.includes(d.key)
+          ? ([225, 29, 72, 200] as [number, number, number, number])
+          : ([88, 166, 255, nodeOpacity] as [number, number, number, number]),
+      getLineColor: (d: MapPointEntry) =>
+        opts.highlightNodeKeys?.includes(d.key)
+          ? ([225, 29, 72, 255] as [number, number, number, number])
+          : outlineSoft,
       lineWidthUnits: 'pixels',
-      getLineWidth: 0.7,
+      getLineWidth: (d: MapPointEntry) => (opts.highlightNodeKeys?.includes(d.key) ? 2 : 0.7),
       radiusMinPixels: 1.5,
       radiusMaxPixels: 14,
+      updateTriggers: {
+        getFillColor: [opts.highlightNodeKeys],
+        getRadius: [opts.highlightNodeKeys],
+        getLineWidth: [opts.highlightNodeKeys],
+        getLineColor: [opts.highlightNodeKeys],
+      },
       parameters: isGlobe ? { cullMode: 'none' } : undefined,
       onClick: (info: { object?: MapPointEntry }) => {
         if (info.object) opts.onPointClick(info.object);

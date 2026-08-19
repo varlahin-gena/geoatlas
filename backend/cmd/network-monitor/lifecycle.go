@@ -62,6 +62,12 @@ func (a *app) run(ctx context.Context) error {
 	}
 	bakCancel()
 
+	anomCtx, anomCancel := context.WithTimeout(base, 5*time.Second)
+	if a.anomalyJobs != nil {
+		a.anomalyJobs.Shutdown(anomCtx)
+	}
+	anomCancel()
+
 	ingestWait := a.ingestSvc.ShutdownWaitTimeout()
 	snap := a.ingestSvc.Stats()
 	slog.Info("waiting for ingest drain",
