@@ -36,7 +36,7 @@ jobs:
       docker_any: ${{ steps.gates.outputs.docker_any }}
       docker_images: ${{ steps.gates.outputs.docker_images }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       # PRs only: skip Playwright / ClickHouse / fuzz / docker when those trees did not change.
       # Push to main/develop still runs every job (gates force true below).
@@ -167,7 +167,7 @@ jobs:
     name: release contract (VERSION / OpenAPI / CHANGELOG)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - name: check VERSION ↔ CHANGELOG ↔ OpenAPI
         run: bash scripts/check-release-contract.sh
 
@@ -177,7 +177,7 @@ jobs:
     if: needs.changes.outputs.shell == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - name: install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: shellcheck
@@ -196,9 +196,9 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: "1.25.x"
           check-latest: true
@@ -247,7 +247,7 @@ jobs:
           go test ./internal/parser/ -run=^$ -fuzz=FuzzParseVerbose -fuzztime=200000x
           go test ./internal/adapter/ingestnet/ -run=^$ -fuzz=FuzzFrameReader -fuzztime=200000x
 
-      - uses: golangci/golangci-lint-action@v9
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           version: v2.12.2
           working-directory: backend
@@ -262,9 +262,9 @@ jobs:
       run:
         working-directory: pkg/chconn
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: "1.25.x"
           check-latest: true
@@ -284,9 +284,9 @@ jobs:
       run:
         working-directory: pkg/syslogngstats
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: "1.25.x"
           check-latest: true
@@ -322,9 +322,9 @@ jobs:
           --health-retries 30
           --ulimit nofile=262144:262144
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: "1.25.x"
           check-latest: true
@@ -394,9 +394,9 @@ jobs:
       run:
         working-directory: stats-collector
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: "1.25.x"
           check-latest: true
@@ -416,7 +416,7 @@ jobs:
       - name: go test
         run: go test -race -count=1 ./...
 
-      - uses: golangci/golangci-lint-action@v9
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           version: v2.12.2
           working-directory: stats-collector
@@ -428,9 +428,9 @@ jobs:
     if: needs.changes.outputs.govulncheck == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: "1.25.x"
           check-latest: true
@@ -460,10 +460,10 @@ jobs:
       matrix:
         image: ${{ fromJSON(needs.changes.outputs.docker_images) }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       # docker-container driver: type=gha cache + --load for /health smoke.
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: build image
         env:
@@ -474,7 +474,7 @@ jobs:
     name: frontend (SPA contract smoke)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: SPA / nginx contract
         run: bash scripts/frontend-smoke.sh
@@ -486,7 +486,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       # Pin commit (annotated tag v0.36.0). Do not use 0.28.0 — tag was pulled after the 2026 supply-chain incident.
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -499,7 +499,7 @@ jobs:
           output: trivy-fs.sarif
           exit-code: "0"
 
-      - uses: github/codeql-action/upload-sarif@v3
+      - uses: github/codeql-action/upload-sarif@f3712979fa5f215279b101dd0a2e3bdfb4353324 # v3
         if: always()
         with:
           sarif_file: trivy-fs.sarif
@@ -514,9 +514,9 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: "22"
           cache: npm
