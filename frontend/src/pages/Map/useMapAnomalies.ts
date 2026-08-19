@@ -54,12 +54,14 @@ export function anomalyMapToView(
   const link = item?.map;
   if (!link) return {};
   const filter = (link.filter || 'all') as MapActionFilter;
+  const focusedCountry = link.country || null;
+  const search = link.group === 'country' && focusedCountry ? '' : link.q || '';
   return {
     period: resolveAnomalyPeriod(item, currentPeriod),
     groupBy: link.group || 'ip',
     filter: filter === 'allowed' || filter === 'blocked' ? filter : 'all',
-    search: link.q || '',
-    focusedCountry: link.country || null,
+    search,
+    focusedCountry,
   };
 }
 

@@ -9,7 +9,12 @@ describe('anomalyMapToView', () => {
       },
       '3h',
     );
-    expect(view).toMatchObject({ period: '3h', groupBy: 'country', focusedCountry: 'Israel' });
+    expect(view).toMatchObject({
+      period: '3h',
+      groupBy: 'country',
+      focusedCountry: 'Israel',
+      search: '',
+    });
   });
 
   it('expands the period when the anomaly is older than its base window', () => {
@@ -26,5 +31,16 @@ describe('anomalyMapToView', () => {
     );
     expect(view.period).toBe('3h');
     vi.useRealTimers();
+  });
+
+  it('does not carry anomaly q when country focus already narrows the map', () => {
+    const view = anomalyMapToView(
+      {
+        map: { period: '1h', group: 'country', filter: 'all', q: 'dst:Portugal', country: 'Portugal' },
+      },
+      '1d',
+    );
+    expect(view.search).toBe('');
+    expect(view.focusedCountry).toBe('Portugal');
   });
 });

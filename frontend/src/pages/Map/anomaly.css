@@ -27,6 +27,24 @@
   color: var(--accent, #58a6ff);
   font-weight: 600;
 }
+.anomaly-exit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent, #58a6ff) 50%, var(--border));
+  background: color-mix(in srgb, var(--panel) 92%, var(--accent, #58a6ff) 8%);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  max-width: min(560px, calc(100% - 24px));
+}
+.anomaly-exit-btn:hover {
+  border-color: var(--accent, #58a6ff);
+}
 .anomaly-panel {
   width: min(360px, calc(100vw - 24px));
   max-height: min(70vh, 520px);

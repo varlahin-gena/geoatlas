@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/auth/AuthContext';
 import { filterNav, PAGE_NAV } from '@/components/nav';
 import { useToast } from '@/components/Toast';
@@ -19,7 +19,7 @@ import { highlightFromAnomaly } from './mapAnomalyOverlay';
 import { useMapDetail } from './useMapDetail';
 import { useMapEvents } from './useMapEvents';
 import { useMapFilters } from './useMapFilters';
-import { useMapViewQuery } from './mapQuery';
+import { type MapViewState, useMapViewQuery } from './mapQuery';
 import { useMapLibreController } from './useMapLibreController';
 import { useMapReputation } from './useMapReputation';
 import { useMapUploads } from './useMapUploads';
@@ -57,6 +57,7 @@ export default function MapPage() {
     applySearchFilter,
     applyView,
   } = view;
+  const anomalyReturnViewRef = useRef<MapViewState | null>(null);
 
   const {
     repMenuOpen,
@@ -310,6 +311,27 @@ export default function MapPage() {
       : emptyOverlay;
 
   const reloadGeoStatus = geoWizard.reloadStatus;
+  const inAnomalyMode = anomalies.active != null;
+
+  function snapshotCurrentView(): MapViewState {
+    return {
+      period,
+      periodFrom,
+      periodTo,
+      groupBy,
+      filter,
+      search,
+      focusedCountry,
+    };
+  }
+
+  function exitAnomalyMode() {
+    anomalies.setActive(null);
+    const back = anomalyReturnViewRef.current;
+    anomalyReturnViewRef.current = null;
+    if (back) applyView(back);
+  }
+
   useEffect(() => {
     if (!isAdmin) return;
     const refreshGeo = () => void reloadGeoStatus();
@@ -402,6 +424,11 @@ export default function MapPage() {
           <div ref={mapContainer} id="map-host" className="viz-host" />
 
           <div className="map-top-stack">
+            {inAnomalyMode ? (
+              <button type="button" className="anomaly-exit-btn" onClick={exitAnomalyMode}>
+                Выйти из режима аномалии
+              </button>
+            ) : null}
             {!anomalies.open ? (
               <AnomalyStrip summary={anomalies.summary} onOpen={() => anomalies.setOpen(true)} />
             ) : null}
@@ -431,6 +458,9 @@ export default function MapPage() {
                 items={anomalies.items}
                 onClose={() => anomalies.setOpen(false)}
                 onShow={(item) => {
+                  if (!anomalyReturnViewRef.current) {
+                    anomalyReturnViewRef.current = snapshotCurrentView();
+                  }
                   anomalies.setActive(item);
                   applyView(anomalyMapToView(item, period));
                   anomalies.setOpen(false);
