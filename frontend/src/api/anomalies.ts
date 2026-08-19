@@ -4,7 +4,6 @@ import type { components } from './openapi';
 export type AnomalyEvent = components['schemas']['AnomalyEvent'];
 export type AnomalySummary = components['schemas']['AnomalySummary'];
 export type AnomalyList = components['schemas']['AnomalyList'];
-export type AnomalyScanStatus = components['schemas']['AnomalyScanStatus'];
 export type AnomalyMapLink = components['schemas']['AnomalyMapLink'];
 
 export function fetchAnomalySummary(init?: RequestInit): Promise<AnomalySummary> {
