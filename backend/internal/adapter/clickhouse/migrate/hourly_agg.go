@@ -137,7 +137,7 @@ func BackfillHourlyEdgesAgg(ctx context.Context, ch clickhouse.Conn) error {
 		return nil
 	}
 	slog.Info("hourly edges agg: backfill started", "days", len(days))
-	if err := insertIPEdgesDays(ctx, ch, sqlclause.IPEdgesHourlyTable, days, nil); err != nil {
+	if err := insertIPEdgesDays(ctx, ch, sqlclause.IPEdgesHourlyTable, days, nil, true); err != nil {
 		aggstate.SetHourlyEdgesAggReady(false)
 		return err
 	}

@@ -336,7 +336,8 @@ func insertGeoEdgesDays(ctx context.Context, ch clickhouse.Conn, groupBy string,
 	table := sqlclause.GeoEdgesTable(groupBy)
 	srcKey, dstKey, srcLabel, dstLabel := sqlclause.GeoGroupExprsPrefixed("traffic_logs", groupBy)
 	selectBody := geoEdgesAggSelectBody(srcKey, dstKey, srcLabel, dstLabel, sqlclause.GeoCoordOK)
-	fromSQL := geoEdgesEnrichedFromSQL(sqlclause.DayTimestampRangeSQL("traffic_logs.timestamp"))
+	// Plain traffic_logs: enrich JOIN OOMs on small CH hosts; map overlays nm_geo_enrich_ip on read.
+	fromSQL := fmt.Sprintf("FROM traffic_logs\n\t\tWHERE %s", sqlclause.DayTimestampRangeSQL("traffic_logs.timestamp"))
 
 	insertTpl := fmt.Sprintf(`
 		INSERT INTO %s
@@ -344,7 +345,7 @@ func insertGeoEdgesDays(ctx context.Context, ch clickhouse.Conn, groupBy string,
 		%s
 		GROUP BY day, src_key, dst_key
 		%s
-	`, table, selectBody, fromSQL, query.AggSettings())
+	`, table, selectBody, fromSQL, query.BackfillAggSettings())
 
 	for i, day := range days {
 		if err := ctx.Err(); err != nil {

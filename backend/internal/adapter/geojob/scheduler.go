@@ -182,13 +182,9 @@ func (s *Scheduler) runEnrich(ctx context.Context) {
 	}
 	if n > 0 {
 		slog.Info("geo job: enrich lookup ready", "ips", n, "lookback_days", s.lookbackDays)
-		if err := s.store.RebuildGeoEdgesLookback(ctx, s.lookbackDays); err != nil {
-			if ctx.Err() != nil {
-				slog.Info("geo job: geo-edges rebuild canceled")
-				return
-			}
-			slog.Error("geo job: geo-edges rebuild failed", "err", err)
-		}
+		// Skip edges rebuild here: on small CH hosts day INSERT+JOIN OOMs (~1.2 GiB)
+		// and flips edges_agg to error. Map reads already overlay nm_geo_enrich_ip.
+		slog.Info("geo job: skip edges lookback rebuild (map uses enrich overlay)")
 	}
 }
 

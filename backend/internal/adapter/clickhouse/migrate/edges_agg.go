@@ -226,7 +226,7 @@ func BackfillEdgesAgg(ctx context.Context, ch clickhouse.Conn) error {
 		DaysTotal: len(days), StartedAt: time.Now().UTC(),
 	})
 
-	if err := insertIPEdgesDays(ctx, ch, sqlclause.IPEdgesDailyTable, days, updateEdgesBackfillStatus(rawRows, len(days))); err != nil {
+	if err := insertIPEdgesDays(ctx, ch, sqlclause.IPEdgesDailyTable, days, updateEdgesBackfillStatus(rawRows, len(days)), true); err != nil {
 		return err
 	}
 
@@ -253,7 +253,7 @@ func updateEdgesBackfillStatus(rawRows uint64, total int) func(int) {
 	}
 }
 
-func insertIPEdgesDays(ctx context.Context, ch clickhouse.Conn, table string, days []time.Time, onDay func(int)) error {
+func insertIPEdgesDays(ctx context.Context, ch clickhouse.Conn, table string, days []time.Time, onDay func(int), markError bool) error {
 	if table != sqlclause.IPEdgesDailyTable && table != sqlclause.IPEdgesHourlyTable {
 		return fmt.Errorf("insert IP edges: invalid table %q", table)
 	}
@@ -275,7 +275,7 @@ func insertIPEdgesDays(ctx context.Context, ch clickhouse.Conn, table string, da
 		%s
 		GROUP BY %s
 		%s
-	`, table, ipEdgesSelectBody(timeExpr, timeAlias), fromSQL, groupExtra, query.AggSettings())
+	`, table, ipEdgesSelectBody(timeExpr, timeAlias), fromSQL, groupExtra, query.BackfillAggSettings())
 
 	for i, day := range days {
 		if err := ctx.Err(); err != nil {
@@ -285,9 +285,11 @@ func insertIPEdgesDays(ctx context.Context, ch clickhouse.Conn, table string, da
 		err := ch.Exec(ictx, insertTpl, day, day)
 		icancel()
 		if err != nil {
-			aggstate.SetEdgesAggStatus(aggstate.EdgesAggStatus{
-				State: "error", Message: err.Error(), DaysTotal: len(days), DaysDone: i,
-			})
+			if markError {
+				aggstate.SetEdgesAggStatus(aggstate.EdgesAggStatus{
+					State: "error", Message: err.Error(), DaysTotal: len(days), DaysDone: i,
+				})
+			}
 			return fmt.Errorf("backfill %s day %s: %w", table, day.Format("2006-01-02"), err)
 		}
 		slog.Info("ip edges: backfill day", "table", table, "done", i+1, "total", len(days), "day", day.Format("2006-01-02"))
@@ -306,17 +308,11 @@ func rebuildIPEdgesDays(ctx context.Context, ch clickhouse.Conn, table string, d
 	if err != nil || !exists {
 		return err
 	}
-	prev := aggstate.GetEdgesAggStatus()
 	for _, day := range days {
 		if err := dropDatePartition(ctx, ch, table, day); err != nil {
 			return err
 		}
 	}
-	err = insertIPEdgesDays(ctx, ch, table, days, nil)
-	// Lookback rebuild after enrich must not leave the map stuck on edges_agg_error
-	// if daily/hourly agg was already ready (map can use traffic_logs + enrich overlay).
-	if err != nil && prev.State == "ready" {
-		aggstate.SetEdgesAggStatus(prev)
-	}
-	return err
+	// markError=false: lookback rebuild must not flip UI to edges_agg_error.
+	return insertIPEdgesDays(ctx, ch, table, days, nil, false)
 }

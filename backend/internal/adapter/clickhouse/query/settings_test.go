@@ -50,3 +50,18 @@ func TestAggSettingsSpillBelowMemoryHeadroom(t *testing.T) {
 		t.Fatalf("expected spill=max/4, got:\n%s", s)
 	}
 }
+
+func TestBackfillAggSettingsUsesSingleThread(t *testing.T) {
+	ConfigureQuerySettings(1288490188, 512<<20, 512<<20, 4)
+	t.Cleanup(func() {
+		ConfigureQuerySettings(2<<30, 256<<20, 256<<20, 2)
+	})
+	s := BackfillAggSettings()
+	if !strings.Contains(s, "max_threads = 1") {
+		t.Fatalf("expected max_threads=1:\n%s", s)
+	}
+	if !strings.Contains(s, "max_bytes_before_external_group_by = 161061273") {
+		// max/8 = 161061273
+		t.Fatalf("expected spill=max/8:\n%s", s)
+	}
+}
