@@ -71,27 +71,32 @@ export function useMapDetail(opts: {
   const openLineDetail = useCallback(
     (line: MapLine) => {
       setDetail(
-        buildLineDetail(line, groupBy, [
-          {
-            label: 'Копировать src',
-            onClick: () => void copyToClipboard(line.src || '', toast),
-          },
-          {
-            label: 'Копировать dst',
-            onClick: () => void copyToClipboard(line.dst || '', toast),
-          },
-          {
-            label: 'Поиск src',
-            onClick: () => applySearchFilter(line.src_label || line.src || ''),
-          },
-          {
-            label: 'Поиск dst',
-            onClick: () => applySearchFilter(line.dst_label || line.dst || ''),
-          },
-        ]),
+        buildLineDetail(
+          line,
+          groupBy,
+          [
+            {
+              label: 'Копировать src',
+              onClick: () => void copyToClipboard(line.src || '', toast),
+            },
+            {
+              label: 'Копировать dst',
+              onClick: () => void copyToClipboard(line.dst || '', toast),
+            },
+            {
+              label: 'Поиск src',
+              onClick: () => applySearchFilter(line.src_label || line.src || ''),
+            },
+            {
+              label: 'Поиск dst',
+              onClick: () => applySearchFilter(line.dst_label || line.dst || ''),
+            },
+          ],
+          points,
+        ),
       );
     },
-    [groupBy, toast, applySearchFilter],
+    [groupBy, toast, applySearchFilter, points],
   );
 
   const openPointDetail = useCallback(

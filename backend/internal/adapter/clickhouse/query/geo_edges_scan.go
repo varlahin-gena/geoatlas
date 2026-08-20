@@ -149,6 +149,8 @@ func promoteMinutesToHours(tr model.TimeRange, prefer bool) model.TimeRange {
 func scanGeoFromLogsSelect(logsTable, srcKey, dstKey, srcLabel, dstLabel, whereExtra string) string {
 	// Не использовать any(src_city) AS src_city: ClickHouse подставит алиас
 	// внутрь any(cityLabelExpr), получится вложенный aggregate (code 184).
+	// Live traffic_logs — JOIN nm_geo_enrich_ip (дыры без ALTER UPDATE).
+	fromSQL := sqlclause.MapLogsFromSQL(logsTable, whereExtra)
 	return fmt.Sprintf(`
 		SELECT
 			%s AS src_key,
@@ -179,15 +181,14 @@ func scanGeoFromLogsSelect(logsTable, srcKey, dstKey, srcLabel, dstLabel, whereE
 			any(dst_country) AS out_dst_country,
 			any(src_city) AS out_src_city,
 			any(dst_city) AS out_dst_city
-		FROM %s
-		WHERE %s
+		%s
 		GROUP BY src_key, dst_key
 		ORDER BY coord_weight DESC, cnt DESC
 	`, srcKey, dstKey, srcLabel, dstLabel,
 		sqlclause.CountIfBlockedSQL(), sqlclause.CountIfAllowedSQL(),
 		sqlclause.GeoCoordOK, sqlclause.GeoCoordOK, sqlclause.GeoCoordOK, sqlclause.GeoCoordOK,
 		sqlclause.CoordWeightSQL(),
-		logsTable, whereExtra)
+		fromSQL)
 }
 
 func scanGeoFromLogsRelative(

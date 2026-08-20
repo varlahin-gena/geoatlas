@@ -107,3 +107,34 @@ func TestGeoEdgesTableAllowlist(t *testing.T) {
 		}
 	}
 }
+
+func TestTrafficLogsEnrichedFromSQLJoinsLookup(t *testing.T) {
+	pred := DayTimestampRangeSQL("traffic_logs.timestamp")
+	from := TrafficLogsEnrichedFromSQL(pred)
+	for _, want := range []string{
+		GeoEnrichIPTable,
+		"LEFT JOIN",
+		"AS sg ON",
+		"AS dg ON",
+		"AS traffic_logs",
+		pred,
+	} {
+		if !strings.Contains(from, want) {
+			t.Fatalf("enriched FROM missing %q:\n%s", want, from)
+		}
+	}
+}
+
+func TestMapLogsFromSQL(t *testing.T) {
+	live := MapLogsFromSQL("traffic_logs", "timestamp >= now()")
+	if !strings.Contains(live, GeoEnrichIPTable) {
+		t.Fatalf("live must join enrich:\n%s", live)
+	}
+	bak := MapLogsFromSQL("nm_bak_traffic_logs", "timestamp >= now()")
+	if strings.Contains(bak, GeoEnrichIPTable) {
+		t.Fatalf("backup must skip enrich:\n%s", bak)
+	}
+	if !strings.Contains(bak, "FROM nm_bak_traffic_logs") {
+		t.Fatalf("backup FROM missing:\n%s", bak)
+	}
+}

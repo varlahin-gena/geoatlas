@@ -163,53 +163,9 @@ func ensureGeoEnrichIPTable(ctx context.Context, ch clickhouse.Conn) error {
 	return nil
 }
 
-// geoEdgesEnrichedFromSQL — FROM-подзапрос: traffic_logs + LEFT JOIN nm_geo_enrich_ip.
-// Исторические дыры закрываются на чтении при INSERT SELECT, без ALTER UPDATE.
-// Пустая lookup-таблица → поведение как FROM traffic_logs.
-// dayFilterPlaceholder — "?" для параметра дня (toDate(timestamp) = ?).
+// geoEdgesEnrichedFromSQL — обёртка над sqlclause.TrafficLogsEnrichedFromSQL (rebuild INSERT SELECT).
 func geoEdgesEnrichedFromSQL(wherePred string) string {
-	sgCountryNeed := sqlclause.CountryNeedsSQL("traffic_logs.src_country")
-	dgCountryNeed := sqlclause.CountryNeedsSQL("traffic_logs.dst_country")
-	return fmt.Sprintf(`
-		FROM (
-			SELECT
-				traffic_logs.timestamp AS timestamp,
-				traffic_logs.action AS action,
-				traffic_logs.rule AS rule,
-				traffic_logs.proto AS proto,
-				traffic_logs.src_port AS src_port,
-				traffic_logs.dst_port AS dst_port,
-				traffic_logs.device AS device,
-				traffic_logs.src_zone AS src_zone,
-				traffic_logs.dst_zone AS dst_zone,
-				traffic_logs.bytes_sent AS bytes_sent,
-				traffic_logs.bytes_recv AS bytes_recv,
-				traffic_logs.packets_sent AS packets_sent,
-				traffic_logs.packets_recv AS packets_recv,
-				traffic_logs.src_ip AS src_ip,
-				traffic_logs.dst_ip AS dst_ip,
-				if(traffic_logs.src_lat = 0 AND traffic_logs.src_lon = 0 AND (sg.lat != 0 OR sg.lon != 0),
-					sg.lat, traffic_logs.src_lat) AS src_lat,
-				if(traffic_logs.src_lat = 0 AND traffic_logs.src_lon = 0 AND (sg.lat != 0 OR sg.lon != 0),
-					sg.lon, traffic_logs.src_lon) AS src_lon,
-				if(traffic_logs.dst_lat = 0 AND traffic_logs.dst_lon = 0 AND (dg.lat != 0 OR dg.lon != 0),
-					dg.lat, traffic_logs.dst_lat) AS dst_lat,
-				if(traffic_logs.dst_lat = 0 AND traffic_logs.dst_lon = 0 AND (dg.lat != 0 OR dg.lon != 0),
-					dg.lon, traffic_logs.dst_lon) AS dst_lon,
-				if((traffic_logs.src_city = '' OR lower(traffic_logs.src_city) IN ('unknown', 'неизвестно')) AND sg.city != '',
-					sg.city, traffic_logs.src_city) AS src_city,
-				if((traffic_logs.dst_city = '' OR lower(traffic_logs.dst_city) IN ('unknown', 'неизвестно')) AND dg.city != '',
-					dg.city, traffic_logs.dst_city) AS dst_city,
-				if(traffic_logs.src_region = '' AND sg.region != '', sg.region, traffic_logs.src_region) AS src_region,
-				if(traffic_logs.dst_region = '' AND dg.region != '', dg.region, traffic_logs.dst_region) AS dst_region,
-				if(%[2]s AND sg.country != '', sg.country, traffic_logs.src_country) AS src_country,
-				if(%[3]s AND dg.country != '', dg.country, traffic_logs.dst_country) AS dst_country
-			FROM traffic_logs
-			LEFT JOIN %[1]s AS sg ON traffic_logs.src_ip = sg.ip
-			LEFT JOIN %[1]s AS dg ON traffic_logs.dst_ip = dg.ip
-			WHERE %[4]s
-		) AS traffic_logs
-	`, sqlclause.GeoEnrichIPTable, sgCountryNeed, dgCountryNeed, wherePred)
+	return sqlclause.TrafficLogsEnrichedFromSQL(wherePred)
 }
 
 func ensureGeoEdgesTable(ctx context.Context, ch clickhouse.Conn, groupBy string) error {

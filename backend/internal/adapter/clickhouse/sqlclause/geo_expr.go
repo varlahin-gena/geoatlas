@@ -23,6 +23,66 @@ func CountryNeedsSQL(col string) string {
 	return fmt.Sprintf(`(%[1]s = '' OR lower(%[1]s) IN ('unknown', 'reserved') OR %[1]s = 'Неизвестно' OR lengthUTF8(trimBoth(%[1]s)) = 2)`, col)
 }
 
+// CityNeedsSQL — пустой/placeholder city, можно заменить из lookup.
+func CityNeedsSQL(col string) string {
+	return fmt.Sprintf(`(%[1]s = '' OR lower(%[1]s) IN ('unknown', 'неизвестно'))`, col)
+}
+
+// TrafficLogsEnrichedFromSQL — FROM-подзапрос: traffic_logs + LEFT JOIN nm_geo_enrich_ip.
+// Исторические дыры закрываются на чтении без ALTER UPDATE.
+// Пустая lookup-таблица → поведение как FROM traffic_logs.
+func TrafficLogsEnrichedFromSQL(wherePred string) string {
+	sgCountryNeed := CountryNeedsSQL("traffic_logs.src_country")
+	dgCountryNeed := CountryNeedsSQL("traffic_logs.dst_country")
+	return fmt.Sprintf(`
+		FROM (
+			SELECT
+				traffic_logs.timestamp AS timestamp,
+				traffic_logs.action AS action,
+				traffic_logs.rule AS rule,
+				traffic_logs.proto AS proto,
+				traffic_logs.src_port AS src_port,
+				traffic_logs.dst_port AS dst_port,
+				traffic_logs.device AS device,
+				traffic_logs.src_zone AS src_zone,
+				traffic_logs.dst_zone AS dst_zone,
+				traffic_logs.bytes_sent AS bytes_sent,
+				traffic_logs.bytes_recv AS bytes_recv,
+				traffic_logs.packets_sent AS packets_sent,
+				traffic_logs.packets_recv AS packets_recv,
+				traffic_logs.src_ip AS src_ip,
+				traffic_logs.dst_ip AS dst_ip,
+				if(traffic_logs.src_lat = 0 AND traffic_logs.src_lon = 0 AND (sg.lat != 0 OR sg.lon != 0),
+					sg.lat, traffic_logs.src_lat) AS src_lat,
+				if(traffic_logs.src_lat = 0 AND traffic_logs.src_lon = 0 AND (sg.lat != 0 OR sg.lon != 0),
+					sg.lon, traffic_logs.src_lon) AS src_lon,
+				if(traffic_logs.dst_lat = 0 AND traffic_logs.dst_lon = 0 AND (dg.lat != 0 OR dg.lon != 0),
+					dg.lat, traffic_logs.dst_lat) AS dst_lat,
+				if(traffic_logs.dst_lat = 0 AND traffic_logs.dst_lon = 0 AND (dg.lat != 0 OR dg.lon != 0),
+					dg.lon, traffic_logs.dst_lon) AS dst_lon,
+				if(%[5]s AND sg.city != '', sg.city, traffic_logs.src_city) AS src_city,
+				if(%[6]s AND dg.city != '', dg.city, traffic_logs.dst_city) AS dst_city,
+				if(traffic_logs.src_region = '' AND sg.region != '', sg.region, traffic_logs.src_region) AS src_region,
+				if(traffic_logs.dst_region = '' AND dg.region != '', dg.region, traffic_logs.dst_region) AS dst_region,
+				if(%[2]s AND sg.country != '', sg.country, traffic_logs.src_country) AS src_country,
+				if(%[3]s AND dg.country != '', dg.country, traffic_logs.dst_country) AS dst_country
+			FROM traffic_logs
+			LEFT JOIN %[1]s AS sg ON traffic_logs.src_ip = sg.ip
+			LEFT JOIN %[1]s AS dg ON traffic_logs.dst_ip = dg.ip
+			WHERE %[4]s
+		) AS traffic_logs
+	`, GeoEnrichIPTable, sgCountryNeed, dgCountryNeed, wherePred,
+		CityNeedsSQL("traffic_logs.src_city"), CityNeedsSQL("traffic_logs.dst_city"))
+}
+
+// MapLogsFromSQL — FROM для скана карты. Live traffic_logs — с overlay nm_geo_enrich_ip.
+func MapLogsFromSQL(logsTable, wherePred string) string {
+	if logsTable == "traffic_logs" {
+		return TrafficLogsEnrichedFromSQL(wherePred)
+	}
+	return fmt.Sprintf("FROM %s\n\t\tWHERE %s", logsTable, wherePred)
+}
+
 // GeoEdgesTable возвращает имя daily-агрегата по city|country.
 // Неизвестный groupBy → "" (не интерполируем произвольные строки в SQL).
 func GeoEdgesTable(groupBy string) string {

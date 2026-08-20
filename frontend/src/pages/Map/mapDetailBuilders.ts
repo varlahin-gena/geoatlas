@@ -44,6 +44,7 @@ function lineEndpointRows(
     port?: number | string;
     zone?: string;
     country?: string;
+    city?: string;
   },
   groupBy: string,
   coarse: boolean,
@@ -56,6 +57,9 @@ function lineEndpointRows(
     { key: lineDetailSampleKey('Порт', coarse), value: side.port ? String(side.port) : '' },
     { key: lineDetailSampleKey('Zone', coarse), value: side.zone || '' },
   );
+  if (side.city) {
+    rows.push({ key: 'City', value: side.city });
+  }
   if (showCountry) {
     rows.push({ key: 'Country', value: mapRuCountry(side.country) });
   }
@@ -66,8 +70,11 @@ export function buildLineDetail(
   line: MapLine,
   groupBy: string,
   actions: DetailAction[],
+  points?: Record<string, MapPoint>,
 ): DetailState {
   const coarse = groupBy === 'subnet' || groupBy === 'city' || groupBy === 'country';
+  const srcPoint = points?.[line.src];
+  const dstPoint = points?.[line.dst];
   return {
     kind: 'line',
     title: `${line.src_label || line.src} → ${line.dst_label || line.dst}`,
@@ -92,7 +99,8 @@ export function buildLineDetail(
             label: line.src_label,
             port: line.src_port,
             zone: line.src_zone,
-            country: line.src_country,
+            country: line.src_country || srcPoint?.country,
+            city: srcPoint?.city,
           },
           groupBy,
           coarse,
@@ -106,7 +114,8 @@ export function buildLineDetail(
             label: line.dst_label,
             port: line.dst_port,
             zone: line.dst_zone,
-            country: line.dst_country,
+            country: line.dst_country || dstPoint?.country,
+            city: dstPoint?.city,
           },
           groupBy,
           coarse,

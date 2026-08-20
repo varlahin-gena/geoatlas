@@ -23,6 +23,35 @@ func TestScanGeoFromLogsSelectClauseOrder(t *testing.T) {
 	}
 }
 
+func TestScanGeoFromLogsSelectJoinsEnrichLookup(t *testing.T) {
+	q := scanGeoFromLogsSelect("traffic_logs", "src_k", "dst_k", "src_l", "dst_l", "timestamp >= now()")
+	for _, want := range []string{
+		sqlclause.GeoEnrichIPTable,
+		"LEFT JOIN",
+		"AS sg ON",
+		"AS dg ON",
+		"AS traffic_logs",
+		"timestamp >= now()",
+	} {
+		if !strings.Contains(q, want) {
+			t.Fatalf("missing %q in:\n%s", want, q)
+		}
+	}
+	if strings.Contains(q, "FROM traffic_logs\n\t\tWHERE") {
+		t.Fatalf("live scan must use enriched subquery, not bare FROM traffic_logs:\n%s", q)
+	}
+}
+
+func TestScanGeoFromLogsSelectBackupSkipsEnrich(t *testing.T) {
+	q := scanGeoFromLogsSelect("nm_bak_traffic_logs", "src_k", "dst_k", "src_l", "dst_l", "timestamp >= now()")
+	if strings.Contains(q, sqlclause.GeoEnrichIPTable) {
+		t.Fatalf("backup scan must not join enrich table:\n%s", q)
+	}
+	if !strings.Contains(q, "FROM nm_bak_traffic_logs") {
+		t.Fatalf("expected bare backup FROM:\n%s", q)
+	}
+}
+
 func TestScanGeoFromLogsSelectNoAliasShadowing(t *testing.T) {
 	srcKey, dstKey, srcLabel, dstLabel := sqlclause.GeoGroupExprs("city")
 	q := scanGeoFromLogsSelect(
