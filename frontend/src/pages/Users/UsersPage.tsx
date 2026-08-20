@@ -101,7 +101,8 @@ export default function UsersPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
-              <span className="hint">мин. {MIN_PASSWORD_LEN}, буква и цифра</span>            </div>
+              <span className="field-hint">мин. {MIN_PASSWORD_LEN}, буква и цифра</span>
+            </div>
             <div className="field">
               <label htmlFor="cRole">Роль</label>
               <select id="cRole" value={role} onChange={(e) => setRole(e.target.value)}>

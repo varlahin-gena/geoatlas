@@ -211,7 +211,7 @@ export function SystemPipelineTab({
                   setRetention({ ...retention, [key]: Number(e.target.value) })
                 }
               />
-              <span className="hint">сейчас: {Number(retention[key] ?? 0)} дн.</span>
+              <span className="field-hint">сейчас: {Number(retention[key] ?? 0)} дн.</span>
             </div>
           ))}
           <button type="submit" className="btn primary">
