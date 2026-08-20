@@ -17,6 +17,13 @@ type Repository struct {
 
 func New(ch clickhouse.Conn) *Repository { return &Repository{ch: ch} }
 
+func normalizeListLimit(limit int) int {
+	if limit < 1 || limit > 200 {
+		return 100
+	}
+	return limit
+}
+
 func (r *Repository) WriteDR(ctx context.Context, e usecaseaudit.DREvent) error {
 	if r == nil || r.ch == nil {
 		return nil
@@ -53,6 +60,7 @@ func (r *Repository) ListDR(ctx context.Context, q usecaseaudit.DRQuery) ([]usec
 	if r == nil || r.ch == nil {
 		return nil, fmt.Errorf("clickhouse not configured")
 	}
+	limit := normalizeListLimit(q.Limit)
 	var sb strings.Builder
 	args := []any{q.Since}
 	sb.WriteString(`SELECT timestamp, actor, action, target, status, message, meta FROM dr_events WHERE timestamp >= ?`)
@@ -69,13 +77,13 @@ func (r *Repository) ListDR(ctx context.Context, q usecaseaudit.DRQuery) ([]usec
 		args = append(args, v)
 	}
 	sb.WriteString(` ORDER BY timestamp DESC LIMIT ?`)
-	args = append(args, uint64(q.Limit))
+	args = append(args, uint64(limit))
 	rows, err := r.ch.Query(ctx, sb.String(), args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	out := make([]usecaseaudit.DREvent, 0, q.Limit)
+	out := make([]usecaseaudit.DREvent, 0, limit)
 	for rows.Next() {
 		var e usecaseaudit.DREvent
 		var meta string
@@ -94,6 +102,7 @@ func (r *Repository) ListAudit(ctx context.Context, q usecaseaudit.AuditQuery) (
 	if r == nil || r.ch == nil {
 		return nil, fmt.Errorf("clickhouse not configured")
 	}
+	limit := normalizeListLimit(q.Limit)
 	var sb strings.Builder
 	args := []any{q.Since}
 	sb.WriteString(`SELECT timestamp, actor, action, resource_type, resource_id, result, ip, details FROM audit_events WHERE timestamp >= ?`)
@@ -110,13 +119,13 @@ func (r *Repository) ListAudit(ctx context.Context, q usecaseaudit.AuditQuery) (
 		args = append(args, v)
 	}
 	sb.WriteString(` ORDER BY timestamp DESC LIMIT ?`)
-	args = append(args, uint64(q.Limit))
+	args = append(args, uint64(limit))
 	rows, err := r.ch.Query(ctx, sb.String(), args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	out := make([]usecaseaudit.AuditEvent, 0, q.Limit)
+	out := make([]usecaseaudit.AuditEvent, 0, limit)
 	for rows.Next() {
 		var e usecaseaudit.AuditEvent
 		var details string
