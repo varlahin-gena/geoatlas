@@ -141,7 +141,7 @@ func (r *Repository) List(ctx context.Context, q usecaseanomaly.ListQuery) ([]us
 		if detail != "" && detail != "{}" {
 			_ = json.Unmarshal([]byte(detail), &e.Detail)
 		}
-		e.Map = mapLinkFromEvent(e)
+		e.Map = usecaseanomaly.MapLinkFor(e)
 		out = append(out, e)
 	}
 	return out, rows.Err()
@@ -745,22 +745,3 @@ func displayIP(ip string) string {
 	return ip
 }
 
-func mapLinkFromEvent(e usecaseanomaly.Event) usecaseanomaly.MapLink {
-	switch e.Code {
-	case usecaseanomaly.CodePortScan, usecaseanomaly.CodeHorizontalScan:
-		if e.SrcIP != "" {
-			return usecaseanomaly.MapLink{Period: "15m", Group: "ip", Filter: "all", Query: "src:" + e.SrcIP}
-		}
-	case usecaseanomaly.CodeRepNewDst:
-		q := ""
-		if e.SrcIP != "" && e.DstIP != "" {
-			q = "src:" + e.SrcIP + " dst:" + e.DstIP
-		}
-		return usecaseanomaly.MapLink{Period: "1h", Group: "ip", Filter: "all", Query: q}
-	case usecaseanomaly.CodeNewCountryDst:
-		return usecaseanomaly.MapLink{Period: "1h", Group: "country", Filter: "all", Query: "dst:" + e.DstCountry, Country: e.DstCountry}
-	case usecaseanomaly.CodeBlockedSurge:
-		return usecaseanomaly.MapLink{Period: "1h", Group: "country", Filter: "blocked"}
-	}
-	return usecaseanomaly.MapLink{Period: "1h", Group: "city", Filter: "all"}
-}

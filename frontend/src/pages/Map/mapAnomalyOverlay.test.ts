@@ -43,4 +43,14 @@ describe('highlightFromAnomaly', () => {
     const h = highlightFromAnomaly(item, points, [], 'city');
     expect(h.nodeKeys).toContain('203.0.113.5');
   });
+
+  it('matches city in city grouping', () => {
+    const item: AnomalyEvent = {
+      fingerprint: 'city',
+      code: 'custom_city_alert',
+      src_city: 'Ashburn',
+    };
+    const h = highlightFromAnomaly(item, points, [], 'city');
+    expect(h.nodeKeys).toContain('198.51.100.9');
+  });
 });

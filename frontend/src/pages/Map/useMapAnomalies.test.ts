@@ -43,4 +43,19 @@ describe('anomalyMapToView', () => {
     expect(view.search).toBe('');
     expect(view.focusedCountry).toBe('Portugal');
   });
+
+  it('keeps blocked surge map query in ip mode', () => {
+    const view = anomalyMapToView(
+      {
+        map: { period: '1h', group: 'ip', filter: 'blocked', q: '(src:10.10. OR dst:10.10.)' },
+      },
+      '1h',
+    );
+    expect(view).toMatchObject({
+      groupBy: 'ip',
+      filter: 'blocked',
+      search: '(src:10.10. OR dst:10.10.)',
+      focusedCountry: null,
+    });
+  });
 });

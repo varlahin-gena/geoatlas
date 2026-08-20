@@ -23,6 +23,7 @@ export function highlightFromAnomaly(
   const srcIP = (item.src_ip || '').trim();
   const dstIP = (item.dst_ip || '').trim();
   const countries = [item.src_country, item.dst_country].filter(Boolean) as string[];
+  const cities = [item.src_city, item.dst_city].map(norm).filter(Boolean);
   const nodeKeys: string[] = [];
   const edgeKeys: string[] = [];
 
@@ -36,10 +37,19 @@ export function highlightFromAnomaly(
   } else {
     for (const [key, p] of Object.entries(points)) {
       const hay = `${key} ${p.country || ''} ${p.city || ''} ${p.label || ''}`;
+      const hayNorm = hay.toLowerCase();
       for (const c of countries) {
-        if (c && hay.toLowerCase().includes(c.toLowerCase())) {
+        if (c && hayNorm.includes(c.toLowerCase())) {
           nodeKeys.push(key);
           break;
+        }
+      }
+      if (groupBy === 'city') {
+        for (const city of cities) {
+          if (hayNorm.includes(city)) {
+            nodeKeys.push(key);
+            break;
+          }
         }
       }
       if (srcIP && (norm(key) === norm(srcIP) || hay.includes(srcIP))) nodeKeys.push(key);

@@ -573,12 +573,7 @@ func (s *Service) detectBlockedSurge(ctx context.Context, now time.Time, th Thre
 		if net.Label != "" {
 			where = net.Network + " (" + net.Label + ")"
 		}
-		netQuery := ipPrefixQuery(net)
-		mapQuery := ""
-		if netQuery != "" {
-			mapQuery = fmt.Sprintf("(src:%s OR dst:%s)", netQuery, netQuery)
-		}
-		out = append(out, Event{
+		event := Event{
 			DetectedAt:  now,
 			WindowStart: currStart,
 			WindowEnd:   now,
@@ -595,8 +590,9 @@ func (s *Service) detectBlockedSurge(ctx context.Context, now time.Time, th Thre
 			EventCount:     curr,
 			Fingerprint:    fingerprint(CodeBlockedSurge, "", "", net.Network, now),
 			SuppressionKey: key,
-			Map:            MapLink{Period: "1h", Group: "ip", Filter: "blocked", Query: mapQuery},
-		})
+		}
+		event.Map = MapLinkFor(event)
+		out = append(out, event)
 	}
 	return out, nil
 }
