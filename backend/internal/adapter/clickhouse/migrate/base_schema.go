@@ -25,6 +25,24 @@ ENGINE = MergeTree()
 ORDER BY (start_ip, end_ip)
 `
 
+const enterpriseNetsDDL = `
+CREATE TABLE IF NOT EXISTS enterprise_nets
+(
+    start_ip   UInt32,
+    end_ip     UInt32,
+    network    String,
+    label      String,
+    country    String,
+    region     String,
+    city       String,
+    created_at DateTime64(3),
+    ver        UInt64,
+    is_deleted UInt8 DEFAULT 0
+)
+ENGINE = ReplacingMergeTree(ver)
+ORDER BY (start_ip, end_ip)
+`
+
 const parseErrorsDDL = `
 CREATE TABLE IF NOT EXISTS parse_errors
 (
@@ -81,6 +99,7 @@ func coldBootstrapStatements() []bootstrapStmt {
 	return []bootstrapStmt{
 		{title: "traffic_logs: основной поток событий МСЭ", sql: trafficLogsCreateSQL("traffic_logs", true)},
 		{title: "geo_ranges: GeoIP-база", sql: geoRangesDDL},
+		{title: "enterprise_nets: подсети предприятия для аномалий", sql: enterpriseNetsDDL},
 		{title: "reputation_ranges: офлайн-репутационные списки", sql: reputationRangesDDL},
 		{title: "parse_errors: строки логов, которые не удалось распарсить", sql: parseErrorsDDL},
 		{title: "system_metrics: метрики самой системы", sql: systemMetricsDDL},

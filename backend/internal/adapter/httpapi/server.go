@@ -199,6 +199,15 @@ func NewServer(p Params, opts ...ServerOption) *Server {
 	rr.Handle("PUT", "/api/geo-ranges",
 		chain(http.HandlerFunc(geoH.UpdateGeoRange), opsMW, csrf, maxBytesMW(maxJSONBodySize)),
 	)
+	rr.Handle("GET", "/api/enterprise-nets",
+		withTimeout(chain(http.HandlerFunc(geoH.ListEnterpriseNets), adminMW), readTimeout),
+	)
+	rr.Handle("POST", "/api/enterprise-nets",
+		chain(http.HandlerFunc(geoH.AddEnterpriseNet), opsMW, csrf, maxBytesMW(maxJSONBodySize)),
+	)
+	rr.Handle("DELETE", "/api/enterprise-nets/{start_ip}/{end_ip}",
+		chain(http.HandlerFunc(geoH.DeleteEnterpriseNet), opsMW, csrf),
+	)
 
 	rr.Handle("GET", "/api/reputation/lists",
 		withTimeout(chain(http.HandlerFunc(repH.ListLists), adminMW), readTimeout),

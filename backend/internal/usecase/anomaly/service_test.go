@@ -2,6 +2,7 @@ package anomaly
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -74,13 +75,13 @@ type fakeScan struct {
 }
 
 func (f *fakeScan) OldestLogTime(context.Context) (time.Time, error) { return f.oldest, nil }
-func (f *fakeScan) PortScan(context.Context, time.Duration, int, int, bool) ([]PortScanHit, error) {
+func (f *fakeScan) PortScan(context.Context, time.Duration, int, int, bool, []IPRange) ([]PortScanHit, error) {
 	return f.ports, nil
 }
-func (f *fakeScan) HorizontalScan(context.Context, time.Duration, int, int, bool) ([]HorizontalScanHit, error) {
+func (f *fakeScan) HorizontalScan(context.Context, time.Duration, int, int, bool, []IPRange) ([]HorizontalScanHit, error) {
 	return f.horiz, nil
 }
-func (f *fakeScan) BlockedCount(_ context.Context, start, end time.Time) (uint64, error) {
+func (f *fakeScan) BlockedCount(_ context.Context, start, end time.Time, _ *IPRange) (uint64, error) {
 	if !f.hasBlocked {
 		return 0, nil
 	}
@@ -94,19 +95,19 @@ func (f *fakeScan) BlockedCount(_ context.Context, start, end time.Time) (uint64
 	}
 	return f.blockedPrev, nil
 }
-func (f *fakeScan) CurrentCountries(context.Context, time.Duration, uint64) ([]CountryCount, error) {
+func (f *fakeScan) CurrentCountries(context.Context, time.Duration, uint64, []IPRange) ([]CountryCount, error) {
 	return f.countries, nil
 }
-func (f *fakeScan) CurrentCountryTotal(context.Context, time.Duration) (uint64, error) {
+func (f *fakeScan) CurrentCountryTotal(context.Context, time.Duration, []IPRange) (uint64, error) {
 	return f.countryTotal, nil
 }
-func (f *fakeScan) BaselineCountries(context.Context, int, uint64) (map[string]struct{}, error) {
+func (f *fakeScan) BaselineCountries(context.Context, int, uint64, []IPRange) (map[string]struct{}, error) {
 	if f.baseline == nil {
 		return map[string]struct{}{}, nil
 	}
 	return f.baseline, nil
 }
-func (f *fakeScan) RecentEdges(context.Context, time.Duration, int) ([]EdgeRow, error) {
+func (f *fakeScan) RecentEdges(context.Context, time.Duration, int, []IPRange) ([]EdgeRow, error) {
 	return f.edges, nil
 }
 func (f *fakeScan) KnownPairs(context.Context, [][2]string, time.Duration) (map[string]struct{}, error) {
@@ -125,6 +126,21 @@ func (f fakeRep) Lookup(ip string) []model.ReputationHit {
 		return nil
 	}
 	return f.hits[ip]
+}
+
+type fakeNets struct {
+	items []model.EnterpriseNet
+}
+
+func (f fakeNets) ListEnterpriseNets(context.Context) ([]model.EnterpriseNet, error) {
+	return f.items, nil
+}
+
+func withEnterprise(s *Service) *Service {
+	s.SetEnterpriseNets(fakeNets{items: []model.EnterpriseNet{{
+		StartIP: 167772160, EndIP: 184549375, Network: "10.0.0.0/8", Label: "LAN",
+	}}})
+	return s
 }
 
 func newSvc(store *fakeStore, scan *fakeScan, rep ReputationLookuper) *Service {
@@ -154,7 +170,7 @@ func TestPortScanEmits(t *testing.T) {
 		oldest: now.Add(-30 * 24 * time.Hour),
 		ports:  []PortScanHit{{SrcIP: "203.0.113.5", Ports: 80, Events: 200, SrcCountry: "CN"}},
 	}
-	res := newSvc(store, scan, nil).Scan(context.Background(), now)
+	res := withEnterprise(newSvc(store, scan, nil)).Scan(context.Background(), now)
 	if res.Inserted != 1 {
 		t.Fatalf("inserted=%d error=%s", res.Inserted, res.Error)
 	}
@@ -187,7 +203,7 @@ func TestHorizontalScanEmits(t *testing.T) {
 		oldest: now.Add(-30 * 24 * time.Hour),
 		horiz:  []HorizontalScanHit{{SrcIP: "198.51.100.7", Net24: "203.0.113.0/24", Hosts: 50, Events: 90}},
 	}
-	res := newSvc(store, scan, nil).Scan(context.Background(), now)
+	res := withEnterprise(newSvc(store, scan, nil)).Scan(context.Background(), now)
 	if res.Inserted != 1 || store.inserted[0].Code != CodeHorizontalScan {
 		t.Fatalf("got %+v inserted=%v", store.inserted, res)
 	}
@@ -203,7 +219,7 @@ func TestBlockedSurgeFloor(t *testing.T) {
 		blockedCurr: 20,
 		blockedPrev: 0,
 	}
-	res := newSvc(store, scan, nil).Scan(context.Background(), now)
+	res := withEnterprise(newSvc(store, scan, nil)).Scan(context.Background(), now)
 	if res.Inserted != 0 {
 		t.Fatalf("0→20 must not emit, got %d", res.Inserted)
 	}
@@ -219,15 +235,38 @@ func TestBlockedSurgeEmits(t *testing.T) {
 		blockedCurr: 2000,
 		blockedPrev: 80,
 	}
-	res := newSvc(store, scan, nil).Scan(context.Background(), now)
+	res := withEnterprise(newSvc(store, scan, nil)).Scan(context.Background(), now)
 	found := false
 	for _, e := range store.inserted {
 		if e.Code == CodeBlockedSurge {
 			found = true
+			if e.Device != "10.0.0.0/8" {
+				t.Fatalf("expected per-net device, got %q", e.Device)
+			}
 		}
 	}
 	if res.Inserted == 0 || !found {
 		t.Fatalf("expected blocked_surge, inserted=%d items=%v", res.Inserted, store.inserted)
+	}
+}
+
+func TestScanSkippedWithoutEnterpriseNets(t *testing.T) {
+	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
+	store := &fakeStore{exist: map[string]struct{}{}}
+	scan := &fakeScan{
+		oldest:      now.Add(-30 * 24 * time.Hour),
+		now:         now,
+		hasBlocked:  true,
+		blockedCurr: 2000,
+		blockedPrev: 80,
+		ports:       []PortScanHit{{SrcIP: "203.0.113.5", Ports: 80, Events: 200}},
+	}
+	res := newSvc(store, scan, nil).Scan(context.Background(), now)
+	if res.Skipped != "no_enterprise_nets" {
+		t.Fatalf("skipped=%q want no_enterprise_nets", res.Skipped)
+	}
+	if len(store.inserted) != 0 {
+		t.Fatalf("expected no alerts without enterprise nets, got %v", store.inserted)
 	}
 }
 
@@ -258,7 +297,7 @@ func TestNewCountryEmits(t *testing.T) {
 		countryTotal: 100,
 		baseline:     map[string]struct{}{"RU": {}},
 	}
-	res := newSvc(store, scan, nil).Scan(context.Background(), now)
+	res := withEnterprise(newSvc(store, scan, nil)).Scan(context.Background(), now)
 	found := false
 	for _, e := range store.inserted {
 		if e.Code == CodeNewCountryDst {
@@ -280,7 +319,7 @@ func TestRepNewDst(t *testing.T) {
 	rep := fakeRep{hits: map[string][]model.ReputationHit{
 		"198.51.100.9": {{List: "spamhaus_drop", Category: "drop"}},
 	}}
-	res := newSvc(store, scan, rep).Scan(context.Background(), now)
+	res := withEnterprise(newSvc(store, scan, rep)).Scan(context.Background(), now)
 	found := false
 	for _, e := range store.inserted {
 		if e.Code == CodeRepNewDst {
@@ -288,18 +327,43 @@ func TestRepNewDst(t *testing.T) {
 		}
 	}
 	if res.Inserted == 0 || !found {
-		t.Fatalf("expected rep_new_dst %+v", store.inserted)
+		t.Fatalf("expected rep_new_peer %+v", store.inserted)
 	}
 
 	scan.knownPairs = map[string]struct{}{"10.1.1.1|198.51.100.9": {}}
 	store2 := &fakeStore{exist: map[string]struct{}{}}
-	res2 := newSvc(store2, scan, rep).Scan(context.Background(), now)
+	res2 := withEnterprise(newSvc(store2, scan, rep)).Scan(context.Background(), now)
 	for _, e := range store2.inserted {
 		if e.Code == CodeRepNewDst {
 			t.Fatal("known pair must not emit")
 		}
 	}
 	_ = res2
+}
+
+func TestRepNewSrc(t *testing.T) {
+	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
+	store := &fakeStore{exist: map[string]struct{}{}}
+	scan := &fakeScan{
+		oldest: now.Add(-30 * 24 * time.Hour),
+		edges:  []EdgeRow{{SrcIP: "198.51.100.9", DstIP: "10.1.1.1", Count: 5}},
+	}
+	rep := fakeRep{hits: map[string][]model.ReputationHit{
+		"198.51.100.9": {{List: "spamhaus_drop", Category: "drop"}},
+	}}
+	res := withEnterprise(newSvc(store, scan, rep)).Scan(context.Background(), now)
+	found := false
+	for _, e := range store.inserted {
+		if e.Code == CodeRepNewDst {
+			found = true
+			if !strings.Contains(e.Title, "Репутационный источник") {
+				t.Fatalf("unexpected title %q", e.Title)
+			}
+		}
+	}
+	if res.Inserted == 0 || !found {
+		t.Fatalf("expected rep_new_peer for bad src %+v", store.inserted)
+	}
 }
 
 func TestAckCreatesSuppressionWindow(t *testing.T) {
@@ -326,7 +390,7 @@ func TestNewCountryMinShareSkipsNoise(t *testing.T) {
 		countryTotal: 1000,
 		baseline:     map[string]struct{}{"RU": {}},
 	}
-	res := newSvc(store, scan, nil).Scan(context.Background(), now)
+	res := withEnterprise(newSvc(store, scan, nil)).Scan(context.Background(), now)
 	if res.Inserted != 0 {
 		t.Fatalf("expected low-share country to skip, got %d", res.Inserted)
 	}
@@ -345,7 +409,7 @@ func TestNewCountryRepeatCooldownSkipsRecentRepeat(t *testing.T) {
 		countryTotal: 100,
 		baseline:     map[string]struct{}{"RU": {}},
 	}
-	res := newSvc(store, scan, nil).Scan(context.Background(), now)
+	res := withEnterprise(newSvc(store, scan, nil)).Scan(context.Background(), now)
 	if res.Inserted != 0 {
 		t.Fatalf("expected repeat cooldown to skip, got %d", res.Inserted)
 	}
@@ -362,7 +426,7 @@ func TestSuppressedPatternNotInserted(t *testing.T) {
 		oldest: now.Add(-30 * 24 * time.Hour),
 		ports:  []PortScanHit{{SrcIP: "203.0.113.5", Ports: 80, Events: 200}},
 	}
-	res := newSvc(store, scan, nil).Scan(context.Background(), now)
+	res := withEnterprise(newSvc(store, scan, nil)).Scan(context.Background(), now)
 	if res.Inserted != 0 {
 		t.Fatalf("expected active suppression to skip insert, got %d", res.Inserted)
 	}
@@ -376,7 +440,7 @@ func TestDedupSameFingerprint(t *testing.T) {
 		oldest: now.Add(-30 * 24 * time.Hour),
 		ports:  []PortScanHit{{SrcIP: "203.0.113.5", Ports: 80, Events: 200}},
 	}
-	res := newSvc(store, scan, nil).Scan(context.Background(), now)
+	res := withEnterprise(newSvc(store, scan, nil)).Scan(context.Background(), now)
 	if res.Inserted != 0 {
 		t.Fatalf("dedup failed: %d", res.Inserted)
 	}
@@ -394,7 +458,7 @@ func TestCapPerCode(t *testing.T) {
 		hits[i].SrcIP = "198.51.100." + itoa(i+1)
 	}
 	scan := &fakeScan{oldest: now.Add(-30 * 24 * time.Hour), ports: hits}
-	res := newSvc(store, scan, nil).Scan(context.Background(), now)
+	res := withEnterprise(newSvc(store, scan, nil)).Scan(context.Background(), now)
 	n := 0
 	for _, e := range store.inserted {
 		if e.Code == CodePortScan {

@@ -23,6 +23,7 @@ const (
 	tickTimeout          = 25 * time.Second
 	eventTTL             = 30 * 24 * time.Hour
 	summarySince         = 24 * time.Hour
+	blockedSurgeRepeatCooldown = 6 * time.Hour
 )
 
 // Config — флаги модуля.
@@ -68,6 +69,7 @@ type Service struct {
 	rep      ReputationLookuper
 	gate     Gate
 	metric   Metrics
+	nets     EnterpriseNetSource
 	statusMu sync.Mutex
 	status   ScanStatus
 }
@@ -79,6 +81,12 @@ func New(cfg Config, store EventStore, scan TrafficScanner, rep ReputationLookup
 	s := &Service{cfg: cfg, store: store, scan: scan, rep: rep, gate: gate, metric: metric}
 	s.status = ScanStatus{Enabled: cfg.Enabled}
 	return s
+}
+
+func (s *Service) SetEnterpriseNets(src EnterpriseNetSource) {
+	if s != nil {
+		s.nets = src
+	}
 }
 
 func (s *Service) Enabled() bool {
@@ -133,6 +141,7 @@ func (s *Service) List(ctx context.Context, q ListQuery) (ListResult, error) {
 	sum.Learning = s.isLearning(ctx, now)
 	sum.Enabled = true
 	sum.UpdatedAt = now
+	sum.EnterpriseNets = len(s.loadEnterpriseNets(ctx))
 	return ListResult{Items: items, Summary: sum}, nil
 }
 
@@ -148,6 +157,7 @@ func (s *Service) Summary(ctx context.Context) (Summary, error) {
 	sum.Learning = s.isLearning(ctx, now)
 	sum.Enabled = true
 	sum.UpdatedAt = now
+	sum.EnterpriseNets = len(s.loadEnterpriseNets(ctx))
 	return sum, nil
 }
 
@@ -196,6 +206,22 @@ func (s *Service) Scan(ctx context.Context, now time.Time) ScanResult {
 	if s.cfg.NewCountryMinShare > 0 {
 		th.NewCountryMinShare = s.cfg.NewCountryMinShare
 	}
+	ent := s.loadEnterpriseNets(tctx)
+	if len(ent) == 0 {
+		dur := time.Since(start)
+		res.Skipped = "no_enterprise_nets"
+		s.setStatus(func(st *ScanStatus) {
+			st.Learning = learning
+			st.LastDuration = dur.Truncate(time.Millisecond).String()
+			st.LastInserted = 0
+			st.LastSkip = res.Skipped
+			st.EnterpriseNets = 0
+			st.LastError = ""
+			st.LastOK = now
+		})
+		s.observe(dur, 0, res.Skipped)
+		return res
+	}
 
 	var candidates []Event
 	run := func(code string, fn func(context.Context) ([]Event, error)) {
@@ -217,22 +243,22 @@ func (s *Service) Scan(ctx context.Context, now time.Time) ScanResult {
 	}
 
 	run(CodeBlockedSurge, func(c context.Context) ([]Event, error) {
-		return s.detectBlockedSurge(c, now, th)
+		return s.detectBlockedSurge(c, now, th, ent)
 	})
 	run(CodeNewCountryDst, func(c context.Context) ([]Event, error) {
 		if learning {
 			return nil, nil
 		}
-		return s.detectNewCountry(c, now, th)
+		return s.detectNewCountry(c, now, th, ent)
 	})
 	run(CodePortScan, func(c context.Context) ([]Event, error) {
-		return s.detectPortScan(c, now, th)
+		return s.detectPortScan(c, now, th, ent)
 	})
 	run(CodeHorizontalScan, func(c context.Context) ([]Event, error) {
-		return s.detectHorizontalScan(c, now, th)
+		return s.detectHorizontalScan(c, now, th, ent)
 	})
 	run(CodeRepNewDst, func(c context.Context) ([]Event, error) {
-		return s.detectRepNewDst(c, now, th)
+		return s.detectRepNewDst(c, now, th, ent)
 	})
 
 	kept := s.dedupAndCap(tctx, candidates, now)
@@ -259,6 +285,7 @@ func (s *Service) Scan(ctx context.Context, now time.Time) ScanResult {
 		st.LastDuration = dur.Truncate(time.Millisecond).String()
 		st.LastInserted = res.Inserted
 		st.LastSkip = ""
+		st.EnterpriseNets = len(ent)
 		if res.Error != "" {
 			st.LastError = res.Error
 		} else {
@@ -274,6 +301,25 @@ func (s *Service) observe(d time.Duration, inserted int, skip string) {
 	if s.metric != nil {
 		s.metric.ObserveScan(d, inserted, skip)
 	}
+}
+
+func (s *Service) loadEnterpriseNets(ctx context.Context) []IPRange {
+	if s == nil || s.nets == nil {
+		return nil
+	}
+	rows, err := s.nets.ListEnterpriseNets(ctx)
+	if err != nil {
+		slog.Warn("anomaly enterprise nets load failed", "err", err)
+		return nil
+	}
+	out := make([]IPRange, 0, len(rows))
+	for _, n := range rows {
+		if n.EndIP < n.StartIP {
+			continue
+		}
+		out = append(out, IPRange{Start: n.StartIP, End: n.EndIP, Network: n.Network, Label: n.Label})
+	}
+	return out
 }
 
 func suppressionKeyForCodeCountry(code, country string) SuppressionKey {
@@ -295,6 +341,9 @@ func suppressionKeyForEvent(e Event) SuppressionKey {
 			return SuppressionKey(e.Code + "|pair|" + e.SrcIP + "|" + e.DstIP)
 		}
 	case CodeBlockedSurge:
+		if e.Device != "" {
+			return SuppressionKey(e.Code + "|net|" + e.Device)
+		}
 		return SuppressionKey(e.Code + "|global")
 	}
 	return ""
@@ -381,8 +430,11 @@ func (s *Service) dedupAndCap(ctx context.Context, in []Event, now time.Time) []
 	return out
 }
 
-func (s *Service) detectPortScan(ctx context.Context, now time.Time, th Thresholds) ([]Event, error) {
-	hits, err := s.scan.PortScan(ctx, portScanWindow, th.PortScanPorts, th.PortScanEvents, s.cfg.IncludePrivate)
+func (s *Service) detectPortScan(ctx context.Context, now time.Time, th Thresholds, nets []IPRange) ([]Event, error) {
+	if len(nets) == 0 {
+		return nil, nil
+	}
+	hits, err := s.scan.PortScan(ctx, portScanWindow, th.PortScanPorts, th.PortScanEvents, s.cfg.IncludePrivate, nets)
 	if err != nil {
 		return nil, err
 	}
@@ -400,7 +452,7 @@ func (s *Service) detectPortScan(ctx context.Context, now time.Time, th Threshol
 			Code:        CodePortScan,
 			Severity:    sev,
 			Score:       scoreAgainst(float64(h.Ports), float64(th.PortScanPorts), sev),
-			Title:       fmt.Sprintf("Сканирование портов с %s (%d портов за 5 мин)", src, h.Ports),
+			Title:       fmt.Sprintf("Сканирование портов: %s (%d портов за 5 мин)", src, h.Ports),
 			Detail: map[string]any{
 				"src_ip": src, "unique_ports": h.Ports, "events": h.Events,
 				"window_minutes": 5, "threshold_ports": th.PortScanPorts,
@@ -414,8 +466,11 @@ func (s *Service) detectPortScan(ctx context.Context, now time.Time, th Threshol
 	return out, nil
 }
 
-func (s *Service) detectHorizontalScan(ctx context.Context, now time.Time, th Thresholds) ([]Event, error) {
-	hits, err := s.scan.HorizontalScan(ctx, horizontalScanWindow, th.HorizontalHosts, th.HorizontalEvents, s.cfg.IncludePrivate)
+func (s *Service) detectHorizontalScan(ctx context.Context, now time.Time, th Thresholds, nets []IPRange) ([]Event, error) {
+	if len(nets) == 0 {
+		return nil, nil
+	}
+	hits, err := s.scan.HorizontalScan(ctx, horizontalScanWindow, th.HorizontalHosts, th.HorizontalEvents, s.cfg.IncludePrivate, nets)
 	if err != nil {
 		return nil, err
 	}
@@ -433,7 +488,7 @@ func (s *Service) detectHorizontalScan(ctx context.Context, now time.Time, th Th
 			Code:        CodeHorizontalScan,
 			Severity:    sev,
 			Score:       scoreAgainst(float64(h.Hosts), float64(th.HorizontalHosts), sev),
-			Title:       fmt.Sprintf("Сканирование подсети %s с %s (%d хостов)", h.Net24, src, h.Hosts),
+			Title:       fmt.Sprintf("Сканирование подсети: %s -> %s (%d хостов)", src, h.Net24, h.Hosts),
 			Detail: map[string]any{
 				"src_ip": src, "net24": h.Net24, "hosts": h.Hosts, "events": h.Events,
 				"window_minutes": 5, "threshold_hosts": th.HorizontalHosts,
@@ -447,60 +502,89 @@ func (s *Service) detectHorizontalScan(ctx context.Context, now time.Time, th Th
 	return out, nil
 }
 
-func (s *Service) detectBlockedSurge(ctx context.Context, now time.Time, th Thresholds) ([]Event, error) {
+func (s *Service) detectBlockedSurge(ctx context.Context, now time.Time, th Thresholds, nets []IPRange) ([]Event, error) {
+	if len(nets) == 0 {
+		return nil, nil
+	}
 	currStart := now.Add(-blockedWindow)
 	prevStart := currStart.Add(-blockedWindow)
-	curr, err := s.scan.BlockedCount(ctx, currStart, now)
+	keys := make([]SuppressionKey, 0, len(nets))
+	for _, n := range nets {
+		keys = append(keys, SuppressionKey(CodeBlockedSurge+"|net|"+n.Network))
+	}
+	recent, err := s.store.RecentSuppressionKeys(ctx, CodeBlockedSurge, keys, now.Add(-blockedSurgeRepeatCooldown))
 	if err != nil {
 		return nil, err
 	}
-	prev, err := s.scan.BlockedCount(ctx, prevStart, currStart)
-	if err != nil {
-		return nil, err
+	out := make([]Event, 0)
+	for _, n := range nets {
+		net := n
+		key := SuppressionKey(CodeBlockedSurge + "|net|" + net.Network)
+		if _, ok := recent[key]; ok {
+			continue
+		}
+		curr, err := s.scan.BlockedCount(ctx, currStart, now, &net)
+		if err != nil {
+			return nil, err
+		}
+		prev, err := s.scan.BlockedCount(ctx, prevStart, currStart, &net)
+		if err != nil {
+			return nil, err
+		}
+		if prev < th.SurgeFloor {
+			continue
+		}
+		need := uint64(float64(prev) * th.SurgeRatio)
+		if need < th.SurgeAbsMin {
+			need = th.SurgeAbsMin
+		}
+		if curr < need {
+			continue
+		}
+		sev := SeverityWarn
+		if curr >= th.SurgeAbsMin*5 {
+			sev = SeverityHigh
+		}
+		where := net.Network
+		if net.Label != "" {
+			where = net.Network + " (" + net.Label + ")"
+		}
+		out = append(out, Event{
+			DetectedAt:  now,
+			WindowStart: currStart,
+			WindowEnd:   now,
+			Code:        CodeBlockedSurge,
+			Severity:    sev,
+			Score:       scoreAgainst(float64(curr), float64(need), sev),
+			Title:       fmt.Sprintf("Всплеск блокировок: %s (%d за 15 мин, было %d)", where, curr, prev),
+			Detail: map[string]any{
+				"blocked_current": curr, "blocked_previous": prev,
+				"ratio": th.SurgeRatio, "abs_min": th.SurgeAbsMin, "window_minutes": 15,
+				"network": net.Network, "label": net.Label,
+			},
+			Device:         net.Network,
+			EventCount:     curr,
+			Fingerprint:    fingerprint(CodeBlockedSurge, "", "", net.Network, now),
+			SuppressionKey: key,
+			Map:            MapLink{Period: "1h", Group: "ip", Filter: "blocked"},
+		})
 	}
-	if prev < th.SurgeFloor {
-		return nil, nil
-	}
-	need := uint64(float64(prev) * th.SurgeRatio)
-	if need < th.SurgeAbsMin {
-		need = th.SurgeAbsMin
-	}
-	if curr < need {
-		return nil, nil
-	}
-	sev := SeverityWarn
-	if curr >= th.SurgeAbsMin*5 {
-		sev = SeverityHigh
-	}
-	e := Event{
-		DetectedAt:  now,
-		WindowStart: currStart,
-		WindowEnd:   now,
-		Code:        CodeBlockedSurge,
-		Severity:    sev,
-		Score:       scoreAgainst(float64(curr), float64(need), sev),
-		Title:       fmt.Sprintf("Всплеск блокировок: %d за 15 мин (было %d)", curr, prev),
-		Detail: map[string]any{
-			"blocked_current": curr, "blocked_previous": prev,
-			"ratio": th.SurgeRatio, "abs_min": th.SurgeAbsMin, "window_minutes": 15,
-		},
-		EventCount:  curr,
-		Fingerprint: fingerprint(CodeBlockedSurge, "", "", "*", now),
-		Map:         MapLink{Period: "1h", Group: "country", Filter: "blocked"},
-	}
-	return []Event{e}, nil
+	return out, nil
 }
 
-func (s *Service) detectNewCountry(ctx context.Context, now time.Time, th Thresholds) ([]Event, error) {
-	cur, err := s.scan.CurrentCountries(ctx, countryWindow, th.NewCountryMin)
+func (s *Service) detectNewCountry(ctx context.Context, now time.Time, th Thresholds, nets []IPRange) ([]Event, error) {
+	if len(nets) == 0 {
+		return nil, nil
+	}
+	cur, err := s.scan.CurrentCountries(ctx, countryWindow, th.NewCountryMin, nets)
 	if err != nil {
 		return nil, err
 	}
-	total, err := s.scan.CurrentCountryTotal(ctx, countryWindow)
+	total, err := s.scan.CurrentCountryTotal(ctx, countryWindow, nets)
 	if err != nil {
 		return nil, err
 	}
-	base, err := s.scan.BaselineCountries(ctx, countryBaselineDays, th.NewCountryBaseline)
+	base, err := s.scan.BaselineCountries(ctx, countryBaselineDays, th.NewCountryBaseline, nets)
 	if err != nil {
 		return nil, err
 	}
@@ -544,7 +628,7 @@ func (s *Service) detectNewCountry(ctx context.Context, now time.Time, th Thresh
 			Code:        CodeNewCountryDst,
 			Severity:    sev,
 			Score:       scoreAgainst(float64(c.N), float64(th.NewCountryMin), sev),
-			Title:       fmt.Sprintf("Новая страна назначения: %s (%d событий за час)", cc, c.N),
+			Title:       fmt.Sprintf("Новая страна назначения: %s (%d событий за 1 ч)", cc, c.N),
 			Detail:      map[string]any{"dst_country": cc, "events": c.N, "baseline_days": countryBaselineDays, "share": share},
 			DstCountry:  cc, EventCount: c.N,
 			Fingerprint:    fingerprint(CodeNewCountryDst, "", "", cc, now),
@@ -555,17 +639,21 @@ func (s *Service) detectNewCountry(ctx context.Context, now time.Time, th Thresh
 	return out, nil
 }
 
-func (s *Service) detectRepNewDst(ctx context.Context, now time.Time, th Thresholds) ([]Event, error) {
+func (s *Service) detectRepNewDst(ctx context.Context, now time.Time, th Thresholds, nets []IPRange) ([]Event, error) {
+	if len(nets) == 0 {
+		return nil, nil
+	}
 	if s.rep == nil {
 		return nil, nil
 	}
-	edges, err := s.scan.RecentEdges(ctx, repWindow, 2000)
+	edges, err := s.scan.RecentEdges(ctx, repWindow, 2000, nets)
 	if err != nil {
 		return nil, err
 	}
 	type cand struct {
 		EdgeRow
-		Hits []model.ReputationHit
+		SrcHits []model.ReputationHit
+		DstHits []model.ReputationHit
 	}
 	var cands []cand
 	pairs := make([][2]string, 0)
@@ -574,14 +662,25 @@ func (s *Service) detectRepNewDst(ctx context.Context, now time.Time, th Thresho
 		if src == "" || dst == "" || e.Count < th.RepMinEvents {
 			continue
 		}
-		if isPrivateOrLocal(dst) {
+		var srcHits []model.ReputationHit
+		var dstHits []model.ReputationHit
+		if !isPrivateOrLocal(src) {
+			srcHits = s.rep.Lookup(src)
+		}
+		if !isPrivateOrLocal(dst) {
+			dstHits = s.rep.Lookup(dst)
+		}
+		if len(srcHits) == 0 && len(dstHits) == 0 {
 			continue
 		}
-		hits := s.rep.Lookup(dst)
-		if len(hits) == 0 {
-			continue
-		}
-		cands = append(cands, cand{EdgeRow: EdgeRow{SrcIP: src, DstIP: dst, Count: e.Count, SrcCountry: e.SrcCountry, DstCountry: e.DstCountry}, Hits: hits})
+		cands = append(cands, cand{
+			EdgeRow: EdgeRow{
+				SrcIP: src, DstIP: dst, Count: e.Count,
+				SrcCountry: e.SrcCountry, DstCountry: e.DstCountry,
+			},
+			SrcHits: srcHits,
+			DstHits: dstHits,
+		})
 		pairs = append(pairs, [2]string{src, dst})
 	}
 	if len(cands) == 0 {
@@ -596,12 +695,26 @@ func (s *Service) detectRepNewDst(ctx context.Context, now time.Time, th Thresho
 		if _, ok := known[pairKey(c.SrcIP, c.DstIP)]; ok {
 			continue
 		}
-		list := ""
-		if len(c.Hits) > 0 {
-			list = c.Hits[0].List
-			if list == "" {
-				list = c.Hits[0].Category
+		label := func(hits []model.ReputationHit) string {
+			if len(hits) == 0 {
+				return ""
 			}
+			list := hits[0].List
+			if list == "" {
+				list = hits[0].Category
+			}
+			return list
+		}
+		srcList := label(c.SrcHits)
+		dstList := label(c.DstHits)
+		title := ""
+		switch {
+		case len(c.SrcHits) > 0 && len(c.DstHits) > 0:
+			title = fmt.Sprintf("Репутационная связь: %s ↔ %s (src: %s, dst: %s)", c.SrcIP, c.DstIP, srcList, dstList)
+		case len(c.SrcHits) > 0:
+			title = fmt.Sprintf("Репутационный источник: %s -> %s (%s)", c.SrcIP, c.DstIP, srcList)
+		default:
+			title = fmt.Sprintf("Репутационное назначение: %s <- %s (%s)", c.DstIP, c.SrcIP, dstList)
 		}
 		sev := SeverityHigh
 		out = append(out, Event{
@@ -611,9 +724,10 @@ func (s *Service) detectRepNewDst(ctx context.Context, now time.Time, th Thresho
 			Code:        CodeRepNewDst,
 			Severity:    sev,
 			Score:       scoreAgainst(float64(c.Count), float64(th.RepMinEvents), sev),
-			Title:       fmt.Sprintf("Репутационный dst %s с %s (%s)", c.DstIP, c.SrcIP, list),
+			Title:       title,
 			Detail: map[string]any{
-				"src_ip": c.SrcIP, "dst_ip": c.DstIP, "events": c.Count, "reputation": c.Hits,
+				"src_ip": c.SrcIP, "dst_ip": c.DstIP, "events": c.Count,
+				"src_reputation": c.SrcHits, "dst_reputation": c.DstHits,
 			},
 			SrcIP: c.SrcIP, DstIP: c.DstIP,
 			SrcCountry: c.SrcCountry, DstCountry: c.DstCountry, EventCount: c.Count,

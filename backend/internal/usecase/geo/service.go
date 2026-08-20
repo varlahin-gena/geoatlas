@@ -19,17 +19,24 @@ import (
 
 // Service — application use cases для GeoIP.
 type Service struct {
-	store     RangeStore
-	missing   MissingIPStore
-	index     GeoIndex
-	jobs      GeoJobScheduler
-	codec     RangeCodec
-	maxRanges int
+	store      RangeStore
+	missing    MissingIPStore
+	index      GeoIndex
+	jobs       GeoJobScheduler
+	codec      RangeCodec
+	maxRanges  int
+	enterprise EnterpriseNetStore
 }
 
 // New создаёт GeoIP service. maxRanges — лимит строк CSV на upload (0 = без лимита ranges, только HTTP bytes).
 func New(store RangeStore, missing MissingIPStore, index GeoIndex, jobs GeoJobScheduler, codec RangeCodec, maxRanges int) *Service {
 	return &Service{store: store, missing: missing, index: index, jobs: jobs, codec: codec, maxRanges: maxRanges}
+}
+
+func (s *Service) SetEnterpriseStore(st EnterpriseNetStore) {
+	if s != nil {
+		s.enterprise = st
+	}
 }
 
 // --- Upload ---

@@ -25,7 +25,7 @@ describe('highlightFromAnomaly', () => {
   it('matches IP nodes and edge in ip grouping', () => {
     const item: AnomalyEvent = {
       fingerprint: 'abc',
-      code: 'rep_new_dst',
+      code: 'rep_new_peer',
       src_ip: '203.0.113.5',
       dst_ip: '198.51.100.9',
     };

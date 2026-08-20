@@ -555,7 +555,7 @@ paths:
       summary: Журнал аномалий карты
       description: |
         Детерминированные детекторы (port_scan, horizontal_scan, blocked_surge,
-        new_country_dst, rep_new_dst). Сессия или Bearer≥read. По умолчанию — незакрытые
+        new_country_dst, rep_new_peer). Сессия или Bearer≥read. По умолчанию — незакрытые
         за 24 часа.
       security:
         - cookieAuth: []
@@ -828,6 +828,82 @@ paths:
       responses:
         "200":
           description: cleared
+        "401":
+          description: unauthorized
+        "403":
+          description: forbidden
+
+  /api/enterprise-nets:
+    get:
+      tags: [geo]
+      summary: Список подсетей предприятия
+      description: |
+        Только administrator. Диапазоны, отмеченные как сети организации.
+        Аномалии (всплеск блокировок и др.) учитывают только взаимодействие с этими подсетями;
+        «Скрыть» подавляет повтор по каждой подсети отдельно.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: items list
+        "401":
+          description: unauthorized
+        "403":
+          description: forbidden
+    post:
+      tags: [geo]
+      summary: Отметить диапазон как сеть предприятия
+      description: |
+        administrator или Bearer (ops). `network` — CIDR, диапазон a-b или одиночный IPv4.
+        Пометки живут в таблице `enterprise_nets` и не сбрасываются при заливке GeoIP CSV.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [network]
+              properties:
+                network: { type: string, example: "10.20.0.0/16" }
+                label: { type: string }
+                country: { type: string }
+                region: { type: string }
+                city: { type: string }
+      responses:
+        "200":
+          description: net added
+        "400":
+          description: validation
+        "401":
+          description: unauthorized
+        "403":
+          description: forbidden
+
+  /api/enterprise-nets/{start_ip}/{end_ip}:
+    delete:
+      tags: [geo]
+      summary: Снять отметку сети предприятия
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: start_ip
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: end_ip
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: removed
+        "400":
+          description: invalid range
         "401":
           description: unauthorized
         "403":
@@ -1775,6 +1851,7 @@ components:
       properties:
         fingerprint: { type: string }
         code: { type: string }
+        code_label: { type: string }
         severity: { type: string, enum: [info, warn, high] }
         score: { type: number, format: float }
         title: { type: string }
@@ -1804,6 +1881,7 @@ components:
         learning: { type: boolean }
         enabled: { type: boolean }
         updated_at: { type: string, format: date-time }
+        enterprise_nets: { type: integer }
 
     AnomalyList:
       type: object
@@ -1825,6 +1903,7 @@ components:
         last_duration: { type: string }
         last_inserted: { type: integer }
         last_skip: { type: string }
+        enterprise_nets: { type: integer }
 
     AuthUser:
       type: object

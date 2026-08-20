@@ -1330,7 +1330,7 @@ export interface paths {
         /**
          * Журнал аномалий карты
          * @description Детерминированные детекторы (port_scan, horizontal_scan, blocked_surge,
-         *     new_country_dst, rep_new_dst). Сессия или Bearer≥read. По умолчанию — незакрытые
+         *     new_country_dst, rep_new_peer). Сессия или Bearer≥read. По умолчанию — незакрытые
          *     за 24 часа.
          */
         get: {
@@ -1858,6 +1858,171 @@ export interface paths {
             };
         };
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/enterprise-nets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Список подсетей предприятия
+         * @description Только administrator. Диапазоны, отмеченные как сети организации.
+         *     Аномалии (всплеск блокировок и др.) учитывают только взаимодействие с этими подсетями;
+         *     «Скрыть» подавляет повтор по каждой подсети отдельно.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description items list */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Отметить диапазон как сеть предприятия
+         * @description administrator или Bearer (ops). `network` — CIDR, диапазон a-b или одиночный IPv4.
+         *     Пометки живут в таблице `enterprise_nets` и не сбрасываются при заливке GeoIP CSV.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @example 10.20.0.0/16 */
+                        network: string;
+                        label?: string;
+                        country?: string;
+                        region?: string;
+                        city?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description net added */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description validation */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/enterprise-nets/{start_ip}/{end_ip}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Снять отметку сети предприятия */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    start_ip: number;
+                    end_ip: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description removed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description invalid range */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         options?: never;
         head?: never;
         patch?: never;
@@ -3625,6 +3790,7 @@ export interface components {
         AnomalyEvent: {
             fingerprint?: string;
             code?: string;
+            code_label?: string;
             /** @enum {string} */
             severity?: "info" | "warn" | "high";
             /** Format: float */
@@ -3659,6 +3825,7 @@ export interface components {
             enabled?: boolean;
             /** Format: date-time */
             updated_at?: string;
+            enterprise_nets?: number;
         };
         AnomalyList: {
             items?: components["schemas"]["AnomalyEvent"][];
@@ -3673,6 +3840,7 @@ export interface components {
             last_duration?: string;
             last_inserted?: number;
             last_skip?: string;
+            enterprise_nets?: number;
         };
         AuthUser: {
             username: string;

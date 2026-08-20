@@ -67,6 +67,25 @@ ENGINE = MergeTree()
 ORDER BY (start_ip, end_ip);
 
 -- ============================================================
+-- enterprise_nets: подсети предприятия для аномалий
+-- ============================================================
+CREATE TABLE IF NOT EXISTS enterprise_nets
+(
+    start_ip   UInt32,
+    end_ip     UInt32,
+    network    String,
+    label      String,
+    country    String,
+    region     String,
+    city       String,
+    created_at DateTime64(3),
+    ver        UInt64,
+    is_deleted UInt8 DEFAULT 0
+)
+ENGINE = ReplacingMergeTree(ver)
+ORDER BY (start_ip, end_ip);
+
+-- ============================================================
 -- reputation_ranges: офлайн-репутационные списки
 -- ============================================================
 CREATE TABLE IF NOT EXISTS reputation_ranges

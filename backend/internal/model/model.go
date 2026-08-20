@@ -61,6 +61,19 @@ type GeoRange struct {
 	Lon     float64
 }
 
+// EnterpriseNet — диапазон, отмеченный как сеть предприятия (для аномалий).
+// Хранится отдельно от geo_ranges, чтобы пометки переживали перезаливку GeoIP CSV.
+type EnterpriseNet struct {
+	StartIP   uint32
+	EndIP     uint32
+	Network   string
+	Label     string
+	Country   string
+	Region    string
+	City      string
+	CreatedAt time.Time
+}
+
 type GeoLookup struct {
 	Lat     float64
 	Lon     float64

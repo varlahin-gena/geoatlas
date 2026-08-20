@@ -13,6 +13,27 @@ function relTime(iso?: string): string {
   return `${Math.round(h / 24)} дн назад`;
 }
 
+function codeLabel(code?: string): string {
+  switch (code) {
+    case 'port_scan':
+      return 'Сканирование портов';
+    case 'horizontal_scan':
+      return 'Сканирование подсети';
+    case 'blocked_surge':
+      return 'Всплеск блокировок';
+    case 'new_country_dst':
+      return 'Новая страна назначения';
+    case 'rep_new_peer':
+      return 'Репутационная связь';
+    default:
+      return code || '';
+  }
+}
+
+function eventCodeLabel(item: AnomalyEvent): string {
+  return item.code_label || codeLabel(item.code);
+}
+
 export function AnomalyPanel({
   open,
   items,
@@ -43,7 +64,7 @@ export function AnomalyPanel({
             <li key={item.fingerprint} className={`anomaly-item sev-${item.severity || 'warn'}`}>
               <div className="anomaly-item-title">{item.title}</div>
               <div className="anomaly-item-meta">
-                <span>{item.code}</span>
+                <span>{eventCodeLabel(item)}</span>
                 <span>{relTime(item.detected_at)}</span>
               </div>
               <div className="anomaly-item-actions">

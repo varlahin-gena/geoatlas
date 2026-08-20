@@ -10,6 +10,16 @@ import (
 	"network_monitor/internal/mapagg"
 )
 
+const MaxEnterpriseNets = 200
+
+// EnterpriseNetStore — отмеченные сети предприятия (отдельно от geo_ranges).
+type EnterpriseNetStore interface {
+	ListEnterpriseNets(ctx context.Context) ([]model.EnterpriseNet, error)
+	UpsertEnterpriseNet(ctx context.Context, net model.EnterpriseNet) error
+	DeleteEnterpriseNet(ctx context.Context, startIP, endIP uint32) error
+	CountEnterpriseNets(ctx context.Context) (int, error)
+}
+
 // RangeStore — персистентность geo_ranges в ClickHouse.
 type RangeStore interface {
 	Replace(ctx context.Context, ranges []model.GeoRange) (int, error)

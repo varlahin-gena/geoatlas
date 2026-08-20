@@ -44,6 +44,7 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 	}
 	eventsUC := usecaseevents.New(trafficRepo, bg.geo, repLookuper)
 	geoUC := usecasegeo.New(geoRepo, trafficRepo, bg.geo, a.geoJobs, geoipcodec.New(), cfg.MaxGeoUploadRanges)
+	geoUC.SetEnterpriseStore(geoRepo)
 	parseErrorsUC := parseerrors.New(perrorstore.NewParseErrorRepository(a.pools.API, a.pools.Ingest))
 	parseTestAdapter := parseradapter.NewParseTest(parsers)
 	parseTestUC := parsetest.New(parseTestAdapter, bg.geo, parseTestAdapter)
@@ -100,6 +101,7 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 			NewCountryMinShare:            cfg.AnomalyNewCountryMinShare,
 			NewCountryRepeatCooldownHours: cfg.AnomalyNewCountryRepeatCooldownHours,
 		}, apiRepo, bgRepo, anomRep, anomalyjob.Gate{Ingest: a.ingestSvc}, a.prom)
+		anomalyUC.SetEnterpriseNets(geoUC)
 		a.anomalyJobs = anomalyjob.New(anomalyUC, cfg.AnomalyScanInterval, time.Minute)
 	}
 

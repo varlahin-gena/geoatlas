@@ -18,16 +18,21 @@ type EventStore interface {
 	CountSummary(ctx context.Context, since time.Time) (Summary, error)
 }
 
+// EnterpriseNetSource — отмеченные подсети предприятия.
+type EnterpriseNetSource interface {
+	ListEnterpriseNets(ctx context.Context) ([]model.EnterpriseNet, error)
+}
+
 // TrafficScanner — SQL-сканы для детекторов (без CH-типов в usecase).
 type TrafficScanner interface {
 	OldestLogTime(ctx context.Context) (time.Time, error)
-	PortScan(ctx context.Context, window time.Duration, portsTh, eventsTh int, includePrivate bool) ([]PortScanHit, error)
-	HorizontalScan(ctx context.Context, window time.Duration, hostsTh, eventsTh int, includePrivate bool) ([]HorizontalScanHit, error)
-	BlockedCount(ctx context.Context, start, end time.Time) (uint64, error)
-	CurrentCountries(ctx context.Context, window time.Duration, minN uint64) ([]CountryCount, error)
-	CurrentCountryTotal(ctx context.Context, window time.Duration) (uint64, error)
-	BaselineCountries(ctx context.Context, days int, minN uint64) (map[string]struct{}, error)
-	RecentEdges(ctx context.Context, window time.Duration, limit int) ([]EdgeRow, error)
+	PortScan(ctx context.Context, window time.Duration, portsTh, eventsTh int, includePrivate bool, nets []IPRange) ([]PortScanHit, error)
+	HorizontalScan(ctx context.Context, window time.Duration, hostsTh, eventsTh int, includePrivate bool, nets []IPRange) ([]HorizontalScanHit, error)
+	BlockedCount(ctx context.Context, start, end time.Time, net *IPRange) (uint64, error)
+	CurrentCountries(ctx context.Context, window time.Duration, minN uint64, nets []IPRange) ([]CountryCount, error)
+	CurrentCountryTotal(ctx context.Context, window time.Duration, nets []IPRange) (uint64, error)
+	BaselineCountries(ctx context.Context, days int, minN uint64, nets []IPRange) (map[string]struct{}, error)
+	RecentEdges(ctx context.Context, window time.Duration, limit int, nets []IPRange) ([]EdgeRow, error)
 	KnownPairs(ctx context.Context, pairs [][2]string, lookback time.Duration) (map[string]struct{}, error)
 }
 

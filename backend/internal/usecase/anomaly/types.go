@@ -6,7 +6,7 @@ const (
 	CodePortScan       = "port_scan"
 	CodeHorizontalScan = "horizontal_scan"
 	CodeBlockedSurge   = "blocked_surge"
-	CodeRepNewDst      = "rep_new_dst"
+	CodeRepNewDst      = "rep_new_peer"
 	CodeNewCountryDst  = "new_country_dst"
 
 	SeverityInfo = "info"
@@ -36,6 +36,7 @@ type Event struct {
 	WindowStart    time.Time      `json:"window_start"`
 	WindowEnd      time.Time      `json:"window_end"`
 	Code           string         `json:"code"`
+	CodeLabel      string         `json:"code_label,omitempty"`
 	Severity       string         `json:"severity"`
 	Score          float32        `json:"score"`
 	Title          string         `json:"title"`
@@ -53,6 +54,23 @@ type Event struct {
 	Acknowledged   bool           `json:"acknowledged"`
 	Map            MapLink        `json:"map"`
 	SuppressionKey SuppressionKey `json:"-"`
+}
+
+func CodeHumanLabel(code string) string {
+	switch code {
+	case CodePortScan:
+		return "Сканирование портов"
+	case CodeHorizontalScan:
+		return "Сканирование подсети"
+	case CodeBlockedSurge:
+		return "Всплеск блокировок"
+	case CodeNewCountryDst:
+		return "Новая страна назначения"
+	case CodeRepNewDst:
+		return "Репутационная связь"
+	default:
+		return code
+	}
 }
 
 // ListQuery — фильтр GET /api/anomalies.
@@ -73,6 +91,7 @@ type Summary struct {
 	Learning  bool      `json:"learning"`
 	Enabled   bool      `json:"enabled"`
 	UpdatedAt time.Time `json:"updated_at"`
+	EnterpriseNets int  `json:"enterprise_nets"`
 }
 
 // ScanStatus — live-состояние сканера.
@@ -84,6 +103,7 @@ type ScanStatus struct {
 	LastDuration string    `json:"last_duration,omitempty"`
 	LastInserted int       `json:"last_inserted"`
 	LastSkip     string    `json:"last_skip,omitempty"`
+	EnterpriseNets int     `json:"enterprise_nets"`
 }
 
 // ListResult — ответ списка.
@@ -129,4 +149,12 @@ type EdgeRow struct {
 	Count      uint64
 	SrcCountry string
 	DstCountry string
+}
+
+// IPRange — IPv4-диапазон сети предприятия.
+type IPRange struct {
+	Start   uint32
+	End     uint32
+	Network string
+	Label   string
 }

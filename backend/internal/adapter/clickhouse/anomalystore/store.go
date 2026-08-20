@@ -135,6 +135,7 @@ func (r *Repository) List(ctx context.Context, q usecaseanomaly.ListQuery) ([]us
 			return nil, err
 		}
 		e.Acknowledged = acked != 0
+		e.CodeLabel = usecaseanomaly.CodeHumanLabel(e.Code)
 		e.SrcIP = displayIP(e.SrcIP)
 		e.DstIP = displayIP(e.DstIP)
 		if detail != "" && detail != "{}" {
@@ -303,11 +304,12 @@ func (r *Repository) Ack(ctx context.Context, fingerprint, by string, suppressFo
 	// Compute suppression key from stored fields if anomaly_events.suppression_key is empty
 	// (e.g. events created before migration/backfill).
 	var (
-		code string
-		key  string
-		src  string
-		dst  string
-		city string
+		code   string
+		key    string
+		src    string
+		dst    string
+		city   string
+		device string
 	)
 	err := r.ch.QueryRow(ctx, `
 		SELECT
@@ -315,19 +317,19 @@ func (r *Repository) Ack(ctx context.Context, fingerprint, by string, suppressFo
 			suppression_key,
 			toString(src_ip),
 			toString(dst_ip),
-			dst_country
+			dst_country,
+			device
 		FROM anomaly_events
 		WHERE fingerprint = ?
 		ORDER BY detected_at DESC
 		LIMIT 1
-	`, fingerprint).Scan(&code, &key, &src, &dst, &city)
+	`, fingerprint).Scan(&code, &key, &src, &dst, &city, &device)
 	if err != nil {
 		return err
 	}
 
 	trimKey := strings.TrimSpace(key)
 	if trimKey == "" {
-		// mirror the suppressionKeyForEvent logic from the usecase layer.
 		switch code {
 		case usecaseanomaly.CodeNewCountryDst:
 			trimKey = code + "|country|" + strings.TrimSpace(city)
@@ -336,7 +338,11 @@ func (r *Repository) Ack(ctx context.Context, fingerprint, by string, suppressFo
 		case usecaseanomaly.CodeRepNewDst:
 			trimKey = code + "|pair|" + strings.TrimSpace(src) + "|" + strings.TrimSpace(dst)
 		case usecaseanomaly.CodeBlockedSurge:
-			trimKey = code + "|global"
+			if d := strings.TrimSpace(device); d != "" {
+				trimKey = code + "|net|" + d
+			} else {
+				trimKey = code + "|global"
+			}
 		}
 	}
 	if strings.TrimSpace(trimKey) == "" {
@@ -386,20 +392,23 @@ func (r *Repository) OldestLogTime(ctx context.Context) (time.Time, error) {
 	return t, err
 }
 
-func (r *Repository) PortScan(ctx context.Context, window time.Duration, portsTh, eventsTh int, includePrivate bool) ([]usecaseanomaly.PortScanHit, error) {
+func (r *Repository) PortScan(ctx context.Context, window time.Duration, portsTh, eventsTh int, includePrivate bool, nets []usecaseanomaly.IPRange) ([]usecaseanomaly.PortScanHit, error) {
+	touch, touchArgs := touchNetsSQL(nets)
 	q := fmt.Sprintf(`
 		SELECT toString(src_ip) AS src_ip, uniqExact(dst_port) AS ports, count() AS events, any(src_country) AS src_country
 		FROM traffic_logs
 		WHERE timestamp >= now() - INTERVAL %d SECOND
 		  AND timestamp < now()
 		  %s
+		  %s
 		GROUP BY src_ip
 		HAVING ports >= ? AND events >= ?
 		ORDER BY ports DESC
 		LIMIT 10
 		%s
-	`, int(window.Seconds()), privateSrcSQL(includePrivate), query.AggSettings())
-	rows, err := r.ch.Query(ctx, q, portsTh, eventsTh)
+	`, int(window.Seconds()), privateSrcSQL(includePrivate), touch, query.AggSettings())
+	args := append(touchArgs, portsTh, eventsTh)
+	rows, err := r.ch.Query(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -415,7 +424,8 @@ func (r *Repository) PortScan(ctx context.Context, window time.Duration, portsTh
 	return out, rows.Err()
 }
 
-func (r *Repository) HorizontalScan(ctx context.Context, window time.Duration, hostsTh, eventsTh int, includePrivate bool) ([]usecaseanomaly.HorizontalScanHit, error) {
+func (r *Repository) HorizontalScan(ctx context.Context, window time.Duration, hostsTh, eventsTh int, includePrivate bool, nets []usecaseanomaly.IPRange) ([]usecaseanomaly.HorizontalScanHit, error) {
+	touch, touchArgs := touchNetsSQL(nets)
 	q := fmt.Sprintf(`
 		SELECT
 			toString(src_ip) AS src_ip,
@@ -426,13 +436,15 @@ func (r *Repository) HorizontalScan(ctx context.Context, window time.Duration, h
 		WHERE timestamp >= now() - INTERVAL %d SECOND
 		  AND timestamp < now()
 		  %s
+		  %s
 		GROUP BY src_ip, net24
 		HAVING hosts >= ? AND events >= ?
 		ORDER BY hosts DESC
 		LIMIT 10
 		%s
-	`, int(window.Seconds()), privateSrcSQL(includePrivate), query.AggSettings())
-	rows, err := r.ch.Query(ctx, q, hostsTh, eventsTh)
+	`, int(window.Seconds()), privateSrcSQL(includePrivate), touch, query.AggSettings())
+	args := append(touchArgs, hostsTh, eventsTh)
+	rows, err := r.ch.Query(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -448,30 +460,39 @@ func (r *Repository) HorizontalScan(ctx context.Context, window time.Duration, h
 	return out, rows.Err()
 }
 
-func (r *Repository) BlockedCount(ctx context.Context, start, end time.Time) (uint64, error) {
+func (r *Repository) BlockedCount(ctx context.Context, start, end time.Time, net *usecaseanomaly.IPRange) (uint64, error) {
+	touch, touchArgs := "", []any(nil)
+	if net != nil {
+		touch, touchArgs = touchNetsSQL([]usecaseanomaly.IPRange{*net})
+	}
 	q := fmt.Sprintf(`
 		SELECT %s AS blocked
 		FROM traffic_logs
 		WHERE timestamp >= ? AND timestamp < ?
-	`, sqlclause.CountIfBlockedSQL())
+		  %s
+	`, sqlclause.CountIfBlockedSQL(), touch)
+	args := append([]any{start, end}, touchArgs...)
 	var n uint64
-	err := r.ch.QueryRow(ctx, q, start, end).Scan(&n)
+	err := r.ch.QueryRow(ctx, q, args...).Scan(&n)
 	return n, err
 }
 
-func (r *Repository) CurrentCountries(ctx context.Context, window time.Duration, minN uint64) ([]usecaseanomaly.CountryCount, error) {
+func (r *Repository) CurrentCountries(ctx context.Context, window time.Duration, minN uint64, nets []usecaseanomaly.IPRange) ([]usecaseanomaly.CountryCount, error) {
+	src, srcArgs := colInNetsSQL("src_ip", nets)
 	q := fmt.Sprintf(`
 		SELECT dst_country, count() AS n
 		FROM traffic_logs
 		WHERE timestamp >= now() - INTERVAL %d SECOND
 		  AND dst_country != ''
 		  AND dst_country NOT IN ('Неизвестно', 'Unknown', 'unknown', 'Reserved', 'reserved')
+		  %s
 		GROUP BY dst_country
 		HAVING n >= ?
 		ORDER BY n DESC
 		LIMIT 50
-	`, int(window.Seconds()))
-	rows, err := r.ch.Query(ctx, q, minN)
+	`, int(window.Seconds()), src)
+	args := append(srcArgs, minN)
+	rows, err := r.ch.Query(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -487,21 +508,43 @@ func (r *Repository) CurrentCountries(ctx context.Context, window time.Duration,
 	return out, rows.Err()
 }
 
-func (r *Repository) CurrentCountryTotal(ctx context.Context, window time.Duration) (uint64, error) {
+func (r *Repository) CurrentCountryTotal(ctx context.Context, window time.Duration, nets []usecaseanomaly.IPRange) (uint64, error) {
+	src, srcArgs := colInNetsSQL("src_ip", nets)
 	q := fmt.Sprintf(`
 		SELECT count()
 		FROM traffic_logs
 		WHERE timestamp >= now() - INTERVAL %d SECOND
 		  AND dst_country != ''
 		  AND dst_country NOT IN ('Неизвестно', 'Unknown', 'unknown', 'Reserved', 'reserved')
-	`, int(window.Seconds()))
+		  %s
+	`, int(window.Seconds()), src)
 	var total uint64
-	err := r.ch.QueryRow(ctx, q).Scan(&total)
+	err := r.ch.QueryRow(ctx, q, srcArgs...).Scan(&total)
 	return total, err
 }
 
-func (r *Repository) BaselineCountries(ctx context.Context, days int, minN uint64) (map[string]struct{}, error) {
+func (r *Repository) BaselineCountries(ctx context.Context, days int, minN uint64, nets []usecaseanomaly.IPRange) (map[string]struct{}, error) {
 	out := map[string]struct{}{}
+	if len(nets) > 0 {
+		src, srcArgs := colInNetsSQL("src_ip", nets)
+		q := fmt.Sprintf(`
+			SELECT dst_country
+			FROM traffic_logs
+			WHERE timestamp >= now() - INTERVAL %d DAY AND timestamp < toStartOfDay(now())
+			  AND dst_country != ''
+			  AND dst_country NOT IN ('Неизвестно', 'Unknown', 'unknown', 'Reserved', 'reserved')
+			  %s
+			GROUP BY dst_country
+			HAVING count() >= ?
+		`, days, src)
+		args := append(srcArgs, minN)
+		rows, err := r.ch.Query(ctx, q, args...)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+		return scanCountrySet(rows, out)
+	}
 	q := `
 		SELECT dst_key
 		FROM traffic_edges_country_daily
@@ -512,7 +555,6 @@ func (r *Repository) BaselineCountries(ctx context.Context, days int, minN uint6
 	`
 	rows, err := r.ch.Query(ctx, q, days, minN)
 	if err != nil {
-		// таблица ещё не создана — фолбэк на raw
 		q2 := fmt.Sprintf(`
 			SELECT dst_country
 			FROM traffic_logs
@@ -528,45 +570,39 @@ func (r *Repository) BaselineCountries(ctx context.Context, days int, minN uint6
 		}
 	}
 	defer rows.Close()
-	for rows.Next() {
-		var c string
-		if err := rows.Scan(&c); err != nil {
-			return nil, err
-		}
-		if c != "" {
-			out[c] = struct{}{}
-		}
-	}
-	return out, rows.Err()
+	return scanCountrySet(rows, out)
 }
 
-func (r *Repository) RecentEdges(ctx context.Context, window time.Duration, limit int) ([]usecaseanomaly.EdgeRow, error) {
+func (r *Repository) RecentEdges(ctx context.Context, window time.Duration, limit int, nets []usecaseanomaly.IPRange) ([]usecaseanomaly.EdgeRow, error) {
 	if limit < 1 {
 		limit = 2000
 	}
+	src, srcArgs := colInNetsSQL("src_ip", nets)
 	q := fmt.Sprintf(`
 		SELECT toString(src_ip), toString(dst_ip), sum(cnt) AS cnt,
 		       anyMerge(src_country), anyMerge(dst_country)
 		FROM traffic_edges_hourly
 		WHERE hour >= now() - INTERVAL %d SECOND
+		  %s
 		GROUP BY src_ip, dst_ip
 		ORDER BY cnt DESC
 		LIMIT %d
 		%s
-	`, int(window.Seconds()), limit, query.AggSettings())
-	rows, err := r.ch.Query(ctx, q)
+	`, int(window.Seconds()), src, limit, query.AggSettings())
+	rows, err := r.ch.Query(ctx, q, srcArgs...)
 	if err != nil {
 		q2 := fmt.Sprintf(`
 			SELECT toString(src_ip), toString(dst_ip), count() AS cnt,
 			       any(src_country), any(dst_country)
 			FROM traffic_logs
 			WHERE timestamp >= now() - INTERVAL %d SECOND
+			  %s
 			GROUP BY src_ip, dst_ip
 			ORDER BY cnt DESC
 			LIMIT %d
 			%s
-		`, int(window.Seconds()), limit, query.AggSettings())
-		rows, err = r.ch.Query(ctx, q2)
+		`, int(window.Seconds()), src, limit, query.AggSettings())
+		rows, err = r.ch.Query(ctx, q2, srcArgs...)
 		if err != nil {
 			return nil, err
 		}
@@ -632,6 +668,55 @@ func (r *Repository) KnownPairs(ctx context.Context, pairs [][2]string, lookback
 		out[src+"|"+dst] = struct{}{}
 	}
 	return out, rows.Err()
+}
+
+func scanCountrySet(rows interface {
+	Next() bool
+	Scan(dest ...any) error
+	Err() error
+}, out map[string]struct{}) (map[string]struct{}, error) {
+	if out == nil {
+		out = map[string]struct{}{}
+	}
+	for rows.Next() {
+		var c string
+		if err := rows.Scan(&c); err != nil {
+			return nil, err
+		}
+		if c != "" {
+			out[c] = struct{}{}
+		}
+	}
+	return out, rows.Err()
+}
+
+func touchNetsSQL(nets []usecaseanomaly.IPRange) (string, []any) {
+	return ipNetsSQL([]string{"src_ip", "dst_ip"}, nets)
+}
+
+func colInNetsSQL(col string, nets []usecaseanomaly.IPRange) (string, []any) {
+	return ipNetsSQL([]string{col}, nets)
+}
+
+func ipNetsSQL(cols []string, nets []usecaseanomaly.IPRange) (string, []any) {
+	if len(nets) == 0 || len(cols) == 0 {
+		return "", nil
+	}
+	parts := make([]string, 0, len(nets)*len(cols))
+	args := make([]any, 0, len(nets)*len(cols)*2)
+	for _, n := range nets {
+		if n.End < n.Start {
+			continue
+		}
+		for _, col := range cols {
+			parts = append(parts, fmt.Sprintf("(toUInt32(%s) BETWEEN ? AND ?)", col))
+			args = append(args, n.Start, n.End)
+		}
+	}
+	if len(parts) == 0 {
+		return "", nil
+	}
+	return "AND (" + strings.Join(parts, " OR ") + ")", args
 }
 
 func privateSrcSQL(includePrivate bool) string {

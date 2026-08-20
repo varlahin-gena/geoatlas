@@ -8,6 +8,13 @@ import (
 	"network_monitor/internal/model"
 )
 
+func TestListEnterpriseNetsRejectsNil(t *testing.T) {
+	_, err := listEnterpriseNets(context.Background(), nil)
+	if err == nil || !strings.Contains(err.Error(), "nil") {
+		t.Fatalf("nil conn: %v", err)
+	}
+}
+
 func TestLoadGeoRangesRejectsNil(t *testing.T) {
 	_, err := LoadGeoRanges(context.Background(), nil)
 	if err == nil || !strings.Contains(err.Error(), "nil") {

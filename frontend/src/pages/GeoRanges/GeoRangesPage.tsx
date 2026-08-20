@@ -2,10 +2,14 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { useSearchParams } from 'react-router-dom';
 import { apiFetchRaw } from '@/api/client';
 import {
+  addEnterpriseNet,
   clearGeoRanges,
+  deleteEnterpriseNet,
   exportGeoRanges,
+  fetchEnterpriseNets,
   fetchGeoRanges,
   updateGeoRange,
+  type EnterpriseNet,
   type GeoRange,
 } from '@/api/geo';
 import { AdminLayout } from '@/components/AdminLayout';
@@ -26,6 +30,7 @@ function isIPv4(s: string): boolean {
 export default function GeoRangesPage() {
   const { toast } = useToast();
   const [params] = useSearchParams();
+  const [tab, setTab] = useState<'base' | 'enterprise'>('base');
   const [q, setQ] = useState('');
   const [ipSearch, setIpSearch] = useState(() => (params.get('ip') || '').trim());
   const [ipStatus, setIpStatus] = useState<{ mode: '' | 'hit' | 'miss'; text: string }>({
@@ -49,6 +54,13 @@ export default function GeoRangesPage() {
   });
   const [busy, setBusy] = useState(false);
   const geoFileRef = useRef<HTMLInputElement>(null);
+  const [enterprise, setEnterprise] = useState<EnterpriseNet[]>([]);
+  const [entSearch, setEntSearch] = useState('');
+  const [entIP, setEntIP] = useState('');
+  const [entHits, setEntHits] = useState<GeoRange[]>([]);
+  const [entBusy, setEntBusy] = useState(false);
+  const [manualNet, setManualNet] = useState('');
+  const [manualLabel, setManualLabel] = useState('');
 
   const load = useCallback(async () => {
     const ip = ipSearch.trim();
@@ -85,11 +97,47 @@ export default function GeoRangesPage() {
     }
   }, [ipSearch, toast]);
 
+  const loadEnterprise = useCallback(async () => {
+    try {
+      const data = await fetchEnterpriseNets();
+      setEnterprise(data.items || []);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Ошибка загрузки сетей предприятия', 'error');
+    }
+  }, [toast]);
+
   useEffect(() => {
     document.title = 'ГеоАтлас — База GeoIP';
     const t = window.setTimeout(() => void load(), 300);
     return () => window.clearTimeout(t);
   }, [load]);
+
+  useEffect(() => {
+    void loadEnterprise();
+  }, [loadEnterprise]);
+
+  useEffect(() => {
+    if (tab !== 'enterprise') return;
+    const q = entSearch.trim();
+    const ip = entIP.trim();
+    const t = window.setTimeout(() => {
+      void (async () => {
+        if (!q && !ip) {
+          setEntHits([]);
+          return;
+        }
+        try {
+          const data = await fetchGeoRanges(
+            ip && isIPv4(ip) ? { ip } : q ? { q, limit: 200 } : undefined,
+          );
+          setEntHits(data.ranges || []);
+        } catch (e) {
+          toast(e instanceof Error ? e.message : 'Ошибка поиска', 'error');
+        }
+      })();
+    }, 300);
+    return () => window.clearTimeout(t);
+  }, [tab, entSearch, entIP, toast]);
 
   // SoT: text search is client-side; IP lookup is server-side ?ip=.
   const filtered = useMemo(() => {
@@ -111,6 +159,79 @@ export default function GeoRangesPage() {
           .includes(needle),
     );
   }, [rows, q]);
+
+  const markedKeys = useMemo(() => {
+    const s = new Set<string>();
+    for (const n of enterprise) {
+      if (n.start_ip != null && n.end_ip != null) s.add(`${n.start_ip}-${n.end_ip}`);
+      if (n.network) s.add(n.network);
+    }
+    return s;
+  }, [enterprise]);
+
+  function isMarked(r: GeoRange): boolean {
+    if (r.start_ip != null && r.end_ip != null && markedKeys.has(`${r.start_ip}-${r.end_ip}`)) return true;
+    return Boolean(r.network && markedKeys.has(r.network));
+  }
+
+  async function markRange(r: GeoRange) {
+    const network = (r.network || '').trim();
+    if (!network) {
+      toast('Нет поля Network', 'error');
+      return;
+    }
+    setEntBusy(true);
+    try {
+      await addEnterpriseNet({
+        network,
+        country: r.country,
+        region: r.region,
+        city: r.city,
+        label: [r.city, r.region, r.country].filter(Boolean).join(', '),
+      });
+      toast(`Отмечено: ${network}`, 'success');
+      await loadEnterprise();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Ошибка', 'error');
+    } finally {
+      setEntBusy(false);
+    }
+  }
+
+  async function unmarkNet(n: EnterpriseNet) {
+    if (n.start_ip == null || n.end_ip == null) return;
+    setEntBusy(true);
+    try {
+      await deleteEnterpriseNet(n.start_ip, n.end_ip);
+      toast('Снята отметка', 'success');
+      await loadEnterprise();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Ошибка', 'error');
+    } finally {
+      setEntBusy(false);
+    }
+  }
+
+  async function addManual(e: FormEvent) {
+    e.preventDefault();
+    const network = manualNet.trim();
+    if (!network) {
+      toast('Укажите CIDR или IP', 'error');
+      return;
+    }
+    setEntBusy(true);
+    try {
+      await addEnterpriseNet({ network, label: manualLabel.trim() || undefined });
+      setManualNet('');
+      setManualLabel('');
+      toast(`Отмечено: ${network}`, 'success');
+      await loadEnterprise();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Ошибка', 'error');
+    } finally {
+      setEntBusy(false);
+    }
+  }
 
   function openEdit(r: GeoRange) {
     setEdit(r);
@@ -292,6 +413,170 @@ export default function GeoRangesPage() {
           Текущие диапазоны в таблице geo_ranges. Точечные правки — через «изменить». Полная замена
           базы: «Очистить базу» (снимает early 409), затем «Загрузить CSV». Рестарт backend не нужен.
         </p>
+        <nav className="toolbar" role="tablist" aria-label="Разделы базы GeoIP" style={{ gap: 8, marginBottom: 16 }}>
+          <button
+            type="button"
+            role="tab"
+            className={tab === 'base' ? 'btn primary' : 'btn'}
+            aria-selected={tab === 'base'}
+            onClick={() => setTab('base')}
+          >
+            База GeoIP
+          </button>
+          <button
+            type="button"
+            role="tab"
+            className={tab === 'enterprise' ? 'btn primary' : 'btn'}
+            aria-selected={tab === 'enterprise'}
+            onClick={() => setTab('enterprise')}
+          >
+            Сети предприятия{enterprise.length ? ` (${enterprise.length})` : ''}
+          </button>
+        </nav>
+        {tab === 'enterprise' ? (
+          <>
+            <p className="hint" style={{ marginTop: 0 }}>
+              Отметьте диапазоны своей организации. Без отмеченных сетей детектор аномалий не работает;
+              с отметками все алерты учитывают только трафик с/на эти подсети. «Скрыть» подавляет
+              повтор по каждой сети отдельно. Пометки не сбрасываются при заливке GeoIP CSV.
+            </p>
+            <div className="summary" style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
+              <div>
+                <div className="hint">Отмечено</div>
+                <b>{enterprise.length}</b>
+              </div>
+            </div>
+            <form
+              className="toolbar"
+              style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}
+              onSubmit={addManual}
+            >
+              <input
+                placeholder="CIDR вручную, например 10.20.0.0/16"
+                value={manualNet}
+                onChange={(e) => setManualNet(e.target.value)}
+                style={{ minWidth: 240 }}
+              />
+              <input
+                placeholder="Подпись (офис, ЦОД…)"
+                value={manualLabel}
+                onChange={(e) => setManualLabel(e.target.value)}
+                style={{ minWidth: 160 }}
+              />
+              <button type="submit" className="btn primary" disabled={entBusy}>
+                Отметить
+              </button>
+            </form>
+            <div className="toolbar" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+              <input
+                placeholder="Найти в GeoIP: город, организация, страна…"
+                value={entSearch}
+                onChange={(e) => setEntSearch(e.target.value)}
+                style={{ minWidth: 260 }}
+              />
+              <input
+                placeholder="Или IP…"
+                value={entIP}
+                onChange={(e) => setEntIP(e.target.value)}
+                style={{ minWidth: 140 }}
+              />
+            </div>
+            {(entSearch.trim() || entIP.trim()) ? (
+              <div className="card table-wrap" style={{ marginBottom: 16 }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th scope="col">Network</th>
+                      <th scope="col">Country</th>
+                      <th scope="col">Region</th>
+                      <th scope="col">City</th>
+                      <th scope="col">
+                        <span className="visually-hidden">Действия</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {!entHits.length ? (
+                      <tr>
+                        <td colSpan={5} className="empty">
+                          Нет диапазонов по запросу
+                        </td>
+                      </tr>
+                    ) : (
+                      entHits.map((r) => (
+                        <tr key={`${r.network}-${r.start_ip}-${r.end_ip}`}>
+                          <td className="mono">{r.network}</td>
+                          <td>{r.country}</td>
+                          <td>{r.region}</td>
+                          <td>{r.city}</td>
+                          <td>
+                            {isMarked(r) ? (
+                              <span className="hint">уже отмечен</span>
+                            ) : (
+                              <button
+                                type="button"
+                                className="btn primary"
+                                disabled={entBusy}
+                                onClick={() => void markRange(r)}
+                              >
+                                Отметить
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+            <h2 style={{ fontSize: 16, margin: '8px 0' }}>Отмеченные сети</h2>
+            <div className="card table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Network</th>
+                    <th scope="col">Подпись</th>
+                    <th scope="col">Country</th>
+                    <th scope="col">City</th>
+                    <th scope="col">
+                      <span className="visually-hidden">Действия</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {!enterprise.length ? (
+                    <tr>
+                      <td colSpan={5} className="empty">
+                        Пока ничего не отмечено — найдите диапазон в базе GeoIP или введите CIDR
+                      </td>
+                    </tr>
+                  ) : (
+                    enterprise.map((n) => (
+                      <tr key={`${n.start_ip}-${n.end_ip}`}>
+                        <td className="mono">{n.network}</td>
+                        <td>{n.label}</td>
+                        <td>{n.country}</td>
+                        <td>{n.city}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn danger"
+                            disabled={entBusy}
+                            onClick={() => void unmarkNet(n)}
+                          >
+                            Снять
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : (
+          <>
         {totalInDb >= 400_000 ? (
           <p className="hint" style={{ marginBottom: 12, color: 'var(--warn, #b45309)' }}>
             В базе уже {fmtNumber(totalInDb)} диапазонов
@@ -384,6 +669,8 @@ export default function GeoRangesPage() {
             </tbody>
           </table>
         </div>
+          </>
+        )}
       </div>
       {edit ? (
         <div

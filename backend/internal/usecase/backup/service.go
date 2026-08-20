@@ -709,6 +709,7 @@ func (s *Service) resolveTables(ctx context.Context, includeEdges bool) ([]strin
 	base := []string{
 		"traffic_logs",
 		"geo_ranges",
+		"enterprise_nets",
 		"reputation_ranges",
 		"parse_errors",
 		"system_metrics",

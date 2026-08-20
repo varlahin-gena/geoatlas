@@ -1,7 +1,9 @@
-import { apiFetchRaw, apiGetQuery, apiPost, apiPut } from './client';
+import { apiDelete, apiFetchRaw, apiGetQuery, apiPost, apiPut } from './client';
 
 export interface GeoRange {
   network?: string;
+  start_ip?: number;
+  end_ip?: number;
   country?: string;
   region?: string;
   city?: string;
@@ -52,12 +54,12 @@ export interface GeoMissingResponse {
 }
 
 export function fetchGeoRanges(
-  params?: { ip?: string; limit?: number },
+  params?: { ip?: string; limit?: number; q?: string },
   init?: RequestInit,
 ): Promise<GeoRangesResponse> {
   return apiGetQuery(
     '/api/geo-ranges',
-    { ip: params?.ip, limit: params?.limit },
+    { ip: params?.ip, limit: params?.limit, q: params?.q },
     init,
   ) as Promise<GeoRangesResponse>;
 }
@@ -89,4 +91,41 @@ export function createGeoRange(body: Record<string, unknown>): Promise<{
     added?: string;
     entry?: { network?: string };
   }>;
+}
+
+export interface EnterpriseNet {
+  network?: string;
+  start_ip?: number;
+  end_ip?: number;
+  label?: string;
+  country?: string;
+  region?: string;
+  city?: string;
+  created_at?: string;
+}
+
+export function fetchEnterpriseNets(init?: RequestInit): Promise<{
+  items?: EnterpriseNet[];
+  count?: number;
+  max?: number;
+}> {
+  return apiGetQuery('/api/enterprise-nets', undefined, init) as Promise<{
+    items?: EnterpriseNet[];
+    count?: number;
+    max?: number;
+  }>;
+}
+
+export function addEnterpriseNet(body: {
+  network: string;
+  label?: string;
+  country?: string;
+  region?: string;
+  city?: string;
+}): Promise<{ item?: EnterpriseNet }> {
+  return apiPost('/api/enterprise-nets', body) as Promise<{ item?: EnterpriseNet }>;
+}
+
+export function deleteEnterpriseNet(startIP: number, endIP: number): Promise<unknown> {
+  return apiDelete(`/api/enterprise-nets/${startIP}/${endIP}`);
 }
