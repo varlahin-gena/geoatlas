@@ -38,7 +38,9 @@ test.describe('auth / CSRF / roles', () => {
 
     await page.goto('/system');
     await expect(page).toHaveURL(/\/system$/);
-    await expect(page.getByText('Мониторинг системы')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText('Обзор')).toBeVisible();
+    await expect(page.locator('#adminApp .topbar-title')).toContainText('Мониторинг системы', {
+      timeout: 15_000,
+    });
+    await expect(page.getByRole('tab', { name: 'Обзор' })).toBeVisible();
   });
 });
