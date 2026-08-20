@@ -322,6 +322,30 @@ func (s *Service) loadEnterpriseNets(ctx context.Context) []IPRange {
 	return out
 }
 
+func ipPrefixQuery(n IPRange) string {
+	if n.End < n.Start {
+		return ""
+	}
+	octet := func(v uint32, shift uint) uint32 { return (v >> shift) & 0xFF }
+	var parts []string
+	for _, shift := range []uint{24, 16, 8, 0} {
+		a := octet(n.Start, shift)
+		b := octet(n.End, shift)
+		if a != b {
+			break
+		}
+		parts = append(parts, fmt.Sprintf("%d", a))
+	}
+	switch len(parts) {
+	case 0:
+		return ""
+	case 1, 2, 3:
+		return strings.Join(parts, ".") + "."
+	default:
+		return strings.Join(parts, ".")
+	}
+}
+
 func suppressionKeyForCodeCountry(code, country string) SuppressionKey {
 	return SuppressionKey(code + "|country|" + strings.TrimSpace(country))
 }
@@ -549,6 +573,11 @@ func (s *Service) detectBlockedSurge(ctx context.Context, now time.Time, th Thre
 		if net.Label != "" {
 			where = net.Network + " (" + net.Label + ")"
 		}
+		netQuery := ipPrefixQuery(net)
+		mapQuery := ""
+		if netQuery != "" {
+			mapQuery = fmt.Sprintf("(src:%s OR dst:%s)", netQuery, netQuery)
+		}
 		out = append(out, Event{
 			DetectedAt:  now,
 			WindowStart: currStart,
@@ -566,7 +595,7 @@ func (s *Service) detectBlockedSurge(ctx context.Context, now time.Time, th Thre
 			EventCount:     curr,
 			Fingerprint:    fingerprint(CodeBlockedSurge, "", "", net.Network, now),
 			SuppressionKey: key,
-			Map:            MapLink{Period: "1h", Group: "ip", Filter: "blocked"},
+			Map:            MapLink{Period: "1h", Group: "ip", Filter: "blocked", Query: mapQuery},
 		})
 	}
 	return out, nil
