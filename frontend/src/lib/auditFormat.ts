@@ -10,7 +10,7 @@ function formatBool(v: unknown, on = 'вкл', off = 'выкл'): string {
   return String(v ?? '—');
 }
 
-export function formatScheduleChangeDetails(d: Record<string, unknown>): string {
+function formatScheduleChangeDetails(d: Record<string, unknown>): string {
   const parts: string[] = [];
   const prev = d.prev_enabled;
   const next = d.enabled;
@@ -37,7 +37,7 @@ export function formatScheduleChangeDetails(d: Record<string, unknown>): string 
   return parts.length ? parts.join('; ') : '—';
 }
 
-export function formatAuditDetails(action?: string, details?: Record<string, unknown>): string {
+function formatAuditDetails(action?: string, details?: Record<string, unknown>): string {
   if (!details || !Object.keys(details).length) return '—';
   if (details.error) return String(details.error);
 
