@@ -125,11 +125,8 @@ export function useMapViewQuery() {
   );
 
   useEffect(() => {
+    if (debouncedSearch !== search) return;
     if (debouncedSearch === parsed.search) return;
-    // applyView (and similar) updates local search + URL immediately. While debounce
-    // still holds the previous value, do not write that stale search back to the URL —
-    // it would drop sibling params such as group=.
-    if (search === parsed.search) return;
     patchView({ search: debouncedSearch });
   }, [debouncedSearch, parsed.search, search, patchView]);
 
@@ -185,9 +182,19 @@ export function useMapViewQuery() {
   const applyView = useCallback(
     (partial: Partial<MapViewState>) => {
       if (partial.search != null) setSearchState(partial.search);
-      patchView(partial);
+      setParams(
+        (prev) => {
+          const next = { ...parseMapViewSearch(prev), ...partial };
+          if (partial.period && partial.period !== 'custom') {
+            next.periodFrom = '';
+            next.periodTo = '';
+          }
+          return serializeMapViewSearch(next);
+        },
+        { replace: true },
+      );
     },
-    [patchView],
+    [setParams],
   );
 
   return {
