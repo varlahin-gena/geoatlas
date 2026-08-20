@@ -130,12 +130,13 @@ func partitionIDForDay(ctx context.Context, ch clickhouse.Conn, table string, da
 	qctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	var id string
+	// clickhouse-go binds time.Time for {day:Date} as Unix seconds; CH Date expects YYYY-MM-DD.
 	err := ch.QueryRow(qctx, `
 		SELECT any(partition_id)
 		FROM system.parts
 		WHERE database = currentDatabase() AND table = {table:String} AND active
 		  AND toDate(parseDateTimeBestEffort(partition)) = {day:Date}
-	`, clickhouse.Named("table", table), clickhouse.Named("day", day)).Scan(&id)
+	`, clickhouse.Named("table", table), clickhouse.Named("day", dateParam(day))).Scan(&id)
 	if err != nil {
 		msg := strings.ToLower(err.Error())
 		if strings.Contains(msg, "no rows") || strings.Contains(msg, "empty result") {
@@ -144,6 +145,11 @@ func partitionIDForDay(ctx context.Context, ch clickhouse.Conn, table string, da
 		return "", err
 	}
 	return id, nil
+}
+
+// dateParam formats a calendar day for ClickHouse {name:Date} query parameters.
+func dateParam(day time.Time) string {
+	return day.UTC().Format("2006-01-02")
 }
 
 func normalizeSortingKey(s string) string {

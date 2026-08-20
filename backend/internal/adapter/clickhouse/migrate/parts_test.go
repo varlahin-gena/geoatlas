@@ -3,6 +3,7 @@ package migrate
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"network_monitor/internal/adapter/clickhouse/sqlclause"
 )
@@ -67,5 +68,13 @@ func TestDayTimestampRangeSQL(t *testing.T) {
 	got := sqlclause.DayTimestampRangeSQL("traffic_logs.timestamp")
 	if !strings.Contains(got, "toDateTime(?)") || !strings.Contains(got, "INTERVAL 1 DAY") {
 		t.Fatal(got)
+	}
+}
+
+func TestDateParam(t *testing.T) {
+	day := time.Date(2026, 8, 20, 15, 30, 0, 0, time.FixedZone("MSK", 3*3600))
+	got := dateParam(day)
+	if got != "2026-08-20" {
+		t.Fatalf("dateParam=%q want 2026-08-20", got)
 	}
 }
