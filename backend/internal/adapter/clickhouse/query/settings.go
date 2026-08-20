@@ -28,12 +28,30 @@ func ConfigureQuerySettings(maxMemoryUsage, externalGroupByBytes, externalSortBy
 
 // AggSettings — SETTINGS-фрагмент для тяжёлых GROUP BY / INSERT backfill.
 func AggSettings() string {
+	spillGroup := chExternalGroupByBytes
+	spillSort := chExternalSortBytes
+	// Headroom: spill before max_memory_usage so JOIN+GROUP BY не упираются в hard limit.
+	if head := chMaxMemoryUsage / 4; head > 0 {
+		if spillGroup > head {
+			spillGroup = head
+		}
+		if spillSort > head {
+			spillSort = head
+		}
+	}
+	const minSpill = 64 << 20
+	if spillGroup < minSpill {
+		spillGroup = minSpill
+	}
+	if spillSort < minSpill {
+		spillSort = minSpill
+	}
 	return fmt.Sprintf(`
 	SETTINGS max_bytes_before_external_group_by = %d,
 	         max_bytes_before_external_sort = %d,
 	         max_memory_usage = %d,
 	         max_threads = %d`,
-		chExternalGroupByBytes, chExternalSortBytes, chMaxMemoryUsage, chMaxThreads)
+		spillGroup, spillSort, chMaxMemoryUsage, chMaxThreads)
 }
 
 func limitClause(limit int) string {

@@ -268,7 +268,7 @@ func insertIPEdgesDays(ctx context.Context, ch clickhouse.Conn, table string, da
 		timeExpr, timeAlias = "toDate(traffic_logs.timestamp)", "day"
 		groupExtra = "day, src_ip, dst_ip"
 	}
-	fromSQL := geoEdgesEnrichedFromSQL(sqlclause.DayTimestampRangeSQL("traffic_logs.timestamp"))
+	fromSQL := fmt.Sprintf("FROM traffic_logs\n\t\tWHERE %s", sqlclause.DayTimestampRangeSQL("traffic_logs.timestamp"))
 	insertTpl := fmt.Sprintf(`
 		INSERT INTO %s
 		%s
@@ -306,10 +306,17 @@ func rebuildIPEdgesDays(ctx context.Context, ch clickhouse.Conn, table string, d
 	if err != nil || !exists {
 		return err
 	}
+	prev := aggstate.GetEdgesAggStatus()
 	for _, day := range days {
 		if err := dropDatePartition(ctx, ch, table, day); err != nil {
 			return err
 		}
 	}
-	return insertIPEdgesDays(ctx, ch, table, days, nil)
+	err = insertIPEdgesDays(ctx, ch, table, days, nil)
+	// Lookback rebuild after enrich must not leave the map stuck on edges_agg_error
+	// if daily/hourly agg was already ready (map can use traffic_logs + enrich overlay).
+	if err != nil && prev.State == "ready" {
+		aggstate.SetEdgesAggStatus(prev)
+	}
+	return err
 }

@@ -31,3 +31,22 @@ func TestConfigureQuerySettingsKeepsDefaultThreads(t *testing.T) {
 		t.Fatalf("expected default max_threads=2, got:\n%s", AggSettings())
 	}
 }
+
+func TestAggSettingsSpillBelowMemoryHeadroom(t *testing.T) {
+	// 1.2 GiB query cap (typical 3 GiB CH container @ 40%) with high spill request.
+	ConfigureQuerySettings(1288490188, 512<<20, 512<<20, 2)
+	t.Cleanup(func() {
+		ConfigureQuerySettings(2<<30, 256<<20, 256<<20, 2)
+	})
+	s := AggSettings()
+	if !strings.Contains(s, "max_memory_usage = 1288490188") {
+		t.Fatalf("missing memory cap:\n%s", s)
+	}
+	// Headroom = max/4 ≈ 322MB; spill must be capped below the old 512MB request.
+	if strings.Contains(s, "max_bytes_before_external_group_by = 536870912") {
+		t.Fatalf("spill not capped for headroom:\n%s", s)
+	}
+	if !strings.Contains(s, "max_bytes_before_external_group_by = 322122547") {
+		t.Fatalf("expected spill=max/4, got:\n%s", s)
+	}
+}
