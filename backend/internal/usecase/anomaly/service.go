@@ -322,30 +322,6 @@ func (s *Service) loadEnterpriseNets(ctx context.Context) []IPRange {
 	return out
 }
 
-func ipPrefixQuery(n IPRange) string {
-	if n.End < n.Start {
-		return ""
-	}
-	octet := func(v uint32, shift uint) uint32 { return (v >> shift) & 0xFF }
-	var parts []string
-	for _, shift := range []uint{24, 16, 8, 0} {
-		a := octet(n.Start, shift)
-		b := octet(n.End, shift)
-		if a != b {
-			break
-		}
-		parts = append(parts, fmt.Sprintf("%d", a))
-	}
-	switch len(parts) {
-	case 0:
-		return ""
-	case 1, 2, 3:
-		return strings.Join(parts, ".") + "."
-	default:
-		return strings.Join(parts, ".")
-	}
-}
-
 func suppressionKeyForCodeCountry(code, country string) SuppressionKey {
 	return SuppressionKey(code + "|country|" + strings.TrimSpace(country))
 }
