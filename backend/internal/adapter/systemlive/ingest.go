@@ -1,12 +1,12 @@
 package systemlive
 
 import (
-	"network_monitor/internal/adapter/ingestnet"
+	"network_monitor/internal/model"
 	"network_monitor/internal/usecase/system"
 )
 
 type IngestStatsSource interface {
-	Stats() ingestnet.StatsSnapshot
+	Stats() model.IngestLiveStats
 }
 
 // IngestAdapter translates ingest package snapshots into the system use-case port.

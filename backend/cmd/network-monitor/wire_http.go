@@ -8,8 +8,8 @@ import (
 	"network_monitor/internal/adapter/backupfs"
 	"network_monitor/internal/adapter/backupjob"
 	"network_monitor/internal/adapter/backupschedulefile"
-	"network_monitor/internal/adapter/clickhouse/auditstore"
 	"network_monitor/internal/adapter/clickhouse/anomalystore"
+	"network_monitor/internal/adapter/clickhouse/auditstore"
 	"network_monitor/internal/adapter/clickhouse/backupstore"
 	"network_monitor/internal/adapter/clickhouse/geostore"
 	"network_monitor/internal/adapter/clickhouse/perrorstore"
@@ -18,6 +18,7 @@ import (
 	"network_monitor/internal/adapter/geoipcodec"
 	httpapi "network_monitor/internal/adapter/httpapi"
 	"network_monitor/internal/adapter/parseradapter"
+	"network_monitor/internal/adapter/searchtemplatesfile"
 	"network_monitor/internal/adapter/systemlive"
 	"network_monitor/internal/config"
 	"network_monitor/internal/installprofile"
@@ -30,6 +31,7 @@ import (
 	usecasegeo "network_monitor/internal/usecase/geo"
 	"network_monitor/internal/usecase/parseerrors"
 	"network_monitor/internal/usecase/parsetest"
+	"network_monitor/internal/usecase/searchtemplates"
 	usecasesystem "network_monitor/internal/usecase/system"
 )
 
@@ -105,23 +107,26 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 		a.anomalyJobs = anomalyjob.New(anomalyUC, cfg.AnomalyScanInterval, time.Minute)
 	}
 
+	searchTemplatesUC := searchtemplates.New(searchtemplatesfile.New(cfg.SearchTemplatesFile))
+
 	return httpapi.NewServer(httpapi.Params{
-		Cfg:           cfg,
-		Ingest:        a.ingestSvc,
-		EventsUC:      eventsUC,
-		GeoUC:         geoUC,
-		ReputationUC:  bg.repUC,
-		ParseErrorsUC: parseErrorsUC,
-		SystemUC:      systemUC,
-		SystemPinger:  systemRepo,
-		ParseTestUC:   parseTestUC,
-		RetentionUC:   bg.retentionUC,
-		BackupUC:      backupUC,
-		AuthUC:        authUC,
-		Users:         auth.users,
-		Sessions:      auth.sessions,
-		APITokens:     auth.apiTokens,
-		AnomalyUC:     anomalyUC,
-		Logs:          logsUC,
+		Cfg:               cfg,
+		Ingest:            a.ingestSvc,
+		EventsUC:          eventsUC,
+		GeoUC:             geoUC,
+		ReputationUC:      bg.repUC,
+		ParseErrorsUC:     parseErrorsUC,
+		SystemUC:          systemUC,
+		SystemPinger:      systemRepo,
+		ParseTestUC:       parseTestUC,
+		RetentionUC:       bg.retentionUC,
+		BackupUC:          backupUC,
+		AuthUC:            authUC,
+		Users:             auth.users,
+		Sessions:          auth.sessions,
+		APITokens:         auth.apiTokens,
+		SearchTemplatesUC: searchTemplatesUC,
+		AnomalyUC:         anomalyUC,
+		Logs:              logsUC,
 	}, httpapi.WithMetrics(a.prom))
 }

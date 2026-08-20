@@ -8,6 +8,7 @@ import (
 
 	"network_monitor/internal/adapter/httpapi/loginthrottle"
 	"network_monitor/internal/config"
+	usecaseanomaly "network_monitor/internal/usecase/anomaly"
 	usecaseaudit "network_monitor/internal/usecase/auditlog"
 	usecaseauth "network_monitor/internal/usecase/auth"
 	usecasebackup "network_monitor/internal/usecase/backup"
@@ -15,9 +16,9 @@ import (
 	usecasegeo "network_monitor/internal/usecase/geo"
 	"network_monitor/internal/usecase/parseerrors"
 	"network_monitor/internal/usecase/parsetest"
-	usecaseanomaly "network_monitor/internal/usecase/anomaly"
 	usecasereputation "network_monitor/internal/usecase/reputation"
 	usecaseretention "network_monitor/internal/usecase/retention"
+	"network_monitor/internal/usecase/searchtemplates"
 	usecasesystem "network_monitor/internal/usecase/system"
 )
 
@@ -82,7 +83,7 @@ type ReputationDeps struct {
 // SearchTemplatesDeps — зависимости SearchTemplatesHandler.
 type SearchTemplatesDeps struct {
 	cfg             config.Config
-	searchTemplates SearchTemplatesStore
+	searchTemplates *searchtemplates.Service
 	sessions        SessionParser
 }
 
@@ -92,26 +93,26 @@ type AnomalyDeps struct {
 	anomalyUC *usecaseanomaly.Service
 }
 
-// Params — вход NewDeps / NewServer. SearchTemplates=nil → file store из Cfg.
+// Params — вход NewDeps / NewServer.
 type Params struct {
-	Cfg             config.Config
-	Ingest          Ingester
-	EventsUC        *usecaseevents.Service
-	GeoUC           *usecasegeo.Service
-	ReputationUC    *usecasereputation.Service
-	ParseErrorsUC   *parseerrors.Service
-	SystemUC        *usecasesystem.Service
-	SystemPinger    usecasesystem.ClickHousePinger
-	ParseTestUC     *parsetest.Service
-	RetentionUC     *usecaseretention.Service
-	BackupUC        *usecasebackup.Service
-	AuthUC          *usecaseauth.Service
-	Users           UserDirectory
-	Sessions        SessionParser
-	APITokens       APITokenStore
-	SearchTemplates SearchTemplatesStore
-	AnomalyUC       *usecaseanomaly.Service
-	Logs            *usecaseaudit.Service
+	Cfg               config.Config
+	Ingest            Ingester
+	EventsUC          *usecaseevents.Service
+	GeoUC             *usecasegeo.Service
+	ReputationUC      *usecasereputation.Service
+	ParseErrorsUC     *parseerrors.Service
+	SystemUC          *usecasesystem.Service
+	SystemPinger      usecasesystem.ClickHousePinger
+	ParseTestUC       *parsetest.Service
+	RetentionUC       *usecaseretention.Service
+	BackupUC          *usecasebackup.Service
+	AuthUC            *usecaseauth.Service
+	Users             UserDirectory
+	Sessions          SessionParser
+	APITokens         APITokenStore
+	SearchTemplatesUC *searchtemplates.Service
+	AnomalyUC         *usecaseanomaly.Service
+	Logs              *usecaseaudit.Service
 }
 
 // Deps — композитор HTTP-слоя: domain bags без плоских UC-полей.
@@ -167,7 +168,7 @@ func NewDeps(p Params) *Deps {
 		reputation: &ReputationDeps{reputationUC: p.ReputationUC},
 		templates: &SearchTemplatesDeps{
 			cfg:             p.Cfg,
-			searchTemplates: p.SearchTemplates,
+			searchTemplates: p.SearchTemplatesUC,
 			sessions:        p.Sessions,
 		},
 		anomaly: &AnomalyDeps{cfg: p.Cfg, anomalyUC: p.AnomalyUC},

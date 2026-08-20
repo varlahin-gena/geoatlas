@@ -2,11 +2,10 @@ package httpapi
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strings"
 
-	"network_monitor/internal/adapter/searchtemplatesfile"
+	"network_monitor/internal/usecase/searchtemplates"
 )
 
 type SearchTemplatesHandler struct{ *SearchTemplatesDeps }
@@ -28,11 +27,11 @@ func (h *SearchTemplatesHandler) ListMine(w http.ResponseWriter, r *http.Request
 	}
 	list, err := h.searchTemplates.List(username)
 	if err != nil {
-		writeInternalError(w, "list search templates", err)
+		writeDomainError(w, "list search templates", err)
 		return
 	}
 	if list == nil {
-		list = []searchtemplatesfile.Template{}
+		list = []searchtemplates.Template{}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"templates": list})
 }
@@ -56,7 +55,7 @@ func (h *SearchTemplatesHandler) CreateMine(w http.ResponseWriter, r *http.Reque
 	}
 	t, err := h.searchTemplates.Create(username, req.Name, req.Query)
 	if err != nil {
-		writeSearchTemplateError(w, err)
+		writeDomainError(w, "create search template", err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, t)
@@ -86,7 +85,7 @@ func (h *SearchTemplatesHandler) UpdateMine(w http.ResponseWriter, r *http.Reque
 	}
 	t, err := h.searchTemplates.Update(username, id, req.Name, req.Query)
 	if err != nil {
-		writeSearchTemplateError(w, err)
+		writeDomainError(w, "update search template", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, t)
@@ -108,7 +107,7 @@ func (h *SearchTemplatesHandler) DeleteMine(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if err := h.searchTemplates.Delete(username, id); err != nil {
-		writeSearchTemplateError(w, err)
+		writeDomainError(w, "delete search template", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
@@ -121,11 +120,11 @@ func (h *SearchTemplatesHandler) ListAll(w http.ResponseWriter, r *http.Request)
 	}
 	list, err := h.searchTemplates.ListAll()
 	if err != nil {
-		writeInternalError(w, "list all search templates", err)
+		writeDomainError(w, "list all search templates", err)
 		return
 	}
 	if list == nil {
-		list = []searchtemplatesfile.TemplateWithAuthor{}
+		list = []searchtemplates.TemplateWithAuthor{}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"templates": list})
 }
@@ -145,21 +144,4 @@ func (h *SearchTemplatesHandler) currentUsername(r *http.Request) (string, bool)
 		return "", false
 	}
 	return sess.Username, true
-}
-
-func writeSearchTemplateError(w http.ResponseWriter, err error) {
-	switch {
-	case errors.Is(err, searchtemplatesfile.ErrNotFound):
-		writeJSON(w, http.StatusNotFound, map[string]any{"error": "not found"})
-	case errors.Is(err, searchtemplatesfile.ErrInvalidName):
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid name"})
-	case errors.Is(err, searchtemplatesfile.ErrInvalidQuery):
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid query"})
-	case errors.Is(err, searchtemplatesfile.ErrLimitExceeded):
-		writeJSON(w, http.StatusConflict, map[string]any{"error": "template limit exceeded"})
-	case errors.Is(err, searchtemplatesfile.ErrEmptyPath):
-		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "search templates not configured"})
-	default:
-		writeInternalError(w, "search templates", err)
-	}
 }

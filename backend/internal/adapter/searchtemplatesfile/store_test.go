@@ -1,8 +1,11 @@
 package searchtemplatesfile
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
+
+	"network_monitor/internal/usecase/searchtemplates"
 )
 
 func TestStoreCRUDAndIsolation(t *testing.T) {
@@ -71,12 +74,21 @@ func TestStoreCRUDAndIsolation(t *testing.T) {
 	}
 }
 
-func TestStoreValidation(t *testing.T) {
-	s := New(filepath.Join(t.TempDir(), "t.json"))
-	if _, err := s.Create("u", "", "q"); err != ErrInvalidName {
-		t.Fatalf("empty name: %v", err)
+func TestStoreEmptyPathUnavailable(t *testing.T) {
+	s := New("")
+	if _, err := s.List("u"); !errors.Is(err, searchtemplates.ErrUnavailable) {
+		t.Fatalf("empty path list: %v", err)
 	}
-	if _, err := s.Create("u", "n", ""); err != ErrInvalidQuery {
-		t.Fatalf("empty query: %v", err)
+}
+
+func TestStorePerUserLimit(t *testing.T) {
+	s := New(filepath.Join(t.TempDir(), "t.json"))
+	for i := 0; i < searchtemplates.MaxPerUser; i++ {
+		if _, err := s.Create("u", "n", "q"); err != nil {
+			t.Fatalf("create %d: %v", i, err)
+		}
+	}
+	if _, err := s.Create("u", "n", "q"); !errors.Is(err, searchtemplates.ErrLimitExceeded) {
+		t.Fatalf("over limit: %v", err)
 	}
 }

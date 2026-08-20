@@ -13,39 +13,11 @@ import (
 	"time"
 
 	"network_monitor/internal/fileatomic"
+	"network_monitor/internal/usecase/searchtemplates"
 )
-
-const (
-	MaxNameLen      = 80
-	MaxQueryLen     = 500
-	MaxPerUser      = 50
-	MaxTemplatesAll = 5000
-)
-
-var (
-	ErrNotFound      = errors.New("template not found")
-	ErrInvalidName   = errors.New("invalid template name")
-	ErrInvalidQuery  = errors.New("invalid template query")
-	ErrLimitExceeded = errors.New("template limit exceeded")
-	ErrEmptyPath     = errors.New("search templates file path is empty")
-)
-
-// Template — именованный поисковый запрос пользователя.
-type Template struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Query     string `json:"query"`
-	UpdatedAt string `json:"updated_at"`
-}
-
-// TemplateWithAuthor — шаблон с автором (admin overview).
-type TemplateWithAuthor struct {
-	Template
-	Username string `json:"username"`
-}
 
 type fileData struct {
-	Users map[string][]Template `json:"users"`
+	Users map[string][]searchtemplates.Template `json:"users"`
 }
 
 // Store — потокобезопасное JSON-хранилище шаблонов по username.
@@ -54,14 +26,16 @@ type Store struct {
 	path string
 }
 
+var _ searchtemplates.Store = (*Store)(nil)
+
 func New(path string) *Store {
 	return &Store{path: strings.TrimSpace(path)}
 }
 
-func (s *Store) List(username string) ([]Template, error) {
+func (s *Store) List(username string) ([]searchtemplates.Template, error) {
 	username = strings.TrimSpace(username)
 	if username == "" {
-		return nil, ErrInvalidName
+		return nil, searchtemplates.ErrInvalidName
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -69,24 +43,24 @@ func (s *Store) List(username string) ([]Template, error) {
 	if err != nil {
 		return nil, err
 	}
-	out := append([]Template(nil), data.Users[username]...)
+	out := append([]searchtemplates.Template(nil), data.Users[username]...)
 	sort.SliceStable(out, func(i, j int) bool {
 		return out[i].UpdatedAt > out[j].UpdatedAt
 	})
 	return out, nil
 }
 
-func (s *Store) ListAll() ([]TemplateWithAuthor, error) {
+func (s *Store) ListAll() ([]searchtemplates.TemplateWithAuthor, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	data, err := s.loadUnlocked()
 	if err != nil {
 		return nil, err
 	}
-	out := make([]TemplateWithAuthor, 0)
+	out := make([]searchtemplates.TemplateWithAuthor, 0)
 	for user, items := range data.Users {
 		for _, t := range items {
-			out = append(out, TemplateWithAuthor{Template: t, Username: user})
+			out = append(out, searchtemplates.TemplateWithAuthor{Template: t, Username: user})
 		}
 	}
 	sort.SliceStable(out, func(i, j int) bool {
@@ -98,28 +72,28 @@ func (s *Store) ListAll() ([]TemplateWithAuthor, error) {
 	return out, nil
 }
 
-func (s *Store) Create(username, name, query string) (Template, error) {
+func (s *Store) Create(username, name, query string) (searchtemplates.Template, error) {
 	username = strings.TrimSpace(username)
 	name = strings.TrimSpace(name)
 	query = strings.TrimSpace(query)
 	if username == "" {
-		return Template{}, ErrInvalidName
+		return searchtemplates.Template{}, searchtemplates.ErrInvalidName
 	}
-	if err := validateNameQuery(name, query); err != nil {
-		return Template{}, err
+	if err := searchtemplates.ValidateNameQuery(name, query); err != nil {
+		return searchtemplates.Template{}, err
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	data, err := s.loadUnlocked()
 	if err != nil {
-		return Template{}, err
+		return searchtemplates.Template{}, err
 	}
 	list := data.Users[username]
-	if len(list) >= MaxPerUser {
-		return Template{}, ErrLimitExceeded
+	if len(list) >= searchtemplates.MaxPerUser {
+		return searchtemplates.Template{}, searchtemplates.ErrLimitExceeded
 	}
-	t := Template{
+	t := searchtemplates.Template{
 		ID:        newTemplateID(),
 		Name:      name,
 		Query:     query,
@@ -127,28 +101,28 @@ func (s *Store) Create(username, name, query string) (Template, error) {
 	}
 	data.Users[username] = append(list, t)
 	if err := s.saveUnlocked(data); err != nil {
-		return Template{}, err
+		return searchtemplates.Template{}, err
 	}
 	return t, nil
 }
 
-func (s *Store) Update(username, id, name, query string) (Template, error) {
+func (s *Store) Update(username, id, name, query string) (searchtemplates.Template, error) {
 	username = strings.TrimSpace(username)
 	id = strings.TrimSpace(id)
 	name = strings.TrimSpace(name)
 	query = strings.TrimSpace(query)
 	if username == "" || id == "" {
-		return Template{}, ErrNotFound
+		return searchtemplates.Template{}, searchtemplates.ErrNotFound
 	}
-	if err := validateNameQuery(name, query); err != nil {
-		return Template{}, err
+	if err := searchtemplates.ValidateNameQuery(name, query); err != nil {
+		return searchtemplates.Template{}, err
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	data, err := s.loadUnlocked()
 	if err != nil {
-		return Template{}, err
+		return searchtemplates.Template{}, err
 	}
 	list := data.Users[username]
 	for i := range list {
@@ -160,18 +134,18 @@ func (s *Store) Update(username, id, name, query string) (Template, error) {
 		list[i].UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 		data.Users[username] = list
 		if err := s.saveUnlocked(data); err != nil {
-			return Template{}, err
+			return searchtemplates.Template{}, err
 		}
 		return list[i], nil
 	}
-	return Template{}, ErrNotFound
+	return searchtemplates.Template{}, searchtemplates.ErrNotFound
 }
 
 func (s *Store) Delete(username, id string) error {
 	username = strings.TrimSpace(username)
 	id = strings.TrimSpace(id)
 	if username == "" || id == "" {
-		return ErrNotFound
+		return searchtemplates.ErrNotFound
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -180,7 +154,7 @@ func (s *Store) Delete(username, id string) error {
 		return err
 	}
 	list := data.Users[username]
-	next := make([]Template, 0, len(list))
+	next := make([]searchtemplates.Template, 0, len(list))
 	found := false
 	for _, t := range list {
 		if t.ID == id {
@@ -190,7 +164,7 @@ func (s *Store) Delete(username, id string) error {
 		next = append(next, t)
 	}
 	if !found {
-		return ErrNotFound
+		return searchtemplates.ErrNotFound
 	}
 	if len(next) == 0 {
 		delete(data.Users, username)
@@ -198,16 +172,6 @@ func (s *Store) Delete(username, id string) error {
 		data.Users[username] = next
 	}
 	return s.saveUnlocked(data)
-}
-
-func validateNameQuery(name, query string) error {
-	if name == "" || len([]rune(name)) > MaxNameLen {
-		return ErrInvalidName
-	}
-	if query == "" || len([]rune(query)) > MaxQueryLen {
-		return ErrInvalidQuery
-	}
-	return nil
 }
 
 func newTemplateID() string {
@@ -220,41 +184,41 @@ func newTemplateID() string {
 
 func (s *Store) loadUnlocked() (fileData, error) {
 	if s == nil || s.path == "" {
-		return fileData{}, ErrEmptyPath
+		return fileData{}, searchtemplates.ErrUnavailable
 	}
 	raw, err := os.ReadFile(s.path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return fileData{Users: map[string][]Template{}}, nil
+			return fileData{Users: map[string][]searchtemplates.Template{}}, nil
 		}
 		return fileData{}, err
 	}
 	if len(strings.TrimSpace(string(raw))) == 0 {
-		return fileData{Users: map[string][]Template{}}, nil
+		return fileData{Users: map[string][]searchtemplates.Template{}}, nil
 	}
 	var data fileData
 	if err := json.Unmarshal(raw, &data); err != nil {
 		return fileData{}, fmt.Errorf("parse search templates: %w", err)
 	}
 	if data.Users == nil {
-		data.Users = map[string][]Template{}
+		data.Users = map[string][]searchtemplates.Template{}
 	}
 	return data, nil
 }
 
 func (s *Store) saveUnlocked(data fileData) error {
 	if s == nil || s.path == "" {
-		return ErrEmptyPath
+		return searchtemplates.ErrUnavailable
 	}
 	if data.Users == nil {
-		data.Users = map[string][]Template{}
+		data.Users = map[string][]searchtemplates.Template{}
 	}
 	total := 0
 	for _, list := range data.Users {
 		total += len(list)
 	}
-	if total > MaxTemplatesAll {
-		return ErrLimitExceeded
+	if total > searchtemplates.MaxTemplatesAll {
+		return searchtemplates.ErrLimitExceeded
 	}
 	return fileatomic.WriteJSON(s.path, data)
 }

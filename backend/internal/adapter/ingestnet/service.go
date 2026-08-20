@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"network_monitor/internal/model"
 	usecaseingest "network_monitor/internal/usecase/ingest"
 )
 
@@ -128,7 +129,7 @@ func NewService(cfg Config, deps ProcessorDeps) *Service {
 	return s
 }
 
-func (s *Service) Stats() StatsSnapshot {
+func (s *Service) Stats() model.IngestLiveStats {
 	snap := s.stats.snapshot()
 	if s.lineCh != nil {
 		snap.QueueDepth = int64(len(s.lineCh))

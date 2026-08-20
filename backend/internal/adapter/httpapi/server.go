@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"network_monitor/internal/adapter/httpapi/loginthrottle"
-	"network_monitor/internal/adapter/searchtemplatesfile"
 )
 
 const (
@@ -36,9 +35,6 @@ func WithMetrics(m MetricsRecorder) ServerOption {
 }
 
 func NewServer(p Params, opts ...ServerOption) *Server {
-	if p.SearchTemplates == nil {
-		p.SearchTemplates = searchtemplatesfile.New(p.Cfg.SearchTemplatesFile)
-	}
 	deps := NewDeps(p)
 	for _, opt := range opts {
 		if opt != nil {

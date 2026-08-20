@@ -10,14 +10,14 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"network_monitor/internal/adapter/ingestnet"
+	"network_monitor/internal/model"
 )
 
 const namespace = "nm"
 
-// IngestStats вЂ” СЃРЅРёРјРѕРє live-ingest (СЂРµР°Р»РёР·Р°С†РёСЏ: *ingestnet.Service).
+// IngestStats — снимок live-ingest (реализация: *ingestnet.Service).
 type IngestStats interface {
-	Stats() ingestnet.StatsSnapshot
+	Stats() model.IngestLiveStats
 }
 
 // Registry вЂ” РјРµС‚СЂРёРєРё РїСЂРѕС†РµСЃСЃР° + handler /metrics.

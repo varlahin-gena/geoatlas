@@ -7,6 +7,7 @@ import (
 
 	"network_monitor/internal/apperr"
 	usecasebackup "network_monitor/internal/usecase/backup"
+	"network_monitor/internal/usecase/searchtemplates"
 )
 
 // writeDomainError maps application sentinel errors to HTTP status.
@@ -31,7 +32,8 @@ func writeDomainError(w http.ResponseWriter, logMsg string, err error) {
 	case errors.Is(err, apperr.ErrConflict):
 		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error()})
 	case errors.Is(err, usecasebackup.ErrDisabled),
-		errors.Is(err, usecasebackup.ErrUnavailable):
+		errors.Is(err, usecasebackup.ErrUnavailable),
+		errors.Is(err, searchtemplates.ErrUnavailable):
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": err.Error()})
 	case apperr.IsClient(err):
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})

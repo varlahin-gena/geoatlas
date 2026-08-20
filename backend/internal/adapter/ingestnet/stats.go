@@ -3,46 +3,17 @@ package ingestnet
 import (
 	"sync/atomic"
 	"time"
+
+	"network_monitor/internal/model"
 )
-
-// TransportStats — счётчики приёма по транспорту (udp/tcp на входе syslog-ng).
-type TransportStats struct {
-	ReceivedTotal int64 `json:"received_total"`
-	Connections   int64 `json:"connections"`
-}
-
-// StatsSnapshot — снимок метрик live-ingest для API и мониторинга.
-type StatsSnapshot struct {
-	State              string         `json:"state"`
-	ReceivedTotal      int64          `json:"received_total"`
-	ParsedTotal        int64          `json:"parsed_total"`
-	InsertedTotal      int64          `json:"inserted_total"`
-	SkippedTotal       int64          `json:"skipped_total"`
-	ParseErrorsTotal   int64          `json:"parse_errors_total"`
-	BufferedLines      int64          `json:"buffered_lines"`
-	QueueDepth         int64          `json:"queue_depth"`
-	QueueCapacity      int64          `json:"queue_capacity"`
-	QueueBytes         int64          `json:"queue_bytes"`
-	QueueBytesCapacity int64          `json:"queue_bytes_capacity"`
-	DroppedTotal       int64          `json:"dropped_total"`        // queue admission drops
-	BufferDropsTotal   int64          `json:"buffer_drops_total"`   // processor buffer drops (CH outage path)
-	AuthRejectedTotal  int64          `json:"auth_rejected_total"`  // peer allowlist / bad ingest token
-	CircuitOpen        bool           `json:"circuit_open"`         // insert circuit currently blocking dequeue
-	LastDropAt         string         `json:"last_drop_at,omitempty"`
-	Connections        int64          `json:"connections"`
-	UDP                TransportStats `json:"udp"`
-	TCP                TransportStats `json:"tcp"`
-	LastFlushAt        string         `json:"last_flush_at,omitempty"`
-	LastError          string         `json:"last_error,omitempty"`
-}
 
 type transportStats struct {
 	receivedTotal atomic.Int64
 	connections   atomic.Int64
 }
 
-func (t *transportStats) snapshot() TransportStats {
-	return TransportStats{
+func (t *transportStats) snapshot() model.IngestTransportStats {
+	return model.IngestTransportStats{
 		ReceivedTotal: t.receivedTotal.Load(),
 		Connections:   t.connections.Load(),
 	}
@@ -162,7 +133,7 @@ func (s *stats) addBufferDropped(n int64) {
 	s.lastDropAtUnix.Store(time.Now().UnixNano())
 }
 
-func (s *stats) snapshot() StatsSnapshot {
+func (s *stats) snapshot() model.IngestLiveStats {
 	state, _ := s.state.Load().(string)
 	if s.activeErrors.Load() > 0 {
 		state = "error"
@@ -173,22 +144,22 @@ func (s *stats) snapshot() StatsSnapshot {
 	if ns := s.lastDropAtUnix.Load(); ns > 0 {
 		lastDrop = time.Unix(0, ns).UTC().Format(time.RFC3339)
 	}
-	return StatsSnapshot{
-		State:            state,
-		ReceivedTotal:    s.receivedTotal.Load(),
-		ParsedTotal:      s.parsedTotal.Load(),
-		InsertedTotal:    s.insertedTotal.Load(),
-		SkippedTotal:     s.skippedTotal.Load(),
-		ParseErrorsTotal: s.parseErrorsTotal.Load(),
-		BufferedLines:    s.bufferedLines.Load(),
-		DroppedTotal:     s.droppedTotal.Load(),
-		BufferDropsTotal: s.bufferDropsTotal.Load(),
+	return model.IngestLiveStats{
+		State:             state,
+		ReceivedTotal:     s.receivedTotal.Load(),
+		ParsedTotal:       s.parsedTotal.Load(),
+		InsertedTotal:     s.insertedTotal.Load(),
+		SkippedTotal:      s.skippedTotal.Load(),
+		ParseErrorsTotal:  s.parseErrorsTotal.Load(),
+		BufferedLines:     s.bufferedLines.Load(),
+		DroppedTotal:      s.droppedTotal.Load(),
+		BufferDropsTotal:  s.bufferDropsTotal.Load(),
 		AuthRejectedTotal: s.authRejected.Load(),
-		LastDropAt:       lastDrop,
-		Connections:      s.connections.Load(),
-		UDP:              s.udp.snapshot(),
-		TCP:              s.tcp.snapshot(),
-		LastFlushAt:      lastFlush,
-		LastError:        lastErr,
+		LastDropAt:        lastDrop,
+		Connections:       s.connections.Load(),
+		UDP:               s.udp.snapshot(),
+		TCP:               s.tcp.snapshot(),
+		LastFlushAt:       lastFlush,
+		LastError:         lastErr,
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"network_monitor/internal/apperr"
 	"network_monitor/internal/usecase/parseerrors"
 	usecaseretention "network_monitor/internal/usecase/retention"
+	"network_monitor/internal/usecase/searchtemplates"
 )
 
 func TestWriteDomainErrorMapping(t *testing.T) {
@@ -26,6 +27,7 @@ func TestWriteDomainErrorMapping(t *testing.T) {
 		{"too large", apperr.TooLarge("geo too big"), http.StatusRequestEntityTooLarge, "geo too big"},
 		{"parse ids", parseerrors.ErrNoIDs, http.StatusBadRequest, parseerrors.ErrNoIDs.Error()},
 		{"retention", usecaseretention.ErrInvalidDays, http.StatusBadRequest, usecaseretention.ErrInvalidDays.Error()},
+		{"templates unavailable", searchtemplates.ErrUnavailable, http.StatusServiceUnavailable, "search templates not configured"},
 		{"unknown", errors.New("clickhouse down"), http.StatusInternalServerError, "internal server error"},
 	}
 	for _, tc := range cases {

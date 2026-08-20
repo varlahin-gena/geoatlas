@@ -59,12 +59,16 @@ func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backg
 		repIdx = repstore.NewReloadableReputationIndex(a.pools.Background)
 		repRepo := repstore.NewReputationRepository(a.pools.API, a.pools.Ingest)
 		repFeedStore := reputationfeedsfile.New(cfg.ReputationFeedsFile)
-		repFeeds, err := repFeedStore.LoadOrSeed(reputationFeedsFromConfig(cfg.ReputationFeeds))
+		seed := reputationFeedsFromConfig(cfg.ReputationFeeds)
+		if len(seed) == 0 {
+			seed = usecasereputation.DefaultFeeds()
+		}
+		repFeeds, err := repFeedStore.LoadOrSeed(seed)
 		if err != nil {
 			slog.Warn("reputation feeds file load/seed failed", "err", err, "path", cfg.ReputationFeedsFile)
-			repFeeds = reputationFeedsFromConfig(cfg.ReputationFeeds)
+			repFeeds = seed
 			if len(repFeeds) == 0 {
-				repFeeds = reputationFeedsFromConfig(config.DefaultReputationFeeds())
+				repFeeds = usecasereputation.DefaultFeeds()
 			}
 		} else {
 			slog.Info("reputation feeds loaded", "count", len(repFeeds), "path", cfg.ReputationFeedsFile)
@@ -127,30 +131,21 @@ func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backg
 }
 
 func reputationFeedsFromConfig(feeds []config.ReputationFeed) []usecasereputation.Feed {
-	feeds, _ = config.WithoutRetiredReputationFeeds(feeds)
 	out := make([]usecasereputation.Feed, 0, len(feeds))
 	for _, feed := range feeds {
 		out = append(out, usecasereputation.Feed{
 			Name: feed.Name, URL: feed.URL, Category: feed.Category, Format: feed.Format,
 		})
 	}
+	out, _ = usecasereputation.WithoutRetired(out)
 	return out
 }
 
 func dropRetiredReputationFeeds(feeds []usecasereputation.Feed) (cleaned []usecasereputation.Feed, dropped int) {
-	if len(feeds) == 0 {
-		return nil, dropped
+	cleaned, changed := usecasereputation.WithoutRetired(feeds)
+	if !changed {
+		return feeds, 0
 	}
-	cleaned = make([]usecasereputation.Feed, 0, len(feeds))
-	for _, f := range feeds {
-		if _, retired := config.RetiredReputationFeedNames[f.Name]; retired {
-			dropped++
-			continue
-		}
-		cleaned = append(cleaned, f)
-	}
-	if len(cleaned) == 0 {
-		return nil, dropped
-	}
+	dropped = len(feeds) - len(cleaned)
 	return cleaned, dropped
 }
