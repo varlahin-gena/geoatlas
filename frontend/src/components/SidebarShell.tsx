@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export function SidebarBrand() {
+function SidebarBrand() {
   return (
     <div className="sidebar-header">
       <img className="logo" src="/logo.png" alt="" width={28} height={28} aria-hidden="true" />

@@ -1,4 +1,4 @@
-export type NavGroupId = 'workspace' | 'observe' | 'data' | 'threat' | 'access';
+type NavGroupId = 'workspace' | 'observe' | 'data' | 'threat' | 'access';
 
 export interface NavItem {
   href: string;
@@ -10,7 +10,7 @@ export interface NavItem {
   requiresUIAuth?: boolean;
 }
 
-export const NAV_GROUP_ORDER: NavGroupId[] = [
+const NAV_GROUP_ORDER: NavGroupId[] = [
   'workspace',
   'observe',
   'data',
@@ -18,7 +18,7 @@ export const NAV_GROUP_ORDER: NavGroupId[] = [
   'access',
 ];
 
-export const NAV_GROUP_LABELS: Record<NavGroupId, string> = {
+const NAV_GROUP_LABELS: Record<NavGroupId, string> = {
   workspace: 'Рабочее место',
   observe: 'Наблюдение',
   data: 'Данные и GeoIP',
@@ -95,7 +95,7 @@ export const PAGE_NAV: NavItem[] = [
 ];
 
 export type NavGroupSection = {
-  id: NavGroupId;
+  id: string;
   label: string;
   items: NavItem[];
 };

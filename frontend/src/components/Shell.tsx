@@ -12,8 +12,6 @@ import { SidebarCollapseButton, SidebarShell } from './SidebarShell';
 import { useNavBadges } from './useNavBadges';
 import { useSidebarCollapsed } from './useSidebarCollapsed';
 
-export { NavIcon, NAV_ICONS } from './navIcons';
-
 export function AdminSidebar() {
   const { isAdmin, reputationEnabled, uiAuthEnabled } = useAuth();
   const badges = useNavBadges();
