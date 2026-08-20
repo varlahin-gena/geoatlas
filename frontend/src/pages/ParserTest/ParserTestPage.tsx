@@ -75,7 +75,6 @@ export default function ParserTestPage() {
   return (
     <AdminLayout title="Тест парсеров">
       <div className="page-content-inner">
-        <h1>Тест парсеров</h1>
         <p className="page-lead">
           Строки прогоняются через тот же реестр парсеров, что и боевой ingest (
           <code>/api/parse-test</code>).

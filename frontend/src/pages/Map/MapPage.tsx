@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/auth/AuthContext';
-import { filterNav, PAGE_NAV } from '@/components/nav';
 import { useToast } from '@/components/Toast';
+import { useSidebarCollapsed } from '@/components/useSidebarCollapsed';
 import { fmtNumber } from '@/lib/format';
 import { loadCountriesGeoJSON, type GeoFeatureCollection } from './mapHeatmap';
 import { MapDetailPanel } from './mapDetail';
@@ -31,6 +31,7 @@ import './anomaly.css';
 export default function MapPage() {
   const { isAdmin, reputationEnabled, uiAuthEnabled, theme, user, refresh } = useAuth();
   const { toast } = useToast();
+  const { collapsed: sidebarCollapsed, toggle: toggleSidebar } = useSidebarCollapsed();
   const view = useMapViewQuery();
   const {
     period,
@@ -60,8 +61,6 @@ export default function MapPage() {
   const anomalyReturnViewRef = useRef<MapViewState | null>(null);
 
   const {
-    repMenuOpen,
-    setRepMenuOpen,
     repCategories,
     setRepCategories,
     repLists,
@@ -199,14 +198,6 @@ export default function MapPage() {
     setFocusedCountry,
   });
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    try {
-      return localStorage.getItem('nm.mapSidebarCollapsed') === '1';
-    } catch {
-      return false;
-    }
-  });
-
   useEffect(() => {
     document.title = 'ГеоАтлас — SOC';
     document.body.classList.add('page-map');
@@ -278,25 +269,6 @@ export default function MapPage() {
     highlight.edgeKeys,
   ]);
 
-  const adminLinks = filterNav(PAGE_NAV, {
-    isAdmin,
-    reputationEnabled,
-    uiAuthEnabled,
-    adminLinksOnly: true,
-  });
-
-  function toggleSidebar() {
-    setSidebarCollapsed((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem('nm.mapSidebarCollapsed', next ? '1' : '0');
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
-  }
-
   const truncHint =
     arcCountInfo.total > arcCountInfo.shown
       ? `Показано ${fmtNumber(arcCountInfo.shown)} из ${fmtNumber(arcCountInfo.total)} связей — увеличьте лимит дуг или сузьте период`
@@ -352,38 +324,13 @@ export default function MapPage() {
         К содержимому
       </a>
       <MapSidebar
-        view={{ viewMode, setViewMode, autoRotate, setAutoRotate }}
+        view={{ viewMode, setViewMode }}
         isAdmin={isAdmin}
         uploads={{ logFileRef, geoFileRef, uploadFile }}
         actions={{ fetchData, resetView, exportPng, toggleSidebar }}
-        adminLinks={adminLinks}
         geoWizard={{
           open: geoWizard.open,
           empty: geoWizard.geo == null ? null : geoWizard.geo.count === 0,
-        }}
-        viz={{
-          minCount,
-          setMinCount,
-          arcCountInfo,
-          maxArcs,
-          setMaxArcs,
-          showLegend,
-          setShowLegend,
-          showStats,
-          setShowStats,
-          showHeatmap,
-          setShowHeatmap,
-          showCountryLabels,
-          setShowCountryLabels,
-          monoArcs,
-          setMonoArcs,
-        }}
-        data={{
-          autoRefresh,
-          setAutoRefresh,
-          dataSource,
-          selectDataSource,
-          backupAttached,
         }}
       />
 
@@ -395,8 +342,6 @@ export default function MapPage() {
             reputationEnabled,
             ipMode,
             repFilterCount,
-            repMenuOpen,
-            setRepMenuOpen,
             repCategories,
             setRepCategories,
             repLists,
@@ -415,6 +360,37 @@ export default function MapPage() {
             periodTo,
             setPeriodTo,
             fetchData,
+          }}
+          layers={{
+            viewMode,
+            viz: {
+              minCount,
+              setMinCount,
+              arcCountInfo,
+              maxArcs,
+              setMaxArcs,
+              showLegend,
+              setShowLegend,
+              showStats,
+              setShowStats,
+              showHeatmap,
+              setShowHeatmap,
+              showCountryLabels,
+              setShowCountryLabels,
+              monoArcs,
+              setMonoArcs,
+            },
+            data: {
+              autoRefresh,
+              setAutoRefresh,
+              dataSource,
+              selectDataSource,
+              backupAttached,
+            },
+            globe: {
+              autoRotate,
+              setAutoRotate,
+            },
           }}
         />
 

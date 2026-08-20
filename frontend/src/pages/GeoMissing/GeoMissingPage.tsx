@@ -111,7 +111,7 @@ export default function GeoMissingPage() {
   }, [period, limit, toast]);
 
   useEffect(() => {
-    document.title = 'ГеоАтлас — IP без GeoIP';
+    document.title = 'ГеоАтлас — IP без координат';
     void load();
   }, [load]);
 
@@ -220,8 +220,7 @@ export default function GeoMissingPage() {
   const by = displaySummary.by_kind || {};
 
   return (
-    <AdminLayout
-      title="IP без GeoIP"
+    <AdminLayout title="IP без координат"
       actions={
         <>
           <button type="button" className="btn" onClick={() => void copyPublic()}>

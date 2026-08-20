@@ -1,8 +1,9 @@
-import type { Dispatch, SetStateAction } from 'react';
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { SystemHealthPill, UserMenu } from '@/components/Shell';
 import { SearchBuilder } from './SearchBuilder';
+import { countActiveMapFilters, MapFiltersPanel } from './MapFiltersPanel';
+import { MapLayersPanel } from './MapLayersPanel';
 import { PERIODS } from './mapPeriods';
-import { categoryLabel } from './mapReputation';
 import type { RepFilterSide } from './mapTypes';
 
 export type MapTopbarProps = {
@@ -22,8 +23,6 @@ export type MapTopbarProps = {
     reputationEnabled: boolean;
     ipMode: boolean;
     repFilterCount: number;
-    repMenuOpen: boolean;
-    setRepMenuOpen: Dispatch<SetStateAction<boolean>>;
     repCategories: Set<string>;
     setRepCategories: Dispatch<SetStateAction<Set<string>>>;
     repLists: Set<string>;
@@ -43,17 +42,54 @@ export type MapTopbarProps = {
     setPeriodTo: (v: string) => void;
     fetchData: () => void | Promise<void>;
   };
+  layers: {
+    viewMode: 'map' | 'globe';
+    viz: {
+      minCount: number;
+      setMinCount: (n: number) => void;
+      arcCountInfo: { shown: number; total: number };
+      maxArcs: number;
+      setMaxArcs: (n: number) => void;
+      showLegend: boolean;
+      setShowLegend: (v: boolean) => void;
+      showStats: boolean;
+      setShowStats: (v: boolean) => void;
+      showHeatmap: boolean;
+      setShowHeatmap: (v: boolean) => void;
+      showCountryLabels: boolean;
+      setShowCountryLabels: (v: boolean) => void;
+      monoArcs: boolean;
+      setMonoArcs: (v: boolean) => void;
+    };
+    data: {
+      autoRefresh: boolean;
+      setAutoRefresh: (v: boolean) => void;
+      dataSource: 'live' | 'backup';
+      selectDataSource: (v: 'live' | 'backup') => void;
+      backupAttached: string;
+    };
+    globe: {
+      autoRotate: boolean;
+      setAutoRotate: (v: boolean) => void;
+    };
+  };
 };
 
-export function MapTopbar({ search: searchCtl, grouping, reputation, period: periodCtl }: MapTopbarProps) {
+type ChromePanel = 'filters' | 'layers' | null;
+
+export function MapTopbar({
+  search: searchCtl,
+  grouping,
+  reputation,
+  period: periodCtl,
+  layers,
+}: MapTopbarProps) {
   const { search, setSearch, builderOpen, setBuilderOpen } = searchCtl;
   const { groupBy, setGroupBy, filter, setFilter } = grouping;
   const {
     reputationEnabled,
     ipMode,
     repFilterCount,
-    repMenuOpen,
-    setRepMenuOpen,
     repCategories,
     setRepCategories,
     repLists,
@@ -65,6 +101,62 @@ export function MapTopbar({ search: searchCtl, grouping, reputation, period: per
     repTree,
   } = reputation;
   const { period, setPeriod, periodFrom, setPeriodFrom, periodTo, setPeriodTo, fetchData } = periodCtl;
+
+  const [panel, setPanel] = useState<ChromePanel>(null);
+  const filtersWrapRef = useRef<HTMLDivElement>(null);
+  const layersWrapRef = useRef<HTMLDivElement>(null);
+
+  const filtersActive = countActiveMapFilters({
+    groupBy,
+    filter,
+    repFilterCount,
+    repColorArcs,
+  });
+
+  function openPanel(next: ChromePanel) {
+    setPanel((prev) => (prev === next ? null : next));
+    if (next) setBuilderOpen(false);
+  }
+
+  function openBuilder() {
+    setBuilderOpen((v) => {
+      const next = !v;
+      if (next) setPanel(null);
+      return next;
+    });
+  }
+
+  useEffect(() => {
+    if (builderOpen) setPanel(null);
+  }, [builderOpen]);
+
+  useEffect(() => {
+    if (!panel) return;
+    function onDoc(e: MouseEvent) {
+      const t = e.target as Node;
+      if (panel === 'filters' && filtersWrapRef.current?.contains(t)) return;
+      if (panel === 'layers' && layersWrapRef.current?.contains(t)) return;
+      setPanel(null);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setPanel(null);
+    }
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [panel]);
+
+  function resetFilters() {
+    setGroupBy('ip');
+    setFilter('all');
+    setRepCategories(new Set());
+    setRepLists(new Set());
+    setRepSide('any');
+    setRepColorArcs(false);
+  }
 
   return (
     <header className="topbar">
@@ -86,7 +178,7 @@ export function MapTopbar({ search: searchCtl, grouping, reputation, period: per
           aria-expanded={builderOpen}
           aria-controls="searchBuilderPanel"
           title="Расширенный поиск"
-          onClick={() => setBuilderOpen((v) => !v)}
+          onClick={openBuilder}
         >
           <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M3 5h18" />
@@ -101,164 +193,6 @@ export function MapTopbar({ search: searchCtl, grouping, reputation, period: per
           onApply={setSearch}
         />
       </div>
-
-      <div className="group-control">
-        <span>Группа:</span>
-        <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)}>
-          <option value="ip">IP</option>
-          <option value="subnet">/24</option>
-          <option value="city">Город</option>
-          <option value="country">Страна</option>
-        </select>
-      </div>
-
-      <div className="filter-tabs">
-        <button
-          type="button"
-          className={filter === 'all' ? 'active' : ''}
-          onClick={() => setFilter('all')}
-        >
-          Все
-        </button>
-        <button
-          type="button"
-          className={`allowed${filter === 'allowed' ? ' active' : ''}`}
-          onClick={() => setFilter('allowed')}
-        >
-          Разрешённые
-        </button>
-        <button
-          type="button"
-          className={`blocked${filter === 'blocked' ? ' active' : ''}`}
-          onClick={() => setFilter('blocked')}
-        >
-          Заблокированные
-        </button>
-      </div>
-
-      {reputationEnabled ? (
-        <div className="reputation-filter" id="reputationFilterWrap">
-          <button
-            type="button"
-            className={`rep-filter-btn${(repFilterCount > 0 || repColorArcs) && ipMode ? ' active' : ''}`}
-            title={
-              ipMode
-                ? 'Фильтр и подсветка по репутационным спискам'
-                : 'Доступно в режиме Группа: IP'
-            }
-            disabled={!ipMode}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!ipMode) return;
-              setRepMenuOpen((v) => !v);
-            }}
-          >
-            Репутация
-            <span
-              className="rep-badge"
-              style={{
-                display: repFilterCount > 0 && ipMode ? 'inline-flex' : 'none',
-              }}
-            >
-              {repFilterCount}
-            </span>
-          </button>
-          <div
-            className={`reputation-menu${repMenuOpen ? ' open' : ''}`}
-            role="dialog"
-            aria-label="Фильтр репутации"
-          >
-            <div className="rep-menu-head">
-              <span>Репутация</span>
-              <button
-                type="button"
-                className="rep-clear"
-                onClick={() => {
-                  setRepCategories(new Set());
-                  setRepLists(new Set());
-                  setRepSide('any');
-                }}
-              >
-                Сбросить
-              </button>
-            </div>
-            <div className="rep-menu-side">
-              <label htmlFor="repFilterSide">Сторона</label>
-              <select
-                id="repFilterSide"
-                value={repSide}
-                onChange={(e) => setRepSide(e.target.value as RepFilterSide)}
-              >
-                <option value="any">src или dst</option>
-                <option value="src">только src</option>
-                <option value="dst">только dst</option>
-                <option value="both">оба конца</option>
-              </select>
-            </div>
-            <label className="rep-color-toggle">
-              <input
-                type="checkbox"
-                checked={repColorArcs}
-                onChange={(e) => setRepColorArcs(e.target.checked)}
-              />
-              Окрашивать дуги с хитом
-            </label>
-            <p className="rep-menu-hint">
-              Частные и спец. сети (RFC1918, CGNAT, loopback) не учитываются. В деталях дуги
-              смотрите «диапазон».
-            </p>
-            <div className="rep-menu-body">
-              {!ipMode ? (
-                <div className="rep-menu-empty">Переключите «Группа» на IP</div>
-              ) : Object.keys(repTree).length === 0 ? (
-                <div className="rep-menu-empty">Нет совпадений на карте</div>
-              ) : (
-                Object.keys(repTree)
-                  .sort()
-                  .map((cat) => (
-                    <div key={cat}>
-                      <label className="rep-cat">
-                        <input
-                          type="checkbox"
-                          checked={repCategories.has(cat)}
-                          onChange={(e) => {
-                            setRepCategories((prev) => {
-                              const next = new Set(prev);
-                              if (e.target.checked) next.add(cat);
-                              else next.delete(cat);
-                              return next;
-                            });
-                          }}
-                        />{' '}
-                        <strong>{categoryLabel(cat)}</strong>{' '}
-                        <span className="rep-cat-key">({cat})</span>
-                      </label>
-                      {Array.from(repTree[cat])
-                        .sort()
-                        .map((list) => (
-                          <label className="rep-list" key={list}>
-                            <input
-                              type="checkbox"
-                              checked={repLists.has(list)}
-                              onChange={(e) => {
-                                setRepLists((prev) => {
-                                  const next = new Set(prev);
-                                  if (e.target.checked) next.add(list);
-                                  else next.delete(list);
-                                  return next;
-                                });
-                              }}
-                            />{' '}
-                            {list}
-                          </label>
-                        ))}
-                    </div>
-                  ))
-              )}
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       <div className="period-control">
         <span>Период:</span>
@@ -292,6 +226,56 @@ export function MapTopbar({ search: searchCtl, grouping, reputation, period: per
             Применить
           </button>
         </div>
+      </div>
+
+      <div className="map-chrome-trigger" ref={filtersWrapRef}>
+        <button
+          type="button"
+          className={`map-chrome-btn${panel === 'filters' || filtersActive > 0 ? ' active' : ''}`}
+          aria-expanded={panel === 'filters'}
+          aria-haspopup="dialog"
+          onClick={() => openPanel('filters')}
+        >
+          Фильтры
+          {filtersActive > 0 ? <span className="map-chrome-badge">{filtersActive}</span> : null}
+        </button>
+        <MapFiltersPanel
+          open={panel === 'filters'}
+          grouping={grouping}
+          reputation={{
+            reputationEnabled,
+            ipMode,
+            repCategories,
+            setRepCategories,
+            repLists,
+            setRepLists,
+            repSide,
+            setRepSide,
+            repColorArcs,
+            setRepColorArcs,
+            repTree,
+          }}
+          onReset={resetFilters}
+        />
+      </div>
+
+      <div className="map-chrome-trigger" ref={layersWrapRef}>
+        <button
+          type="button"
+          className={`map-chrome-btn${panel === 'layers' ? ' active' : ''}`}
+          aria-expanded={panel === 'layers'}
+          aria-haspopup="dialog"
+          onClick={() => openPanel('layers')}
+        >
+          Слои
+        </button>
+        <MapLayersPanel
+          open={panel === 'layers'}
+          viewMode={layers.viewMode}
+          viz={layers.viz}
+          data={layers.data}
+          globe={layers.globe}
+        />
       </div>
 
       <div className="topbar-spacer" />

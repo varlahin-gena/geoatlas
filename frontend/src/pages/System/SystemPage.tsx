@@ -90,7 +90,7 @@ export default function SystemPage() {
   }, []);
 
   useEffect(() => {
-    document.title = 'ГеоАтлас — Мониторинг';
+    document.title = 'ГеоАтлас — Мониторинг системы';
   }, []);
 
   useEffect(() => {

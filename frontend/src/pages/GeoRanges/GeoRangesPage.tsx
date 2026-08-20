@@ -408,7 +408,6 @@ export default function GeoRangesPage() {
       }
     >
       <div className="page-content-inner">
-        <h1>База GeoIP</h1>
         <p className="page-lead">
           Текущие диапазоны в таблице geo_ranges. Точечные правки — через «изменить». Полная замена
           базы: «Очистить базу» (снимает early 409), затем «Загрузить CSV». Рестарт backend не нужен.
@@ -646,7 +645,7 @@ export default function GeoRangesPage() {
                       ? 'IP не входит ни в один диапазон базы GeoIP'
                       : rows.length
                         ? 'Нет диапазонов по текстовому фильтру'
-                        : 'Нет диапазонов — загрузите CSV или добавьте со страницы IP без GeoIP'}
+                        : 'Нет диапазонов — загрузите CSV или добавьте со страницы IP без координат'}
                   </td>
                 </tr>
               ) : (

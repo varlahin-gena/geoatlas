@@ -279,7 +279,7 @@ export function GeoWizardModal(props: Props) {
                   <h4>Позже точечно</h4>
                   <p className="geo-wizard-hint">
                     Когда появятся события, IP без координат можно добавить на странице{' '}
-                    <Link to="/geo-missing">IP без GeoIP</Link>.
+                    <Link to="/geo-missing">IP без координат</Link>.
                   </p>
                 </section>
               </div>

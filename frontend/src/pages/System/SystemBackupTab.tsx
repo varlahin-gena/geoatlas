@@ -151,7 +151,7 @@ export function SystemBackupTab() {
       !confirm(
         `Подключить «${b.name}» для просмотра на карте?\n\n` +
           `Данные попадут в shadow-таблицы nm_bak_* (live и ingest не трогаются). ` +
-          `На карте переключите источник на «Бэкап».`,
+          `На карте переключите источник на «Резервная копия».`,
       )
     ) {
       return;
@@ -240,7 +240,7 @@ export function SystemBackupTab() {
         <p className="hint">
           Native ClickHouse BACKUP на том clickhouse-backups. «Подключить» копирует данные в
           shadow-таблицы <code>nm_bak_*</code> — live и ingest не меняются. На карте переключатель
-          Live / Бэкап. «Отключить» удаляет только shadow. Полный appliance restore (включая auth):{' '}
+          Прямой эфир / Резервная копия. «Отключить» удаляет только shadow. Полный appliance restore (включая auth):{' '}
           <code>./scripts/restore-clickhouse.sh &lt;name&gt;</code>
         </p>
         {loading && !cat ? <p className="hint">Загрузка…</p> : null}

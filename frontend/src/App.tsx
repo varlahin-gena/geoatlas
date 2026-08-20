@@ -106,7 +106,7 @@ export default function App() {
                 path="/geo-missing"
                 element={
                   <RequireAuth admin>
-                    <Lazy label="IP без GeoIP">
+                    <Lazy label="IP без координат">
                       <GeoMissingPage />
                     </Lazy>
                   </RequireAuth>

@@ -190,7 +190,6 @@ export default function ReputationPage() {
       }
     >
       <div className="page-content-inner">
-        <h1>Репутация IP</h1>
         <p className="page-lead">
           URL-фиды хранятся в <code>reputation_feeds.json</code> и обновляются по расписанию. Форматы:{' '}
           <code>netset/plain</code>, <code>spamhaus_json</code>, <code>csv_ip</code>.
