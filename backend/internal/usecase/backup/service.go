@@ -260,31 +260,16 @@ func (s *Service) UpdateSchedule(ctx context.Context, in Schedule, actor string)
 		})
 		return Schedule{}, err
 	}
+	msg, meta := scheduleUpdateAudit(prev, out)
 	s.logDREvent(ctx, usecaseaudit.DREvent{
 		Actor:   safeActor(actor),
 		Action:  "backup.schedule.update",
 		Target:  "schedule",
 		Status:  "succeeded",
-		Message: "backup schedule updated",
-		Meta: map[string]any{
-			"enabled":       out.Enabled,
-			"hour":          out.Hour,
-			"minute":        out.Minute,
-			"timezone":      out.Timezone,
-			"keep":          out.Keep,
-			"include_edges": out.IncludeEdges,
-			"include_auth":  out.IncludeAuth,
-		},
+		Message: msg,
+		Meta:    meta,
 	})
-	s.logBackupMutation(ctx, actor, "backup.schedule.update", "backup_schedule", "schedule", "succeeded", map[string]any{
-		"enabled":       out.Enabled,
-		"hour":          out.Hour,
-		"minute":        out.Minute,
-		"timezone":      out.Timezone,
-		"keep":          out.Keep,
-		"include_edges": out.IncludeEdges,
-		"include_auth":  out.IncludeAuth,
-	})
+	s.logBackupMutation(ctx, actor, "backup.schedule.update", "backup_schedule", "schedule", "succeeded", meta)
 	return out, nil
 }
 

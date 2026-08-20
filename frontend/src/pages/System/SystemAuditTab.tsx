@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { fetchAuditLog } from '@/api/system';
 import { useToast } from '@/components/Toast';
+import { formatAuditRow } from '@/lib/auditFormat';
 import { fmtDate } from '@/lib/format';
 import type { AuditEvent } from './systemTypes';
 
@@ -83,6 +84,7 @@ export function SystemAuditTab() {
                   <th scope="col">Action</th>
                   <th scope="col">Resource</th>
                   <th scope="col">Result</th>
+                  <th scope="col">Детали</th>
                   <th scope="col">IP</th>
                 </tr>
               </thead>
@@ -97,6 +99,7 @@ export function SystemAuditTab() {
                       {item.resource_id ? ` · ${item.resource_id}` : ''}
                     </td>
                     <td>{item.result || '—'}</td>
+                    <td>{formatAuditRow(item)}</td>
                     <td>{item.ip || '—'}</td>
                   </tr>
                 ))}

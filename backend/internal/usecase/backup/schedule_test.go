@@ -82,6 +82,34 @@ func TestShouldFire(t *testing.T) {
 	}
 }
 
+func TestScheduleUpdateAudit(t *testing.T) {
+	base := Schedule{Hour: 2, Minute: 30, Timezone: "UTC", Keep: 7}
+	prev := base
+	prev.Enabled = false
+	out := base
+	out.Enabled = true
+	msg, meta := scheduleUpdateAudit(prev, out)
+	if msg != "schedule enabled" {
+		t.Fatalf("msg=%q want schedule enabled", msg)
+	}
+	if meta["prev_enabled"] != false || meta["enabled"] != true {
+		t.Fatalf("meta=%v", meta)
+	}
+	prev.Enabled = true
+	out.Enabled = false
+	msg, _ = scheduleUpdateAudit(prev, out)
+	if msg != "schedule disabled" {
+		t.Fatalf("msg=%q want schedule disabled", msg)
+	}
+	prev.Enabled = true
+	out.Enabled = true
+	out.Hour = 3
+	msg, _ = scheduleUpdateAudit(prev, out)
+	if msg != "schedule settings updated" {
+		t.Fatalf("msg=%q want schedule settings updated", msg)
+	}
+}
+
 func TestNextRunAt(t *testing.T) {
 	loc, err := time.LoadLocation("UTC")
 	if err != nil {

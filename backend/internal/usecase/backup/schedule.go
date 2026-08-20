@@ -119,6 +119,29 @@ func NextRunAt(sch Schedule, now time.Time) time.Time {
 
 // ShouldFire — true, если сегодня ещё не было успешного автобэкапа и локальное время
 // уже достигло (или прошло) слот HH:MM (догон после простоя / ErrBusy / сбоя job).
+// scheduleUpdateAudit — человекочитаемое сообщение и meta для audit/DR при смене расписания.
+func scheduleUpdateAudit(prev, out Schedule) (message string, meta map[string]any) {
+	meta = map[string]any{
+		"enabled":       out.Enabled,
+		"prev_enabled":  prev.Enabled,
+		"hour":          out.Hour,
+		"minute":        out.Minute,
+		"timezone":      out.Timezone,
+		"keep":          out.Keep,
+		"include_edges": out.IncludeEdges,
+		"include_auth":  out.IncludeAuth,
+	}
+	switch {
+	case prev.Enabled && !out.Enabled:
+		message = "schedule disabled"
+	case !prev.Enabled && out.Enabled:
+		message = "schedule enabled"
+	default:
+		message = "schedule settings updated"
+	}
+	return message, meta
+}
+
 func ShouldFire(sch Schedule, now time.Time) (fire bool, dateKey string) {
 	if !sch.Enabled {
 		return false, ""

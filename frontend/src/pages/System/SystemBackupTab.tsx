@@ -9,6 +9,7 @@ import {
   putBackupSchedule,
 } from '@/api/system';
 import { useToast } from '@/components/Toast';
+import { formatDRMessage } from '@/lib/auditFormat';
 import { fmtDate, fmtNumber } from '@/lib/format';
 import { usePolling } from '@/lib/usePolling';
 import { fmtBytes } from './systemFormat';
@@ -644,7 +645,7 @@ export function SystemBackupTab() {
                     <td className="mono">{item.action || '—'}</td>
                     <td>{item.target || '—'}</td>
                     <td>{item.status || '—'}</td>
-                    <td>{item.message || '—'}</td>
+                    <td>{formatDRMessage(item)}</td>
                   </tr>
                 ))}
               </tbody>
