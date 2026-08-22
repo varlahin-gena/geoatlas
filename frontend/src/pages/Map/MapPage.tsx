@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/auth/AuthContext';
 import { useToast } from '@/components/Toast';
 import { useSidebarCollapsed } from '@/components/useSidebarCollapsed';
