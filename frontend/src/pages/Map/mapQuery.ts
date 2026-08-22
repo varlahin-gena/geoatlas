@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import { PERIODS } from './mapPeriods';
 
@@ -98,7 +98,6 @@ function sameView(a: MapViewState, b: MapViewState): boolean {
 }
 
 export function useMapViewQuery() {
-  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const parsed = parseMapViewSearch(params);
   const alertFingerprint = parseAlertFingerprint(params);
@@ -108,6 +107,8 @@ export function useMapViewQuery() {
   const [maxArcs, setMaxArcs] = useState(5000);
   const debouncedSearch = useDebouncedValue(search, 300);
   const debouncedMaxArcs = useDebouncedValue(maxArcs, 300);
+  /** While true, patchView must not re-attach `alert=` after Live reset. */
+  const dropAlertRef = useRef(false);
 
   useEffect(() => {
     setSearchState(parsed.search);
@@ -122,12 +123,13 @@ export function useMapViewQuery() {
             next.periodFrom = '';
             next.periodTo = '';
           }
-          const alert = opts?.clearAlert ? null : parseAlertFingerprint(prev);
+          const clearAlert = Boolean(opts?.clearAlert || dropAlertRef.current);
+          const alert = clearAlert ? null : parseAlertFingerprint(prev);
           const nextSp = serializeMapViewSearch(next);
           if (alert) nextSp.set('alert', alert);
           const prevView = parseMapViewSearch(prev);
           const prevAlert = parseAlertFingerprint(prev);
-          if (sameView(next, prevView) && alert === prevAlert && !opts?.clearAlert) return prev;
+          if (sameView(next, prevView) && alert === prevAlert && !clearAlert) return prev;
           return nextSp;
         },
         { replace: true },
@@ -202,12 +204,12 @@ export function useMapViewQuery() {
             next.periodTo = '';
           }
           const nextSp = serializeMapViewSearch(next);
-          const alert =
-            opts?.clearAlert || opts?.alert === null
-              ? null
-              : opts?.alert !== undefined
-                ? opts.alert
-                : parseAlertFingerprint(prev);
+          const clearAlert = Boolean(opts?.clearAlert || dropAlertRef.current || opts?.alert === null);
+          const alert = clearAlert
+            ? null
+            : opts?.alert !== undefined
+              ? opts.alert
+              : parseAlertFingerprint(prev);
           if (alert) nextSp.set('alert', alert);
           return nextSp;
         },
@@ -218,16 +220,19 @@ export function useMapViewQuery() {
   );
 
   const resetToLiveView = useCallback(() => {
+    dropAlertRef.current = true;
     setSearchState(MAP_VIEW_DEFAULTS.search);
     try {
       sessionStorage.removeItem('geoatlas.mapAlert');
     } catch {
       /* ignore */
     }
-    // Navigate to bare `/` so alert/group/q are fully cleared (empty
-    // URLSearchParams can be a no-op in some react-router updates).
-    navigate('/', { replace: true });
-  }, [navigate]);
+    setParams(serializeMapViewSearch({ ...MAP_VIEW_DEFAULTS }), { replace: true });
+    // Keep dropAlertRef true long enough to cover debounced search patchView.
+    window.setTimeout(() => {
+      dropAlertRef.current = false;
+    }, 400);
+  }, [setParams]);
 
   return {
     period: parsed.period,
