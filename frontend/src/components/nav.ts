@@ -18,7 +18,7 @@ const NAV_GROUP_ORDER: NavGroupId[] = [
   'access',
 ];
 
-const SETTINGS_GROUP_ORDER: NavGroupId[] = ['observe', 'data', 'access'];
+const SETTINGS_GROUP_ORDER: NavGroupId[] = ['data', 'access'];
 
 const NAV_GROUP_LABELS: Record<NavGroupId, string> = {
   workspace: 'Рабочее место',
@@ -101,6 +101,13 @@ export const PAGE_NAV: NavItem[] = [
     match: ['/api-tokens', '/api-tokens.html'],
     adminOnly: true,
   },
+  {
+    href: '/tls',
+    label: 'HTTPS-сертификаты',
+    group: 'access',
+    match: ['/tls', '/tls.html'],
+    adminOnly: true,
+  },
 ];
 
 export type NavGroupSection = {
@@ -129,14 +136,16 @@ export function groupNav(items: NavItem[]): NavGroupSection[] {
 
 export function splitNavItems(items: NavItem[]): {
   workspace: NavItem[];
+  observe: NavItem[];
   settings: NavGroupSection[];
 } {
   const workspace = items.filter((item) => item.group === 'workspace');
+  const observe = items.filter((item) => item.group === 'observe');
   const settings = groupNavByOrder(
-    items.filter((item) => item.group !== 'workspace'),
+    items.filter((item) => item.group !== 'workspace' && item.group !== 'observe'),
     SETTINGS_GROUP_ORDER,
   );
-  return { workspace, settings };
+  return { workspace, observe, settings };
 }
 
 export function settingsBadgeTotal(

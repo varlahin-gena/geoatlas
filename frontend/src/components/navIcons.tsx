@@ -79,6 +79,20 @@ export function NavIcon({ kind }: { kind: string }) {
           <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
         </svg>
       );
+    case 'observe':
+      return (
+        <svg {...common}>
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      );
+    case 'tls':
+      return (
+        <svg {...common}>
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+        </svg>
+      );
     case 'anomalies':
       return (
         <svg {...common}>
@@ -103,4 +117,5 @@ export const NAV_ICONS: Record<string, string> = {
   '/reputation': 'reputation',
   '/users': 'users',
   '/api-tokens': 'tokens',
+  '/tls': 'tls',
 };

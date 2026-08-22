@@ -49,9 +49,11 @@ export function MapSidebar({
 
   return (
     <SidebarShell>
-      <NavSections items={navItems} badges={badges} />
-
-      <div className="sidebar-tools">
+      <NavSections
+        items={navItems}
+        badges={badges}
+        middle={
+          <div className="sidebar-tools">
         <div className="sidebar-section collapse-hide">
           <div className="sidebar-section-title">Режим</div>
           <div className="mode-switch">
@@ -172,7 +174,9 @@ export function MapSidebar({
             <span className="label">Экспорт PNG</span>
           </button>
         </div>
-      </div>
+          </div>
+        }
+      />
 
       <SidebarCollapseButton onToggle={toggleSidebar} />
     </SidebarShell>

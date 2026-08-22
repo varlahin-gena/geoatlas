@@ -161,6 +161,12 @@ services:
       BACKUP_INCLUDE_EDGES: ${BACKUP_INCLUDE_EDGES:-true}
       BACKUP_INCLUDE_AUTH: ${BACKUP_INCLUDE_AUTH:-true}
       BACKUP_SCHEDULE_FILE: /app/data/backup_schedule.json
+      TLS_CERT_DIR: /certs
+      TLS_CERT_FILE: fullchain.pem
+      TLS_KEY_FILE: privkey.pem
+      HTTPS_ENABLED: ${HTTPS_ENABLED:-auto}
+      HTTPS_PORT: ${HTTPS_PORT:-443}
+      HTTP_REDIRECT: ${HTTP_REDIRECT:-1}
       # Только local/dev: legacy placeholders и/или AUTH_DISABLED / API_AUTH_DISABLED
       NM_ALLOW_INSECURE: ${NM_ALLOW_INSECURE:-0}
       TZ: Europe/Moscow
@@ -169,6 +175,7 @@ services:
       - ./install-meta.json:/app/install-meta.json:ro
       - auth-users:/app/data
       - clickhouse-backups:/var/lib/clickhouse-backups
+      - ./certs:/certs:rw
     depends_on:
       volume-perms:
         condition: service_completed_successfully

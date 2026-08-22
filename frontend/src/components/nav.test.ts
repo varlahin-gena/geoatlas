@@ -49,20 +49,20 @@ describe('groupNav', () => {
 });
 
 describe('splitNavItems', () => {
-  it('separates workspace from settings groups', () => {
+  it('separates workspace, observe, and settings groups', () => {
     const items = filterNav(PAGE_NAV, {
       isAdmin: true,
       reputationEnabled: true,
       uiAuthEnabled: true,
     });
-    const { workspace, settings } = splitNavItems(items);
+    const { workspace, observe, settings } = splitNavItems(items);
     expect(workspace.map((i) => i.href)).toEqual(['/']);
-    expect(settings.map((s) => s.id)).toEqual(['observe', 'data', 'access']);
-    expect(settings.find((s) => s.id === 'observe')?.items.map((i) => i.label)).toEqual([
+    expect(observe.map((i) => i.label)).toEqual([
       'Мониторинг системы',
       'Аномалии',
       'Репутация IP',
     ]);
+    expect(settings.map((s) => s.id)).toEqual(['data', 'access']);
   });
 });
 

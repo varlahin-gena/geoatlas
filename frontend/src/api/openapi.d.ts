@@ -3115,6 +3115,122 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/system/tls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Статус HTTPS-сертификатов
+         * @description Только administrator или Bearer.
+         *     Читает PEM из каталога `certs/` (TLS_CERT_DIR в backend).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Статус TLS и метаданные сертификата */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /**
+         * Загрузить HTTPS-сертификат и ключ
+         * @description Только administrator или Bearer (+ CSRF для cookie-сессии).
+         *     Сохраняет `fullchain.pem` и `privkey.pem` на диск.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: {
+                    "X-CSRF-Token"?: string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        cert_pem: string;
+                        key_pem: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Сертификаты сохранены */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Невалидный PEM или несовпадение ключа */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/system/tls/reload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Применить сертификаты (reload nginx)
+         * @description Только administrator или Bearer (+ CSRF).
+         *     Выполняет NM_TLS_RELOAD_CMD, если задан, иначе возвращает подсказку о перезапуске frontend.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    "X-CSRF-Token"?: string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Результат применения */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/system/backups": {
         parameters: {
             query?: never;

@@ -1415,6 +1415,68 @@ paths:
         "400":
           description: Невалидные дни (нужно 1…730)
 
+  /api/system/tls:
+    get:
+      tags: [system]
+      summary: Статус HTTPS-сертификатов
+      description: |
+        Только administrator или Bearer.
+        Читает PEM из каталога `certs/` (TLS_CERT_DIR в backend).
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Статус TLS и метаданные сертификата
+    put:
+      tags: [system]
+      summary: Загрузить HTTPS-сертификат и ключ
+      description: |
+        Только administrator или Bearer (+ CSRF для cookie-сессии).
+        Сохраняет `fullchain.pem` и `privkey.pem` на диск.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: X-CSRF-Token
+          in: header
+          required: false
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cert_pem, key_pem]
+              properties:
+                cert_pem: { type: string }
+                key_pem: { type: string }
+      responses:
+        "200":
+          description: Сертификаты сохранены
+        "400":
+          description: Невалидный PEM или несовпадение ключа
+
+  /api/system/tls/reload:
+    post:
+      tags: [system]
+      summary: Применить сертификаты (reload nginx)
+      description: |
+        Только administrator или Bearer (+ CSRF).
+        Выполняет NM_TLS_RELOAD_CMD, если задан, иначе возвращает подсказку о перезапуске frontend.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: X-CSRF-Token
+          in: header
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: Результат применения
+
   /api/system/backups:
     get:
       tags: [system]

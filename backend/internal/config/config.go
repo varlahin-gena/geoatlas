@@ -42,6 +42,14 @@ type Config struct {
 	APITokensFile string
 	// RetentionFile — JSON с TTL таблиц CH (том /app/data рядом с users.json).
 	RetentionFile string
+	// TLS cert dir on host (./certs mounted in backend for HTTPS UI).
+	TLSCertDir      string
+	TLSCertFile     string
+	TLSKeyFile      string
+	HTTPSEnabled    string
+	HTTPSPort       string
+	HTTPRedirect    string
+	TLSReloadCmd    string
 	// SearchTemplatesFile — персональные шаблоны поиска карты по username.
 	SearchTemplatesFile string
 
@@ -155,6 +163,13 @@ func FromEnv() Config {
 		AuthUsersFile:        envOr("AUTH_USERS_FILE", "/app/data/users.json"),
 		APITokensFile:        envOr("API_TOKENS_FILE", "/app/data/api_tokens.json"),
 		RetentionFile:        envOr("RETENTION_FILE", "/app/data/retention.json"),
+		TLSCertDir:           strings.TrimSpace(os.Getenv("TLS_CERT_DIR")),
+		TLSCertFile:          envOr("TLS_CERT_FILE", "fullchain.pem"),
+		TLSKeyFile:           envOr("TLS_KEY_FILE", "privkey.pem"),
+		HTTPSEnabled:         envOr("HTTPS_ENABLED", "auto"),
+		HTTPSPort:            envOr("HTTPS_PORT", "443"),
+		HTTPRedirect:         envOr("HTTP_REDIRECT", "1"),
+		TLSReloadCmd:         strings.TrimSpace(os.Getenv("NM_TLS_RELOAD_CMD")),
 		SearchTemplatesFile:  envOr("SEARCH_TEMPLATES_FILE", "/app/data/search_templates.json"),
 		AllowMultiInstance:   parser.bool("NM_ALLOW_MULTI_INSTANCE", false),
 		MaxLogUploadSize:     parser.int64("MAX_LOG_UPLOAD_SIZE", 1<<30), // 1 GiB

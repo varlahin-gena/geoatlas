@@ -18,6 +18,7 @@ import (
 	"network_monitor/internal/usecase/parsetest"
 	usecasereputation "network_monitor/internal/usecase/reputation"
 	usecaseretention "network_monitor/internal/usecase/retention"
+	usecasetls "network_monitor/internal/usecase/tls"
 	"network_monitor/internal/usecase/searchtemplates"
 	usecasesystem "network_monitor/internal/usecase/system"
 )
@@ -39,6 +40,7 @@ type SystemDeps struct {
 	systemUC     *usecasesystem.Service
 	retentionUC  *usecaseretention.Service
 	backupUC     *usecasebackup.Service
+	tlsUC        *usecasetls.Service
 	loginLimiter *loginthrottle.Limiter
 	logs         *usecaseaudit.Service
 }
@@ -157,6 +159,15 @@ func NewDeps(p Params) *Deps {
 			systemUC:     p.SystemUC,
 			retentionUC:  p.RetentionUC,
 			backupUC:     p.BackupUC,
+			tlsUC: usecasetls.New(usecasetls.Config{
+				CertDir:      p.Cfg.TLSCertDir,
+				CertFile:     p.Cfg.TLSCertFile,
+				KeyFile:      p.Cfg.TLSKeyFile,
+				HTTPSEnabled: p.Cfg.HTTPSEnabled,
+				HTTPSPort:    p.Cfg.HTTPSPort,
+				HTTPRedirect: p.Cfg.HTTPRedirect,
+				ReloadCmd:    p.Cfg.TLSReloadCmd,
+			}),
 			loginLimiter: lim,
 			logs:         p.Logs,
 		},

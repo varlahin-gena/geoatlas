@@ -12,6 +12,7 @@ const MapPage = lazy(() => import('@/pages/Map/MapPage'));
 const SystemPage = lazy(() => import('@/pages/System/SystemPage'));
 const UsersPage = lazy(() => import('@/pages/Users/UsersPage'));
 const ApiTokensPage = lazy(() => import('@/pages/ApiTokens/ApiTokensPage'));
+const TlsPage = lazy(() => import('@/pages/Tls/TlsPage'));
 const ParseErrorsPage = lazy(() => import('@/pages/ParseErrors/ParseErrorsPage'));
 const ParserTestPage = lazy(() => import('@/pages/ParserTest/ParserTestPage'));
 const GeoMissingPage = lazy(() => import('@/pages/GeoMissing/GeoMissingPage'));
@@ -84,6 +85,16 @@ export default function App() {
                 }
               />
               <Route
+                path="/tls"
+                element={
+                  <RequireAuth admin>
+                    <Lazy label="HTTPS-сертификаты">
+                      <TlsPage />
+                    </Lazy>
+                  </RequireAuth>
+                }
+              />
+              <Route
                 path="/parse-errors"
                 element={
                   <RequireAuth admin>
@@ -148,6 +159,7 @@ export default function App() {
               <Route path="/system.html" element={<Navigate to="/system" replace />} />
               <Route path="/users.html" element={<Navigate to="/users" replace />} />
               <Route path="/api-tokens.html" element={<Navigate to="/api-tokens" replace />} />
+              <Route path="/tls.html" element={<Navigate to="/tls" replace />} />
               <Route path="/parse-errors.html" element={<Navigate to="/parse-errors" replace />} />
               <Route path="/parser-test.html" element={<Navigate to="/parser-test" replace />} />
               <Route path="/geo-missing.html" element={<Navigate to="/geo-missing" replace />} />

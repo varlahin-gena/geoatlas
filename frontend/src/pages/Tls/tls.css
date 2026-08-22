@@ -1,0 +1,41 @@
+.tls-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px 16px;
+  margin: 0 0 16px;
+}
+.tls-status-grid dt {
+  margin: 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.tls-status-grid dd {
+  margin: 4px 0 0;
+  font-size: 14px;
+}
+.tls-cert-summary {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+.tls-cert-summary.is-warn {
+  border-color: color-mix(in srgb, var(--orange) 50%, var(--border));
+}
+.tls-cert-summary strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 14px;
+  line-height: 1.35;
+  word-break: break-word;
+}
+.tls-upload-form textarea {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}

@@ -84,20 +84,16 @@ function MapStatsGrid({
 }
 
 export function MapInfoDock({
-  open,
   tab,
   onTabChange,
-  onClose,
   showLegendTab,
   showStatsTab,
   monoArcs,
   repColorArcs,
   stats,
 }: {
-  open: boolean;
   tab: InfoDockTab;
   onTabChange: (tab: InfoDockTab) => void;
-  onClose: () => void;
   showLegendTab: boolean;
   showStatsTab: boolean;
   monoArcs: boolean;
@@ -112,8 +108,6 @@ export function MapInfoDock({
     cities: number;
   };
 }) {
-  if (!open) return null;
-
   const tabs: { id: InfoDockTab; label: string }[] = [];
   if (showLegendTab) tabs.push({ id: 'legend', label: 'Легенда' });
   if (showStatsTab) tabs.push({ id: 'stats', label: 'Статистика' });
@@ -138,9 +132,6 @@ export function MapInfoDock({
             </button>
           ))}
         </nav>
-        <button type="button" className="btn ghost map-info-dock-close" onClick={onClose} aria-label="Закрыть">
-          ×
-        </button>
       </header>
       <div className="map-info-dock-body" role="tabpanel">
         {activeTab === 'legend' ? <MapLegend monoArcs={monoArcs} repColorArcs={repColorArcs} /> : null}

@@ -49,6 +49,15 @@ body.page-map {
     overflow-y: auto;
     overflow-x: hidden;
     min-width: 0;
+    height: 100%;
+    min-height: 0;
+}
+.sidebar-nav-spacer {
+    flex: 1 1 auto;
+    min-height: 8px;
+}
+.sidebar-nav-bottom {
+    flex-shrink: 0;
 }
 .sidebar-header {
     height: var(--topbar-h);
@@ -216,7 +225,6 @@ body.page-map {
 .app.sidebar-collapsed .sidebar .side-range-label { display: none; }
 
 .sidebar-collapse-btn {
-    margin-top: auto;
     border-top: 1px solid var(--border);
     padding: 10px;
     position: sticky;
@@ -683,14 +691,6 @@ body.page-map {
     font-size: 10px;
     font-weight: 700;
     line-height: 16px;
-}
-.map-info-dock-close {
-    flex-shrink: 0;
-    align-self: center;
-    margin-right: 4px;
-    padding: 4px 8px;
-    font-size: 16px;
-    line-height: 1;
 }
 .map-info-dock-body {
     overflow: auto;

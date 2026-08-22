@@ -143,7 +143,6 @@ export default function MapPage() {
   const [viewMode, setViewMode] = useState<'map' | 'globe'>('map');
   const [showLegend, setShowLegend] = useState(true);
   const [showStats, setShowStats] = useState(true);
-  const [infoDockOpen, setInfoDockOpen] = useState(true);
   const [infoDockTab, setInfoDockTab] = useState<InfoDockTab>('legend');
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [showCountryLabels, setShowCountryLabels] = useState(false);
@@ -187,20 +186,7 @@ export default function MapPage() {
     }
   }, [showLegend, showStats, infoDockTab]);
 
-  useEffect(() => {
-    if (!showLegend && !showStats && infoDockOpen) {
-      setInfoDockOpen(false);
-    }
-  }, [showLegend, showStats, infoDockOpen]);
-
-  function openInfoDock(tab: InfoDockTab) {
-    setInfoDockOpen(true);
-    setInfoDockTab(tab);
-  }
-
-  function closeInfoDock() {
-    setInfoDockOpen(false);
-  }
+  const infoDockVisible = showLegend || showStats;
 
   const { detail, closeDetail, openLineDetail, openPointDetail, openCountryDetail } = useMapDetail({
     groupBy,
@@ -368,12 +354,12 @@ export default function MapPage() {
               showLegend,
               setShowLegend: (v: boolean) => {
                 setShowLegend(v);
-                if (v) openInfoDock('legend');
+                if (v) setInfoDockTab('legend');
               },
               showStats,
               setShowStats: (v: boolean) => {
                 setShowStats(v);
-                if (v) openInfoDock('stats');
+                if (v) setInfoDockTab('stats');
               },
               showHeatmap,
               setShowHeatmap,
@@ -397,7 +383,7 @@ export default function MapPage() {
         />
 
         <div
-          className={`viz-area${loading ? ' is-loading' : ''}${showGeoEmptyBanner ? ' has-geo-empty-banner' : ''}${truncHint ? ' has-viz-hint' : ''}${infoDockOpen ? ' has-map-info-dock' : ''}`}
+          className={`viz-area${loading ? ' is-loading' : ''}${showGeoEmptyBanner ? ' has-geo-empty-banner' : ''}${truncHint ? ' has-viz-hint' : ''}${infoDockVisible ? ' has-map-info-dock' : ''}`}
         >
           <div ref={mapContainer} id="map-host" className="viz-host" />
 
@@ -422,10 +408,8 @@ export default function MapPage() {
             repColorArcs={repColorArcs}
             stats={stats}
             infoDock={{
-              open: infoDockOpen,
               tab: infoDockTab,
               onTabChange: setInfoDockTab,
-              onClose: closeInfoDock,
               showLegendTab: showLegend,
               showStatsTab: showStats,
             }}

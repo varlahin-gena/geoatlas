@@ -11,10 +11,8 @@ export function MapVizOverlays({
   emptyOverlay: { title: string; text: string } | null;
   loading: boolean;
   infoDock: {
-    open: boolean;
     tab: InfoDockTab;
     onTabChange: (tab: InfoDockTab) => void;
-    onClose: () => void;
     showLegendTab: boolean;
     showStatsTab: boolean;
   };
@@ -48,13 +46,11 @@ export function MapVizOverlays({
         <span>Загрузка данных…</span>
       </div>
 
-      {infoDock.open ? (
+      {infoDock.showLegendTab || infoDock.showStatsTab ? (
         <div className="map-end-dock">
           <MapInfoDock
-            open={infoDock.open}
             tab={infoDock.tab}
             onTabChange={infoDock.onTabChange}
-            onClose={infoDock.onClose}
             showLegendTab={infoDock.showLegendTab}
             showStatsTab={infoDock.showStatsTab}
             monoArcs={monoArcs}

@@ -252,6 +252,15 @@ func NewServer(p Params, opts ...ServerOption) *Server {
 	rr.Handle("PUT", "/api/system/retention",
 		chain(http.HandlerFunc(system.PutRetention), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
 	)
+	rr.Handle("GET", "/api/system/tls",
+		withTimeout(chain(http.HandlerFunc(system.GetTLS), adminMW), healthTimeout),
+	)
+	rr.Handle("PUT", "/api/system/tls",
+		chain(http.HandlerFunc(system.PutTLS), adminMW, csrf, maxBytesMW(1<<20)),
+	)
+	rr.Handle("POST", "/api/system/tls/reload",
+		chain(http.HandlerFunc(system.PostTLSReload), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
+	)
 	rr.Handle("GET", "/api/system/backups",
 		withTimeout(chain(http.HandlerFunc(system.GetBackups), adminMW), healthTimeout),
 	)

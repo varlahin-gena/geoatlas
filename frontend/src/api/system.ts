@@ -103,3 +103,48 @@ export function detachBackup(name: string): Promise<unknown> {
 export function deleteBackup(name: string): Promise<unknown> {
   return apiDelete(apiPath('/api/system/backups/{name}', { name }));
 }
+
+export type TlsCertInfo = {
+  subject?: string;
+  issuer?: string;
+  not_before?: string;
+  not_after?: string;
+  days_left?: number;
+  sans?: string[];
+  fingerprint_sha256?: string;
+  self_signed?: boolean;
+};
+
+export type TlsStatus = {
+  configured?: boolean;
+  writable?: boolean;
+  cert_present?: boolean;
+  key_present?: boolean;
+  https_enabled?: string;
+  https_port?: string;
+  http_redirect?: string;
+  cert_path?: string;
+  key_path?: string;
+  cert?: TlsCertInfo;
+};
+
+export type TlsReloadResult = {
+  reloaded?: boolean;
+  restart_required?: boolean;
+  message?: string;
+};
+
+export function fetchTlsStatus(): Promise<{ tls?: TlsStatus } & TlsStatus> {
+  return apiGet('/api/system/tls') as Promise<{ tls?: TlsStatus } & TlsStatus>;
+}
+
+export function putTls(body: { cert_pem: string; key_pem: string }): Promise<{
+  ok?: boolean;
+  reload?: TlsReloadResult;
+}> {
+  return apiPut('/api/system/tls', body) as Promise<{ ok?: boolean; reload?: TlsReloadResult }>;
+}
+
+export function postTlsReload(): Promise<{ ok?: boolean; reload?: TlsReloadResult }> {
+  return apiPost('/api/system/tls/reload', {}) as Promise<{ ok?: boolean; reload?: TlsReloadResult }>;
+}

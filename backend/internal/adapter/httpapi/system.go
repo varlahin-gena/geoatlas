@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	usecaseaudit "network_monitor/internal/usecase/auditlog"
 	usecasebackup "network_monitor/internal/usecase/backup"
 	usecaseretention "network_monitor/internal/usecase/retention"
+	usecasetls "network_monitor/internal/usecase/tls"
 	"network_monitor/internal/usecase/system"
 )
 
@@ -396,6 +398,77 @@ func (h *SystemHandler) listAuditLog(ctx context.Context, r *http.Request) ([]us
 		Result: q.Get("result"),
 		Actor:  q.Get("actor"),
 	})
+}
+
+func (h *SystemHandler) GetTLS(w http.ResponseWriter, r *http.Request) {
+	if h.tlsUC == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "tls service unavailable"})
+		return
+	}
+	st, err := h.tlsUC.Status()
+	if err != nil {
+		writeInternalError(w, "tls status failed", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "tls": st})
+}
+
+func (h *SystemHandler) PutTLS(w http.ResponseWriter, r *http.Request) {
+	if h.tlsUC == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "tls service unavailable"})
+		return
+	}
+	var req struct {
+		CertPEM string `json:"cert_pem"`
+		KeyPEM  string `json:"key_pem"`
+	}
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+		return
+	}
+	err := h.tlsUC.Update(usecasetls.UpdateInput{CertPEM: req.CertPEM, KeyPEM: req.KeyPEM})
+	if err != nil {
+		writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
+			Actor:        actorFromRequest(r),
+			Action:       "system.tls.update",
+			ResourceType: "tls",
+			ResourceID:   "https",
+			Result:       "failed",
+			IP:           clientIPFromRequest(r),
+			Details:      map[string]any{"error": err.Error()},
+		})
+		if errors.Is(err, usecasetls.ErrUnavailable) {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "tls storage unavailable"})
+			return
+		}
+		if errors.Is(err, usecasetls.ErrInvalidPEM) {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			return
+		}
+		writeInternalError(w, "tls update failed", err)
+		return
+	}
+	reload := h.tlsUC.Reload()
+	writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
+		Actor:        actorFromRequest(r),
+		Action:       "system.tls.update",
+		ResourceType: "tls",
+		ResourceID:   "https",
+		Result:       "succeeded",
+		IP:           clientIPFromRequest(r),
+	})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "reload": reload})
+}
+
+func (h *SystemHandler) PostTLSReload(w http.ResponseWriter, r *http.Request) {
+	if h.tlsUC == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "tls service unavailable"})
+		return
+	}
+	reload := h.tlsUC.Reload()
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "reload": reload})
 }
 
 func (h *SystemHandler) failedLoginsSnapshot() []loginthrottle.FailedLoginEvent {
