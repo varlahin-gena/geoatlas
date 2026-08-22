@@ -528,6 +528,49 @@ tbody tr:hover { background: var(--panel-2); }
 .toast.info { border-left-color: var(--accent); }
 .toast.warn { border-left-color: var(--orange); }
 
+.data-section-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.data-section-nav-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.data-section-nav-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-right: 4px;
+}
+.data-section-nav-group a {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-dim);
+  text-decoration: none;
+  border: 1px solid transparent;
+}
+.data-section-nav-group a:hover {
+  color: var(--text);
+  background: var(--panel-2);
+}
+.data-section-nav-group a.active {
+  color: var(--text);
+  background: var(--panel-2);
+  border-color: var(--border);
+}
+
 .modal-backdrop {
   display: none;
   position: fixed;

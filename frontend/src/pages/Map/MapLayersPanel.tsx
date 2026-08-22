@@ -110,11 +110,11 @@ export function MapLayersPanel({ open, viewMode, viz, data, globe }: MapLayersPa
         <div className="map-chrome-panel-label">Оверлеи</div>
         <label className="side-toggle">
           <input type="checkbox" checked={showLegend} onChange={(e) => setShowLegend(e.target.checked)} />
-          <span>Легенда</span>
+          <span>Легенда (инфо-панель)</span>
         </label>
         <label className="side-toggle">
           <input type="checkbox" checked={showStats} onChange={(e) => setShowStats(e.target.checked)} />
-          <span>Статистика</span>
+          <span>Статистика (инфо-панель)</span>
         </label>
         <label
           className="side-toggle"

@@ -64,7 +64,7 @@ export function SystemPipelineTab({
   return (
     <div className="tab-panel active" role="tabpanel">
       <section className="card card-compact">
-        <h3 className="card-title">Pipeline</h3>
+        <h3 className="card-title">Конвейер</h3>
         <div className="pipeline">
           <div className={`pipeline-stage ${syslogStageStatus}`}>
             <div className="stage-name">Syslog-NG</div>

@@ -54,10 +54,6 @@
   border-radius: 10px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
 }
-.map-end-dock:has(.anomaly-panel) .anomaly-panel {
-  flex: 1 1 auto;
-  max-height: none;
-}
 .anomaly-panel-head {
   display: flex;
   align-items: center;

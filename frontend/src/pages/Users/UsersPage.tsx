@@ -13,11 +13,13 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { useToast } from '@/components/Toast';
 import { fmtDate } from '@/lib/format';
 import { MIN_PASSWORD_LEN, validatePasswordClient } from '@/lib/passwordPolicy';
+
 export default function UsersPage() {
   const { user: me, refresh } = useAuth();
   const { toast } = useToast();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [error, setError] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
   const [fio, setFio] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -42,6 +44,14 @@ export default function UsersPage() {
     void load();
   }, [load]);
 
+  function resetCreateForm() {
+    setUsername('');
+    setPassword('');
+    setFio('');
+    setRole('operator');
+    setMustReset(true);
+  }
+
   async function onCreate(e: FormEvent) {
     e.preventDefault();
     const policyErr = validatePasswordClient(password, username);
@@ -58,9 +68,8 @@ export default function UsersPage() {
         must_reset_password: mustReset,
       });
       toast('Создано', 'success');
-      setUsername('');
-      setPassword('');
-      setFio('');
+      resetCreateForm();
+      setCreateOpen(false);
       void load();
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Ошибка', 'error');
@@ -68,56 +77,16 @@ export default function UsersPage() {
   }
 
   return (
-    <AdminLayout title="Пользователи">
+    <AdminLayout
+      title="Пользователи"
+      actions={
+        <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
+          Создать
+        </button>
+      }
+    >
       <div className="page-content-inner narrow">
         <p className="page-lead">локальные учётные записи</p>
-        <div className="card">
-          <h2>Создать учётную запись</h2>
-          <form className="form-row" onSubmit={onCreate}>
-            <div className="field" style={{ minWidth: 220, flex: 1 }}>
-              <label htmlFor="cFio">ФИО</label>
-              <input id="cFio" maxLength={200} value={fio} onChange={(e) => setFio(e.target.value)} placeholder="Иванов Иван Иванович" />
-            </div>
-            <div className="field">
-              <label htmlFor="cUser">Логин</label>
-              <input
-                id="cUser"
-                required
-                pattern="[A-Za-z0-9._\-]{2,64}"
-                title="2–64: латиница, цифры, . _ -"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="cPass">Пароль</label>
-              <input
-                id="cPass"
-                type="password"
-                required
-                minLength={MIN_PASSWORD_LEN}
-                autoComplete="new-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-              <span className="field-hint">мин. {MIN_PASSWORD_LEN}, буква и цифра</span>
-            </div>
-            <div className="field">
-              <label htmlFor="cRole">Роль</label>
-              <select id="cRole" value={role} onChange={(e) => setRole(e.target.value)}>
-                <option value="operator">Оператор</option>
-                <option value="administrator">Администратор</option>
-              </select>
-            </div>
-            <label className="checkbox">
-              <input type="checkbox" checked={mustReset} onChange={(e) => setMustReset(e.target.checked)} />
-              <span>Сброс пароля при первом входе</span>
-            </label>
-            <button type="submit" className="btn primary">
-              Создать
-            </button>
-          </form>
-        </div>
 
         <div className="card">
           <h2>Учётные записи</h2>
@@ -238,6 +207,89 @@ export default function UsersPage() {
           </div>
         </div>
       </div>
+
+      {createOpen ? (
+        <div
+          className="modal-backdrop show"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setCreateOpen(false);
+              resetCreateForm();
+            }
+          }}
+        >
+          <form
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-user-title"
+            onSubmit={onCreate}
+          >
+            <h3 id="create-user-title">Создать учётную запись</h3>
+            <div className="field">
+              <label htmlFor="cFio">ФИО</label>
+              <input
+                id="cFio"
+                maxLength={200}
+                value={fio}
+                onChange={(e) => setFio(e.target.value)}
+                placeholder="Иванов Иван Иванович"
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="cUser">Логин</label>
+              <input
+                id="cUser"
+                required
+                pattern="[A-Za-z0-9._\-]{2,64}"
+                title="2–64: латиница, цифры, . _ -"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="cPass">Пароль</label>
+              <input
+                id="cPass"
+                type="password"
+                required
+                minLength={MIN_PASSWORD_LEN}
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <span className="field-hint">мин. {MIN_PASSWORD_LEN}, буква и цифра</span>
+            </div>
+            <div className="field">
+              <label htmlFor="cRole">Роль</label>
+              <select id="cRole" value={role} onChange={(e) => setRole(e.target.value)}>
+                <option value="operator">Оператор</option>
+                <option value="administrator">Администратор</option>
+              </select>
+            </div>
+            <label className="checkbox">
+              <input type="checkbox" checked={mustReset} onChange={(e) => setMustReset(e.target.checked)} />
+              <span>Сброс пароля при первом входе</span>
+            </label>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  setCreateOpen(false);
+                  resetCreateForm();
+                }}
+              >
+                Отмена
+              </button>
+              <button type="submit" className="btn primary">
+                Создать
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
 
       {resetTarget ? (
         <div

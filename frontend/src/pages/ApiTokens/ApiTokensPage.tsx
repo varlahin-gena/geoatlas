@@ -7,6 +7,7 @@ import { fmtDate } from '@/lib/format';
 export default function ApiTokensPage() {
   const { toast } = useToast();
   const [tokens, setTokens] = useState<TokenRow[]>([]);
+  const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState('');
   const [scope, setScope] = useState('ops');
   const [secret, setSecret] = useState('');
@@ -27,12 +28,23 @@ export default function ApiTokensPage() {
     void load();
   }, [load]);
 
+  function resetCreateForm() {
+    setName('');
+    setScope('ops');
+  }
+
+  function closeCreateModal() {
+    setCreateOpen(false);
+    resetCreateForm();
+    setSecret('');
+  }
+
   async function onCreate(e: FormEvent) {
     e.preventDefault();
     try {
       const data = await createToken({ name: name.trim(), scope });
       setSecret(data.secret || '');
-      setName('');
+      resetCreateForm();
       toast('Токен создан', 'success');
       void load();
     } catch (err) {
@@ -41,65 +53,15 @@ export default function ApiTokensPage() {
   }
 
   return (
-    <AdminLayout title="API-токены">
+    <AdminLayout
+      title="API-токены"
+      actions={
+        <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
+          Создать токен
+        </button>
+      }
+    >
       <div className="page-content-inner narrow">
-        <div className="card">
-          <h2>Создать API-токен</h2>
-          <p className="hint" style={{ marginTop: 0 }}>
-            Scope: <b>read</b> — карта; <b>ops</b> — ingest/upload; <b>admin</b> — как env Bearer (полный
-            API).
-          </p>
-          <form className="form-row" onSubmit={onCreate}>
-            <div className="field">
-              <label htmlFor="cName">Имя</label>
-              <input
-                id="cName"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="ci-bot / grafana"
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="cScope">Scope</label>
-              <select id="cScope" value={scope} onChange={(e) => setScope(e.target.value)}>
-                <option value="read">read</option>
-                <option value="ops">ops</option>
-                <option value="admin">admin</option>
-              </select>
-            </div>
-            <button type="submit" className="btn primary">
-              Создать
-            </button>
-          </form>
-          {secret ? (
-            <div className="secret-panel" style={{ marginTop: 12 }}>
-              <p>
-                Секрет показывается один раз:
-              </p>
-              <code>{secret}</code>
-              <div className="actions" style={{ marginTop: 8 }}>
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(secret);
-                      toast('Скопировано', 'success');
-                    } catch {
-                      toast('Не удалось скопировать', 'error');
-                    }
-                  }}
-                >
-                  Копировать
-                </button>
-                <button type="button" className="btn" onClick={() => setSecret('')}>
-                  Скрыть
-                </button>
-              </div>
-            </div>
-          ) : null}
-        </div>
         <div className="card">
           <h2>Токены</h2>
           <div className="table-wrap">
@@ -165,6 +127,86 @@ export default function ApiTokensPage() {
           </p>
         </div>
       </div>
+
+      {createOpen ? (
+        <div
+          className="modal-backdrop show"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeCreateModal();
+          }}
+        >
+          {secret ? (
+            <div className="modal" role="dialog" aria-modal="true" aria-labelledby="token-secret-title">
+              <h3 id="token-secret-title">Токен создан</h3>
+              <div className="secret-panel">
+                <p>Секрет показывается один раз:</p>
+                <code>{secret}</code>
+              </div>
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(secret);
+                      toast('Скопировано', 'success');
+                    } catch {
+                      toast('Не удалось скопировать', 'error');
+                    }
+                  }}
+                >
+                  Копировать
+                </button>
+                <button type="button" className="btn primary" onClick={closeCreateModal}>
+                  Готово
+                </button>
+              </div>
+            </div>
+          ) : (
+            <form
+              className="modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="create-token-title"
+              onSubmit={onCreate}
+            >
+              <h3 id="create-token-title">Создать API-токен</h3>
+              <p className="hint" style={{ marginTop: 0 }}>
+                Scope: <b>read</b> — карта; <b>ops</b> — ingest/upload; <b>admin</b> — как env Bearer
+                (полный API).
+              </p>
+              <div className="field">
+                <label htmlFor="cName">Имя</label>
+                <input
+                  id="cName"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="ci-bot / grafana"
+                  autoFocus
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="cScope">Scope</label>
+                <select id="cScope" value={scope} onChange={(e) => setScope(e.target.value)}>
+                  <option value="read">read</option>
+                  <option value="ops">ops</option>
+                  <option value="admin">admin</option>
+                </select>
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn" onClick={closeCreateModal}>
+                  Отмена
+                </button>
+                <button type="submit" className="btn primary">
+                  Создать
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      ) : null}
+      <style>{`.actions { display: flex; flex-wrap: wrap; gap: 6px; }`}</style>
     </AdminLayout>
   );
 }

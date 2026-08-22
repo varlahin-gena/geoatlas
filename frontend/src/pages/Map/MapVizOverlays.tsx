@@ -1,22 +1,30 @@
-import type { ReactNode } from 'react';
-import { fmtNumber } from '@/lib/format';
+import type { AnomalyEvent, AnomalySummary } from '@/api/anomalies';
+import { MapInfoDock, type InfoDockTab } from './MapInfoDock';
 
 export function MapVizOverlays({
   emptyOverlay,
   loading,
-  showLegend,
+  infoDock,
   monoArcs,
   repColorArcs,
-  showStats,
   stats,
-  endDock,
 }: {
   emptyOverlay: { title: string; text: string } | null;
   loading: boolean;
-  showLegend: boolean;
+  infoDock: {
+    open: boolean;
+    tab: InfoDockTab;
+    onTabChange: (tab: InfoDockTab) => void;
+    onClose: () => void;
+    showLegendTab: boolean;
+    showStatsTab: boolean;
+    summary: AnomalySummary | null;
+    anomalyItems: AnomalyEvent[];
+    onAnomalyShow: (item: AnomalyEvent) => void;
+    onAnomalyAck: (fingerprint: string) => void;
+  };
   monoArcs: boolean;
   repColorArcs: boolean;
-  showStats: boolean;
   stats: {
     events: number;
     allowed: number;
@@ -26,7 +34,6 @@ export function MapVizOverlays({
     countries: number;
     cities: number;
   };
-  endDock?: ReactNode;
 }) {
   return (
     <>
@@ -46,77 +53,23 @@ export function MapVizOverlays({
         <span>Загрузка данных…</span>
       </div>
 
-      {showLegend || endDock ? (
+      {infoDock.open ? (
         <div className="map-end-dock">
-          {showLegend ? (
-            <div className="legend">
-              <div className="legend-title">Статус трафика</div>
-              {monoArcs ? (
-                <div className="legend-row">
-                  <span className="legend-line" style={{ background: 'var(--accent)' }} /> Связь
-                </div>
-              ) : (
-                <>
-                  <div className="legend-row">
-                    <span className="legend-line" style={{ background: 'var(--green)' }} /> Разрешённый
-                  </div>
-                  <div className="legend-row">
-                    <span className="legend-line" style={{ background: 'var(--red)' }} /> Заблокированный
-                  </div>
-                  {repColorArcs ? (
-                    <div className="legend-row">
-                      <span className="legend-line" style={{ background: 'var(--orange)' }} />{' '}
-                      Репутационный хит
-                    </div>
-                  ) : null}
-                </>
-              )}
-              <div
-                className="legend-row"
-                style={{ marginTop: 6, color: 'var(--text-muted)', fontSize: 11 }}
-              >
-                Толщина линии / размер точки — кол-во событий
-              </div>
-            </div>
-          ) : null}
-          {endDock}
-        </div>
-      ) : null}
-
-      {showStats ? (
-        <div className="stats-floating">
-          <div className="stats-item">
-            <span className="lbl">Событий</span>
-            <span className="val" id="stat-total">
-              {fmtNumber(stats.events)}
-            </span>
-          </div>
-          <div className="stats-item">
-            <span className="lbl">Allowed</span>
-            <span className="val green">{fmtNumber(stats.allowed)}</span>
-          </div>
-          <div className="stats-item">
-            <span className="lbl">Blocked</span>
-            <span className="val red">{fmtNumber(stats.blocked)}</span>
-          </div>
-          <div className="stats-item">
-            <span className="lbl">Связей</span>
-            <span className="val" id="stat-edges">
-              {fmtNumber(stats.connections)}
-            </span>
-          </div>
-          <div className="stats-item">
-            <span className="lbl">Узлов</span>
-            <span className="val">{fmtNumber(stats.nodes)}</span>
-          </div>
-          <div className="stats-item">
-            <span className="lbl">Стран</span>
-            <span className="val">{fmtNumber(stats.countries)}</span>
-          </div>
-          <div className="stats-item">
-            <span className="lbl">Городов</span>
-            <span className="val">{fmtNumber(stats.cities)}</span>
-          </div>
+          <MapInfoDock
+            open={infoDock.open}
+            tab={infoDock.tab}
+            onTabChange={infoDock.onTabChange}
+            onClose={infoDock.onClose}
+            showLegendTab={infoDock.showLegendTab}
+            showStatsTab={infoDock.showStatsTab}
+            summary={infoDock.summary}
+            monoArcs={monoArcs}
+            repColorArcs={repColorArcs}
+            stats={stats}
+            anomalyItems={infoDock.anomalyItems}
+            onAnomalyShow={infoDock.onAnomalyShow}
+            onAnomalyAck={infoDock.onAnomalyAck}
+          />
         </div>
       ) : null}
     </>

@@ -13,6 +13,7 @@ import {
   type GeoRange,
 } from '@/api/geo';
 import { AdminLayout } from '@/components/AdminLayout';
+import { DataSectionNav } from '@/components/DataSectionNav';
 import { useToast } from '@/components/Toast';
 import { fmtNumber } from '@/lib/format';
 
@@ -408,6 +409,7 @@ export default function GeoRangesPage() {
       }
     >
       <div className="page-content-inner">
+        <DataSectionNav />
         <p className="page-lead">
           Текущие диапазоны в таблице geo_ranges. Точечные правки — через «изменить». Полная замена
           базы: «Очистить базу» (снимает early 409), затем «Загрузить CSV». Рестарт backend не нужен.

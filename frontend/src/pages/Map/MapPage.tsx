@@ -10,9 +10,9 @@ import { collectReputationMenuTree } from './mapReputation';
 import { MapSidebar } from './MapSidebar';
 import { MapTopbar } from './MapTopbar';
 import { MapVizOverlays } from './MapVizOverlays';
+import type { InfoDockTab } from './MapInfoDock';
 import { GeoWizardModal } from './GeoWizardModal';
 import { AnomalyStrip } from './AnomalyStrip';
-import { AnomalyPanel } from './AnomalyPanel';
 import { useGeoWizard } from './useGeoWizard';
 import { useMapAnomalies, anomalyMapToView } from './useMapAnomalies';
 import { highlightFromAnomaly } from './mapAnomalyOverlay';
@@ -146,6 +146,8 @@ export default function MapPage() {
   const [viewMode, setViewMode] = useState<'map' | 'globe'>('map');
   const [showLegend, setShowLegend] = useState(true);
   const [showStats, setShowStats] = useState(true);
+  const [infoDockOpen, setInfoDockOpen] = useState(true);
+  const [infoDockTab, setInfoDockTab] = useState<InfoDockTab>('legend');
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [showCountryLabels, setShowCountryLabels] = useState(false);
   const [monoArcs, setMonoArcs] = useState(false);
@@ -179,6 +181,33 @@ export default function MapPage() {
   });
 
   const anomalies = useMapAnomalies();
+  const { setOpen: setAnomaliesOpen } = anomalies;
+
+  useEffect(() => {
+    if (infoDockTab === 'legend' && !showLegend) {
+      setInfoDockTab(showStats ? 'stats' : 'anomalies');
+    } else if (infoDockTab === 'stats' && !showStats) {
+      setInfoDockTab(showLegend ? 'legend' : 'anomalies');
+    }
+  }, [showLegend, showStats, infoDockTab]);
+
+  useEffect(() => {
+    if (infoDockOpen && infoDockTab === 'anomalies') {
+      setAnomaliesOpen(true);
+    } else if (infoDockTab !== 'anomalies') {
+      setAnomaliesOpen(false);
+    }
+  }, [infoDockOpen, infoDockTab, setAnomaliesOpen]);
+
+  function openInfoDock(tab: InfoDockTab) {
+    setInfoDockOpen(true);
+    setInfoDockTab(tab);
+  }
+
+  function closeInfoDock() {
+    setInfoDockOpen(false);
+    setAnomaliesOpen(false);
+  }
   const highlight = useMemo(
     () => highlightFromAnomaly(anomalies.active, points, visibleLines, groupBy),
     [anomalies.active, points, visibleLines, groupBy],
@@ -304,6 +333,18 @@ export default function MapPage() {
     if (back) applyView(back);
   }
 
+  function handleAnomalyShow(item: (typeof anomalies.items)[number]) {
+    if (!anomalyReturnViewRef.current) {
+      anomalyReturnViewRef.current = snapshotCurrentView();
+    }
+    anomalies.setActive(item);
+    applyView(anomalyMapToView(item, period));
+    closeInfoDock();
+  }
+
+  const showAnomalyStrip =
+    !infoDockOpen || infoDockTab !== 'anomalies';
+
   useEffect(() => {
     if (!isAdmin) return;
     const refreshGeo = () => void reloadGeoStatus();
@@ -370,9 +411,15 @@ export default function MapPage() {
               maxArcs,
               setMaxArcs,
               showLegend,
-              setShowLegend,
+              setShowLegend: (v: boolean) => {
+                setShowLegend(v);
+                if (v) openInfoDock('legend');
+              },
               showStats,
-              setShowStats,
+              setShowStats: (v: boolean) => {
+                setShowStats(v);
+                if (v) openInfoDock('stats');
+              },
               showHeatmap,
               setShowHeatmap,
               showCountryLabels,
@@ -395,7 +442,7 @@ export default function MapPage() {
         />
 
         <div
-          className={`viz-area${loading ? ' is-loading' : ''}${showGeoEmptyBanner ? ' has-geo-empty-banner' : ''}${truncHint ? ' has-viz-hint' : ''}${showLegend ? ' has-map-legend' : ''}`}
+          className={`viz-area${loading ? ' is-loading' : ''}${showGeoEmptyBanner ? ' has-geo-empty-banner' : ''}${truncHint ? ' has-viz-hint' : ''}${infoDockOpen ? ' has-map-info-dock' : ''}`}
         >
           <div ref={mapContainer} id="map-host" className="viz-host" />
 
@@ -405,8 +452,8 @@ export default function MapPage() {
                 Выйти из режима аномалии
               </button>
             ) : null}
-            {!anomalies.open ? (
-              <AnomalyStrip summary={anomalies.summary} onOpen={() => anomalies.setOpen(true)} />
+            {showAnomalyStrip ? (
+              <AnomalyStrip summary={anomalies.summary} onOpen={() => openInfoDock('anomalies')} />
             ) : null}
             {truncHint ? <div className="viz-hint warn">{truncHint}</div> : null}
           </div>
@@ -423,31 +470,25 @@ export default function MapPage() {
           <MapVizOverlays
             emptyOverlay={displayEmptyOverlay}
             loading={loading}
-            showLegend={showLegend}
             monoArcs={monoArcs}
             repColorArcs={repColorArcs}
-            showStats={showStats}
             stats={stats}
-            endDock={
-              <AnomalyPanel
-                open={anomalies.open}
-                items={anomalies.items}
-                onClose={() => anomalies.setOpen(false)}
-                onShow={(item) => {
-                  if (!anomalyReturnViewRef.current) {
-                    anomalyReturnViewRef.current = snapshotCurrentView();
-                  }
-                  anomalies.setActive(item);
-                  applyView(anomalyMapToView(item, period));
-                  anomalies.setOpen(false);
-                }}
-                onAck={(fp) => {
-                  void anomalies.ack(fp).catch(() => {
-                    toast('Не удалось скрыть аномалию', 'error');
-                  });
-                }}
-              />
-            }
+            infoDock={{
+              open: infoDockOpen,
+              tab: infoDockTab,
+              onTabChange: setInfoDockTab,
+              onClose: closeInfoDock,
+              showLegendTab: showLegend,
+              showStatsTab: showStats,
+              summary: anomalies.summary,
+              anomalyItems: anomalies.items,
+              onAnomalyShow: handleAnomalyShow,
+              onAnomalyAck: (fp) => {
+                void anomalies.ack(fp).catch(() => {
+                  toast('Не удалось скрыть аномалию', 'error');
+                });
+              },
+            }}
           />
 
           <MapDetailPanel detail={detail} onClose={closeDetail} />

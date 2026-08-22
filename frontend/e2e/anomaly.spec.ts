@@ -56,20 +56,10 @@ test.describe('anomaly strip', () => {
     await expect(page.locator('#map-main')).toBeVisible({ timeout: 15_000 });
     await expect(page.locator('.anomaly-strip')).toContainText('критично');
     await page.locator('.anomaly-strip').click();
-    await expect(page.locator('.anomaly-panel')).toBeVisible();
+    await expect(page.locator('.map-info-dock')).toBeVisible();
+    await expect(page.locator('.map-info-dock-tabs button.active')).toContainText('Аномалии');
+    await expect(page.locator('.anomaly-panel-list')).toBeVisible();
     await expect(page.locator('.anomaly-strip')).toHaveCount(0);
-    const panelBox = await page.locator('.anomaly-panel').boundingBox();
-    const legendBox = await page.locator('.legend').boundingBox();
-    expect(panelBox).toBeTruthy();
-    expect(legendBox).toBeTruthy();
-    if (panelBox && legendBox) {
-      const overlap =
-        panelBox.x < legendBox.x + legendBox.width &&
-        panelBox.x + panelBox.width > legendBox.x &&
-        panelBox.y < legendBox.y + legendBox.height &&
-        panelBox.y + panelBox.height > legendBox.y;
-      expect(overlap).toBe(false);
-    }
     await page.getByRole('button', { name: 'На карте' }).click();
     await expect(page).toHaveURL(/q=src/);
     await expect(page).toHaveURL(/group=ip/);

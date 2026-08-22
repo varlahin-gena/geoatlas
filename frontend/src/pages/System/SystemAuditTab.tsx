@@ -26,7 +26,7 @@ export function SystemAuditTab() {
       });
       setItems(res.items || []);
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Не удалось загрузить audit log', 'error');
+      toast(e instanceof Error ? e.message : 'Не удалось загрузить журнал аудита', 'error');
     } finally {
       setLoading(false);
     }
@@ -41,7 +41,7 @@ export function SystemAuditTab() {
       <section className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <h3 className="card-title" style={{ margin: 0 }}>
-            Audit log
+            Журнал аудита
           </h3>
           <button type="button" className="btn" onClick={() => void load()} disabled={loading}>
             Обновить
@@ -53,18 +53,18 @@ export function SystemAuditTab() {
         <div className="history-filters">
           <input
             className="input"
-            placeholder="actor"
+            placeholder="Учётная запись"
             value={actor}
             onChange={(e) => setActor(e.target.value)}
           />
           <input
             className="input"
-            placeholder="action"
+            placeholder="Действие"
             value={action}
             onChange={(e) => setAction(e.target.value)}
           />
           <select className="input" value={result} onChange={(e) => setResult(e.target.value)}>
-            <option value="">Любой result</option>
+            <option value="">Любой результат</option>
             <option value="succeeded">succeeded</option>
             <option value="failed">failed</option>
           </select>

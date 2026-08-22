@@ -421,10 +421,10 @@ export default function SystemPage() {
               {(
                 [
                   ['overview', 'Обзор'],
-                  ['pipeline', 'Pipeline'],
+                  ['pipeline', 'Конвейер'],
                   ['backup', 'Резервное копирование'],
                   ['security', 'Безопасность'],
-                  ['audit', 'Audit log'],
+                  ['audit', 'Журнал аудита'],
                   ['charts', 'Графики'],
                 ] as const
               ).map(([id, label]) => (

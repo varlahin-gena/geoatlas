@@ -7,6 +7,7 @@ import {
   type GeoMissingSummary as Summary,
 } from '@/api/geo';
 import { AdminLayout } from '@/components/AdminLayout';
+import { DataSectionNav } from '@/components/DataSectionNav';
 import { useToast } from '@/components/Toast';
 import { fmtNumber } from '@/lib/format';
 import { buildPeriodQuery } from '@/pages/Map/mapConstants';
@@ -233,6 +234,7 @@ export default function GeoMissingPage() {
       }
     >
       <div className="page-content-inner">
+        <DataSectionNav />
         <h1>Адреса, которые не удалось поставить на карту</h1>
         <p className="page-lead">
           Уникальные IP из трафика без координат. Публичные можно добавить в базу GeoIP; приватные
