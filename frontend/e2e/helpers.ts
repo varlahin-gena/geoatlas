@@ -36,7 +36,7 @@ async function fulfillJson(route: Route, status: number, body: unknown) {
 export async function installSessionMocks(
   page: Page,
   role: AuthUser['role'],
-  opts?: { events?: unknown; eventsStatus?: number },
+  opts?: { events?: unknown; eventsStatus?: number; geoCount?: number },
 ) {
   let session: AuthUser | null = null;
   const eventsBody = opts?.events ?? {
@@ -45,6 +45,7 @@ export async function installSessionMocks(
     stats: { raw_pairs: 0, skipped_no_geo: 0 },
   };
   const eventsStatus = opts?.eventsStatus ?? 200;
+  const geoCount = opts?.geoCount ?? 0;
 
   await page.route('**/config.js', async (route) => {
     await route.fulfill({
@@ -108,8 +109,7 @@ export async function installSessionMocks(
   });
 
   await page.route(/\/api\/geo-ranges(\/|\?|$)/, async (route) => {
-    // Non-zero count keeps the geo wizard from blocking map interactions in e2e.
-    await fulfillJson(route, 200, { count: 1000, ranges: [], index_ready: true });
+    await fulfillJson(route, 200, { count: geoCount, ranges: [], index_ready: true });
   });
 
   await page.route('**/api/auth/geo-wizard-dismiss', async (route) => {

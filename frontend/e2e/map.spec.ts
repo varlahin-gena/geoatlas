@@ -3,7 +3,7 @@ import { MAP_FIXTURE, installSessionMocks, loginAs, seedCsrf } from './helpers';
 
 test.describe('map fixture / URL / session', () => {
   test('login shows fixture arcs in stats', async ({ page }) => {
-    await installSessionMocks(page, 'administrator', { events: MAP_FIXTURE });
+    await installSessionMocks(page, 'administrator', { events: MAP_FIXTURE, geoCount: 1000 });
     await seedCsrf(page);
     await loginAs(page, 'admin');
     await expect(page.locator('#map-main')).toBeVisible({ timeout: 15_000 });

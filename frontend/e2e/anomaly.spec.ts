@@ -3,17 +3,11 @@ import { MAP_FIXTURE, installSessionMocks, loginAs, seedCsrf } from './helpers';
 
 test.describe('anomaly strip', () => {
   test('badge and На карте update query string', async ({ page }) => {
-    await installSessionMocks(page, 'administrator', { events: MAP_FIXTURE });
-    // Non-empty GeoIP so the empty-geo wizard does not block the anomaly strip.
-    await page.unroute(/\/api\/geo-ranges(\/|\?|$)/);
-    await page.route(/\/api\/geo-ranges(\/|\?|$)/, async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ count: 1000, ranges: [], index_ready: true }),
-      });
-    });
-    await page.unroute('**/api/anomalies/summary');
+    await installSessionMocks(page, 'administrator', { events: MAP_FIXTURE, geoCount: 1000 });
+    await seedCsrf(page);
+    await loginAs(page, 'admin');
+    await expect(page.locator('#map-main')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('.anomaly-strip')).toContainText('критично');
     await page.unroute(/\/api\/anomalies(\/|\?|$)/);
     await page.route('**/api/anomalies/summary', async (route) => {
       await route.fulfill({
