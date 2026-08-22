@@ -108,7 +108,8 @@ export async function installSessionMocks(
   });
 
   await page.route(/\/api\/geo-ranges(\/|\?|$)/, async (route) => {
-    await fulfillJson(route, 200, { count: 0, ranges: [], index_ready: true });
+    // Non-zero count keeps the geo wizard from blocking map interactions in e2e.
+    await fulfillJson(route, 200, { count: 1000, ranges: [], index_ready: true });
   });
 
   await page.route('**/api/auth/geo-wizard-dismiss', async (route) => {
