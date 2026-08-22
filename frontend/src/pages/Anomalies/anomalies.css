@@ -1,0 +1,101 @@
+.anomaly-summary-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.anomaly-summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 120px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+
+.anomaly-summary-card strong {
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.anomaly-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+  align-items: center;
+}
+
+.anomaly-include-acked {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.warn-banner {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--orange) 45%, var(--border));
+  background: color-mix(in srgb, var(--orange) 8%, var(--panel));
+  margin-bottom: 12px;
+}
+
+.anomalies-table .anomaly-title-cell {
+  max-width: 320px;
+  line-height: 1.35;
+}
+
+.anomalies-table .mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.anomalies-table tr.is-acked {
+  opacity: 0.65;
+}
+
+.anomaly-sev-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+}
+
+.anomaly-sev-badge.sev-high {
+  color: var(--red);
+  border-color: color-mix(in srgb, var(--red) 45%, var(--border));
+  background: color-mix(in srgb, var(--red) 10%, transparent);
+}
+
+.anomaly-sev-badge.sev-warn {
+  color: var(--orange);
+  border-color: color-mix(in srgb, var(--orange) 45%, var(--border));
+  background: color-mix(in srgb, var(--orange) 10%, transparent);
+}
+
+.anomaly-sev-badge.sev-info {
+  color: var(--text-muted);
+}
+
+.anomalies-table .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.anomalies-table .btn.sm {
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+.sev-high { color: var(--red); }
+.sev-warn { color: var(--orange); }

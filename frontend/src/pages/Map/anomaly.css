@@ -11,6 +11,10 @@
   cursor: pointer;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
   max-width: min(560px, calc(100% - 24px));
+  text-decoration: none;
+}
+.anomaly-strip:hover {
+  border-color: color-mix(in srgb, var(--accent, #58a6ff) 45%, var(--border));
 }
 .anomaly-strip.is-high {
   border-color: color-mix(in srgb, var(--red) 55%, var(--border));

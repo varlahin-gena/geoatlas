@@ -7,6 +7,7 @@ import {
   putRetention,
 } from '@/api/system';
 import { AdminLayout } from '@/components/AdminLayout';
+import { ObserveSectionNav } from '@/components/ObserveSectionNav';
 import { useToast } from '@/components/Toast';
 import { fmtNumber } from '@/lib/format';
 import { usePolling } from '@/lib/usePolling';
@@ -343,6 +344,7 @@ export default function SystemPage() {
         </>
       }
     >
+          <ObserveSectionNav />
           <div className="content-chrome">
             <section
               className={`chrome-section chrome-alerts${alerts.length ? '' : ' chrome-alerts--empty'}`}

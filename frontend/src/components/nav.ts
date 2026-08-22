@@ -18,6 +18,8 @@ const NAV_GROUP_ORDER: NavGroupId[] = [
   'access',
 ];
 
+const SETTINGS_GROUP_ORDER: NavGroupId[] = ['observe', 'data', 'access'];
+
 const NAV_GROUP_LABELS: Record<NavGroupId, string> = {
   workspace: 'Рабочее место',
   observe: 'Наблюдение',
@@ -40,6 +42,13 @@ export const PAGE_NAV: NavItem[] = [
     group: 'observe',
     match: ['/system', '/system.html'],
     adminOnly: true,
+  },
+  {
+    href: '/anomalies',
+    label: 'Аномалии',
+    group: 'observe',
+    match: ['/anomalies', '/anomalies.html'],
+    adminOnly: false,
   },
   {
     href: '/parse-errors',
@@ -72,7 +81,7 @@ export const PAGE_NAV: NavItem[] = [
   {
     href: '/reputation',
     label: 'Репутация IP',
-    group: 'threat',
+    group: 'observe',
     match: ['/reputation', '/reputation.html'],
     adminOnly: true,
     requiresReputation: true,
@@ -100,18 +109,64 @@ export type NavGroupSection = {
   items: NavItem[];
 };
 
-export function groupNav(items: NavItem[]): NavGroupSection[] {
+function groupNavByOrder(items: NavItem[], order: NavGroupId[]): NavGroupSection[] {
   const byGroup = new Map<NavGroupId, NavItem[]>();
   for (const item of items) {
     const list = byGroup.get(item.group);
     if (list) list.push(item);
     else byGroup.set(item.group, [item]);
   }
-  return NAV_GROUP_ORDER.filter((id) => (byGroup.get(id)?.length ?? 0) > 0).map((id) => ({
+  return order.filter((id) => (byGroup.get(id)?.length ?? 0) > 0).map((id) => ({
     id,
     label: NAV_GROUP_LABELS[id],
     items: byGroup.get(id)!,
   }));
+}
+
+export function groupNav(items: NavItem[]): NavGroupSection[] {
+  return groupNavByOrder(items, NAV_GROUP_ORDER);
+}
+
+export function splitNavItems(items: NavItem[]): {
+  workspace: NavItem[];
+  settings: NavGroupSection[];
+} {
+  const workspace = items.filter((item) => item.group === 'workspace');
+  const settings = groupNavByOrder(
+    items.filter((item) => item.group !== 'workspace'),
+    SETTINGS_GROUP_ORDER,
+  );
+  return { workspace, settings };
+}
+
+export function settingsBadgeTotal(
+  sections: NavGroupSection[],
+  badges: Record<string, string | null | undefined>,
+): string | null {
+  let sum = 0;
+  for (const section of sections) {
+    for (const item of section.items) {
+      const raw = badges[item.href];
+      if (!raw) continue;
+      const n = raw.endsWith('+') ? parseInt(raw, 10) : parseInt(raw, 10);
+      if (Number.isFinite(n)) sum += n;
+    }
+  }
+  return formatNavBadge(sum, 99);
+}
+
+export function sectionBadgeTotal(
+  section: NavGroupSection,
+  badges: Record<string, string | null | undefined>,
+): string | null {
+  let sum = 0;
+  for (const item of section.items) {
+    const raw = badges[item.href];
+    if (!raw) continue;
+    const n = raw.endsWith('+') ? parseInt(raw, 10) : parseInt(raw, 10);
+    if (Number.isFinite(n)) sum += n;
+  }
+  return formatNavBadge(sum, 99);
 }
 
 function normalizePath(pathname: string): string {

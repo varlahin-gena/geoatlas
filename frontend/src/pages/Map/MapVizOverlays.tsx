@@ -1,4 +1,3 @@
-import type { AnomalyEvent, AnomalySummary } from '@/api/anomalies';
 import { MapInfoDock, type InfoDockTab } from './MapInfoDock';
 
 export function MapVizOverlays({
@@ -18,10 +17,6 @@ export function MapVizOverlays({
     onClose: () => void;
     showLegendTab: boolean;
     showStatsTab: boolean;
-    summary: AnomalySummary | null;
-    anomalyItems: AnomalyEvent[];
-    onAnomalyShow: (item: AnomalyEvent) => void;
-    onAnomalyAck: (fingerprint: string) => void;
   };
   monoArcs: boolean;
   repColorArcs: boolean;
@@ -62,13 +57,9 @@ export function MapVizOverlays({
             onClose={infoDock.onClose}
             showLegendTab={infoDock.showLegendTab}
             showStatsTab={infoDock.showStatsTab}
-            summary={infoDock.summary}
             monoArcs={monoArcs}
             repColorArcs={repColorArcs}
             stats={stats}
-            anomalyItems={infoDock.anomalyItems}
-            onAnomalyShow={infoDock.onAnomalyShow}
-            onAnomalyAck={infoDock.onAnomalyAck}
           />
         </div>
       ) : null}

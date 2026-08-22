@@ -1,8 +1,6 @@
-import type { AnomalyEvent, AnomalySummary } from '@/api/anomalies';
 import { fmtNumber } from '@/lib/format';
-import { AnomalyPanel } from './AnomalyPanel';
 
-export type InfoDockTab = 'legend' | 'stats' | 'anomalies';
+export type InfoDockTab = 'legend' | 'stats';
 
 function MapLegend({ monoArcs, repColorArcs }: { monoArcs: boolean; repColorArcs: boolean }) {
   return (
@@ -92,13 +90,9 @@ export function MapInfoDock({
   onClose,
   showLegendTab,
   showStatsTab,
-  summary,
   monoArcs,
   repColorArcs,
   stats,
-  anomalyItems,
-  onAnomalyShow,
-  onAnomalyAck,
 }: {
   open: boolean;
   tab: InfoDockTab;
@@ -106,7 +100,6 @@ export function MapInfoDock({
   onClose: () => void;
   showLegendTab: boolean;
   showStatsTab: boolean;
-  summary: AnomalySummary | null;
   monoArcs: boolean;
   repColorArcs: boolean;
   stats: {
@@ -118,17 +111,13 @@ export function MapInfoDock({
     countries: number;
     cities: number;
   };
-  anomalyItems: AnomalyEvent[];
-  onAnomalyShow: (item: AnomalyEvent) => void;
-  onAnomalyAck: (fingerprint: string) => void;
 }) {
   if (!open) return null;
 
-  const anomalyTotal = summary?.total || 0;
-  const tabs: { id: InfoDockTab; label: string; badge?: number }[] = [];
+  const tabs: { id: InfoDockTab; label: string }[] = [];
   if (showLegendTab) tabs.push({ id: 'legend', label: 'Легенда' });
   if (showStatsTab) tabs.push({ id: 'stats', label: 'Статистика' });
-  tabs.push({ id: 'anomalies', label: 'Аномалии', badge: anomalyTotal || undefined });
+  if (!tabs.length) return null;
 
   const activeTab = tabs.some((t) => t.id === tab) ? tab : tabs[0]?.id;
 
@@ -146,7 +135,6 @@ export function MapInfoDock({
               onClick={() => onTabChange(t.id)}
             >
               {t.label}
-              {t.badge ? <span className="map-info-dock-tab-badge">{t.badge}</span> : null}
             </button>
           ))}
         </nav>
@@ -157,14 +145,6 @@ export function MapInfoDock({
       <div className="map-info-dock-body" role="tabpanel">
         {activeTab === 'legend' ? <MapLegend monoArcs={monoArcs} repColorArcs={repColorArcs} /> : null}
         {activeTab === 'stats' ? <MapStatsGrid stats={stats} /> : null}
-        {activeTab === 'anomalies' ? (
-          <AnomalyPanel
-            embedded
-            items={anomalyItems}
-            onShow={onAnomalyShow}
-            onAck={onAnomalyAck}
-          />
-        ) : null}
       </div>
     </aside>
   );

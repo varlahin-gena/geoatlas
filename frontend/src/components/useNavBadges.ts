@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { fetchGeoMissing } from '@/api/geo';
+import { fetchAnomalySummary } from '@/api/anomalies';
 import { listParseErrors } from '@/api/parseErrors';
 import { isAbortError } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
@@ -18,31 +19,42 @@ const GEO_LIMIT = 100;
  * Counts are capped by fetch limit and shown as "99+" when saturated.
  */
 export function useNavBadges(): NavBadges {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const [badges, setBadges] = useState<NavBadges>({});
 
   usePolling(
     async (signal) => {
-      if (!isAdmin) {
+      if (!user) {
         setBadges({});
         return;
       }
       try {
         const periodQs = buildPeriodQuery('12h', '', '').replace(/^&/, '');
-        const [parseRes, geoRes] = await Promise.all([
-          listParseErrors({ limit: PARSE_LIMIT }),
-          fetchGeoMissing(`${periodQs}&limit=${GEO_LIMIT}`),
-        ]);
+        const requests: Promise<unknown>[] = [fetchAnomalySummary({ signal })];
+        if (isAdmin) {
+          requests.push(
+            listParseErrors({ limit: PARSE_LIMIT }),
+            fetchGeoMissing(`${periodQs}&limit=${GEO_LIMIT}`),
+          );
+        }
+        const results = await Promise.all(requests);
         if (signal.aborted) return;
 
-        const parseCount = (parseRes.errors || []).length;
-        const geoCount = Number(geoRes.summary?.unique_ips ?? geoRes.items?.length ?? 0);
-
+        const anomalyRes = results[0] as Awaited<ReturnType<typeof fetchAnomalySummary>>;
         const next: NavBadges = {};
-        const parseBadge = formatNavBadge(parseCount, PARSE_LIMIT - 1);
-        if (parseBadge) next['/parse-errors'] = parseBadge;
-        const geoBadge = formatNavBadge(geoCount, GEO_LIMIT - 1);
-        if (geoBadge) next['/geo-missing'] = geoBadge;
+        const anomalyBadge = formatNavBadge(anomalyRes.total || 0, 99);
+        if (anomalyBadge) next['/anomalies'] = anomalyBadge;
+
+        if (isAdmin) {
+          const parseRes = results[1] as Awaited<ReturnType<typeof listParseErrors>>;
+          const geoRes = results[2] as Awaited<ReturnType<typeof fetchGeoMissing>>;
+          const parseCount = (parseRes.errors || []).length;
+          const geoCount = Number(geoRes.summary?.unique_ips ?? geoRes.items?.length ?? 0);
+          const parseBadge = formatNavBadge(parseCount, PARSE_LIMIT - 1);
+          if (parseBadge) next['/parse-errors'] = parseBadge;
+          const geoBadge = formatNavBadge(geoCount, GEO_LIMIT - 1);
+          if (geoBadge) next['/geo-missing'] = geoBadge;
+        }
         setBadges(next);
       } catch (e) {
         if (isAbortError(e) || signal.aborted) return;
@@ -50,7 +62,7 @@ export function useNavBadges(): NavBadges {
       }
     },
     POLL_MS,
-    isAdmin,
+    Boolean(user),
   );
 
   return badges;

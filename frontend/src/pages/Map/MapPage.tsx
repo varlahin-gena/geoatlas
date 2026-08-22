@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/auth/AuthContext';
 import { useToast } from '@/components/Toast';
 import { useSidebarCollapsed } from '@/components/useSidebarCollapsed';
@@ -14,12 +14,11 @@ import type { InfoDockTab } from './MapInfoDock';
 import { GeoWizardModal } from './GeoWizardModal';
 import { AnomalyStrip } from './AnomalyStrip';
 import { useGeoWizard } from './useGeoWizard';
-import { useMapAnomalies, anomalyMapToView } from './useMapAnomalies';
-import { highlightFromAnomaly } from './mapAnomalyOverlay';
+import { useMapAnomalies } from './useMapAnomalies';
 import { useMapDetail } from './useMapDetail';
 import { useMapEvents } from './useMapEvents';
 import { useMapFilters } from './useMapFilters';
-import { type MapViewState, useMapViewQuery } from './mapQuery';
+import { useMapViewQuery } from './mapQuery';
 import { useMapLibreController } from './useMapLibreController';
 import { useMapReputation } from './useMapReputation';
 import { useMapUploads } from './useMapUploads';
@@ -56,9 +55,7 @@ export default function MapPage() {
     setFocusedCountry,
     clearFocusedCountry,
     applySearchFilter,
-    applyView,
   } = view;
-  const anomalyReturnViewRef = useRef<MapViewState | null>(null);
 
   const {
     repCategories,
@@ -181,23 +178,20 @@ export default function MapPage() {
   });
 
   const anomalies = useMapAnomalies();
-  const { setOpen: setAnomaliesOpen } = anomalies;
 
   useEffect(() => {
     if (infoDockTab === 'legend' && !showLegend) {
-      setInfoDockTab(showStats ? 'stats' : 'anomalies');
+      setInfoDockTab(showStats ? 'stats' : 'legend');
     } else if (infoDockTab === 'stats' && !showStats) {
-      setInfoDockTab(showLegend ? 'legend' : 'anomalies');
+      setInfoDockTab(showLegend ? 'legend' : 'stats');
     }
   }, [showLegend, showStats, infoDockTab]);
 
   useEffect(() => {
-    if (infoDockOpen && infoDockTab === 'anomalies') {
-      setAnomaliesOpen(true);
-    } else if (infoDockTab !== 'anomalies') {
-      setAnomaliesOpen(false);
+    if (!showLegend && !showStats && infoDockOpen) {
+      setInfoDockOpen(false);
     }
-  }, [infoDockOpen, infoDockTab, setAnomaliesOpen]);
+  }, [showLegend, showStats, infoDockOpen]);
 
   function openInfoDock(tab: InfoDockTab) {
     setInfoDockOpen(true);
@@ -206,12 +200,7 @@ export default function MapPage() {
 
   function closeInfoDock() {
     setInfoDockOpen(false);
-    setAnomaliesOpen(false);
   }
-  const highlight = useMemo(
-    () => highlightFromAnomaly(anomalies.active, points, visibleLines, groupBy),
-    [anomalies.active, points, visibleLines, groupBy],
-  );
 
   const { detail, closeDetail, openLineDetail, openPointDetail, openCountryDetail } = useMapDetail({
     groupBy,
@@ -263,8 +252,8 @@ export default function MapPage() {
         onLineClick: openLineDetail,
         onPointClick: openPointDetail,
         onCountryClick: (key, feature) => openCountryDetail(key, feature),
-        highlightNodeKeys: highlight.nodeKeys,
-        highlightEdgeKeys: highlight.edgeKeys,
+        highlightNodeKeys: undefined,
+        highlightEdgeKeys: undefined,
       });
       overlay.setProps({ layers: result.layers as never[] });
       setArcCountInfo({ shown: result.shown, total: result.total });
@@ -294,8 +283,6 @@ export default function MapPage() {
     openCountryDetail,
     overlayRef,
     layersRefreshBusy,
-    highlight.nodeKeys,
-    highlight.edgeKeys,
   ]);
 
   const truncHint =
@@ -312,38 +299,6 @@ export default function MapPage() {
       : emptyOverlay;
 
   const reloadGeoStatus = geoWizard.reloadStatus;
-  const inAnomalyMode = anomalies.active != null;
-
-  function snapshotCurrentView(): MapViewState {
-    return {
-      period,
-      periodFrom,
-      periodTo,
-      groupBy,
-      filter,
-      search,
-      focusedCountry,
-    };
-  }
-
-  function exitAnomalyMode() {
-    anomalies.setActive(null);
-    const back = anomalyReturnViewRef.current;
-    anomalyReturnViewRef.current = null;
-    if (back) applyView(back);
-  }
-
-  function handleAnomalyShow(item: (typeof anomalies.items)[number]) {
-    if (!anomalyReturnViewRef.current) {
-      anomalyReturnViewRef.current = snapshotCurrentView();
-    }
-    anomalies.setActive(item);
-    applyView(anomalyMapToView(item, period));
-    closeInfoDock();
-  }
-
-  const showAnomalyStrip =
-    !infoDockOpen || infoDockTab !== 'anomalies';
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -447,14 +402,7 @@ export default function MapPage() {
           <div ref={mapContainer} id="map-host" className="viz-host" />
 
           <div className="map-top-stack">
-            {inAnomalyMode ? (
-              <button type="button" className="anomaly-exit-btn" onClick={exitAnomalyMode}>
-                Выйти из режима аномалии
-              </button>
-            ) : null}
-            {showAnomalyStrip ? (
-              <AnomalyStrip summary={anomalies.summary} onOpen={() => openInfoDock('anomalies')} />
-            ) : null}
+            <AnomalyStrip summary={anomalies.summary} />
             {truncHint ? <div className="viz-hint warn">{truncHint}</div> : null}
           </div>
 
@@ -480,14 +428,6 @@ export default function MapPage() {
               onClose: closeInfoDock,
               showLegendTab: showLegend,
               showStatsTab: showStats,
-              summary: anomalies.summary,
-              anomalyItems: anomalies.items,
-              onAnomalyShow: handleAnomalyShow,
-              onAnomalyAck: (fp) => {
-                void anomalies.ack(fp).catch(() => {
-                  toast('Не удалось скрыть аномалию', 'error');
-                });
-              },
             }}
           />
 

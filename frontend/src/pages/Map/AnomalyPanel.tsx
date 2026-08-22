@@ -1,38 +1,5 @@
 import type { AnomalyEvent } from '@/api/anomalies';
-
-function relTime(iso?: string): string {
-  if (!iso) return '';
-  const t = Date.parse(iso);
-  if (!Number.isFinite(t)) return '';
-  const sec = Math.max(0, Math.round((Date.now() - t) / 1000));
-  if (sec < 60) return `${sec} с назад`;
-  const min = Math.round(sec / 60);
-  if (min < 60) return `${min} мин назад`;
-  const h = Math.round(min / 60);
-  if (h < 48) return `${h} ч назад`;
-  return `${Math.round(h / 24)} дн назад`;
-}
-
-function codeLabel(code?: string): string {
-  switch (code) {
-    case 'port_scan':
-      return 'Сканирование портов';
-    case 'horizontal_scan':
-      return 'Сканирование подсети';
-    case 'blocked_surge':
-      return 'Всплеск блокировок';
-    case 'new_country_dst':
-      return 'Новая страна назначения';
-    case 'rep_new_peer':
-      return 'Репутационная связь';
-    default:
-      return code || '';
-  }
-}
-
-function eventCodeLabel(item: AnomalyEvent): string {
-  return item.code_label || codeLabel(item.code);
-}
+import { eventCodeLabel, relTime } from '@/pages/Anomalies/anomalyDisplay';
 
 function AnomalyList({
   items,

@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { MAP_FIXTURE, installSessionMocks, loginAs, seedCsrf } from './helpers';
 
 test.describe('anomaly strip', () => {
-  test('badge and На карте update query string', async ({ page }) => {
+  test('badge links to anomalies page and На карте updates query string', async ({ page }) => {
     await installSessionMocks(page, 'administrator', { events: MAP_FIXTURE, geoCount: 1000 });
     await page.unroute('**/api/anomalies/summary');
     await page.unroute(/\/api\/anomalies(\/|\?|$)/);
@@ -46,12 +46,11 @@ test.describe('anomaly strip', () => {
     await loginAs(page, 'admin');
     await expect(page.locator('#map-main')).toBeVisible({ timeout: 15_000 });
     await expect(page.locator('.anomaly-strip')).toContainText('критично');
+    await expect(page.locator('.map-info-dock-tabs')).not.toContainText('Аномалии');
     await page.locator('.anomaly-strip').click();
-    await expect(page.locator('.map-info-dock')).toBeVisible();
-    await expect(page.locator('.map-info-dock-tabs button.active')).toContainText('Аномалии');
-    await expect(page.locator('.anomaly-panel-list')).toBeVisible();
-    await expect(page.locator('.anomaly-strip')).toHaveCount(0);
-    await page.getByRole('button', { name: 'На карте' }).click();
+    await expect(page).toHaveURL(/\/anomalies/);
+    await expect(page.locator('.anomalies-table')).toBeVisible();
+    await page.getByRole('link', { name: 'На карте' }).click();
     await expect(page).toHaveURL(/q=src/);
     await expect(page).toHaveURL(/group=ip/);
     // Keep the current (wider) map period; default 1d is omitted from the query string.

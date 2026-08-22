@@ -72,6 +72,21 @@ export function NavIcon({ kind }: { kind: string }) {
           <path d="M7 11V7a5 5 0 0 1 10 0v4" />
         </svg>
       );
+    case 'settings':
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="3" />
+          <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+        </svg>
+      );
+    case 'anomalies':
+      return (
+        <svg {...common}>
+          <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+          <line x1="12" y1="9" x2="12" y2="13" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+      );
     default:
       return null;
   }
@@ -80,6 +95,7 @@ export function NavIcon({ kind }: { kind: string }) {
 export const NAV_ICONS: Record<string, string> = {
   '/': 'map',
   '/system': 'system',
+  '/anomalies': 'anomalies',
   '/parser-test': 'parser',
   '/parse-errors': 'errors',
   '/geo-missing': 'geo-missing',
