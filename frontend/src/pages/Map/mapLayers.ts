@@ -139,7 +139,7 @@ const GLOBE_LAYER_PARAMETERS = {
   depthWrite: false,
 };
 
-export function coordBucketKey(lon: number, lat: number, precision = 3): string {
+function coordBucketKey(lon: number, lat: number, precision = 3): string {
   const m = 10 ** precision;
   return `${Math.round(lon * m) / m}:${Math.round(lat * m) / m}`;
 }
