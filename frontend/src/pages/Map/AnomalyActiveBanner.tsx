@@ -38,9 +38,9 @@ export function AnomalyActiveBanner({ alert, onReturnLive }: Props) {
         <Link to="/anomalies" className="btn sm">
           К алерту
         </Link>
-        <button type="button" className="btn sm primary" onClick={onReturnLive}>
+        <Link to="/" className="btn sm primary" onClick={onReturnLive}>
           Live-карта
-        </button>
+        </Link>
       </div>
     </div>
   );
