@@ -190,6 +190,7 @@ export default function MapPage() {
   );
 
   function returnToLiveMap() {
+    // Link already navigates to `/`; clear memory + sync hook search state / live source.
     clearMapAlertMemory();
     resetToLiveView();
     if (dataSource !== 'live') selectDataSource('live');
