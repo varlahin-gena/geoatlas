@@ -61,7 +61,8 @@ test.describe('anomaly strip', () => {
       page.waitForURL((url) => !url.searchParams.has('alert'), { timeout: 10_000 }),
       page.getByRole('link', { name: 'Live-карта' }).click(),
     ]);
-    await expect(page.locator('.anomaly-exit-btn')).toHaveCount(0);
+    await expect(page).not.toHaveURL(/alert=/);
+    await expect(page.locator('.anomaly-exit-btn')).toBeHidden({ timeout: 10_000 });
     await expect(page.locator('.anomaly-strip')).toBeVisible({ timeout: 15_000 });
   });
 });

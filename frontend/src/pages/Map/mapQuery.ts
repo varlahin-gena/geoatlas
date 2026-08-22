@@ -107,8 +107,13 @@ export function useMapViewQuery() {
   const [maxArcs, setMaxArcs] = useState(5000);
   const debouncedSearch = useDebouncedValue(search, 300);
   const debouncedMaxArcs = useDebouncedValue(maxArcs, 300);
-  /** While true, patchView must not re-attach `alert=` after Live reset. */
-  const dropAlertRef = useRef(false);
+  /** Desired alert fingerprint to keep across patchView; null after Live reset. */
+  const alertKeepRef = useRef<string | null>(alertFingerprint);
+
+  useEffect(() => {
+    // Sync from URL unless we intentionally cleared (Live reset).
+    if (alertFingerprint) alertKeepRef.current = alertFingerprint;
+  }, [alertFingerprint]);
 
   useEffect(() => {
     setSearchState(parsed.search);
@@ -123,13 +128,13 @@ export function useMapViewQuery() {
             next.periodFrom = '';
             next.periodTo = '';
           }
-          const clearAlert = Boolean(opts?.clearAlert || dropAlertRef.current);
-          const alert = clearAlert ? null : parseAlertFingerprint(prev);
+          if (opts?.clearAlert) alertKeepRef.current = null;
+          const alert = alertKeepRef.current;
           const nextSp = serializeMapViewSearch(next);
           if (alert) nextSp.set('alert', alert);
           const prevView = parseMapViewSearch(prev);
           const prevAlert = parseAlertFingerprint(prev);
-          if (sameView(next, prevView) && alert === prevAlert && !clearAlert) return prev;
+          if (sameView(next, prevView) && alert === prevAlert) return prev;
           return nextSp;
         },
         { replace: true },
@@ -204,12 +209,12 @@ export function useMapViewQuery() {
             next.periodTo = '';
           }
           const nextSp = serializeMapViewSearch(next);
-          const clearAlert = Boolean(opts?.clearAlert || dropAlertRef.current || opts?.alert === null);
-          const alert = clearAlert
-            ? null
-            : opts?.alert !== undefined
-              ? opts.alert
-              : parseAlertFingerprint(prev);
+          if (opts?.clearAlert || opts?.alert === null) {
+            alertKeepRef.current = null;
+          } else if (opts?.alert) {
+            alertKeepRef.current = opts.alert;
+          }
+          const alert = alertKeepRef.current;
           if (alert) nextSp.set('alert', alert);
           return nextSp;
         },
@@ -220,7 +225,7 @@ export function useMapViewQuery() {
   );
 
   const resetToLiveView = useCallback(() => {
-    dropAlertRef.current = true;
+    alertKeepRef.current = null;
     setSearchState(MAP_VIEW_DEFAULTS.search);
     try {
       sessionStorage.removeItem('geoatlas.mapAlert');
@@ -228,10 +233,6 @@ export function useMapViewQuery() {
       /* ignore */
     }
     setParams(serializeMapViewSearch({ ...MAP_VIEW_DEFAULTS }), { replace: true });
-    // Keep dropAlertRef true long enough to cover debounced search patchView.
-    window.setTimeout(() => {
-      dropAlertRef.current = false;
-    }, 400);
   }, [setParams]);
 
   return {

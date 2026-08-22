@@ -185,7 +185,7 @@ export default function MapPage() {
 
   const anomalies = useMapAnomalies();
   const activeAlert = useMemo(
-    () => readMapAlert(alertFingerprint),
+    () => (alertFingerprint ? readMapAlert(alertFingerprint) : null),
     [alertFingerprint],
   );
 
