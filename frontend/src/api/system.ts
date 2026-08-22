@@ -104,7 +104,7 @@ export function deleteBackup(name: string): Promise<unknown> {
   return apiDelete(apiPath('/api/system/backups/{name}', { name }));
 }
 
-export type TlsCertInfo = {
+type TlsCertInfo = {
   subject?: string;
   issuer?: string;
   not_before?: string;
