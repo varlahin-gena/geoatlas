@@ -9,7 +9,7 @@ vi.mock('@deck.gl/layers', () => ({
   TextLayer: class TextLayer {},
 }));
 
-import { hasCoords, statusRGB, topByCount } from './mapLayers';
+import { hasCoords, statusRGB, topByCount, normalizeLonLat, resolveNodeLonLat, buildLineCoordFallback } from './mapLayers';
 import type { MapLine } from './mapTypes';
 
 describe('mapLayers helpers', () => {
@@ -52,5 +52,35 @@ describe('mapLayers helpers', () => {
     ];
     expect(topByCount(lines, 2).map((l) => l.count)).toEqual([9, 3]);
     expect(topByCount(lines, 10)).toHaveLength(3);
+  });
+
+  it('normalizeLonLat swaps out-of-range latitude', () => {
+    expect(normalizeLonLat(92.8672, 56.0184)).toEqual([92.8672, 56.0184]);
+    expect(normalizeLonLat(56.0184, 92.8672)).toEqual([92.8672, 56.0184]);
+  });
+
+  it('resolveNodeLonLat prefers line fallback when points map diverges', () => {
+    const lines: MapLine[] = [
+      {
+        src: '1.2.3.4',
+        dst: '10.93.0.49',
+        src_lat: 40.7,
+        src_lon: -74.0,
+        dst_lat: 56.0184,
+        dst_lon: 92.8672,
+        count: 5,
+      },
+    ];
+    const fallback = buildLineCoordFallback(lines);
+    const points = {
+      '1.2.3.4': { lat: 89, lon: 10, count: 5 },
+      '10.93.0.49': { lat: 56.0184, lon: 92.8672, count: 5 },
+    };
+    expect(resolveNodeLonLat('1.2.3.4', undefined, undefined, points, fallback)).toEqual([
+      -74.0, 40.7,
+    ]);
+    expect(resolveNodeLonLat('10.93.0.49', undefined, undefined, points, fallback)).toEqual([
+      92.8672, 56.0184,
+    ]);
   });
 });

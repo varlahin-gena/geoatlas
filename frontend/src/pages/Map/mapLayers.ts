@@ -51,16 +51,93 @@ export function hasCoords(line: MapLine): boolean {
   );
 }
 
+/** Clamp/wrap lon/lat; swap when latitude is out of range (common bad GeoIP). */
+export function normalizeLonLat(lon: number, lat: number): [number, number] {
+  let lo = lon;
+  let la = lat;
+  if (!Number.isFinite(lo) || !Number.isFinite(la)) return [0, 0];
+  if (Math.abs(la) > 90 && Math.abs(lo) <= 90) {
+    [lo, la] = [la, lo];
+  }
+  la = Math.max(-90, Math.min(90, la));
+  while (lo > 180) lo -= 360;
+  while (lo < -180) lo += 360;
+  return [lo, la];
+}
+
+function coordDistanceDeg(lon1: number, lat1: number, lon2: number, lat2: number): number {
+  let dLon = Math.abs(lon1 - lon2);
+  if (dLon > 180) dLon = 360 - dLon;
+  return Math.hypot(dLon, Math.abs(lat1 - lat2));
+}
+
+/** Weighted lon/lat from visible line endpoints — matches arc anchor coords. */
+export function buildLineCoordFallback(
+  lines: MapLine[],
+): Map<string, { lon: number; lat: number }> {
+  const acc = new Map<string, { lonSum: number; latSum: number; w: number }>();
+  for (const line of lines) {
+    const w = line.count || 1;
+    for (const [key, lon, lat] of [
+      [line.src, line.src_lon, line.src_lat],
+      [line.dst, line.dst_lon, line.dst_lat],
+    ] as const) {
+      if (!key || typeof lon !== 'number' || typeof lat !== 'number') continue;
+      if (lon === 0 && lat === 0) continue;
+      const [nLon, nLat] = normalizeLonLat(lon, lat);
+      if (nLat === 0 && nLon === 0) continue;
+      const cur = acc.get(key) ?? { lonSum: 0, latSum: 0, w: 0 };
+      cur.lonSum += nLon * w;
+      cur.latSum += nLat * w;
+      cur.w += w;
+      acc.set(key, cur);
+    }
+  }
+  const out = new Map<string, { lon: number; lat: number }>();
+  acc.forEach((v, k) => {
+    if (v.w > 0) out.set(k, { lon: v.lonSum / v.w, lat: v.latSum / v.w });
+  });
+  return out;
+}
+
+export function resolveNodeLonLat(
+  key: string,
+  fallbackLon: number | undefined,
+  fallbackLat: number | undefined,
+  allPoints: Record<string, MapPoint>,
+  lineFallback?: Map<string, { lon: number; lat: number }>,
+): [number, number] {
+  const fb = lineFallback?.get(key);
+  const p = allPoints[key];
+  const pOk = p && !(p.lat === 0 && p.lon === 0);
+  const [pLon, pLat] = pOk ? normalizeLonLat(p.lon, p.lat) : [0, 0];
+  const [fbLon, fbLat] = fb ? [fb.lon, fb.lat] : [NaN, NaN];
+
+  // When points map diverges from line endpoints, trust lines (same source as ArcLayer).
+  if (pOk && fb) {
+    if (coordDistanceDeg(pLon, pLat, fbLon, fbLat) > 5) return [fbLon, fbLat];
+    return [pLon, pLat];
+  }
+  if (fb) return [fbLon, fbLat];
+  if (pOk) return [pLon, pLat];
+  return normalizeLonLat(fallbackLon ?? 0, fallbackLat ?? 0);
+}
+
 function nodeLonLat(
   key: string,
   fallbackLon: number | undefined,
   fallbackLat: number | undefined,
   allPoints: Record<string, MapPoint>,
+  lineFallback?: Map<string, { lon: number; lat: number }>,
 ): [number, number] {
-  const p = allPoints[key];
-  if (p && !(p.lat === 0 && p.lon === 0)) return [p.lon, p.lat];
-  return [fallbackLon ?? 0, fallbackLat ?? 0];
+  return resolveNodeLonLat(key, fallbackLon, fallbackLat, allPoints, lineFallback);
 }
+
+const GLOBE_LAYER_PARAMETERS = {
+  cullMode: 'none' as const,
+  depthTest: false,
+  depthWrite: false,
+};
 
 export function topByCount(arr: MapLine[], max: number): MapLine[] {
   if (!max || arr.length <= max) return arr;
@@ -97,18 +174,26 @@ function arcTilt(d: MapLine): number {
   return ((h % 7) - 3) * 2;
 }
 
-function mapArcHeight(d: MapLine, allPoints: Record<string, MapPoint>): number {
-  const [sLon, sLat] = nodeLonLat(d.src, d.src_lon, d.src_lat, allPoints);
-  const [tLon, tLat] = nodeLonLat(d.dst, d.dst_lon, d.dst_lat, allPoints);
+function mapArcHeight(
+  d: MapLine,
+  allPoints: Record<string, MapPoint>,
+  lineFallback?: Map<string, { lon: number; lat: number }>,
+): number {
+  const [sLon, sLat] = nodeLonLat(d.src, d.src_lon, d.src_lat, allPoints, lineFallback);
+  const [tLon, tLat] = nodeLonLat(d.dst, d.dst_lon, d.dst_lat, allPoints, lineFallback);
   let dLon = Math.abs(tLon - sLon);
   if (dLon > 180) dLon = 360 - dLon;
   const dist = Math.max(1, Math.hypot(dLon, Math.abs(tLat - sLat)));
   return Math.max(0.15, Math.min(0.35, 0.1 + dist / 160));
 }
 
-function globeArcHeight(d: MapLine, allPoints: Record<string, MapPoint>): number {
-  const [sLon, sLat] = nodeLonLat(d.src, d.src_lon, d.src_lat, allPoints);
-  const [tLon, tLat] = nodeLonLat(d.dst, d.dst_lon, d.dst_lat, allPoints);
+function globeArcHeight(
+  d: MapLine,
+  allPoints: Record<string, MapPoint>,
+  lineFallback?: Map<string, { lon: number; lat: number }>,
+): number {
+  const [sLon, sLat] = nodeLonLat(d.src, d.src_lon, d.src_lat, allPoints, lineFallback);
+  const [tLon, tLat] = nodeLonLat(d.dst, d.dst_lon, d.dst_lat, allPoints, lineFallback);
   let dLon = Math.abs(tLon - sLon);
   if (dLon > 180) dLon = 360 - dLon;
   const dist = Math.max(1, Math.hypot(dLon, Math.abs(tLat - sLat)));
@@ -146,9 +231,10 @@ function isArcVisibleOnGlobe(
   viewLon: number,
   viewLat: number,
   allPoints: Record<string, MapPoint>,
+  lineFallback?: Map<string, { lon: number; lat: number }>,
 ): boolean {
-  const [sLon, sLat] = nodeLonLat(line.src, line.src_lon, line.src_lat, allPoints);
-  const [tLon, tLat] = nodeLonLat(line.dst, line.dst_lon, line.dst_lat, allPoints);
+  const [sLon, sLat] = nodeLonLat(line.src, line.src_lon, line.src_lat, allPoints, lineFallback);
+  const [tLon, tLat] = nodeLonLat(line.dst, line.dst_lon, line.dst_lat, allPoints, lineFallback);
   const srcVis = isOnVisibleGlobeHemisphere(sLon, sLat, viewLon, viewLat);
   const dstVis = isOnVisibleGlobeHemisphere(tLon, tLat, viewLon, viewLat);
   if (!srcVis || !dstVis) return false;
@@ -171,6 +257,7 @@ function isArcVisibleOnGlobe(
 function getVisiblePointsFromLines(
   lines: MapLine[],
   allPoints: Record<string, MapPoint>,
+  lineFallback: Map<string, { lon: number; lat: number }>,
 ): MapPointEntry[] {
   const active = new Set<string>();
   lines.forEach((l) => {
@@ -178,11 +265,17 @@ function getVisiblePointsFromLines(
     active.add(l.dst);
   });
   const result: MapPointEntry[] = [];
-  Object.entries(allPoints).forEach(([key, p]) => {
-    if (!p) return;
-    if (!active.has(key)) return;
-    if (p.lat === 0 && p.lon === 0) return;
-    result.push({ key, ...p });
+  active.forEach((key) => {
+    const p = allPoints[key];
+    const [lon, lat] = resolveNodeLonLat(key, undefined, undefined, allPoints, lineFallback);
+    if (lat === 0 && lon === 0) return;
+    result.push({
+      key,
+      ...(p || { lat: 0, lon: 0 }),
+      lon,
+      lat,
+      count: p?.count ?? 1,
+    });
   });
   return result;
 }
@@ -228,16 +321,20 @@ export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
     : Math.min(opts.maxArcs, 800);
 
   // Country heatmap stats use the full visible set (before top-N).
-  const statsPoints = getVisiblePointsFromLines(lines, opts.points);
+  const statsLineFallback = buildLineCoordFallback(lines);
+  const statsPoints = getVisiblePointsFromLines(lines, opts.points, statsLineFallback);
   const statsCache = getCountryStatsCache(statsPoints, opts.countriesGeoJSON);
 
   lines = decorateFlowLines(topByCount(lines, arcLimit));
   const drawnForCount = lines.length;
+  const lineFallback = buildLineCoordFallback(lines);
   if (isGlobe) {
-    lines = lines.filter((l) => isArcVisibleOnGlobe(l, viewLon, viewLat, opts.points));
+    lines = lines.filter((l) =>
+      isArcVisibleOnGlobe(l, viewLon, viewLat, opts.points, lineFallback),
+    );
   }
 
-  let points = getVisiblePointsFromLines(lines, opts.points);
+  let points = getVisiblePointsFromLines(lines, opts.points, lineFallback);
   if (isGlobe) {
     points = points.filter((p) =>
       isOnVisibleGlobeHemisphere(p.lon, p.lat, viewLon, viewLat),
@@ -358,7 +455,7 @@ export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
         fontWeight: 700,
         getTextAnchor: 'middle',
         getAlignmentBaseline: 'center',
-        parameters: isGlobe ? { cullMode: 'none', depthTest: false } : undefined,
+        parameters: isGlobe ? GLOBE_LAYER_PARAMETERS : undefined,
       }),
     );
   }
@@ -369,12 +466,12 @@ export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
       id: 'arcs',
       data: lines,
       pickable: true,
-      greatCircle: false,
+      greatCircle: isGlobe,
       wrapLongitude: !isGlobe,
       getSourcePosition: (d: MapLine) =>
-        nodeLonLat(d.src, d.src_lon, d.src_lat, opts.points),
+        nodeLonLat(d.src, d.src_lon, d.src_lat, opts.points, lineFallback),
       getTargetPosition: (d: MapLine) =>
-        nodeLonLat(d.dst, d.dst_lon, d.dst_lat, opts.points),
+        nodeLonLat(d.dst, d.dst_lon, d.dst_lat, opts.points, lineFallback),
       getSourceColor: (d: MapLine) => [
         ...arcRGB(d.status, d, opts.monoArcColor, opts.repColorArcs),
         d._flowAlpha || 210,
@@ -390,11 +487,13 @@ export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
       },
       widthUnits: 'pixels',
       getHeight: (d: MapLine) =>
-        isGlobe ? globeArcHeight(d, opts.points) : mapArcHeight(d, opts.points),
+        isGlobe
+          ? globeArcHeight(d, opts.points, lineFallback)
+          : mapArcHeight(d, opts.points, lineFallback),
       getTilt: isGlobe ? 0 : (d: MapLine) => arcTilt(d) * 0.5,
       autoHighlight: true,
       highlightColor: [255, 255, 255, 140],
-      parameters: isGlobe ? { cullMode: 'none' } : { depthTest: false },
+      parameters: isGlobe ? GLOBE_LAYER_PARAMETERS : { depthTest: false },
       updateTriggers: {
         getWidth: [opts.highlightEdgeKeys],
         getSourceColor: [opts.monoArcColor, opts.repColorArcs],
@@ -437,7 +536,7 @@ export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
         getLineWidth: [opts.highlightNodeKeys],
         getLineColor: [opts.highlightNodeKeys],
       },
-      parameters: isGlobe ? { cullMode: 'none' } : undefined,
+      parameters: isGlobe ? GLOBE_LAYER_PARAMETERS : undefined,
       onClick: (info: { object?: MapPointEntry }) => {
         if (info.object) opts.onPointClick(info.object);
       },
