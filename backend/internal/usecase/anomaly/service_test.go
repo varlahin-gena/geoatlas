@@ -63,11 +63,11 @@ func (f *fakeStore) Assign(_ context.Context, fingerprint, assignedTo, by string
 	_ = fingerprint
 	return nil
 }
-func (f *fakeStore) AssignIfEmpty(_ context.Context, fingerprint, assignedTo, by string) error {
+func (f *fakeStore) AssignIfEmpty(ctx context.Context, fingerprint, assignedTo, by string) error {
 	if strings.TrimSpace(f.assignedTo) != "" {
 		return nil
 	}
-	return f.Assign(context.Background(), fingerprint, assignedTo, by)
+	return f.Assign(ctx, fingerprint, assignedTo, by)
 }
 func (f *fakeStore) CountSummary(context.Context, time.Time) (Summary, error) {
 	return f.summary, nil
