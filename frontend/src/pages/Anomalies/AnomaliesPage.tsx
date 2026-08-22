@@ -91,6 +91,28 @@ export default function AnomaliesPage() {
     [rows, search],
   );
 
+  const fioByUsername = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const u of directory) {
+      const fio = (u.full_name || '').trim();
+      if (u.username && fio) map.set(u.username, fio);
+    }
+    if (user?.username) {
+      const selfFio = (user.full_name || '').trim();
+      if (selfFio) map.set(user.username, selfFio);
+    }
+    return map;
+  }, [directory, user?.full_name, user?.username]);
+
+  const personLabel = useCallback(
+    (username: string | undefined | null) => {
+      const login = (username || '').trim();
+      if (!login) return '';
+      return fioByUsername.get(login) || login;
+    },
+    [fioByUsername],
+  );
+
   const assigneeOptions = useMemo(() => {
     const names = new Set(directory.map((u) => u.username));
     if (user?.username) names.add(user.username);
@@ -98,8 +120,11 @@ export default function AnomaliesPage() {
       if (row.assigned_to) names.add(row.assigned_to);
       if (row.ack_by) names.add(row.ack_by);
     }
-    return [...names].sort((a, b) => a.localeCompare(b, 'ru'));
-  }, [directory, rows, user?.username]);
+    return [...names]
+      .filter(Boolean)
+      .map((username) => ({ username, label: personLabel(username) || username }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'ru'));
+  }, [directory, personLabel, rows, user?.username]);
 
   async function hideAlert(item: AnomalyEvent) {
     const fp = item.fingerprint;
@@ -132,7 +157,10 @@ export default function AnomaliesPage() {
           item.severity === 'warn' ? Math.max(0, (prev.warn || 0) - 1) : prev.warn || 0;
         return { ...prev, high, warn, total: Math.max(0, (prev.total || 0) - 1) };
       });
-      toast(closer ? `Алерт закрыт (${closer})` : 'Алерт закрыт', 'success');
+      toast(
+        closer ? `Алерт закрыт (${personLabel(closer) || closer})` : 'Алерт закрыт',
+        'success',
+      );
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Не удалось закрыть алерт', 'error');
     } finally {
@@ -149,9 +177,9 @@ export default function AnomaliesPage() {
       setRows((prev) =>
         prev.map((r) => (r.fingerprint === fp ? { ...r, assigned_to: assignedTo } : r)),
       );
-      toast(`Назначено на ${assignedTo}`, 'success');
+      toast(`Назначено на ${personLabel(assignedTo) || assignedTo}`, 'success');
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Не удалось назначить УЗ', 'error');
+      toast(e instanceof Error ? e.message : 'Не удалось назначить исполнителя', 'error');
     } finally {
       setAssigning(null);
     }
@@ -166,7 +194,7 @@ export default function AnomaliesPage() {
 
         <p className="page-lead">
           Алерты, которые сканер обнаружил в трафике за выбранный период. Закрытие скрывает алерт и
-          подавляет повтор на 24 часа; УЗ закрывшего проставляется автоматически, если исполнитель
+          подавляет повтор на 24 часа; ФИО закрывшего проставляется автоматически, если исполнитель
           ещё не выбран. «На карте» открывает контекст события с фильтрами.
         </p>
 
@@ -255,7 +283,7 @@ export default function AnomaliesPage() {
                 <th scope="col">Описание</th>
                 <th scope="col">Источник</th>
                 <th scope="col">Цель</th>
-                <th scope="col">УЗ</th>
+                <th scope="col">ФИО</th>
                 <th scope="col">Событий</th>
                 <th scope="col">Статус</th>
                 <th scope="col">
@@ -296,13 +324,19 @@ export default function AnomaliesPage() {
                       <td className="mono">{item.dst_ip || '—'}</td>
                       <td>
                         {acked ? (
-                          <span title={item.ack_by ? `Закрыл: ${item.ack_by}` : undefined}>
-                            {item.assigned_to || item.ack_by || '—'}
+                          <span
+                            title={
+                              item.ack_by
+                                ? `Закрыл: ${personLabel(item.ack_by) || item.ack_by}`
+                                : undefined
+                            }
+                          >
+                            {personLabel(item.assigned_to || item.ack_by) || '—'}
                           </span>
                         ) : (
                           <select
                             className="anomaly-assignee-select"
-                            aria-label="УЗ исполнителя"
+                            aria-label="ФИО исполнителя"
                             value={item.assigned_to || ''}
                             disabled={assigning === item.fingerprint}
                             onChange={(e) => {
@@ -311,9 +345,9 @@ export default function AnomaliesPage() {
                             }}
                           >
                             <option value="">Не назначен</option>
-                            {assigneeOptions.map((name) => (
-                              <option key={name} value={name}>
-                                {name}
+                            {assigneeOptions.map((opt) => (
+                              <option key={opt.username} value={opt.username} title={opt.username}>
+                                {opt.label}
                               </option>
                             ))}
                           </select>
@@ -323,7 +357,7 @@ export default function AnomaliesPage() {
                       <td>
                         {acked
                           ? item.ack_by
-                            ? `Закрыт (${item.ack_by})`
+                            ? `Закрыт (${personLabel(item.ack_by) || item.ack_by})`
                             : 'Закрыт'
                           : 'Открыт'}
                       </td>

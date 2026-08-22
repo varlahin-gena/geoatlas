@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   isNavActive,
   sectionBadgeTotal,
@@ -98,7 +98,8 @@ export function NavSections({
   middle?: ReactNode;
 }) {
   const location = useLocation();
-  const { collapsed, toggle: toggleSidebar } = useSidebarCollapsed();
+  const navigate = useNavigate();
+  const { collapsed } = useSidebarCollapsed();
   const { workspace, observe, settings } = splitNavItems(items);
 
   const hasActiveObserve = useMemo(
@@ -139,8 +140,8 @@ export function NavSections({
 
   function toggleObserve() {
     if (collapsed) {
-      toggleSidebar();
-      setObserveOpen(true);
+      const first = observe[0];
+      if (first) navigate(first.href);
       return;
     }
     setObserveOpen((v) => !v);
@@ -148,8 +149,8 @@ export function NavSections({
 
   function toggleSettings() {
     if (collapsed) {
-      toggleSidebar();
-      setSettingsOpen(true);
+      const first = settings[0]?.items[0];
+      if (first) navigate(first.href);
       return;
     }
     setSettingsOpen((v) => !v);
