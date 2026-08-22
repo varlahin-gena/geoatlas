@@ -12,8 +12,11 @@ describe('anomalyDisplay', () => {
   } as AnomalyEvent;
 
   it('builds map href from anomaly map link', () => {
-    expect(anomalyMapHref(item)).toContain('group=ip');
-    expect(anomalyMapHref(item)).toContain('q=src%3A203.0.113.5');
+    const href = anomalyMapHref(item);
+    expect(href).toContain('group=ip');
+    expect(href).toContain('q=src%3A203.0.113.5');
+    expect(href).toContain('alert=abc');
+    expect(href).not.toContain('period=15m');
   });
 
   it('filters rows by search text', () => {

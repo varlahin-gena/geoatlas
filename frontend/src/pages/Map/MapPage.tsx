@@ -13,6 +13,11 @@ import { MapVizOverlays } from './MapVizOverlays';
 import type { InfoDockTab } from './MapInfoDock';
 import { GeoWizardModal } from './GeoWizardModal';
 import { AnomalyStrip } from './AnomalyStrip';
+import {
+  AnomalyActiveBanner,
+  clearMapAlertMemory,
+  readMapAlert,
+} from './AnomalyActiveBanner';
 import { useGeoWizard } from './useGeoWizard';
 import { useMapAnomalies } from './useMapAnomalies';
 import { useMapDetail } from './useMapDetail';
@@ -55,6 +60,8 @@ export default function MapPage() {
     setFocusedCountry,
     clearFocusedCountry,
     applySearchFilter,
+    alertFingerprint,
+    resetToLiveView,
   } = view;
 
   const {
@@ -177,6 +184,16 @@ export default function MapPage() {
   });
 
   const anomalies = useMapAnomalies();
+  const activeAlert = useMemo(
+    () => readMapAlert(alertFingerprint),
+    [alertFingerprint],
+  );
+
+  function returnToLiveMap() {
+    clearMapAlertMemory();
+    resetToLiveView();
+    if (dataSource !== 'live') selectDataSource('live');
+  }
 
   useEffect(() => {
     if (infoDockTab === 'legend' && !showLegend) {
@@ -388,7 +405,11 @@ export default function MapPage() {
           <div ref={mapContainer} id="map-host" className="viz-host" />
 
           <div className="map-top-stack">
-            <AnomalyStrip summary={anomalies.summary} />
+            {activeAlert ? (
+              <AnomalyActiveBanner alert={activeAlert} onReturnLive={returnToLiveMap} />
+            ) : (
+              <AnomalyStrip summary={anomalies.summary} />
+            )}
             {truncHint ? <div className="viz-hint warn">{truncHint}</div> : null}
           </div>
 

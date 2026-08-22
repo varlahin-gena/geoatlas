@@ -1,16 +1,6 @@
 import type { AnomalyEvent } from '@/api/anomalies';
 import { anomalyMapToView } from '@/pages/Map/useMapAnomalies';
-import { serializeMapViewSearch, type MapViewState } from '@/pages/Map/mapQuery';
-
-const MAP_VIEW_DEFAULTS: MapViewState = {
-  period: '1d',
-  periodFrom: '',
-  periodTo: '',
-  groupBy: 'city',
-  filter: 'all',
-  search: '',
-  focusedCountry: null,
-};
+import { MAP_VIEW_DEFAULTS, serializeMapViewSearch } from '@/pages/Map/mapQuery';
 
 export const ANOMALY_SEVERITY_OPTIONS = [
   { value: '', label: 'Любая важность' },
@@ -85,8 +75,13 @@ export function severityLabel(severity?: string): string {
 }
 
 export function anomalyMapHref(item: AnomalyEvent): string {
-  const partial = anomalyMapToView(item);
+  // Keep the current map default period (1d) when opening from the list —
+  // do not shrink to the alert's linked window.
+  const partial = anomalyMapToView(item, MAP_VIEW_DEFAULTS.period);
   const sp = serializeMapViewSearch({ ...MAP_VIEW_DEFAULTS, ...partial });
+  if (item.fingerprint) {
+    sp.set('alert', item.fingerprint);
+  }
   const qs = sp.toString();
   return qs ? `/?${qs}` : '/';
 }

@@ -53,7 +53,12 @@ test.describe('anomaly strip', () => {
     await page.getByRole('link', { name: 'На карте' }).click();
     await expect(page).toHaveURL(/q=src/);
     await expect(page).toHaveURL(/group=ip/);
+    await expect(page).toHaveURL(/alert=deadbeef/);
     // Keep the current (wider) map period; default 1d is omitted from the query string.
     await expect(page).not.toHaveURL(/period=15m/);
+    await expect(page.locator('.anomaly-exit-btn')).toContainText('Алерт на карте');
+    await page.getByRole('button', { name: 'Live-карта' }).click();
+    await expect(page).not.toHaveURL(/alert=/);
+    await expect(page.locator('.anomaly-strip')).toBeVisible();
   });
 });

@@ -17,9 +17,19 @@ export function fetchAnomalies(
   return apiGetQuery('/api/anomalies', query, init) as Promise<AnomalyList>;
 }
 
-export function ackAnomaly(fingerprint: string): Promise<{ ok?: boolean; fingerprint?: string }> {
+export function ackAnomaly(fingerprint: string): Promise<{ ok?: boolean; fingerprint?: string; ack_by?: string }> {
   return apiFetch(apiPath('/api/anomalies/{fingerprint}/ack', { fingerprint }), {
     method: 'POST',
     body: '{}',
-  }) as Promise<{ ok?: boolean; fingerprint?: string }>;
+  }) as Promise<{ ok?: boolean; fingerprint?: string; ack_by?: string }>;
+}
+
+export function assignAnomaly(
+  fingerprint: string,
+  assigned_to: string,
+): Promise<{ ok?: boolean; fingerprint?: string; assigned_to?: string }> {
+  return apiFetch(apiPath('/api/anomalies/{fingerprint}/assign', { fingerprint }), {
+    method: 'POST',
+    body: JSON.stringify({ assigned_to }),
+  }) as Promise<{ ok?: boolean; fingerprint?: string; assigned_to?: string }>;
 }

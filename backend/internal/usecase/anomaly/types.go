@@ -52,6 +52,8 @@ type Event struct {
 	Fingerprint    string         `json:"fingerprint"`
 	ExpiresAt      time.Time      `json:"expires_at"`
 	Acknowledged   bool           `json:"acknowledged"`
+	AssignedTo     string         `json:"assigned_to,omitempty"`
+	AckBy          string         `json:"ack_by,omitempty"`
 	Map            MapLink        `json:"map"`
 	SuppressionKey SuppressionKey `json:"-"`
 }

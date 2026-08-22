@@ -19,6 +19,8 @@ type fakeStore struct {
 	ackedFingerprint string
 	ackedBy          string
 	ackedSuppressFor time.Duration
+	assignedTo       string
+	assignedBy       string
 }
 
 func (f *fakeStore) Insert(_ context.Context, events []Event) error {
@@ -54,6 +56,18 @@ func (f *fakeStore) Ack(_ context.Context, fingerprint, by string, suppressFor t
 	f.ackedBy = by
 	f.ackedSuppressFor = suppressFor
 	return nil
+}
+func (f *fakeStore) Assign(_ context.Context, fingerprint, assignedTo, by string) error {
+	f.assignedTo = assignedTo
+	f.assignedBy = by
+	_ = fingerprint
+	return nil
+}
+func (f *fakeStore) AssignIfEmpty(_ context.Context, fingerprint, assignedTo, by string) error {
+	if strings.TrimSpace(f.assignedTo) != "" {
+		return nil
+	}
+	return f.Assign(context.Background(), fingerprint, assignedTo, by)
 }
 func (f *fakeStore) CountSummary(context.Context, time.Time) (Summary, error) {
 	return f.summary, nil

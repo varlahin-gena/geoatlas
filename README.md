@@ -69,7 +69,7 @@
 - Страница системного мониторинга (Обзор / Pipeline / Безопасность / Графики / **Резервное копирование**): метрики контейнеров, пайплайна (в т.ч. **UDP/TCP EPS**, drops, circuit breaker), **форма TTL**, неуспешные логины, хранилище, профиль установки, **индикатор ёмкости**, алёрты; ручной maintenance backfill агрегатов
 - Индикатор здоровья системы на главной странице (ссылка на `/system`); **версия установки** (из пакета / `install-meta.json`) в меню пользователя
 - Docker: fail-closed секреты в compose, hardened контейнеры (`cap_drop: ALL`); запуск через `./start.sh`
-- Контракт HTTP API: [`openapi.yaml`](openapi.yaml) (OpenAPI **1.12.0**)
+- Контракт HTTP API: [`openapi.yaml`](openapi.yaml) (OpenAPI **1.13.0**)
 
 ---
 
@@ -950,7 +950,7 @@ Unit-тесты карты (репутация / heatmap focus / coords helpers)
 
 ### HTTP API
 
-Контракт REST API (в т.ч. auth, events, geo, reputation, retention, tokens, search-templates, backups, аномалии, `/metrics`): [`openapi.yaml`](openapi.yaml), версия документа OpenAPI **1.12.0**. Пробы: `GET /api/live` (процесс), `GET /api/ready` (ClickHouse + ingest); `GET /api/health` — alias live. Остальные эндпоинты — cookie-сессия и/или Bearer (`API_AUTH_TOKEN` / именованный токен со scope). Prometheus scrape: `GET /metrics` (Bearer≥ops / administrator).
+Контракт REST API (в т.ч. auth, events, geo, reputation, retention, tokens, search-templates, backups, аномалии, `/metrics`): [`openapi.yaml`](openapi.yaml), версия документа OpenAPI **1.13.0**. Пробы: `GET /api/live` (процесс), `GET /api/ready` (ClickHouse + ingest); `GET /api/health` — alias live. Остальные эндпоинты — cookie-сессия и/или Bearer (`API_AUTH_TOKEN` / именованный токен со scope). Prometheus scrape: `GET /metrics` (Bearer≥ops / administrator).
 
 ## Лицензия
 

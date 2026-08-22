@@ -250,3 +250,16 @@ CREATE TABLE IF NOT EXISTS anomaly_suppressions
 ENGINE = ReplacingMergeTree(suppressed_at)
 ORDER BY suppression_key
 TTL toDateTime(suppressed_until) + INTERVAL 1 DAY DELETE;
+
+-- ============================================================
+-- anomaly_assignments: назначение аномалий на УЗ
+-- ============================================================
+CREATE TABLE IF NOT EXISTS anomaly_assignments
+(
+    fingerprint String,
+    assigned_to String,
+    assigned_at DateTime64(3),
+    assigned_by String
+)
+ENGINE = ReplacingMergeTree(assigned_at)
+ORDER BY fingerprint;

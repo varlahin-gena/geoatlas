@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -83,7 +84,38 @@ func (h *AnomalyHandler) Ack(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "fingerprint": fp})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "fingerprint": fp, "ack_by": by})
+}
+
+type assignAnomalyRequest struct {
+	AssignedTo string `json:"assigned_to"`
+}
+
+func (h *AnomalyHandler) Assign(w http.ResponseWriter, r *http.Request) {
+	if h == nil || h.anomalyUC == nil || !h.anomalyUC.Enabled() {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "anomaly module disabled"})
+		return
+	}
+	fp := strings.TrimSpace(r.PathValue("fingerprint"))
+	if fp == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "missing fingerprint"})
+		return
+	}
+	var req assignAnomalyRequest
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+		return
+	}
+	by := h.actorName(r)
+	if err := h.anomalyUC.Assign(r.Context(), fp, req.AssignedTo, by); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok": true, "fingerprint": fp, "assigned_to": strings.TrimSpace(req.AssignedTo),
+	})
 }
 
 func (h *AnomalyHandler) actorName(r *http.Request) string {

@@ -95,6 +95,9 @@ func NewServer(p Params, opts ...ServerOption) *Server {
 	rr.Handle("GET", "/api/users",
 		withTimeout(chain(http.HandlerFunc(usersH.List), adminMW), healthTimeout),
 	)
+	rr.Handle("GET", "/api/users/directory",
+		withTimeout(chain(http.HandlerFunc(usersH.Directory), loginMW), healthTimeout),
+	)
 	rr.Handle("POST", "/api/users",
 		chain(http.HandlerFunc(usersH.Create), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
 	)
@@ -170,6 +173,9 @@ func NewServer(p Params, opts ...ServerOption) *Server {
 	)
 	rr.Handle("POST", "/api/anomalies/{fingerprint}/ack",
 		chain(http.HandlerFunc(anomH.Ack), loginMW, csrf, maxBytesMW(maxJSONBodySize)),
+	)
+	rr.Handle("POST", "/api/anomalies/{fingerprint}/assign",
+		chain(http.HandlerFunc(anomH.Assign), loginMW, csrf, maxBytesMW(maxJSONBodySize)),
 	)
 	rr.Handle("GET", "/api/system/status",
 		withTimeout(chain(http.HandlerFunc(system.GetSystemStatus), loginMW), readTimeout),

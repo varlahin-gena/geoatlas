@@ -485,6 +485,32 @@ func (h *UsersHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"users": users})
 }
 
+// Directory — краткий список УЗ для назначения алертов (login, без ролей/паролей).
+func (h *UsersHandler) Directory(w http.ResponseWriter, r *http.Request) {
+	if h != nil && h.AuthDeps != nil && h.cfg.AuthDisabled {
+		writeJSON(w, http.StatusOK, map[string]any{"users": []any{}})
+		return
+	}
+	if h.authUC == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "auth not configured"})
+		return
+	}
+	users, err := h.authUC.ListUsers()
+	if err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "auth not configured"})
+		return
+	}
+	out := make([]map[string]string, 0, len(users))
+	for _, u := range users {
+		item := map[string]string{"username": u.Username}
+		if fn := strings.TrimSpace(u.FullName); fn != "" {
+			item["full_name"] = fn
+		}
+		out = append(out, item)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"users": out})
+}
+
 func (h *UsersHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if h.authModuleDisabled(w) {
 		return

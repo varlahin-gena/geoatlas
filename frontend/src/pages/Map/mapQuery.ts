@@ -8,7 +8,7 @@ const MAP_LIMIT_MAX = 20000;
 
 export type MapActionFilter = 'all' | 'allowed' | 'blocked';
 
-const MAP_VIEW_DEFAULTS = {
+export const MAP_VIEW_DEFAULTS = {
   period: '1d',
   periodFrom: '',
   periodTo: '',
@@ -80,6 +80,11 @@ export function serializeMapViewSearch(state: MapViewState): URLSearchParams {
   return sp;
 }
 
+function parseAlertFingerprint(sp: URLSearchParams): string | null {
+  const v = (sp.get('alert') || '').trim();
+  return v || null;
+}
+
 function sameView(a: MapViewState, b: MapViewState): boolean {
   return (
     a.period === b.period &&
@@ -95,6 +100,7 @@ function sameView(a: MapViewState, b: MapViewState): boolean {
 export function useMapViewQuery() {
   const [params, setParams] = useSearchParams();
   const parsed = parseMapViewSearch(params);
+  const alertFingerprint = parseAlertFingerprint(params);
   const [search, setSearchState] = useState(parsed.search);
   const [builderOpen, setBuilderOpen] = useState(false);
   const [minCount, setMinCount] = useState(1);
@@ -107,7 +113,7 @@ export function useMapViewQuery() {
   }, [parsed.search]);
 
   const patchView = useCallback(
-    (partial: Partial<MapViewState>) => {
+    (partial: Partial<MapViewState>, opts?: { clearAlert?: boolean }) => {
       setParams(
         (prev) => {
           const next = { ...parseMapViewSearch(prev), ...partial };
@@ -115,8 +121,13 @@ export function useMapViewQuery() {
             next.periodFrom = '';
             next.periodTo = '';
           }
-          if (sameView(next, parseMapViewSearch(prev))) return prev;
-          return serializeMapViewSearch(next);
+          const alert = opts?.clearAlert ? null : parseAlertFingerprint(prev);
+          const nextSp = serializeMapViewSearch(next);
+          if (alert) nextSp.set('alert', alert);
+          const prevView = parseMapViewSearch(prev);
+          const prevAlert = parseAlertFingerprint(prev);
+          if (sameView(next, prevView) && alert === prevAlert && !opts?.clearAlert) return prev;
+          return nextSp;
         },
         { replace: true },
       );
@@ -180,7 +191,7 @@ export function useMapViewQuery() {
     [patchView],
   );
   const applyView = useCallback(
-    (partial: Partial<MapViewState>) => {
+    (partial: Partial<MapViewState>, opts?: { clearAlert?: boolean; alert?: string | null }) => {
       if (partial.search != null) setSearchState(partial.search);
       setParams(
         (prev) => {
@@ -189,13 +200,31 @@ export function useMapViewQuery() {
             next.periodFrom = '';
             next.periodTo = '';
           }
-          return serializeMapViewSearch(next);
+          const nextSp = serializeMapViewSearch(next);
+          const alert =
+            opts?.clearAlert || opts?.alert === null
+              ? null
+              : opts?.alert !== undefined
+                ? opts.alert
+                : parseAlertFingerprint(prev);
+          if (alert) nextSp.set('alert', alert);
+          return nextSp;
         },
         { replace: true },
       );
     },
     [setParams],
   );
+
+  const resetToLiveView = useCallback(() => {
+    setSearchState(MAP_VIEW_DEFAULTS.search);
+    setParams(serializeMapViewSearch({ ...MAP_VIEW_DEFAULTS }), { replace: true });
+    try {
+      sessionStorage.removeItem('geoatlas.mapAlert');
+    } catch {
+      /* ignore */
+    }
+  }, [setParams]);
 
   return {
     period: parsed.period,
@@ -223,5 +252,7 @@ export function useMapViewQuery() {
     clearFocusedCountry,
     applySearchFilter,
     applyView,
+    alertFingerprint,
+    resetToLiveView,
   };
 }

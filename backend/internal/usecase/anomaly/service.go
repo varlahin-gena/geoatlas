@@ -173,7 +173,31 @@ func (s *Service) Ack(ctx context.Context, fingerprint, by string) error {
 	if by == "" {
 		by = "unknown"
 	}
-	return s.store.Ack(ctx, fp, by, s.cfg.suppressPeriod())
+	if err := s.store.Ack(ctx, fp, by, s.cfg.suppressPeriod()); err != nil {
+		return err
+	}
+	// Закрытие без явного назначения — УЗ закрывшего становится исполнителем.
+	_ = s.store.AssignIfEmpty(ctx, fp, by, by)
+	return nil
+}
+
+func (s *Service) Assign(ctx context.Context, fingerprint, assignedTo, by string) error {
+	if !s.Enabled() {
+		return fmt.Errorf("anomaly module disabled")
+	}
+	fp := strings.TrimSpace(fingerprint)
+	if fp == "" || len(fp) > 64 {
+		return fmt.Errorf("invalid fingerprint")
+	}
+	to := strings.TrimSpace(assignedTo)
+	if to == "" || len(to) > 64 {
+		return fmt.Errorf("invalid assigned_to")
+	}
+	by = strings.TrimSpace(by)
+	if by == "" {
+		by = "unknown"
+	}
+	return s.store.Assign(ctx, fp, to, by)
 }
 
 func (s *Service) Scan(ctx context.Context, now time.Time) ScanResult {

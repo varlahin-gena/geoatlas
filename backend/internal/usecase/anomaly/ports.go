@@ -15,6 +15,8 @@ type EventStore interface {
 	ActiveSuppressions(ctx context.Context, keys []SuppressionKey, now time.Time) (map[SuppressionKey]struct{}, error)
 	RecentSuppressionKeys(ctx context.Context, code string, keys []SuppressionKey, since time.Time) (map[SuppressionKey]struct{}, error)
 	Ack(ctx context.Context, fingerprint, by string, suppressFor time.Duration) error
+	Assign(ctx context.Context, fingerprint, assignedTo, by string) error
+	AssignIfEmpty(ctx context.Context, fingerprint, assignedTo, by string) error
 	CountSummary(ctx context.Context, since time.Time) (Summary, error)
 }
 

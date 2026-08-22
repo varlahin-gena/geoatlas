@@ -90,13 +90,20 @@ func (r *Repository) List(ctx context.Context, q usecaseanomaly.ListQuery) ([]us
 			e.title, e.detail, toString(e.src_ip), toString(e.dst_ip),
 			e.src_country, e.dst_country, e.src_city, e.dst_city, e.device,
 			e.event_count, e.fingerprint, e.expires_at,
-			if(a.fingerprint = '', 0, 1) AS acked
+			if(a.fingerprint = '', 0, 1) AS acked,
+			ifNull(a.ack_by, '') AS ack_by,
+			ifNull(asg.assigned_to, '') AS assigned_to
 		FROM anomaly_events AS e
 		LEFT JOIN (
-			SELECT fingerprint
+			SELECT fingerprint, argMax(ack_by, ack_at) AS ack_by
 			FROM anomaly_acks
 			GROUP BY fingerprint
 		) AS a ON e.fingerprint = a.fingerprint
+		LEFT JOIN (
+			SELECT fingerprint, argMax(assigned_to, assigned_at) AS assigned_to
+			FROM anomaly_assignments
+			GROUP BY fingerprint
+		) AS asg ON e.fingerprint = asg.fingerprint
 		WHERE e.detected_at >= ?
 	`)
 	args = append(args, q.Since)
@@ -130,7 +137,7 @@ func (r *Repository) List(ctx context.Context, q usecaseanomaly.ListQuery) ([]us
 			&e.DetectedAt, &e.WindowStart, &e.WindowEnd, &e.Code, &e.Severity, &e.Score,
 			&e.Title, &detail, &e.SrcIP, &e.DstIP,
 			&e.SrcCountry, &e.DstCountry, &e.SrcCity, &e.DstCity, &e.Device,
-			&e.EventCount, &e.Fingerprint, &e.ExpiresAt, &acked,
+			&e.EventCount, &e.Fingerprint, &e.ExpiresAt, &acked, &e.AckBy, &e.AssignedTo,
 		); err != nil {
 			return nil, err
 		}
@@ -353,6 +360,45 @@ func (r *Repository) Ack(ctx context.Context, fingerprint, by string, suppressFo
 		(suppression_key, code, source_fingerprint, suppressed_at, suppressed_until, suppressed_by)
 		VALUES (?, ?, ?, ?, ?, ?)
 	`, trimKey, code, fingerprint, now, now.Add(suppressFor), by)
+}
+
+func (r *Repository) currentAssignee(ctx context.Context, fingerprint string) (string, error) {
+	var to string
+	err := r.ch.QueryRow(ctx, `
+		SELECT argMax(assigned_to, assigned_at)
+		FROM anomaly_assignments
+		WHERE fingerprint = ?
+	`, fingerprint).Scan(&to)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(to), nil
+}
+
+func (r *Repository) Assign(ctx context.Context, fingerprint, assignedTo, by string) error {
+	if r == nil || r.ch == nil {
+		return fmt.Errorf("clickhouse not configured")
+	}
+	now := time.Now().UTC()
+	return r.ch.Exec(ctx, `
+		INSERT INTO anomaly_assignments (fingerprint, assigned_to, assigned_at, assigned_by)
+		VALUES (?, ?, ?, ?)
+	`, fingerprint, assignedTo, now, by)
+}
+
+func (r *Repository) AssignIfEmpty(ctx context.Context, fingerprint, assignedTo, by string) error {
+	if r == nil || r.ch == nil {
+		return fmt.Errorf("clickhouse not configured")
+	}
+	cur, err := r.currentAssignee(ctx, fingerprint)
+	if err != nil {
+		// Empty table / no rows — treat as unassigned.
+		cur = ""
+	}
+	if cur != "" {
+		return nil
+	}
+	return r.Assign(ctx, fingerprint, assignedTo, by)
 }
 
 func (r *Repository) CountSummary(ctx context.Context, since time.Time) (usecaseanomaly.Summary, error) {

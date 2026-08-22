@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: ГеоАтлас API
-  version: "1.12.0"
+  version: "1.13.0"
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
@@ -184,6 +184,29 @@ paths:
       responses:
         "201":
           description: Created
+  /api/users/directory:
+    get:
+      tags: [auth]
+      summary: Краткий список УЗ для назначения алертов
+      description: Любой залогиненный пользователь. Только username и full_name.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        username: { type: string }
+                        full_name: { type: string }
   /api/users/{username}/role:
     post:
       tags: [auth]
@@ -639,6 +662,43 @@ paths:
                   fingerprint: { type: string }
         "400":
           description: Невалидный fingerprint
+        "503":
+          description: Модуль выключен
+
+  /api/anomalies/{fingerprint}/assign:
+    post:
+      tags: [anomalies]
+      summary: Назначить аномалию на учётную запись
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: fingerprint
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [assigned_to]
+              properties:
+                assigned_to: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  fingerprint: { type: string }
+                  assigned_to: { type: string }
+        "400":
+          description: Невалидный запрос
         "503":
           description: Модуль выключен
 
@@ -1930,6 +1990,8 @@ components:
         window_start: { type: string, format: date-time }
         window_end: { type: string, format: date-time }
         acknowledged: { type: boolean }
+        assigned_to: { type: string }
+        ack_by: { type: string }
         map:
           $ref: "#/components/schemas/AnomalyMapLink"
 

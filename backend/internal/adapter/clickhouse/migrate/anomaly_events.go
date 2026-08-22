@@ -55,3 +55,15 @@ ENGINE = ReplacingMergeTree(suppressed_at)
 ORDER BY suppression_key
 TTL toDateTime(suppressed_until) + INTERVAL 1 DAY DELETE
 `
+
+const anomalyAssignmentsDDL = `
+CREATE TABLE IF NOT EXISTS anomaly_assignments
+(
+    fingerprint String,
+    assigned_to String,
+    assigned_at DateTime64(3),
+    assigned_by String
+)
+ENGINE = ReplacingMergeTree(assigned_at)
+ORDER BY fingerprint
+`

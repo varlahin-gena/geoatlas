@@ -13,6 +13,15 @@ export function listUsers(): Promise<{ users: UserRow[] }> {
   return apiGet('/api/users') as Promise<{ users: UserRow[] }>;
 }
 
+export type UserDirectoryEntry = {
+  username: string;
+  full_name?: string;
+};
+
+export function listUserDirectory(): Promise<{ users: UserDirectoryEntry[] }> {
+  return apiGet('/api/users/directory') as Promise<{ users: UserDirectoryEntry[] }>;
+}
+
 export function createUser(body: {
   username: string;
   password: string;

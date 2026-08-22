@@ -7,6 +7,8 @@
 
 ### Added
 - **Anomaly Engine v1**: журнал аномалий на карте — `port_scan`, `horizontal_scan`, `blocked_surge`, `new_country_dst`, `rep_new_peer`; `GET /api/anomalies`, `/summary`, `/status`, `POST /ack`; фоновый скан каждые 5 мин; полоска и панель на карте. `ANOMALY_ENABLED` (по умолчанию true). OpenAPI **1.12.0**.
+- Аномалии: назначение на УЗ (`POST /api/anomalies/{fp}/assign`, таблица `anomaly_assignments`); в списке поля `assigned_to` / `ack_by`; `GET /api/users/directory` для выбора исполнителя. При закрытии УЗ закрывшего проставляется, если исполнитель ещё пуст. OpenAPI **1.13.0**.
+- Карта: баннер активного алерта («На карте») и кнопка **Live-карта** — сброс фильтров к live-виду.
 - CI: сборка Docker-образов backend / frontend / stats-collector (`scripts/ci-docker-build.sh`); frontend — дым `/health` после `docker build`
 - CI: Trivy image scan для `balabit/syslog-ng:4.11.0` (вход `:514`, тот же тег что в compose)
 - CI: `govulncheck` по backend / stats-collector / pkg/chconn / pkg/syslogngstats (`scripts/ci-govulncheck.sh`)

@@ -469,6 +469,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/users/directory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Краткий список УЗ для назначения алертов
+         * @description Любой залогиненный пользователь. Только username и full_name.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            users?: {
+                                username?: string;
+                                full_name?: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/users/{username}/role": {
         parameters: {
             query?: never;
@@ -1476,6 +1520,68 @@ export interface paths {
                     };
                 };
                 /** @description Невалидный fingerprint */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Модуль выключен */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/anomalies/{fingerprint}/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Назначить аномалию на учётную запись */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    fingerprint: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        assigned_to: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            ok?: boolean;
+                            fingerprint?: string;
+                            assigned_to?: string;
+                        };
+                    };
+                };
+                /** @description Невалидный запрос */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -3930,6 +4036,8 @@ export interface components {
             /** Format: date-time */
             window_end?: string;
             acknowledged?: boolean;
+            assigned_to?: string;
+            ack_by?: string;
             map?: components["schemas"]["AnomalyMapLink"];
         };
         AnomalySummary: {
