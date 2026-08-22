@@ -26,11 +26,67 @@ func MapLinkFor(e Event) MapLink {
 			return MapLink{Period: "1h", Group: "country", Filter: "all", Query: "dst:" + country, Country: country}
 		}
 	case CodeBlockedSurge:
-		if q := blockedSurgeQuery(e); q != "" {
-			return MapLink{Period: "1h", Group: "ip", Filter: "blocked", Query: q}
+		if link := blockedSurgeMapLink(e); link.Query != "" {
+			return link
 		}
 	}
 	return fallbackMapLink(e)
+}
+
+func blockedSurgeMapLink(e Event) MapLink {
+	q := blockedSurgeQuery(e)
+	if q == "" {
+		return MapLink{}
+	}
+	group := "ip"
+	query := q
+	if city := blockedSurgeCityLabel(e); city != "" && blockedSurgeIsWide(e) {
+		group = "city"
+		query = "city:" + city
+	}
+	return MapLink{Period: "1h", Group: group, Filter: "blocked", Query: query}
+}
+
+func blockedSurgeCityLabel(e Event) string {
+	label := ""
+	if e.Detail != nil {
+		if raw, ok := e.Detail["label"].(string); ok {
+			label = strings.TrimSpace(raw)
+		}
+	}
+	if label == "" {
+		return ""
+	}
+	if i := strings.Index(label, ","); i > 0 {
+		return strings.TrimSpace(label[:i])
+	}
+	return label
+}
+
+func blockedSurgeIsWide(e Event) bool {
+	network := strings.TrimSpace(e.Device)
+	if network == "" && e.Detail != nil {
+		if raw, ok := e.Detail["network"].(string); ok {
+			network = strings.TrimSpace(raw)
+		}
+	}
+	if network == "" {
+		return false
+	}
+	if strings.Contains(network, "-") {
+		return true
+	}
+	if strings.Contains(network, "/") {
+		_, ipNet, err := net.ParseCIDR(network)
+		if err != nil {
+			return false
+		}
+		ones, _ := ipNet.Mask.Size()
+		return ones <= 16
+	}
+	prefix := networkPrefixQuery(network)
+	parts := strings.Split(strings.TrimSuffix(prefix, "."), ".")
+	return len(parts) <= 2
 }
 
 func blockedSurgeQuery(e Event) string {

@@ -139,6 +139,66 @@ const GLOBE_LAYER_PARAMETERS = {
   depthWrite: false,
 };
 
+export function coordBucketKey(lon: number, lat: number, precision = 3): string {
+  const m = 10 ** precision;
+  return `${Math.round(lon * m) / m}:${Math.round(lat * m) / m}`;
+}
+
+/** Spread nodes that share the same geo (typical for LAN / geo_range subnets). */
+export function buildDisplayCoordMap(points: MapPointEntry[]): Map<string, [number, number]> {
+  const buckets = new Map<string, MapPointEntry[]>();
+  for (const p of points) {
+    const bk = coordBucketKey(p.lon, p.lat);
+    const arr = buckets.get(bk) ?? [];
+    arr.push(p);
+    buckets.set(bk, arr);
+  }
+  const out = new Map<string, [number, number]>();
+  buckets.forEach((group) => {
+    if (group.length === 1) {
+      out.set(group[0].key, [group[0].lon, group[0].lat]);
+      return;
+    }
+    const baseLon = group[0].lon;
+    const baseLat = group[0].lat;
+    const n = group.length;
+    const radius = Math.min(1.2, 0.12 + Math.sqrt(n) * 0.08);
+    const latCos = Math.max(0.25, Math.cos((baseLat * Math.PI) / 180));
+    group.forEach((p, i) => {
+      const angle = (2 * Math.PI * i) / n;
+      out.set(p.key, [
+        baseLon + (radius * Math.cos(angle)) / latCos,
+        baseLat + radius * Math.sin(angle) * 0.55,
+      ]);
+    });
+  });
+  return out;
+}
+
+function displayLonLat(
+  key: string,
+  fallbackLon: number | undefined,
+  fallbackLat: number | undefined,
+  allPoints: Record<string, MapPoint>,
+  lineFallback: Map<string, { lon: number; lat: number }> | undefined,
+  displayCoords: Map<string, [number, number]>,
+): [number, number] {
+  return displayCoords.get(key) ?? nodeLonLat(key, fallbackLon, fallbackLat, allPoints, lineFallback);
+}
+
+function arcHeightWithSpread(
+  d: MapLine,
+  allPoints: Record<string, MapPoint>,
+  lineFallback: Map<string, { lon: number; lat: number }> | undefined,
+  isGlobe: boolean,
+): number {
+  const base = isGlobe
+    ? globeArcHeight(d, allPoints, lineFallback)
+    : mapArcHeight(d, allPoints, lineFallback);
+  const rankSpread = ((d._flowRank ?? 0) % 7) * 0.015;
+  return base + rankSpread;
+}
+
 export function topByCount(arr: MapLine[], max: number): MapLine[] {
   if (!max || arr.length <= max) return arr;
   return [...arr].sort((a, b) => (b.count || 0) - (a.count || 0)).slice(0, max);
@@ -152,15 +212,13 @@ function decorateFlowLines(lines: MapLine[]): MapLine[] {
   return sorted.map((line, idx) => {
     const rankT = n <= 1 ? 1 : 1 - idx / (n - 1);
     const alpha = Math.round(60 + rankT * 150);
-    const pairKey = [String(line.src_country || ''), String(line.dst_country || '')]
-      .sort()
-      .join('>');
-    let tilt = corridorTilt.get(pairKey);
+    const edgeId = `${line.src}\0${line.dst}`;
+    let tilt = corridorTilt.get(edgeId);
     if (tilt === undefined) {
       let h = 0;
-      for (let i = 0; i < pairKey.length; i++) h = (h * 31 + pairKey.charCodeAt(i)) | 0;
-      tilt = ((h % 7) - 3) * 2;
-      corridorTilt.set(pairKey, tilt);
+      for (let i = 0; i < edgeId.length; i++) h = (h * 31 + edgeId.charCodeAt(i)) | 0;
+      tilt = ((h % 11) - 5) * 1.5;
+      corridorTilt.set(edgeId, tilt);
     }
     return { ...line, _flowAlpha: alpha, _flowTilt: tilt, _flowRank: idx };
   });
@@ -335,6 +393,7 @@ export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
   }
 
   let points = getVisiblePointsFromLines(lines, opts.points, lineFallback);
+  const displayCoords = buildDisplayCoordMap(points);
   if (isGlobe) {
     points = points.filter((p) =>
       isOnVisibleGlobeHemisphere(p.lon, p.lat, viewLon, viewLat),
@@ -469,9 +528,9 @@ export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
       greatCircle: isGlobe,
       wrapLongitude: !isGlobe,
       getSourcePosition: (d: MapLine) =>
-        nodeLonLat(d.src, d.src_lon, d.src_lat, opts.points, lineFallback),
+        displayLonLat(d.src, d.src_lon, d.src_lat, opts.points, lineFallback, displayCoords),
       getTargetPosition: (d: MapLine) =>
-        nodeLonLat(d.dst, d.dst_lon, d.dst_lat, opts.points, lineFallback),
+        displayLonLat(d.dst, d.dst_lon, d.dst_lat, opts.points, lineFallback, displayCoords),
       getSourceColor: (d: MapLine) => [
         ...arcRGB(d.status, d, opts.monoArcColor, opts.repColorArcs),
         d._flowAlpha || 210,
@@ -486,10 +545,7 @@ export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
         return base;
       },
       widthUnits: 'pixels',
-      getHeight: (d: MapLine) =>
-        isGlobe
-          ? globeArcHeight(d, opts.points, lineFallback)
-          : mapArcHeight(d, opts.points, lineFallback),
+      getHeight: (d: MapLine) => arcHeightWithSpread(d, opts.points, lineFallback, isGlobe),
       getTilt: isGlobe ? 0 : (d: MapLine) => arcTilt(d) * 0.5,
       autoHighlight: true,
       highlightColor: [255, 255, 255, 140],
@@ -512,7 +568,7 @@ export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
       stroked: true,
       filled: true,
       radiusUnits: 'pixels',
-      getPosition: (d: MapPointEntry) => [d.lon, d.lat],
+      getPosition: (d: MapPointEntry) => displayCoords.get(d.key) ?? [d.lon, d.lat],
       getRadius: (d: MapPointEntry) => {
         const base = Math.max(1.5, Math.min(8, 1.5 + Math.sqrt(d.count || 1) * 0.6));
         if (opts.highlightNodeKeys?.includes(d.key)) return base + 4;

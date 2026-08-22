@@ -18,6 +18,23 @@ func TestMapLinkForBlockedSurgeUsesIPScope(t *testing.T) {
 	}
 }
 
+func TestMapLinkForBlockedSurgeWideNetWithLabelUsesCity(t *testing.T) {
+	got := MapLinkFor(Event{
+		Code:   CodeBlockedSurge,
+		Device: "10.72.0.0-10.72.255.254",
+		Detail: map[string]any{
+			"label":   "Belozernii, СТГ, Россия",
+			"network": "10.72.0.0-10.72.255.254",
+		},
+	})
+	if got.Group != "city" {
+		t.Fatalf("group = %q, want city", got.Group)
+	}
+	if got.Query != "city:Belozernii" {
+		t.Fatalf("query = %q", got.Query)
+	}
+}
+
 func TestMapLinkForUsesCountryScope(t *testing.T) {
 	got := MapLinkFor(Event{
 		Code:       CodeNewCountryDst,

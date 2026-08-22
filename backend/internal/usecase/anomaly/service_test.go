@@ -243,8 +243,11 @@ func TestBlockedSurgeEmits(t *testing.T) {
 			if e.Device != "10.0.0.0/8" {
 				t.Fatalf("expected per-net device, got %q", e.Device)
 			}
-			if e.Map.Query != "(src:10. OR dst:10.)" {
+			if e.Map.Query != "city:LAN" {
 				t.Fatalf("expected map query for enterprise net, got %q", e.Map.Query)
+			}
+			if e.Map.Group != "city" {
+				t.Fatalf("expected city group for wide net, got %q", e.Map.Group)
 			}
 		}
 	}

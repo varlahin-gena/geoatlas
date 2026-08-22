@@ -9,7 +9,7 @@ vi.mock('@deck.gl/layers', () => ({
   TextLayer: class TextLayer {},
 }));
 
-import { hasCoords, statusRGB, topByCount, normalizeLonLat, resolveNodeLonLat, buildLineCoordFallback } from './mapLayers';
+import { hasCoords, statusRGB, topByCount, normalizeLonLat, resolveNodeLonLat, buildLineCoordFallback, buildDisplayCoordMap } from './mapLayers';
 import type { MapLine } from './mapTypes';
 
 describe('mapLayers helpers', () => {
@@ -82,5 +82,20 @@ describe('mapLayers helpers', () => {
     expect(resolveNodeLonLat('10.93.0.49', undefined, undefined, points, fallback)).toEqual([
       92.8672, 56.0184,
     ]);
+  });
+
+  it('buildDisplayCoordMap spreads co-located nodes', () => {
+    const points = [
+      { key: '10.72.0.1', lon: 38.8, lat: 45.1, count: 1 },
+      { key: '10.72.0.2', lon: 38.8004, lat: 45.0996, count: 2 },
+      { key: '8.8.8.8', lon: -122.1, lat: 37.4, count: 1 },
+    ];
+    const map = buildDisplayCoordMap(points);
+    const a = map.get('10.72.0.1');
+    const b = map.get('10.72.0.2');
+    expect(a).toBeTruthy();
+    expect(b).toBeTruthy();
+    expect(a![0]).not.toBeCloseTo(b![0], 3);
+    expect(map.get('8.8.8.8')).toEqual([-122.1, 37.4]);
   });
 });
