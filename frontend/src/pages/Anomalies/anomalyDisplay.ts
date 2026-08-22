@@ -50,7 +50,7 @@ export function relTime(iso?: string): string {
   return `${Math.round(h / 24)} дн назад`;
 }
 
-export function codeLabel(code?: string): string {
+function codeLabel(code?: string): string {
   switch (code) {
     case 'port_scan':
       return 'Сканирование портов';
