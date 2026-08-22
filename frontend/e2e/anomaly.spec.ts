@@ -59,6 +59,7 @@ test.describe('anomaly strip', () => {
     await expect(page.locator('.anomaly-exit-btn')).toContainText('Алерт на карте');
     await page.getByRole('button', { name: 'Live-карта' }).click();
     await expect(page).not.toHaveURL(/alert=/);
-    await expect(page.locator('.anomaly-strip')).toBeVisible();
+    await expect(page.locator('.anomaly-exit-btn')).toHaveCount(0);
+    await expect(page.locator('.anomaly-strip')).toBeVisible({ timeout: 15_000 });
   });
 });

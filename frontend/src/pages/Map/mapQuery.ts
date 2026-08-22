@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import { PERIODS } from './mapPeriods';
 
@@ -98,6 +98,7 @@ function sameView(a: MapViewState, b: MapViewState): boolean {
 }
 
 export function useMapViewQuery() {
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const parsed = parseMapViewSearch(params);
   const alertFingerprint = parseAlertFingerprint(params);
@@ -218,13 +219,15 @@ export function useMapViewQuery() {
 
   const resetToLiveView = useCallback(() => {
     setSearchState(MAP_VIEW_DEFAULTS.search);
-    setParams(serializeMapViewSearch({ ...MAP_VIEW_DEFAULTS }), { replace: true });
     try {
       sessionStorage.removeItem('geoatlas.mapAlert');
     } catch {
       /* ignore */
     }
-  }, [setParams]);
+    // Navigate to bare `/` so alert/group/q are fully cleared (empty
+    // URLSearchParams can be a no-op in some react-router updates).
+    navigate('/', { replace: true });
+  }, [navigate]);
 
   return {
     period: parsed.period,
