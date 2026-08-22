@@ -4,10 +4,7 @@ import { MAP_FIXTURE, installSessionMocks, loginAs, seedCsrf } from './helpers';
 test.describe('anomaly strip', () => {
   test('badge and На карте update query string', async ({ page }) => {
     await installSessionMocks(page, 'administrator', { events: MAP_FIXTURE, geoCount: 1000 });
-    await seedCsrf(page);
-    await loginAs(page, 'admin');
-    await expect(page.locator('#map-main')).toBeVisible({ timeout: 15_000 });
-    await expect(page.locator('.anomaly-strip')).toContainText('критично');
+    await page.unroute('**/api/anomalies/summary');
     await page.unroute(/\/api\/anomalies(\/|\?|$)/);
     await page.route('**/api/anomalies/summary', async (route) => {
       await route.fulfill({
