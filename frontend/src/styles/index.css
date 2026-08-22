@@ -52,13 +52,6 @@ body.page-map {
     height: 100%;
     min-height: 0;
 }
-.sidebar-nav-spacer {
-    flex: 1 1 auto;
-    min-height: 8px;
-}
-.sidebar-nav-bottom {
-    flex-shrink: 0;
-}
 .sidebar-header {
     height: var(--topbar-h);
     display: flex; align-items: center; gap: 10px;
@@ -225,6 +218,7 @@ body.page-map {
 .app.sidebar-collapsed .sidebar .side-range-label { display: none; }
 
 .sidebar-collapse-btn {
+    margin-top: auto;
     border-top: 1px solid var(--border);
     padding: 10px;
     position: sticky;
@@ -236,9 +230,26 @@ body.page-map {
 }
 .sidebar-tools {
     border-top: 1px solid var(--border);
-    margin-top: 6px;
+    margin-top: 0;
     padding-top: 4px;
     flex-shrink: 0;
+}
+.sidebar-tools .sidebar-section.nav-settings {
+    border-top: none;
+    margin-top: 0;
+    padding-top: 0;
+}
+.nav-settings-toggle .side-btn-badge {
+    margin-left: auto;
+}
+.nav-settings-toggle .nav-caret {
+    margin-left: 8px;
+}
+.nav-subgroup-toggle .side-btn-badge {
+    margin-left: auto;
+}
+.nav-subgroup-toggle .nav-caret {
+    margin-left: 8px;
 }
 .sidebar-collapse-btn .icon { transition: transform 0.2s ease; }
 .app.sidebar-collapsed .sidebar-collapse-btn .icon { transform: rotate(180deg); }

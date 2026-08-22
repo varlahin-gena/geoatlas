@@ -53,7 +53,7 @@ export function MapSidebar({
         items={navItems}
         badges={badges}
         middle={
-          <div className="sidebar-tools">
+          <>
         <div className="sidebar-section collapse-hide">
           <div className="sidebar-section-title">Режим</div>
           <div className="mode-switch">
@@ -174,7 +174,7 @@ export function MapSidebar({
             <span className="label">Экспорт PNG</span>
           </button>
         </div>
-          </div>
+          </>
         }
       />
 

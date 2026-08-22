@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import {
   fetchTlsStatus,
   postTlsReload,
@@ -21,10 +21,14 @@ function readFile(file: File): Promise<string> {
 
 export default function TlsPage() {
   const { toast } = useToast();
+  const certInputRef = useRef<HTMLInputElement>(null);
+  const keyInputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<TlsStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [certPEM, setCertPEM] = useState('');
   const [keyPEM, setKeyPEM] = useState('');
+  const [certName, setCertName] = useState('');
+  const [keyName, setKeyName] = useState('');
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -48,6 +52,7 @@ export default function TlsPage() {
     if (!file) return;
     try {
       setCertPEM(await readFile(file));
+      setCertName(file.name);
     } catch {
       toast('Не удалось прочитать файл сертификата', 'error');
     }
@@ -57,6 +62,7 @@ export default function TlsPage() {
     if (!file) return;
     try {
       setKeyPEM(await readFile(file));
+      setKeyName(file.name);
     } catch {
       toast('Не удалось прочитать файл ключа', 'error');
     }
@@ -65,13 +71,18 @@ export default function TlsPage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!certPEM.trim() || !keyPEM.trim()) {
-      toast('Укажите сертификат и приватный ключ', 'error');
+      toast('Выберите fullchain.pem и privkey.pem', 'error');
       return;
     }
     setBusy(true);
     try {
       const res = await putTls({ cert_pem: certPEM.trim(), key_pem: keyPEM.trim() });
+      setCertPEM('');
       setKeyPEM('');
+      setCertName('');
+      setKeyName('');
+      if (certInputRef.current) certInputRef.current.value = '';
+      if (keyInputRef.current) keyInputRef.current.value = '';
       toast('Сертификаты сохранены', 'success');
       if (res.reload?.message) {
         toast(res.reload.message, res.reload.reloaded ? 'success' : 'info');
@@ -98,6 +109,7 @@ export default function TlsPage() {
 
   const cert = status?.cert;
   const expiringSoon = cert?.days_left != null && cert.days_left <= 30;
+  const canSave = Boolean(status?.writable && certPEM && keyPEM && !busy);
 
   return (
     <AdminLayout
@@ -177,7 +189,9 @@ export default function TlsPage() {
               ) : null}
             </div>
           ) : status?.configured ? (
-            <p className="hint">Сертификат ещё не загружен — HTTPS включится после добавления PEM и перезапуска frontend.</p>
+            <p className="hint">
+              Сертификат ещё не загружен — HTTPS включится после добавления PEM и перезапуска frontend.
+            </p>
           ) : null}
 
           {status?.configured ? (
@@ -190,54 +204,44 @@ export default function TlsPage() {
         <form className="card tls-upload-form" onSubmit={(e) => void onSubmit(e)}>
           <h2>Загрузить сертификат</h2>
           <p className="hint">
-            Full chain (<code>fullchain.pem</code>) и приватный ключ (<code>privkey.pem</code>).
-            Ключ не показывается после сохранения.
+            Выберите <code>fullchain.pem</code> и <code>privkey.pem</code>, затем сохраните.
           </p>
 
-          <label className="form-row">
-            <span>Файл сертификата</span>
-            <input
-              type="file"
-              accept=".pem,.crt,.cer,.txt"
-              disabled={!status?.writable || busy}
-              onChange={(e) => void onPickCert(e.target.files?.[0] || null)}
-            />
-          </label>
-          <label className="form-row">
-            <span>Сертификат (PEM)</span>
-            <textarea
-              rows={6}
-              value={certPEM}
-              onChange={(e) => setCertPEM(e.target.value)}
-              placeholder="-----BEGIN CERTIFICATE-----"
-              disabled={!status?.writable || busy}
-              spellCheck={false}
-            />
-          </label>
+          <input
+            ref={certInputRef}
+            type="file"
+            accept=".pem,.crt,.cer,.txt"
+            className="visually-hidden"
+            disabled={!status?.writable || busy}
+            onChange={(e) => void onPickCert(e.target.files?.[0] || null)}
+          />
+          <input
+            ref={keyInputRef}
+            type="file"
+            accept=".pem,.key,.txt"
+            className="visually-hidden"
+            disabled={!status?.writable || busy}
+            onChange={(e) => void onPickKey(e.target.files?.[0] || null)}
+          />
 
-          <label className="form-row">
-            <span>Файл ключа</span>
-            <input
-              type="file"
-              accept=".pem,.key,.txt"
+          <div className="tls-upload-actions">
+            <button
+              type="button"
+              className="btn"
               disabled={!status?.writable || busy}
-              onChange={(e) => void onPickKey(e.target.files?.[0] || null)}
-            />
-          </label>
-          <label className="form-row">
-            <span>Приватный ключ (PEM)</span>
-            <textarea
-              rows={6}
-              value={keyPEM}
-              onChange={(e) => setKeyPEM(e.target.value)}
-              placeholder="-----BEGIN PRIVATE KEY-----"
+              onClick={() => certInputRef.current?.click()}
+            >
+              {certName ? `Сертификат: ${certName}` : 'Выбрать fullchain.pem'}
+            </button>
+            <button
+              type="button"
+              className="btn"
               disabled={!status?.writable || busy}
-              spellCheck={false}
-            />
-          </label>
-
-          <div className="form-actions">
-            <button type="submit" className="btn primary" disabled={!status?.writable || busy}>
+              onClick={() => keyInputRef.current?.click()}
+            >
+              {keyName ? `Ключ: ${keyName}` : 'Выбрать privkey.pem'}
+            </button>
+            <button type="submit" className="btn primary" disabled={!canSave}>
               {busy ? 'Сохранение…' : 'Сохранить сертификаты'}
             </button>
           </div>

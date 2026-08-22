@@ -164,9 +164,75 @@ export function NavSections({
     });
   }
 
-  if (!workspace.length && !observe.length && !settings.length) return null;
+  const observeBlock =
+    observe.length > 0 ? (
+      <NavCollapsibleSection
+        label="Наблюдение"
+        iconKind="observe"
+        open={observeOpen}
+        onToggle={toggleObserve}
+        badge={observeBadge}
+        sectionClassName={sectionClassName}
+        extraClassName="nav-observe"
+      >
+        {observe.map((item) => (
+          <NavLinkItem
+            key={item.href}
+            item={item}
+            active={isNavActive(item, location.pathname)}
+            badge={badges[item.href]}
+            nested
+          />
+        ))}
+      </NavCollapsibleSection>
+    ) : null;
 
-  const bottomVisible = observe.length > 0 || settings.length > 0;
+  const settingsBlock =
+    settings.length > 0 ? (
+      <NavCollapsibleSection
+        label="Настройки"
+        iconKind="settings"
+        open={settingsOpen}
+        onToggle={toggleSettings}
+        badge={settingsBadge}
+        sectionClassName={sectionClassName}
+      >
+        {settings.map((section) => {
+          const groupOpen = openGroups.has(section.id);
+          const groupBadge = sectionBadgeTotal(section, badges);
+          const groupActive = section.items.some((item) => isNavActive(item, location.pathname));
+          return (
+            <div key={section.id} className={`nav-subgroup${groupActive ? ' has-active' : ''}`}>
+              <button
+                type="button"
+                className={`nav-subgroup-toggle${groupOpen ? ' open' : ''}`}
+                aria-expanded={groupOpen}
+                onClick={() => toggleGroup(section.id)}
+              >
+                <span className="nav-subgroup-label">{section.label}</span>
+                {groupBadge ? <span className="side-btn-badge">{groupBadge}</span> : null}
+                <span className="nav-caret" aria-hidden />
+              </button>
+              {groupOpen ? (
+                <div className="nav-subgroup-items">
+                  {section.items.map((item) => (
+                    <NavLinkItem
+                      key={item.href}
+                      item={item}
+                      active={isNavActive(item, location.pathname)}
+                      badge={badges[item.href]}
+                      nested
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </NavCollapsibleSection>
+    ) : null;
+
+  if (!workspace.length && !observe.length && !settings.length && !middle) return null;
 
   return (
     <>
@@ -183,85 +249,18 @@ export function NavSections({
         </div>
       ) : null}
 
-      {middle}
-
-      {bottomVisible ? (
+      {middle ? (
+        <div className="sidebar-tools">
+          {middle}
+          {observeBlock}
+          {settingsBlock}
+        </div>
+      ) : (
         <>
-          <div className="sidebar-nav-spacer" aria-hidden="true" />
-          <div className="sidebar-nav-bottom">
-            {observe.length > 0 ? (
-              <NavCollapsibleSection
-                label="Наблюдение"
-                iconKind="observe"
-                open={observeOpen}
-                onToggle={toggleObserve}
-                badge={observeBadge}
-                sectionClassName={sectionClassName}
-                extraClassName="nav-observe"
-              >
-                {observe.map((item) => (
-                  <NavLinkItem
-                    key={item.href}
-                    item={item}
-                    active={isNavActive(item, location.pathname)}
-                    badge={badges[item.href]}
-                    nested
-                  />
-                ))}
-              </NavCollapsibleSection>
-            ) : null}
-
-            {settings.length > 0 ? (
-              <NavCollapsibleSection
-                label="Настройки"
-                iconKind="settings"
-                open={settingsOpen}
-                onToggle={toggleSettings}
-                badge={settingsBadge}
-                sectionClassName={sectionClassName}
-              >
-                {settings.map((section) => {
-                  const groupOpen = openGroups.has(section.id);
-                  const groupBadge = sectionBadgeTotal(section, badges);
-                  const groupActive = section.items.some((item) =>
-                    isNavActive(item, location.pathname),
-                  );
-                  return (
-                    <div
-                      key={section.id}
-                      className={`nav-subgroup${groupActive ? ' has-active' : ''}`}
-                    >
-                      <button
-                        type="button"
-                        className={`nav-subgroup-toggle${groupOpen ? ' open' : ''}`}
-                        aria-expanded={groupOpen}
-                        onClick={() => toggleGroup(section.id)}
-                      >
-                        <span className="nav-subgroup-label">{section.label}</span>
-                        {groupBadge ? <span className="side-btn-badge">{groupBadge}</span> : null}
-                        <span className="nav-caret" aria-hidden />
-                      </button>
-                      {groupOpen ? (
-                        <div className="nav-subgroup-items">
-                          {section.items.map((item) => (
-                            <NavLinkItem
-                              key={item.href}
-                              item={item}
-                              active={isNavActive(item, location.pathname)}
-                              badge={badges[item.href]}
-                              nested
-                            />
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </NavCollapsibleSection>
-            ) : null}
-          </div>
+          {observeBlock}
+          {settingsBlock}
         </>
-      ) : null}
+      )}
     </>
   );
 }
