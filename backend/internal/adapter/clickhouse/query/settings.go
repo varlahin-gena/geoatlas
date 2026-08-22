@@ -31,10 +31,10 @@ func AggSettings() string {
 	return formatAggSettings(chMaxMemoryUsage, chExternalGroupByBytes, chExternalSortBytes, chMaxThreads)
 }
 
-// BackfillAggSettings — более агрессивный spill / 1 поток для day INSERT на малых хостах.
+// BackfillAggSettings — более агрессивный spill / 1 поток для hour-chunk INSERT на малых хостах.
 func BackfillAggSettings() string {
 	threads := 1
-	spill := chMaxMemoryUsage / 8
+	spill := chMaxMemoryUsage / 16
 	const minSpill = 32 << 20
 	if spill < minSpill {
 		spill = minSpill

@@ -1,6 +1,7 @@
 package query
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -60,8 +61,8 @@ func TestBackfillAggSettingsUsesSingleThread(t *testing.T) {
 	if !strings.Contains(s, "max_threads = 1") {
 		t.Fatalf("expected max_threads=1:\n%s", s)
 	}
-	if !strings.Contains(s, "max_bytes_before_external_group_by = 161061273") {
-		// max/8 = 161061273
-		t.Fatalf("expected spill=max/8:\n%s", s)
+	wantSpill := 1288490188 / 16
+	if !strings.Contains(s, fmt.Sprintf("max_bytes_before_external_group_by = %d", wantSpill)) {
+		t.Fatalf("expected spill=max/16 (%d):\n%s", wantSpill, s)
 	}
 }

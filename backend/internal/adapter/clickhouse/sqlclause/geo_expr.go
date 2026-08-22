@@ -18,6 +18,11 @@ func DayTimestampRangeSQL(tsCol string) string {
 	return fmt.Sprintf("%[1]s >= toDateTime(?) AND %[1]s < toDateTime(?) + INTERVAL 1 DAY", tsCol)
 }
 
+// HourTimestampRangeSQL — фильтр одного часа. Bind: hourStart, hourStart (DateTime).
+func HourTimestampRangeSQL(tsCol string) string {
+	return fmt.Sprintf("%[1]s >= toDateTime(?) AND %[1]s < toDateTime(?) + INTERVAL 1 HOUR", tsCol)
+}
+
 // CountryNeedsSQL — условие «страна нужна из GeoIP» (зеркало model.NeedsCountry).
 func CountryNeedsSQL(col string) string {
 	return fmt.Sprintf(`(%[1]s = '' OR lower(%[1]s) IN ('unknown', 'reserved') OR %[1]s = 'Неизвестно' OR lengthUTF8(trimBoth(%[1]s)) = 2)`, col)

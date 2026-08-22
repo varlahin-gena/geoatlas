@@ -268,7 +268,7 @@ func insertIPEdgesDays(ctx context.Context, ch clickhouse.Conn, table string, da
 		timeExpr, timeAlias = "toDate(traffic_logs.timestamp)", "day"
 		groupExtra = "day, src_ip, dst_ip"
 	}
-	fromSQL := fmt.Sprintf("FROM traffic_logs\n\t\tWHERE %s", sqlclause.DayTimestampRangeSQL("traffic_logs.timestamp"))
+	fromSQL := fmt.Sprintf("FROM traffic_logs\n\t\tWHERE %s", sqlclause.HourTimestampRangeSQL("traffic_logs.timestamp"))
 	insertTpl := fmt.Sprintf(`
 		INSERT INTO %s
 		%s
@@ -281,16 +281,23 @@ func insertIPEdgesDays(ctx context.Context, ch clickhouse.Conn, table string, da
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		ictx, icancel := context.WithTimeout(ctx, 30*time.Minute)
-		err := ch.Exec(ictx, insertTpl, day, day)
-		icancel()
-		if err != nil {
-			if markError {
-				aggstate.SetEdgesAggStatus(aggstate.EdgesAggStatus{
-					State: "error", Message: err.Error(), DaysTotal: len(days), DaysDone: i,
-				})
+		dayStart := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, time.UTC)
+		for h := 0; h < 24; h++ {
+			if err := ctx.Err(); err != nil {
+				return err
 			}
-			return fmt.Errorf("backfill %s day %s: %w", table, day.Format("2006-01-02"), err)
+			hourStart := dayStart.Add(time.Duration(h) * time.Hour)
+			ictx, icancel := context.WithTimeout(ctx, 30*time.Minute)
+			err := ch.Exec(ictx, insertTpl, hourStart, hourStart)
+			icancel()
+			if err != nil {
+				if markError {
+					aggstate.SetEdgesAggStatus(aggstate.EdgesAggStatus{
+						State: "error", Message: err.Error(), DaysTotal: len(days), DaysDone: i,
+					})
+				}
+				return fmt.Errorf("backfill %s day %s hour %02d: %w", table, day.Format("2006-01-02"), h, err)
+			}
 		}
 		slog.Info("ip edges: backfill day", "table", table, "done", i+1, "total", len(days), "day", day.Format("2006-01-02"))
 		if onDay != nil {

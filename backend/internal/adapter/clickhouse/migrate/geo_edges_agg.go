@@ -337,7 +337,7 @@ func insertGeoEdgesDays(ctx context.Context, ch clickhouse.Conn, groupBy string,
 	srcKey, dstKey, srcLabel, dstLabel := sqlclause.GeoGroupExprsPrefixed("traffic_logs", groupBy)
 	selectBody := geoEdgesAggSelectBody(srcKey, dstKey, srcLabel, dstLabel, sqlclause.GeoCoordOK)
 	// Plain traffic_logs: enrich JOIN OOMs on small CH hosts; map overlays nm_geo_enrich_ip on read.
-	fromSQL := fmt.Sprintf("FROM traffic_logs\n\t\tWHERE %s", sqlclause.DayTimestampRangeSQL("traffic_logs.timestamp"))
+	fromSQL := fmt.Sprintf("FROM traffic_logs\n\t\tWHERE %s", sqlclause.HourTimestampRangeSQL("traffic_logs.timestamp"))
 
 	insertTpl := fmt.Sprintf(`
 		INSERT INTO %s
@@ -351,11 +351,18 @@ func insertGeoEdgesDays(ctx context.Context, ch clickhouse.Conn, groupBy string,
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		ictx, icancel := context.WithTimeout(ctx, 30*time.Minute)
-		err := ch.Exec(ictx, insertTpl, day, day)
-		icancel()
-		if err != nil {
-			return fmt.Errorf("geo edges backfill %s day %s: %w", groupBy, day.Format("2006-01-02"), err)
+		dayStart := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, time.UTC)
+		for h := 0; h < 24; h++ {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			hourStart := dayStart.Add(time.Duration(h) * time.Hour)
+			ictx, icancel := context.WithTimeout(ctx, 30*time.Minute)
+			err := ch.Exec(ictx, insertTpl, hourStart, hourStart)
+			icancel()
+			if err != nil {
+				return fmt.Errorf("geo edges backfill %s day %s hour %02d: %w", groupBy, day.Format("2006-01-02"), h, err)
+			}
 		}
 		slog.Info("geo edges agg: backfill day", "group_by", groupBy, "done", i+1, "total", len(days), "day", day.Format("2006-01-02"))
 	}

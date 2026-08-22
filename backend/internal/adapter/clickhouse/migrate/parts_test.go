@@ -71,6 +71,13 @@ func TestDayTimestampRangeSQL(t *testing.T) {
 	}
 }
 
+func TestHourTimestampRangeSQL(t *testing.T) {
+	got := sqlclause.HourTimestampRangeSQL("traffic_logs.timestamp")
+	if !strings.Contains(got, "toDateTime(?)") || !strings.Contains(got, "INTERVAL 1 HOUR") {
+		t.Fatal(got)
+	}
+}
+
 func TestDateParam(t *testing.T) {
 	day := time.Date(2026, 8, 20, 15, 30, 0, 0, time.FixedZone("MSK", 3*3600))
 	got := dateParam(day)
