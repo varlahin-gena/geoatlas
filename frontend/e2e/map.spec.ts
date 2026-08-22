@@ -7,6 +7,8 @@ test.describe('map fixture / URL / session', () => {
     await seedCsrf(page);
     await loginAs(page, 'admin');
     await expect(page.locator('#map-main')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('.map-info-dock')).toBeVisible();
+    await page.getByRole('tab', { name: 'Статистика' }).click();
     await expect(page.locator('#stat-edges')).toHaveText('1');
     await expect(page.locator('#stat-total')).toHaveText('10');
   });

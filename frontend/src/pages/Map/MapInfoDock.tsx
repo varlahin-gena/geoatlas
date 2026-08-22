@@ -51,7 +51,9 @@ function MapStatsGrid({
     <div className="map-info-dock-stats">
       <div className="stats-item">
         <span className="lbl">Событий</span>
-        <span className="val">{fmtNumber(stats.events)}</span>
+        <span className="val" id="stat-total">
+          {fmtNumber(stats.events)}
+        </span>
       </div>
       <div className="stats-item">
         <span className="lbl">Разрешено</span>
@@ -63,7 +65,9 @@ function MapStatsGrid({
       </div>
       <div className="stats-item">
         <span className="lbl">Связей</span>
-        <span className="val">{fmtNumber(stats.connections)}</span>
+        <span className="val" id="stat-edges">
+          {fmtNumber(stats.connections)}
+        </span>
       </div>
       <div className="stats-item">
         <span className="lbl">Узлов</span>
