@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { installSessionMocks, loginAs, seedCsrf } from './helpers';
 
 test.describe('system page', () => {
-  test('admin opens overview and charts tab without crash', async ({ page }) => {
+  test('admin overview shows metrics and charts tab paints', async ({ page }) => {
     await installSessionMocks(page, 'administrator', { geoCount: 100 });
     await page.route('**/api/system/stats', async (route) => {
       await route.fulfill({
@@ -30,7 +30,9 @@ test.describe('system page', () => {
     await loginAs(page, 'admin');
 
     await page.goto('/system');
-    await expect(page.getByRole('heading', { name: 'Мониторинг системы' })).toBeVisible({
+    await expect(page).toHaveURL(/\/system$/);
+    // AdminLayout title is a div.topbar-title, not a heading landmark.
+    await expect(page.locator('#adminApp .topbar-title')).toContainText('Мониторинг системы', {
       timeout: 15_000,
     });
     await expect(page.locator('.status-strip')).toBeVisible();
