@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 
 /** Shared across Map and Admin shells. */
 export const SIDEBAR_COLLAPSED_KEY = 'nm.sidebarCollapsed';
@@ -34,16 +34,44 @@ export function persistSidebarCollapsed(next: boolean, storage: Storage = localS
   }
 }
 
-/** One collapse preference for map + admin sidebars. */
+type Listener = () => void;
+
+/** Module store so AdminSidebar / MapPage / NavSections share one collapsed flag. */
+let collapsedSnapshot = readSidebarCollapsed();
+const listeners = new Set<Listener>();
+
+function emit() {
+  for (const listener of listeners) listener();
+}
+
+function subscribe(listener: Listener) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function getSnapshot() {
+  return collapsedSnapshot;
+}
+
+function getServerSnapshot() {
+  return false;
+}
+
+function setCollapsed(next: boolean) {
+  if (next === collapsedSnapshot) return;
+  collapsedSnapshot = next;
+  persistSidebarCollapsed(next);
+  emit();
+}
+
+/** One collapse preference for map + admin sidebars (shared across hook callers). */
 export function useSidebarCollapsed() {
-  const [collapsed, setCollapsed] = useState(() => readSidebarCollapsed());
+  const collapsed = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const toggle = useCallback(() => {
-    setCollapsed((prev) => {
-      const next = !prev;
-      persistSidebarCollapsed(next);
-      return next;
-    });
+    setCollapsed(!getSnapshot());
   }, []);
 
   return { collapsed, toggle };

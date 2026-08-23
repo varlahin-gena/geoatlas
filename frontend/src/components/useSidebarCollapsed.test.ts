@@ -1,8 +1,10 @@
+import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
   persistSidebarCollapsed,
   readSidebarCollapsed,
   SIDEBAR_COLLAPSED_KEY,
+  useSidebarCollapsed,
 } from './useSidebarCollapsed';
 
 function memStorage(initial: Record<string, string> = {}): Storage {
@@ -60,5 +62,21 @@ describe('persistSidebarCollapsed', () => {
     expect(s.getItem(SIDEBAR_COLLAPSED_KEY)).toBe('1');
     expect(s.getItem('nm.mapSidebarCollapsed')).toBeNull();
     expect(s.getItem('nm.adminSidebarCollapsed')).toBeNull();
+  });
+});
+
+describe('useSidebarCollapsed', () => {
+  it('keeps multiple hook callers in sync after toggle', () => {
+    const a = renderHook(() => useSidebarCollapsed());
+    const b = renderHook(() => useSidebarCollapsed());
+    const before = a.result.current.collapsed;
+    expect(b.result.current.collapsed).toBe(before);
+
+    act(() => {
+      a.result.current.toggle();
+    });
+
+    expect(a.result.current.collapsed).toBe(!before);
+    expect(b.result.current.collapsed).toBe(!before);
   });
 });
