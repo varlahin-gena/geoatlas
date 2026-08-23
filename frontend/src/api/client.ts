@@ -5,6 +5,26 @@ export function csrfToken(): string {
   return m ? decodeURIComponent(m[1]) : '';
 }
 
+function isUnsafeMethod(method?: string): boolean {
+  const m = (method || 'GET').toUpperCase();
+  return m !== 'GET' && m !== 'HEAD' && m !== 'OPTIONS';
+}
+
+/** Cookie ga_csrf может отсутствовать у старых сессий — /api/auth/me выдаёт его через EnsureCSRFCookie. */
+let csrfEnsurePromise: Promise<void> | null = null;
+
+export async function ensureCsrfCookie(): Promise<void> {
+  if (csrfToken() || window.GA_CONFIG?.apiAuthToken) return;
+  if (!csrfEnsurePromise) {
+    csrfEnsurePromise = fetch('/api/auth/me', { credentials: 'same-origin' })
+      .catch(() => undefined)
+      .finally(() => {
+        csrfEnsurePromise = null;
+      });
+  }
+  await csrfEnsurePromise;
+}
+
 export function authHeaders(extra?: HeadersInit): Record<string, string> {
   const h: Record<string, string> = {};
   if (extra) {
@@ -61,6 +81,9 @@ export async function apiFetch<T = unknown>(
   path: string,
   init: RequestInit = {},
 ): Promise<T> {
+  if (isUnsafeMethod(init.method)) {
+    await ensureCsrfCookie();
+  }
   const headers = authHeaders(init.headers);
   if (init.body && !(init.body instanceof FormData) && !headers['Content-Type']) {
     headers['Content-Type'] = 'application/json';
@@ -87,6 +110,9 @@ export async function apiFetch<T = unknown>(
 }
 
 export async function apiFetchRaw(path: string, init: RequestInit = {}): Promise<Response> {
+  if (isUnsafeMethod(init.method)) {
+    await ensureCsrfCookie();
+  }
   const headers = authHeaders(init.headers);
   const res = await fetch(path, {
     ...init,

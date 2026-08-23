@@ -9,6 +9,7 @@ import {
   apiPost,
   authHeaders,
   csrfToken,
+  ensureCsrfCookie,
   isAbortError,
   isAuthApiPath,
 } from './client';
@@ -43,6 +44,7 @@ describe('isAuthApiPath', () => {
 
 describe('csrfToken / authHeaders', () => {
   afterEach(() => {
+    vi.unstubAllGlobals();
     document.cookie = 'ga_csrf=; Max-Age=0; path=/';
     delete (window as { GA_CONFIG?: unknown }).GA_CONFIG;
   });
@@ -59,6 +61,23 @@ describe('csrfToken / authHeaders', () => {
       Authorization: 'Bearer secret',
       'X-CSRF-Token': 'abc',
     });
+  });
+
+  it('ensureCsrfCookie fetches /api/auth/me when ga_csrf missing', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await ensureCsrfCookie();
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/auth/me', { credentials: 'same-origin' });
+  });
+
+  it('ensureCsrfCookie is no-op when token already present', async () => {
+    document.cookie = 'ga_csrf=existing';
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    await ensureCsrfCookie();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
