@@ -249,13 +249,13 @@ export function SystemBackupTab() {
             <div className="kv-row">
               <span className="k">Статус</span>
               <span className="v">
-                {status?.state || '—'}
-                {status?.name ? ` · ${status.name}` : ''}
+                {String(status?.state || '—')}
+                {status?.name ? ` · ${String(status.name)}` : ''}
               </span>
             </div>
             <div className="kv-row">
               <span className="k">Сообщение</span>
-              <span className="v">{status?.message || '—'}</span>
+              <span className="v">{String(status?.message || '—')}</span>
             </div>
             <div className="kv-row">
               <span className="k">Каталог</span>

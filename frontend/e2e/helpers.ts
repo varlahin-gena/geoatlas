@@ -93,11 +93,25 @@ export async function installSessionMocks(
 
   await page.route('**/api/system/retention', async (route) => {
     await fulfillJson(route, 200, {
-      traffic_logs_days: 30,
-      edges_days: 30,
-      parse_errors_days: 7,
-      system_metrics_days: 7,
+      retention: {
+        traffic_logs_days: 30,
+        edges_days: 30,
+        parse_errors_days: 7,
+        system_metrics_days: 7,
+      },
     });
+  });
+
+  await page.route('**/api/system/history**', async (route) => {
+    await fulfillJson(route, 200, { period: '1h', series: {} });
+  });
+
+  await page.route('**/api/system/backups**', async (route) => {
+    await fulfillJson(route, 200, { ok: true, backups: [], enabled: true });
+  });
+
+  await page.route('**/api/audit**', async (route) => {
+    await fulfillJson(route, 200, { items: [] });
   });
 
   await page.route(/\/api\/events(\/|\?|$)/, async (route) => {

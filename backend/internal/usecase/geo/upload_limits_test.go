@@ -190,3 +190,19 @@ func TestPrecheckUpload(t *testing.T) {
 		t.Fatalf("dry_run precheck: %v", err)
 	}
 }
+
+func TestUploadCSVRejectsMemHeadroom(t *testing.T) {
+	idx := geoip.New()
+	codec := &uploadCodec{ranges: nRanges(3)}
+	svc := New(&uploadStore{}, uploadMissing{}, idx, nil, codec, 0)
+	svc.SetSoftMemLimitBytes(1) // 1 byte — любой commit не пройдёт
+
+	_, err := svc.UploadCSV(context.Background(), bytes.NewReader(nil), false)
+	if !errors.Is(err, apperr.ErrConflict) {
+		t.Fatalf("err=%v want ErrConflict", err)
+	}
+	_, err = svc.UploadCSV(context.Background(), bytes.NewReader(nil), true)
+	if err != nil {
+		t.Fatalf("dry_run must skip headroom: %v", err)
+	}
+}

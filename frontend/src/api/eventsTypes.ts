@@ -13,16 +13,5 @@ export type EventsPayload = Omit<components['schemas']['EventsResponse'], 'lines
   lines?: MapLine[];
 };
 
-export interface SeriesPoint {
-  t?: string;
-  allowed?: number;
-  blocked?: number;
-  total?: number;
-}
-
-export interface SeriesPayload {
-  country?: string;
-  bucket_sec?: number;
-  period?: string;
-  points?: SeriesPoint[];
-}
+export type SeriesPayload = components['schemas']['EventsSeriesResponse'];
+export type SeriesPoint = NonNullable<SeriesPayload['points']>[number];

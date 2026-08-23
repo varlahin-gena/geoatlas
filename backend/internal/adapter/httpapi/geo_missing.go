@@ -29,7 +29,7 @@ func (h *GeoHandler) GetGeoMissing(w http.ResponseWriter, r *http.Request) {
 	}
 	tr, err := parseEventTimeRange(r.URL.Query())
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid time range"})
+		writeBadRequest(w, "invalid time range")
 		return
 	}
 

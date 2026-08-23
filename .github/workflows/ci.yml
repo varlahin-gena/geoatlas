@@ -222,7 +222,15 @@ jobs:
       - name: coverage smoke (critical packages)
         run: |
           set -euo pipefail
-          pkgs=(./internal/adapter/ingestnet/ ./internal/usecase/ingest/ ./internal/config/ ./internal/adapter/geojob/)
+          pkgs=(
+            ./internal/adapter/ingestnet/
+            ./internal/usecase/ingest/
+            ./internal/config/
+            ./internal/adapter/geojob/
+            ./internal/mapagg/
+            ./internal/adapter/httpapi/authmw/
+          )
+          soft_pkgs=(./internal/adapter/clickhouse/trafficstore/)
           fail=0
           for pkg in "${pkgs[@]}"; do
             line=$(go test -count=1 -cover "$pkg" 2>&1 | tee /dev/stderr | tail -n1)
@@ -235,6 +243,18 @@ jobs:
             fi
             # Soft floor — ловим регресс «тесты пропали», не гонимся за 100%.
             awk -v p="$pct" -v pkg="$pkg" 'BEGIN { if (p+0 < 40) { printf "ERROR: %s coverage %.1f%% < 40%%\n", pkg, p; exit 1 } }' \
+              || fail=1
+          done
+          for pkg in "${soft_pkgs[@]}"; do
+            line=$(go test -count=1 -cover "$pkg" 2>&1 | tee /dev/stderr | tail -n1)
+            pct=$(echo "$line" | sed -n 's/.*coverage: \([0-9.]*\)% of statements.*/\1/p')
+            if [[ -z "$pct" ]]; then
+              echo "ERROR: no coverage for $pkg ($line)" >&2
+              fail=1
+              continue
+            fi
+            # trafficstore: soft floor 20% (цель 40% — отдельный debt); ловим только обнуление.
+            awk -v p="$pct" -v pkg="$pkg" 'BEGIN { if (p+0 < 20) { printf "ERROR: %s coverage %.1f%% < 20%%\n", pkg, p; exit 1 } }' \
               || fail=1
           done
           exit "$fail"

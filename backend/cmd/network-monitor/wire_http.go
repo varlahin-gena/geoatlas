@@ -47,6 +47,11 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 	eventsUC := usecaseevents.New(trafficRepo, bg.geo, repLookuper)
 	geoUC := usecasegeo.New(geoRepo, trafficRepo, bg.geo, a.geoJobs, geoipcodec.New(), cfg.MaxGeoUploadRanges)
 	geoUC.SetEnterpriseStore(geoRepo)
+	geoUC.SetHeavySlot(a.heavy)
+	if p, err := installprofile.Load(cfg.InstallProfilePath); err == nil && p != nil && p.Limits.Backend.MemoryGB > 0 {
+		// 75% cgroup backend → soft ceiling для HeapAlloc+upload snapshot.
+		geoUC.SetSoftMemLimitBytes(uint64(p.Limits.Backend.MemoryGB) * 3 / 4 * (1 << 30))
+	}
 	parseErrorsUC := parseerrors.New(perrorstore.NewParseErrorRepository(a.pools.API, a.pools.Ingest))
 	parseTestAdapter := parseradapter.NewParseTest(parsers)
 	parseTestUC := parsetest.New(parseTestAdapter, bg.geo, parseTestAdapter)
@@ -80,6 +85,7 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 	schedStore := backupschedulefile.New(cfg.BackupScheduleFile, usecasebackup.DefaultsSchedule(opts))
 	backupUC := usecasebackup.New(opts, backupstore.NewBackupRunner(a.pools.Background), backupfs.New(cfg.BackupDir), schedStore)
 	backupUC.SetLogService(logsUC)
+	backupUC.SetHeavySlot(a.heavy)
 	a.backupJobs = backupjob.NewFromService(backupUC, time.Minute)
 
 	var anomalyUC *usecaseanomaly.Service
@@ -105,6 +111,7 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 		}, apiRepo, bgRepo, anomRep, anomalyjob.Gate{Ingest: a.ingestSvc}, a.prom)
 		anomalyUC.SetEnterpriseNets(geoUC)
 		a.anomalyJobs = anomalyjob.New(anomalyUC, cfg.AnomalyScanInterval, time.Minute)
+		a.anomalyJobs.SetLimiter(a.heavy)
 	}
 
 	searchTemplatesUC := searchtemplates.New(searchtemplatesfile.New(cfg.SearchTemplatesFile))

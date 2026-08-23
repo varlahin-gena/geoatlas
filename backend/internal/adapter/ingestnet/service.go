@@ -65,6 +65,7 @@ type Service struct {
 	processors []*usecaseingest.Processor
 	circuit    *usecaseingest.CircuitBreaker
 	peers      *PeerAllowlist
+	degrade    func() bool // true → throttle dequeue (heavy job busy)
 
 	lineCh      chan ingestedLine
 	queueBytes  atomic.Int64
@@ -127,6 +128,14 @@ func NewService(cfg Config, deps ProcessorDeps) *Service {
 		s.processors[i] = usecaseingest.NewProcessor(ucDeps, st)
 	}
 	return s
+}
+
+// SetDegradeProbe — при true workers замедляют dequeue (heavy geo/backup busy).
+func (s *Service) SetDegradeProbe(fn func() bool) {
+	if s == nil {
+		return
+	}
+	s.degrade = fn
 }
 
 func (s *Service) Stats() model.IngestLiveStats {
@@ -517,6 +526,30 @@ func (s *Service) worker(ctx context.Context, proc *usecaseingest.Processor) {
 			case <-timer.C:
 			}
 			continue
+		}
+
+		// A4: при heavy job не вычищаем очередь на полной скорости — admission drops
+		// остаются видимыми, CPU уступает geo/backup.
+		if s.degrade != nil && s.degrade() {
+			timer := time.NewTimer(100 * time.Millisecond)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				drainCtx, cancel := s.beginDrain(ctx)
+				s.drainWorker(drainCtx, proc)
+				cancel()
+				return
+			case <-t.C:
+				timer.Stop()
+				if _, err := proc.Flush(ctx); err != nil {
+					noteErr(err)
+					slog.Error("ingest: flush error", "err", err)
+				} else {
+					noteOK()
+				}
+				continue
+			case <-timer.C:
+			}
 		}
 
 		select {

@@ -97,18 +97,28 @@ export async function apiFetchRaw(path: string, init: RequestInit = {}): Promise
   return res;
 }
 
-/** JSON body of HTTP 200 for an OpenAPI path+method, if the spec declares application/json. */
+type JsonContent<R> = R extends { content: { 'application/json': infer J } } ? J : never;
+
+/** JSON body of HTTP 200 or 201 for an OpenAPI path+method, if the spec declares application/json. */
 export type ApiJson<P extends keyof paths, M extends keyof paths[P]> = paths[P][M] extends {
-  responses: { 200: { content: { 'application/json': infer R } } };
+  responses: infer Res;
 }
-  ? R
+  ? Res extends { 200: infer R200 }
+    ? JsonContent<R200> extends never
+      ? Res extends { 201: infer R201 }
+        ? JsonContent<R201>
+        : never
+      : JsonContent<R200>
+    : Res extends { 201: infer R201 }
+      ? JsonContent<R201>
+      : never
   : never;
 
 export function apiGet<P extends keyof paths & string>(
   path: P,
   init?: RequestInit,
 ): Promise<ApiJson<P, 'get'>> {
-  return apiFetch(path, init) as Promise<ApiJson<P, 'get'>>;
+  return apiFetch<ApiJson<P, 'get'>>(path, init);
 }
 
 export function apiPost<P extends keyof paths & string>(
@@ -116,11 +126,11 @@ export function apiPost<P extends keyof paths & string>(
   body?: unknown,
   init?: RequestInit,
 ): Promise<ApiJson<P, 'post'>> {
-  return apiFetch(path, {
+  return apiFetch<ApiJson<P, 'post'>>(path, {
     ...init,
     method: 'POST',
     body: body === undefined ? init?.body : JSON.stringify(body),
-  }) as Promise<ApiJson<P, 'post'>>;
+  });
 }
 
 export type ApiQueryInput =
@@ -142,18 +152,15 @@ function buildQuery(query?: ApiQueryInput): string {
 
 /**
  * GET with query string; response typed from OpenAPI path when schema declares JSON.
- * Callers may cast when the spec omits `content` (users/tokens/geo lists).
  */
 export function apiGetQuery<P extends keyof paths & string>(
   path: P,
   query?: ApiQueryInput,
   init?: RequestInit,
-): Promise<ApiJson<P, 'get'> extends never ? unknown : ApiJson<P, 'get'>> {
+): Promise<ApiJson<P, 'get'>> {
   const qs = buildQuery(query);
   const url = qs ? `${path}?${qs}` : path;
-  return apiFetch(url, init) as Promise<
-    ApiJson<P, 'get'> extends never ? unknown : ApiJson<P, 'get'>
-  >;
+  return apiFetch<ApiJson<P, 'get'>>(url, init);
 }
 
 /** Substitute `{param}` segments; values are encodeURIComponent'd. */
@@ -171,8 +178,12 @@ export function apiDelete(path: string, init?: RequestInit): Promise<unknown> {
   return apiFetch(path, { ...init, method: 'DELETE' });
 }
 
-export function apiPut(path: string, body?: unknown, init?: RequestInit): Promise<unknown> {
-  return apiFetch(path, {
+export function apiPut<P extends keyof paths & string>(
+  path: P,
+  body?: unknown,
+  init?: RequestInit,
+): Promise<ApiJson<P, 'put'>> {
+  return apiFetch<ApiJson<P, 'put'>>(path, {
     ...init,
     method: 'PUT',
     body: body === undefined ? init?.body : JSON.stringify(body),

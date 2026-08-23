@@ -11,6 +11,7 @@ import (
 	chadapter "network_monitor/internal/adapter/clickhouse"
 	"network_monitor/internal/adapter/datalock"
 	"network_monitor/internal/adapter/geojob"
+	"network_monitor/internal/adapter/heavytask"
 	httpapi "network_monitor/internal/adapter/httpapi"
 	"network_monitor/internal/adapter/ingestnet"
 	appmetrics "network_monitor/internal/adapter/metrics"
@@ -27,6 +28,8 @@ type app struct {
 	repJobs     *reputationjob.Scheduler
 	backupJobs  *backupjob.Scheduler
 	anomalyJobs *anomalyjob.Scheduler
+	heavy       *heavytask.Limiter
+	skipGate    *heavytask.DeferredGate
 	dataLock    *datalock.Lock
 	bgCancel    context.CancelFunc
 	bgWg        sync.WaitGroup
@@ -80,12 +83,18 @@ func buildApp(ctx context.Context, cfg config.Config) (*app, error) {
 		cancel:     cancel,
 		listenAddr: cfg.ListenAddr,
 		dataLock:   dataLock,
+		heavy:      heavytask.New(1),
+		skipGate:   heavytask.NewDeferredGate(),
 	}
 
 	bg := wireBackground(ctx, bgCtx, a, cfg)
 	parsers := newParserRegistry()
 	a.prom = appmetrics.New(nil)
 	startIngest(a, cfg, bg.geo, parsers)
+	a.skipGate.Set(anomalyjob.Gate{Ingest: a.ingestSvc})
+	if a.geoJobs != nil {
+		a.geoJobs.SetGate(a.skipGate)
+	}
 	a.prom.SetIngest(a.ingestSvc)
 	a.srv = buildHTTP(cfg, a, authParts, bg, parsers)
 	if a.repJobs != nil {

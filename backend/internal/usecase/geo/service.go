@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -17,15 +18,23 @@ import (
 	"network_monitor/internal/model"
 )
 
+// HeavySlot — общий слот тяжёлых задач (heavytask.Limiter).
+type HeavySlot interface {
+	Acquire(ctx context.Context) error
+	Release()
+}
+
 // Service — application use cases для GeoIP.
 type Service struct {
-	store      RangeStore
-	missing    MissingIPStore
-	index      GeoIndex
-	jobs       GeoJobScheduler
-	codec      RangeCodec
-	maxRanges  int
-	enterprise EnterpriseNetStore
+	store         RangeStore
+	missing       MissingIPStore
+	index         GeoIndex
+	jobs          GeoJobScheduler
+	codec         RangeCodec
+	maxRanges     int
+	softMemLimit  uint64 // 0 = headroom check off
+	heavy         HeavySlot
+	enterprise    EnterpriseNetStore
 }
 
 // New создаёт GeoIP service. maxRanges — лимит строк CSV на upload (0 = без лимита ranges, только HTTP bytes).
@@ -36,6 +45,20 @@ func New(store RangeStore, missing MissingIPStore, index GeoIndex, jobs GeoJobSc
 func (s *Service) SetEnterpriseStore(st EnterpriseNetStore) {
 	if s != nil {
 		s.enterprise = st
+	}
+}
+
+// SetSoftMemLimitBytes — потолок HeapAlloc+new snapshot (+reserve). 0 = выкл.
+func (s *Service) SetSoftMemLimitBytes(n uint64) {
+	if s != nil {
+		s.softMemLimit = n
+	}
+}
+
+// SetHeavySlot — single-flight commit с backup/anomaly/geo jobs.
+func (s *Service) SetHeavySlot(slot HeavySlot) {
+	if s != nil {
+		s.heavy = slot
 	}
 }
 
@@ -103,6 +126,16 @@ func (s *Service) UploadCSV(ctx context.Context, r io.Reader, dryRun bool) (Uplo
 		}
 		return UploadResult{DryRun: true, Count: len(ranges), Sample: sample}, nil
 	}
+	if err := s.rejectInsufficientMemHeadroom(built, len(ranges)); err != nil {
+		slog.Info("geo upload rejected: mem headroom", "ranges", len(ranges), "err", err.Error())
+		return UploadResult{}, err
+	}
+	if s.heavy != nil {
+		if err := s.heavy.Acquire(ctx); err != nil {
+			return UploadResult{}, apperr.Conflict("geo replace busy: heavy background job in progress or canceled")
+		}
+		defer s.heavy.Release()
+	}
 	count, err := s.persistRangesWithSnapshot(ctx, ranges, built)
 	if err != nil {
 		return UploadResult{}, err
@@ -157,6 +190,30 @@ func (s *Service) checkUploadLimits(n int, dryRun bool) error {
 		return apperr.Conflict(fmt.Sprintf(
 			"geo replace would spike RAM (index=%d, upload=%d, limit=%d); skip re-upload if data is unchanged, or clear geo_ranges first / raise GEOIP_UPLOAD_MAX_RANGES",
 			existing, n, s.maxRanges,
+		))
+	}
+	return nil
+}
+
+// rejectInsufficientMemHeadroom — A3: не коммитить replace, если HeapAlloc+new≈peak не влезает.
+func (s *Service) rejectInsufficientMemHeadroom(built *geoip.BuiltSnapshot, n int) error {
+	if s == nil || s.softMemLimit == 0 {
+		return nil
+	}
+	var newBytes uint64
+	if built != nil {
+		newBytes = built.ApproxBytes()
+	} else if n > 0 {
+		newBytes = uint64(n) * 48
+	}
+	var ms runtime.MemStats
+	runtime.ReadMemStats(&ms)
+	const reserve = 512 << 20 // 512 MiB запас под ingest/HTTP
+	peak := ms.HeapAlloc + newBytes
+	if peak+reserve > s.softMemLimit {
+		return apperr.Conflict(fmt.Sprintf(
+			"geo replace would exceed memory headroom (heap=%d MiB, upload≈%d MiB, soft_limit=%d MiB); clear geo_ranges first, use smaller CSV, or raise backend memory profile",
+			ms.HeapAlloc>>20, newBytes>>20, s.softMemLimit>>20,
 		))
 	}
 	return nil

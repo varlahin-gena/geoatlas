@@ -76,6 +76,24 @@ func RunStartup(ctx context.Context, deps Dependencies, opts Options, warn WarnF
 		return
 	}
 
+	if deps.Gate != nil {
+		if reason := deps.Gate.SkipReason(); reason != "" {
+			if deps.Ready != nil {
+				if err := deps.Ready.RefreshEdgesAggReady(bctx); err != nil {
+					warn("edges agg ready check failed", err)
+				}
+				if err := deps.Ready.RefreshGeoEdgesAggReady(bctx); err != nil {
+					warn("geo edges ready check failed", err)
+				}
+				if err := deps.Ready.RefreshHourlyEdgesAggReady(bctx); err != nil {
+					warn("hourly edges ready check failed", err)
+				}
+			}
+			info("startup backfill skipped", "reason", reason)
+			return
+		}
+	}
+
 	if deps.Backfill != nil {
 		if err := deps.Backfill.BackfillEdgesAgg(bctx); err != nil {
 			warn("edges agg backfill failed", err)

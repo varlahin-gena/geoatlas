@@ -1,25 +1,19 @@
 import { apiDelete, apiFetch, apiGet, apiPath, apiPost } from './client';
+import type { components } from './openapi';
 import type { UserRole } from './types';
 
-export interface UserRow {
-  username: string;
-  full_name?: string;
-  role: string;
-  must_reset_password?: boolean;
-  created_at?: string;
-}
-
-export function listUsers(): Promise<{ users: UserRow[] }> {
-  return apiGet('/api/users') as Promise<{ users: UserRow[] }>;
-}
-
+export type UserRow = components['schemas']['AuthUserPublic'];
 export type UserDirectoryEntry = {
   username: string;
   full_name?: string;
 };
 
-export function listUserDirectory(): Promise<{ users: UserDirectoryEntry[] }> {
-  return apiGet('/api/users/directory') as Promise<{ users: UserDirectoryEntry[] }>;
+export function listUsers(): Promise<{ users?: UserRow[] }> {
+  return apiGet('/api/users');
+}
+
+export function listUserDirectory(): Promise<{ users?: UserDirectoryEntry[] }> {
+  return apiGet('/api/users/directory');
 }
 
 export function createUser(body: {
@@ -28,7 +22,7 @@ export function createUser(body: {
   role: string;
   full_name?: string;
   must_reset_password?: boolean;
-}): Promise<unknown> {
+}): Promise<UserRow> {
   return apiPost('/api/users', body);
 }
 

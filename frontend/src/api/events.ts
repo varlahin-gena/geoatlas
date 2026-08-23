@@ -1,7 +1,9 @@
 import { apiGetQuery } from './client';
 import type { EventsPayload, SeriesPayload } from './eventsTypes';
 
-export function fetchMapEvents(opts: {
+export type { EventsPayload, SeriesPayload, MapLine, MapPoint, SeriesPoint } from './eventsTypes';
+
+export async function fetchMapEvents(opts: {
   groupBy: string;
   limit: number;
   filter?: string;
@@ -30,10 +32,15 @@ export function fetchMapEvents(opts: {
   if (opts.repLists?.length) params.set('rep_list', opts.repLists.join(','));
   if (opts.repSide && opts.repSide !== 'any') params.set('rep_side', opts.repSide);
 
-  return apiGetQuery('/api/events', params, {
+  const data = await apiGetQuery('/api/events', params, {
     signal: opts.signal,
     cache: 'no-store',
-  }) as Promise<EventsPayload>;
+  });
+  return {
+    ...data,
+    lines: data.lines,
+    points: data.points,
+  };
 }
 
 export function fetchCountrySeries(
@@ -52,5 +59,5 @@ export function fetchCountrySeries(
   return apiGetQuery('/api/events/series', params, {
     signal,
     cache: 'no-store',
-  }) as Promise<SeriesPayload>;
+  });
 }

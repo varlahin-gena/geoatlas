@@ -34,6 +34,11 @@ type EnrichScheduler interface {
 	ScheduleEnrichOnly(parent context.Context, timeout time.Duration)
 }
 
+// SkipGate — пропуск heavy backfill (circuit / edges rebuild).
+type SkipGate interface {
+	SkipReason() string
+}
+
 // GeoRangeCounter — число диапазонов в live GeoIP-индексе.
 type GeoRangeCounter interface {
 	RangeCount() int
@@ -52,6 +57,7 @@ type Dependencies struct {
 	Enrich    EnrichScheduler
 	Geo       GeoRangeCounter
 	Retention RetentionApplier
+	Gate      SkipGate
 }
 
 // Options — флаги старта.

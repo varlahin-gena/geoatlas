@@ -32,7 +32,7 @@ func (h *APITokensHandler) Create(w http.ResponseWriter, r *http.Request) {
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&body); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+		writeBadRequest(w, "invalid json")
 		return
 	}
 	pub, plain, err := h.apiTokens.Create(body.Name, body.Scope)
@@ -97,7 +97,7 @@ func (h *APITokensHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 func writeTokenStoreError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, auth.ErrInvalidTokenName), errors.Is(err, auth.ErrInvalidScope):
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		writeBadRequest(w, err.Error())
 	case errors.Is(err, auth.ErrTokenNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": err.Error()})
 	case errors.Is(err, auth.ErrTokenLimit):

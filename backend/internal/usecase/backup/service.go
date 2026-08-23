@@ -106,6 +106,12 @@ type Options struct {
 	IncludeAuth  bool
 }
 
+// HeavySlot — общий слот тяжёлых задач (heavytask.Limiter).
+type HeavySlot interface {
+	Acquire(ctx context.Context) error
+	Release()
+}
+
 // Service — list + async create / attach / detach + schedule.
 type Service struct {
 	opts     Options
@@ -115,6 +121,7 @@ type Service struct {
 	job      *Job
 	drLog    *usecaseaudit.Service
 	auditLog *usecaseaudit.Service
+	heavy    HeavySlot
 
 	mu           sync.Mutex
 	lastFireDate string // in-memory dedupe на случай гонки тика
@@ -139,6 +146,28 @@ func (s *Service) SetLogService(logs *usecaseaudit.Service) {
 	}
 	s.drLog = logs
 	s.auditLog = logs
+}
+
+// SetHeavySlot — общий слот с geo/anomaly/reputation (опционально).
+func (s *Service) SetHeavySlot(slot HeavySlot) {
+	if s == nil {
+		return
+	}
+	s.heavy = slot
+}
+
+func (s *Service) acquireHeavy(ctx context.Context) error {
+	if s == nil || s.heavy == nil {
+		return nil
+	}
+	return s.heavy.Acquire(ctx)
+}
+
+func (s *Service) releaseHeavy() {
+	if s == nil || s.heavy == nil {
+		return
+	}
+	s.heavy.Release()
 }
 
 func (s *Service) Catalog() (Catalog, error) {
@@ -494,6 +523,12 @@ func (s *Service) effectivePolicy() (keep int, includeEdges, includeAuth bool) {
 
 func (s *Service) runCreate(ctx context.Context, source string, actor string) {
 	defer s.job.Finish()
+	if err := s.acquireHeavy(ctx); err != nil {
+		s.job.SetError("", "heavy slot: "+err.Error())
+		return
+	}
+	defer s.releaseHeavy()
+
 	succeeded := false
 	defer func() {
 		if source != SourceSchedule {
@@ -589,6 +624,12 @@ func (s *Service) runCreate(ctx context.Context, source string, actor string) {
 
 func (s *Service) runAttach(ctx context.Context, name string, actor string) {
 	defer s.job.Finish()
+	if err := s.acquireHeavy(ctx); err != nil {
+		s.job.SetError(name, "heavy slot: "+err.Error())
+		return
+	}
+	defer s.releaseHeavy()
+
 	s.job.SetRunning(name, "RESTORE в nm_bak_*…")
 	s.logDREvent(ctx, usecaseaudit.DREvent{
 		Actor:   safeActor(actor),
@@ -631,6 +672,12 @@ func (s *Service) runAttach(ctx context.Context, name string, actor string) {
 
 func (s *Service) runDetach(ctx context.Context, name string, actor string) {
 	defer s.job.Finish()
+	if err := s.acquireHeavy(ctx); err != nil {
+		s.job.SetError(name, "heavy slot: "+err.Error())
+		return
+	}
+	defer s.releaseHeavy()
+
 	s.job.SetRunning(name, "DROP nm_bak_*…")
 	s.logDREvent(ctx, usecaseaudit.DREvent{
 		Actor:   safeActor(actor),

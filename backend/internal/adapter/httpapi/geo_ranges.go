@@ -127,7 +127,7 @@ func (h *GeoHandler) AppendGeoRange(w http.ResponseWriter, r *http.Request) {
 
 	var req appendGeoRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+		writeBadRequest(w, "invalid json")
 		return
 	}
 
@@ -153,7 +153,7 @@ func (h *GeoHandler) UpdateGeoRange(w http.ResponseWriter, r *http.Request) {
 
 	var req updateGeoRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+		writeBadRequest(w, "invalid json")
 		return
 	}
 

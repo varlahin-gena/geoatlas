@@ -19,10 +19,12 @@ export type {
   HistoryPayload,
   Retention,
   SystemStats,
-};
+} from './systemTypes';
 export type { SystemVersion };
 
 export type SystemStatus = components['schemas']['SystemStatus'];
+export type TlsStatus = components['schemas']['TlsStatus'];
+export type TlsMutationResponse = components['schemas']['TlsMutationResponse'];
 
 export function fetchSystemVersion(init?: RequestInit): Promise<SystemVersion> {
   return apiGet('/api/system/version', init);
@@ -33,23 +35,24 @@ export function fetchSystemStatus(init?: RequestInit): Promise<SystemStatus> {
 }
 
 export function fetchSystemStats(init?: RequestInit): Promise<SystemStats> {
+  // OpenAPI SystemStats is a loose blob; UI type narrows nested metric maps.
   return apiGet('/api/system/stats', init) as Promise<SystemStats>;
 }
 
-export function fetchRetention(): Promise<{ retention?: Retention } & Retention> {
-  return apiGet('/api/system/retention') as Promise<{ retention?: Retention } & Retention>;
+export function fetchRetention(): Promise<{ ok?: boolean; retention?: Retention }> {
+  return apiGet('/api/system/retention');
 }
 
-export function putRetention(body: Retention): Promise<{ retention?: Retention }> {
-  return apiPut('/api/system/retention', body) as Promise<{ retention?: Retention }>;
+export function putRetention(body: Retention): Promise<{ ok?: boolean; retention?: Retention }> {
+  return apiPut('/api/system/retention', body);
 }
 
 export function fetchSystemHistory(period: string): Promise<HistoryPayload> {
-  return apiGetQuery('/api/system/history', { period }) as Promise<HistoryPayload>;
+  return apiGetQuery('/api/system/history', { period });
 }
 
 export function fetchBackups(): Promise<BackupCatalog> {
-  return apiGet('/api/system/backups') as Promise<BackupCatalog>;
+  return apiGet('/api/system/backups');
 }
 
 export function fetchDRHistory(query?: {
@@ -59,7 +62,7 @@ export function fetchDRHistory(query?: {
   status?: string;
   actor?: string;
 }): Promise<{ items?: DREvent[] }> {
-  return apiGetQuery('/api/dr/history', query || {}) as Promise<{ items?: DREvent[] }>;
+  return apiGetQuery('/api/dr/history', query || {});
 }
 
 export function fetchAuditLog(query?: {
@@ -69,7 +72,7 @@ export function fetchAuditLog(query?: {
   result?: string;
   actor?: string;
 }): Promise<{ items?: AuditEvent[] }> {
-  return apiGetQuery('/api/audit', query || {}) as Promise<{ items?: AuditEvent[] }>;
+  return apiGetQuery('/api/audit', query || {});
 }
 
 export function createBackup(): Promise<unknown> {
@@ -80,10 +83,7 @@ export function putBackupSchedule(schedule: BackupSchedule): Promise<{
   ok?: boolean;
   schedule?: BackupSchedule;
 }> {
-  return apiPut('/api/system/backup-schedule', schedule) as Promise<{
-    ok?: boolean;
-    schedule?: BackupSchedule;
-  }>;
+  return apiPut('/api/system/backup-schedule', schedule);
 }
 
 export function attachBackup(name: string): Promise<unknown> {
@@ -104,47 +104,14 @@ export function deleteBackup(name: string): Promise<unknown> {
   return apiDelete(apiPath('/api/system/backups/{name}', { name }));
 }
 
-type TlsCertInfo = {
-  subject?: string;
-  issuer?: string;
-  not_before?: string;
-  not_after?: string;
-  days_left?: number;
-  sans?: string[];
-  fingerprint_sha256?: string;
-  self_signed?: boolean;
-};
-
-export type TlsStatus = {
-  configured?: boolean;
-  writable?: boolean;
-  cert_present?: boolean;
-  key_present?: boolean;
-  https_enabled?: string;
-  https_port?: string;
-  http_redirect?: string;
-  cert_path?: string;
-  key_path?: string;
-  cert?: TlsCertInfo;
-};
-
-export type TlsReloadResult = {
-  reloaded?: boolean;
-  restart_required?: boolean;
-  message?: string;
-};
-
-export function fetchTlsStatus(): Promise<{ tls?: TlsStatus } & TlsStatus> {
-  return apiGet('/api/system/tls') as Promise<{ tls?: TlsStatus } & TlsStatus>;
+export function fetchTlsStatus(): Promise<components['schemas']['TlsStatusResponse']> {
+  return apiGet('/api/system/tls');
 }
 
-export function putTls(body: { cert_pem: string; key_pem: string }): Promise<{
-  ok?: boolean;
-  reload?: TlsReloadResult;
-}> {
-  return apiPut('/api/system/tls', body) as Promise<{ ok?: boolean; reload?: TlsReloadResult }>;
+export function putTls(body: { cert_pem: string; key_pem: string }): Promise<TlsMutationResponse> {
+  return apiPut('/api/system/tls', body);
 }
 
-export function postTlsReload(): Promise<{ ok?: boolean; reload?: TlsReloadResult }> {
-  return apiPost('/api/system/tls/reload', {}) as Promise<{ ok?: boolean; reload?: TlsReloadResult }>;
+export function postTlsReload(): Promise<TlsMutationResponse> {
+  return apiPost('/api/system/tls/reload', {});
 }

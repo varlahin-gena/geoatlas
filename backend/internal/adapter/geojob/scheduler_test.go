@@ -80,3 +80,24 @@ func TestSchedulerMaintenanceUsesStore(t *testing.T) {
 	defer cancel()
 	s.Shutdown(ctx)
 }
+
+func TestSchedulerMaintenanceSkippedByGate(t *testing.T) {
+	store := &stubStore{}
+	s := New(stubGeo{}, store, DefaultLookbackDays)
+	s.SetGate(staticSkip("circuit"))
+	s.ScheduleMaintenanceBackfill(context.Background(), time.Hour)
+
+	time.Sleep(50 * time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	s.Shutdown(ctx)
+
+	if store.edges.Load() != 0 || store.geoEdges.Load() != 0 {
+		t.Fatalf("maintenance must skip: edges=%d geoEdges=%d", store.edges.Load(), store.geoEdges.Load())
+	}
+}
+
+type staticSkip string
+
+func (s staticSkip) SkipReason() string { return string(s) }
+

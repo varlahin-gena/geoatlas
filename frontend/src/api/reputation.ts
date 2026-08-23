@@ -1,41 +1,20 @@
 import { apiDelete, apiFetch, apiGet, apiPath, apiPost } from './client';
+import type { components } from './openapi';
 
-export interface ReputationFeed {
-  name: string;
-  url?: string;
-  category?: string;
-  format?: string;
-  enabled?: boolean;
-  last_refresh?: string;
-}
-
-export interface ReputationList {
-  name: string;
-  category?: string;
-  count?: number;
-  source?: string;
-  updated_at?: string;
-  last_error?: string;
-}
-
-export interface ReputationRefreshResult {
-  updated?: string[];
-  skipped?: string[];
-  failed?: string[];
-  errors?: Record<string, string>;
-  counts?: Record<string, number>;
-}
+export type ReputationFeed = components['schemas']['ReputationFeed'];
+export type ReputationList = components['schemas']['ReputationListMeta'];
+export type ReputationRefreshResult = components['schemas']['ReputationRefreshResult'];
 
 export function listReputationFeeds(): Promise<{ feeds?: ReputationFeed[] }> {
-  return apiGet('/api/reputation/feeds') as Promise<{ feeds?: ReputationFeed[] }>;
+  return apiGet('/api/reputation/feeds');
 }
 
 export function listReputationLists(): Promise<{ lists?: ReputationList[] }> {
-  return apiGet('/api/reputation/lists') as Promise<{ lists?: ReputationList[] }>;
+  return apiGet('/api/reputation/lists');
 }
 
 export function listReputationCatalog(): Promise<{ feeds?: ReputationFeed[] }> {
-  return apiGet('/api/reputation/catalog') as Promise<{ feeds?: ReputationFeed[] }>;
+  return apiGet('/api/reputation/catalog');
 }
 
 export function createReputationFeed(body: {
@@ -50,7 +29,7 @@ export function createReputationFeed(body: {
 
 export function refreshReputation(force = true): Promise<ReputationRefreshResult> {
   const path = force ? '/api/reputation/refresh?force=1' : '/api/reputation/refresh';
-  return apiFetch(path, { method: 'POST', body: '{}' }) as Promise<ReputationRefreshResult>;
+  return apiFetch<ReputationRefreshResult>(path, { method: 'POST', body: '{}' });
 }
 
 export function deleteReputationList(name: string): Promise<unknown> {

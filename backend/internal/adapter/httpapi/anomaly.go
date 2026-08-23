@@ -35,7 +35,7 @@ func (h *AnomalyHandler) List(w http.ResponseWriter, r *http.Request) {
 	if v := strings.TrimSpace(r.URL.Query().Get("since")); v != "" {
 		t, err := parseTimeParam(v)
 		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid since"})
+			writeBadRequest(w, "invalid since")
 			return
 		}
 		q.Since = t
@@ -76,12 +76,12 @@ func (h *AnomalyHandler) Ack(w http.ResponseWriter, r *http.Request) {
 	}
 	fp := strings.TrimSpace(r.PathValue("fingerprint"))
 	if fp == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "missing fingerprint"})
+		writeBadRequest(w, "missing fingerprint")
 		return
 	}
 	by := h.actorName(r)
 	if err := h.anomalyUC.Ack(r.Context(), fp, by); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		writeBadRequest(w, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "fingerprint": fp, "ack_by": by})
@@ -98,19 +98,19 @@ func (h *AnomalyHandler) Assign(w http.ResponseWriter, r *http.Request) {
 	}
 	fp := strings.TrimSpace(r.PathValue("fingerprint"))
 	if fp == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "missing fingerprint"})
+		writeBadRequest(w, "missing fingerprint")
 		return
 	}
 	var req assignAnomalyRequest
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+		writeBadRequest(w, "invalid json")
 		return
 	}
 	by := h.actorName(r)
 	if err := h.anomalyUC.Assign(r.Context(), fp, req.AssignedTo, by); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		writeBadRequest(w, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{

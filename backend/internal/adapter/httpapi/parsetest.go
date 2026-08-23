@@ -12,7 +12,7 @@ func (h *ParseHandler) ParseTest(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := h.parseTestUC.Run(r.Body)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid body"})
+		writeBadRequest(w, "invalid body")
 		return
 	}
 	writeJSON(w, http.StatusOK, result)

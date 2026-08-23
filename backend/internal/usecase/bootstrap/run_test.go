@@ -144,6 +144,33 @@ func TestRunStartupBackfillThenGeoEnrich(t *testing.T) {
 	}
 }
 
+func TestRunStartupGateSkipsBackfill(t *testing.T) {
+	backfill := &recBackfill{}
+	ready := &recReady{}
+	enrich := &recEnrich{}
+	RunStartup(context.Background(), Dependencies{
+		Backfill: backfill,
+		Ready:    ready,
+		Enrich:   enrich,
+		Geo:      recGeo{n: 12},
+		Gate:     staticSkip("circuit"),
+	}, Options{}, nil, nil)
+	if len(backfill.calls) != 0 {
+		t.Fatalf("backfill must skip on gate, got %v", backfill.calls)
+	}
+	if len(ready.calls) != 3 {
+		t.Fatalf("ready refreshes: %v", ready.calls)
+	}
+	if enrich.n != 0 {
+		t.Fatal("enrich must not schedule when backfill gated")
+	}
+}
+
+type staticSkip string
+
+func (s staticSkip) SkipReason() string { return string(s) }
+
+
 func TestRunStartupNoGeoSkipsEnrich(t *testing.T) {
 	enrich := &recEnrich{}
 	RunStartup(context.Background(), Dependencies{

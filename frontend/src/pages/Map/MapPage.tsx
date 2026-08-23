@@ -5,12 +5,11 @@ import { useSidebarCollapsed } from '@/components/useSidebarCollapsed';
 import { fmtNumber } from '@/lib/format';
 import { loadCountriesGeoJSON, type GeoFeatureCollection } from './mapHeatmap';
 import { MapDetailPanel } from './mapDetail';
-import { buildDeckLayers } from './mapLayers';
 import { collectReputationMenuTree } from './mapReputation';
+import { MapChromeProvider, useMapChrome } from './MapChromeContext';
 import { MapSidebar } from './MapSidebar';
 import { MapTopbar } from './MapTopbar';
 import { MapVizOverlays } from './MapVizOverlays';
-import type { InfoDockTab } from './MapInfoDock';
 import { GeoWizardModal } from './GeoWizardModal';
 import { AnomalyStrip } from './AnomalyStrip';
 import {
@@ -21,16 +20,117 @@ import {
 import { useGeoWizard } from './useGeoWizard';
 import { useMapAnomalies } from './useMapAnomalies';
 import { useMapDetail } from './useMapDetail';
+import { useMapDeckLayers } from './viz/useMapDeckLayers';
 import { useMapEvents } from './useMapEvents';
 import { useMapFilters } from './useMapFilters';
 import { useMapViewQuery } from './mapQuery';
 import { useMapLibreController } from './useMapLibreController';
 import { useMapReputation } from './useMapReputation';
 import { useMapUploads } from './useMapUploads';
+import { useMapVizChrome } from './useMapVizChrome';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import '@/styles/index.css';
 import './geoWizard.css';
 import './anomaly.css';
+
+function MapChromeShell({
+  sidebarCollapsed,
+  mapContainer,
+  loading,
+  showGeoEmptyBanner,
+  truncHint,
+  infoDockVisible,
+  activeAlert,
+  returnToLiveMap,
+  anomaliesSummary,
+  geoWizardOpen,
+  displayEmptyOverlay,
+  monoArcs,
+  repColorArcs,
+  stats,
+  infoDockTab,
+  setInfoDockTab,
+  showLegend,
+  showStats,
+  detail,
+  closeDetail,
+}: {
+  sidebarCollapsed: boolean;
+  mapContainer: React.RefObject<HTMLDivElement | null>;
+  loading: boolean;
+  showGeoEmptyBanner: boolean;
+  truncHint: string;
+  infoDockVisible: boolean;
+  activeAlert: ReturnType<typeof readMapAlert>;
+  returnToLiveMap: () => void;
+  anomaliesSummary: ReturnType<typeof useMapAnomalies>['summary'];
+  geoWizardOpen: () => void;
+  displayEmptyOverlay: ReturnType<typeof useMapFilters>['emptyOverlay'];
+  monoArcs: boolean;
+  repColorArcs: boolean;
+  stats: ReturnType<typeof useMapFilters>['stats'];
+  infoDockTab: 'legend' | 'stats';
+  setInfoDockTab: (tab: 'legend' | 'stats') => void;
+  showLegend: boolean;
+  showStats: boolean;
+  detail: ReturnType<typeof useMapDetail>['detail'];
+  closeDetail: () => void;
+}) {
+  const { sidebar, topbar } = useMapChrome();
+
+  return (
+    <div className={`app${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
+      <a className="skip-link" href="#map-main">
+        К содержимому
+      </a>
+      <MapSidebar {...sidebar} />
+
+      <main className="main" id="map-main">
+        <MapTopbar {...topbar} />
+
+        <div
+          className={`viz-area${loading ? ' is-loading' : ''}${showGeoEmptyBanner ? ' has-geo-empty-banner' : ''}${truncHint ? ' has-viz-hint' : ''}${infoDockVisible ? ' has-map-info-dock' : ''}`}
+        >
+          <div ref={mapContainer} id="map-host" className="viz-host" />
+
+          <div className="map-top-stack">
+            {activeAlert ? (
+              <AnomalyActiveBanner alert={activeAlert} onReturnLive={returnToLiveMap} />
+            ) : (
+              <AnomalyStrip summary={anomaliesSummary} />
+            )}
+            {truncHint ? <div className="viz-hint warn">{truncHint}</div> : null}
+          </div>
+
+          {showGeoEmptyBanner ? (
+            <div className="geo-wizard-banner" role="status">
+              <p>База GeoIP пуста — карта не покажет дуги без координат.</p>
+              <button type="button" className="btn primary" onClick={geoWizardOpen}>
+                Мастер GeoIP
+              </button>
+            </div>
+          ) : null}
+
+          <MapVizOverlays
+            emptyOverlay={displayEmptyOverlay}
+            loading={loading}
+            monoArcs={monoArcs}
+            repColorArcs={repColorArcs}
+            stats={stats}
+            infoDock={{
+              tab: infoDockTab,
+              onTabChange: setInfoDockTab,
+              showLegendTab: showLegend,
+              showStatsTab: showStats,
+            }}
+          />
+
+          <MapDetailPanel detail={detail} onClose={closeDetail} />
+        </div>
+      </main>
+    </div>
+  );
+}
 
 export default function MapPage() {
   const { isAdmin, reputationEnabled, uiAuthEnabled, theme, user, refresh } = useAuth();
@@ -147,16 +247,8 @@ export default function MapPage() {
     onGeoReady: fetchData,
   });
 
-  const [viewMode, setViewMode] = useState<'map' | 'globe'>('map');
-  const [showLegend, setShowLegend] = useState(true);
-  const [showStats, setShowStats] = useState(true);
-  const [infoDockTab, setInfoDockTab] = useState<InfoDockTab>('legend');
-  const [showHeatmap, setShowHeatmap] = useState(false);
-  const [showCountryLabels, setShowCountryLabels] = useState(false);
-  const [monoArcs, setMonoArcs] = useState(false);
-  const [autoRotate, setAutoRotate] = useState(true);
+  const viz = useMapVizChrome();
   const [countriesGeoJSON, setCountriesGeoJSON] = useState<GeoFeatureCollection | null>(null);
-  const [arcCountInfo, setArcCountInfo] = useState({ shown: 0, total: 0 });
 
   const {
     mapContainer,
@@ -171,9 +263,9 @@ export default function MapPage() {
     exportPng,
   } = useMapLibreController({
     theme,
-    viewMode,
-    setViewMode,
-    autoRotate,
+    viewMode: viz.viewMode,
+    setViewMode: viz.setViewMode,
+    autoRotate: viz.autoRotate,
     toast,
   });
 
@@ -190,21 +282,10 @@ export default function MapPage() {
   );
 
   function returnToLiveMap() {
-    // Link already navigates to `/`; clear memory + sync hook search state / live source.
     clearMapAlertMemory();
     resetToLiveView();
     if (dataSource !== 'live') selectDataSource('live');
   }
-
-  useEffect(() => {
-    if (infoDockTab === 'legend' && !showLegend) {
-      setInfoDockTab(showStats ? 'stats' : 'legend');
-    } else if (infoDockTab === 'stats' && !showStats) {
-      setInfoDockTab(showLegend ? 'legend' : 'stats');
-    }
-  }, [showLegend, showStats, infoDockTab]);
-
-  const infoDockVisible = showLegend || showStats;
 
   const { detail, closeDetail, openLineDetail, openPointDetail, openCountryDetail } = useMapDetail({
     groupBy,
@@ -220,6 +301,31 @@ export default function MapPage() {
     setFocusedCountry,
   });
 
+  const { arcCountInfo } = useMapDeckLayers({
+    overlayRef,
+    mapReady,
+    layersRefreshBusy,
+    layersTick,
+    viewMode: viz.viewMode,
+    visibleLines,
+    points,
+    countriesGeoJSON,
+    showHeatmap: viz.showHeatmap,
+    showCountryLabels: viz.showCountryLabels,
+    monoArcs: viz.monoArcs,
+    repColorArcs,
+    groupBy,
+    focusedCountry,
+    mapTilesFailed,
+    heavyCountryLayers,
+    theme,
+    globeViewRef,
+    maxArcs,
+    onLineClick: openLineDetail,
+    onPointClick: openPointDetail,
+    onCountryClick: openCountryDetail,
+  });
+
   useEffect(() => {
     document.title = 'ГеоАтлас — SOC';
     document.body.classList.add('page-map');
@@ -229,65 +335,6 @@ export default function MapPage() {
   useEffect(() => {
     void loadCountriesGeoJSON().then(setCountriesGeoJSON);
   }, []);
-
-  // Update deck layers
-  useEffect(() => {
-    const overlay = overlayRef.current;
-    if (!overlay || !mapReady) return;
-    if (layersRefreshBusy.current) return;
-    layersRefreshBusy.current = true;
-    try {
-      const result = buildDeckLayers({
-        mode: viewMode,
-        lines: visibleLines,
-        points,
-        countriesGeoJSON,
-        showHeatmap,
-        showCountryLabels,
-        monoArcColor: monoArcs,
-        repColorArcs,
-        groupBy,
-        focusedCountry,
-        mapTilesFailed,
-        heavyCountryLayersAllowed: heavyCountryLayers,
-        theme,
-        globeView: globeViewRef.current,
-        maxArcs,
-        onLineClick: openLineDetail,
-        onPointClick: openPointDetail,
-        onCountryClick: (key, feature) => openCountryDetail(key, feature),
-        highlightNodeKeys: undefined,
-        highlightEdgeKeys: undefined,
-      });
-      overlay.setProps({ layers: result.layers as never[] });
-      setArcCountInfo({ shown: result.shown, total: result.total });
-    } finally {
-      layersRefreshBusy.current = false;
-    }
-  }, [
-    mapReady,
-    layersTick,
-    viewMode,
-    visibleLines,
-    points,
-    countriesGeoJSON,
-    showHeatmap,
-    showCountryLabels,
-    monoArcs,
-    repColorArcs,
-    groupBy,
-    focusedCountry,
-    mapTilesFailed,
-    heavyCountryLayers,
-    theme,
-    globeViewRef,
-    maxArcs,
-    openLineDetail,
-    openPointDetail,
-    openCountryDetail,
-    overlayRef,
-    layersRefreshBusy,
-  ]);
 
   const truncHint =
     arcCountInfo.total > arcCountInfo.shown
@@ -319,127 +366,97 @@ export default function MapPage() {
   }, [isAdmin, reloadGeoStatus]);
 
   return (
-    <div className={`app${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
-      <a className="skip-link" href="#map-main">
-        К содержимому
-      </a>
-      <MapSidebar
-        view={{ viewMode, setViewMode }}
-        isAdmin={isAdmin}
-        uploads={{ logFileRef, geoFileRef, uploadFile }}
-        actions={{ fetchData, resetView, exportPng, toggleSidebar }}
-        geoWizard={{
-          open: geoWizard.open,
-          empty: geoWizard.geo == null ? null : geoWizard.geo.count === 0,
-        }}
+    <MapChromeProvider
+      sidebarInput={{
+        viewMode: viz.viewMode,
+        setViewMode: viz.setViewMode,
+        isAdmin,
+        logFileRef,
+        geoFileRef,
+        uploadFile,
+        fetchData,
+        resetView,
+        exportPng,
+        toggleSidebar,
+        geoWizardOpen: geoWizard.open,
+        geoWizardEmpty: geoWizard.geo == null ? null : geoWizard.geo.count === 0,
+      }}
+      topbarInput={{
+        search,
+        setSearch,
+        builderOpen,
+        setBuilderOpen,
+        groupBy,
+        setGroupBy,
+        filter,
+        setFilter,
+        reputationEnabled,
+        ipMode,
+        repFilterCount,
+        repCategories,
+        setRepCategories,
+        repLists,
+        setRepLists,
+        repSide,
+        setRepSide,
+        repColorArcs,
+        setRepColorArcs,
+        repTree,
+        period,
+        setPeriod,
+        periodFrom,
+        setPeriodFrom,
+        periodTo,
+        setPeriodTo,
+        fetchData,
+        viewMode: viz.viewMode,
+        minCount,
+        setMinCount,
+        arcCountInfo,
+        maxArcs,
+        setMaxArcs,
+        showLegend: viz.showLegend,
+        setShowLegend: viz.setShowLegend,
+        showStats: viz.showStats,
+        setShowStats: viz.setShowStats,
+        showHeatmap: viz.showHeatmap,
+        setShowHeatmap: viz.setShowHeatmap,
+        showCountryLabels: viz.showCountryLabels,
+        setShowCountryLabels: viz.setShowCountryLabels,
+        monoArcs: viz.monoArcs,
+        setMonoArcs: viz.setMonoArcs,
+        autoRefresh,
+        setAutoRefresh,
+        dataSource,
+        selectDataSource,
+        backupAttached,
+        autoRotate: viz.autoRotate,
+        setAutoRotate: viz.setAutoRotate,
+        setInfoDockTab: viz.setInfoDockTab,
+      }}
+    >
+      <MapChromeShell
+        sidebarCollapsed={sidebarCollapsed}
+        mapContainer={mapContainer}
+        loading={loading}
+        showGeoEmptyBanner={showGeoEmptyBanner}
+        truncHint={truncHint}
+        infoDockVisible={viz.infoDockVisible}
+        activeAlert={activeAlert}
+        returnToLiveMap={returnToLiveMap}
+        anomaliesSummary={anomalies.summary}
+        geoWizardOpen={geoWizard.open}
+        displayEmptyOverlay={displayEmptyOverlay}
+        monoArcs={viz.monoArcs}
+        repColorArcs={repColorArcs}
+        stats={stats}
+        infoDockTab={viz.infoDockTab}
+        setInfoDockTab={viz.setInfoDockTab}
+        showLegend={viz.showLegend}
+        showStats={viz.showStats}
+        detail={detail}
+        closeDetail={closeDetail}
       />
-
-      <main className="main" id="map-main">
-        <MapTopbar
-          search={{ search, setSearch, builderOpen, setBuilderOpen }}
-          grouping={{ groupBy, setGroupBy, filter, setFilter }}
-          reputation={{
-            reputationEnabled,
-            ipMode,
-            repFilterCount,
-            repCategories,
-            setRepCategories,
-            repLists,
-            setRepLists,
-            repSide,
-            setRepSide,
-            repColorArcs,
-            setRepColorArcs,
-            repTree,
-          }}
-          period={{
-            period,
-            setPeriod,
-            periodFrom,
-            setPeriodFrom,
-            periodTo,
-            setPeriodTo,
-            fetchData,
-          }}
-          layers={{
-            viewMode,
-            viz: {
-              minCount,
-              setMinCount,
-              arcCountInfo,
-              maxArcs,
-              setMaxArcs,
-              showLegend,
-              setShowLegend: (v: boolean) => {
-                setShowLegend(v);
-                if (v) setInfoDockTab('legend');
-              },
-              showStats,
-              setShowStats: (v: boolean) => {
-                setShowStats(v);
-                if (v) setInfoDockTab('stats');
-              },
-              showHeatmap,
-              setShowHeatmap,
-              showCountryLabels,
-              setShowCountryLabels,
-              monoArcs,
-              setMonoArcs,
-            },
-            data: {
-              autoRefresh,
-              setAutoRefresh,
-              dataSource,
-              selectDataSource,
-              backupAttached,
-            },
-            globe: {
-              autoRotate,
-              setAutoRotate,
-            },
-          }}
-        />
-
-        <div
-          className={`viz-area${loading ? ' is-loading' : ''}${showGeoEmptyBanner ? ' has-geo-empty-banner' : ''}${truncHint ? ' has-viz-hint' : ''}${infoDockVisible ? ' has-map-info-dock' : ''}`}
-        >
-          <div ref={mapContainer} id="map-host" className="viz-host" />
-
-          <div className="map-top-stack">
-            {activeAlert ? (
-              <AnomalyActiveBanner alert={activeAlert} onReturnLive={returnToLiveMap} />
-            ) : (
-              <AnomalyStrip summary={anomalies.summary} />
-            )}
-            {truncHint ? <div className="viz-hint warn">{truncHint}</div> : null}
-          </div>
-
-          {showGeoEmptyBanner ? (
-            <div className="geo-wizard-banner" role="status">
-              <p>База GeoIP пуста — карта не покажет дуги без координат.</p>
-              <button type="button" className="btn primary" onClick={geoWizard.open}>
-                Мастер GeoIP
-              </button>
-            </div>
-          ) : null}
-
-          <MapVizOverlays
-            emptyOverlay={displayEmptyOverlay}
-            loading={loading}
-            monoArcs={monoArcs}
-            repColorArcs={repColorArcs}
-            stats={stats}
-            infoDock={{
-              tab: infoDockTab,
-              onTabChange: setInfoDockTab,
-              showLegendTab: showLegend,
-              showStatsTab: showStats,
-            }}
-          />
-
-          <MapDetailPanel detail={detail} onClose={closeDetail} />
-        </div>
-      </main>
 
       {geoWizard.visible ? (
         <GeoWizardModal
@@ -460,6 +477,6 @@ export default function MapPage() {
           onWaitForCurl={() => void geoWizard.waitForGeo()}
         />
       ) : null}
-    </div>
+    </MapChromeProvider>
   );
 }

@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"network_monitor/internal/adapter/heavytask"
 	"network_monitor/internal/model"
 	reppkg "network_monitor/internal/reputation"
 	"network_monitor/internal/safeurl"
@@ -34,12 +35,21 @@ type Scheduler struct {
 	enabled  bool
 	applier  Applier
 	client   *http.Client
+	heavy    *heavytask.Limiter
 
 	mu      sync.Mutex
 	etag    map[string]string
 	lastMod map[string]string
 	cancel  context.CancelFunc
 	done    chan struct{}
+}
+
+// SetLimiter — общий слот тяжёлых задач.
+func (s *Scheduler) SetLimiter(l *heavytask.Limiter) {
+	if s == nil {
+		return
+	}
+	s.heavy = l
 }
 
 func New(feeds []usecasereputation.Feed, interval time.Duration, enabled bool, applier Applier) *Scheduler {
@@ -134,6 +144,11 @@ func (s *Scheduler) runOnce(ctx context.Context, force bool) usecasereputation.R
 		Errors: map[string]string{},
 		Counts: map[string]int{},
 	}
+	if err := s.heavy.Acquire(ctx); err != nil {
+		return res
+	}
+	defer s.heavy.Release()
+
 	feeds := s.snapshotFeeds()
 	for _, feed := range feeds {
 		if ctx.Err() != nil {

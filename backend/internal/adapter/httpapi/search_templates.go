@@ -50,7 +50,7 @@ func (h *SearchTemplatesHandler) CreateMine(w http.ResponseWriter, r *http.Reque
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+		writeBadRequest(w, "invalid json")
 		return
 	}
 	t, err := h.searchTemplates.Create(username, req.Name, req.Query)
@@ -73,14 +73,14 @@ func (h *SearchTemplatesHandler) UpdateMine(w http.ResponseWriter, r *http.Reque
 	}
 	id := strings.TrimSpace(r.PathValue("id"))
 	if id == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "missing id"})
+		writeBadRequest(w, "missing id")
 		return
 	}
 	var req searchTemplateRequest
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+		writeBadRequest(w, "invalid json")
 		return
 	}
 	t, err := h.searchTemplates.Update(username, id, req.Name, req.Query)
@@ -103,7 +103,7 @@ func (h *SearchTemplatesHandler) DeleteMine(w http.ResponseWriter, r *http.Reque
 	}
 	id := strings.TrimSpace(r.PathValue("id"))
 	if id == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "missing id"})
+		writeBadRequest(w, "missing id")
 		return
 	}
 	if err := h.searchTemplates.Delete(username, id); err != nil {

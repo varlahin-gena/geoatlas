@@ -27,14 +27,14 @@ func (h *ReputationHandler) UploadReputation(w http.ResponseWriter, r *http.Requ
 	if strings.HasPrefix(ct, "multipart/form-data") {
 		file, _, err := r.FormFile("file")
 		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "missing file"})
+			writeBadRequest(w, "missing file")
 			return
 		}
 		defer file.Close()
 		reader = file
 	} else {
 		if r.Body == nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "empty body"})
+			writeBadRequest(w, "empty body")
 			return
 		}
 		defer r.Body.Close()
@@ -147,7 +147,7 @@ func (h *ReputationHandler) AddFeed(w http.ResponseWriter, r *http.Request) {
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+		writeBadRequest(w, "invalid json")
 		return
 	}
 	err := h.reputationUC.AddFeed(r.Context(), usecasereputation.Feed{

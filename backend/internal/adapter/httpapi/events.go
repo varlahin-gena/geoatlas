@@ -201,7 +201,7 @@ func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	tr, err := parseEventTimeRange(q)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid time range"})
+		writeBadRequest(w, "invalid time range")
 		return
 	}
 
@@ -211,9 +211,7 @@ func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 		attached = h.backupUC.AttachedName()
 	}
 	if dataSource == "backup" && attached == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{
-			"error": "backup not attached; connect a backup in System → Резервное копирование",
-		})
+		writeBadRequest(w, "backup not attached; connect a backup in System → Резервное копирование")
 		return
 	}
 
@@ -272,12 +270,12 @@ func (h *EventsHandler) GetEventsSeries(w http.ResponseWriter, r *http.Request) 
 	q := r.URL.Query()
 	country := strings.TrimSpace(q.Get("country"))
 	if country == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "country is required"})
+		writeBadRequest(w, "country is required")
 		return
 	}
 	tr, err := parseEventTimeRange(q)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid time range"})
+		writeBadRequest(w, "invalid time range")
 		return
 	}
 	dataSource := normalizeDataSource(q.Get("source"))
@@ -286,9 +284,7 @@ func (h *EventsHandler) GetEventsSeries(w http.ResponseWriter, r *http.Request) 
 		attached = h.backupUC.AttachedName()
 	}
 	if dataSource == "backup" && attached == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{
-			"error": "backup not attached; connect a backup in System → Резервное копирование",
-		})
+		writeBadRequest(w, "backup not attached; connect a backup in System → Резервное копирование")
 		return
 	}
 	result, err := h.eventsUC.GetSeries(r.Context(), usecaseevents.GetSeriesInput{

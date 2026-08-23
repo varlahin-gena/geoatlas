@@ -439,7 +439,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["AuthUserList"];
+                    };
                 };
             };
         };
@@ -459,7 +461,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["AuthUserPublic"];
+                    };
                 };
             };
         };
@@ -497,7 +501,7 @@ export interface paths {
                     content: {
                         "application/json": {
                             users?: {
-                                username?: string;
+                                username: string;
                                 full_name?: string;
                             }[];
                         };
@@ -856,7 +860,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ApiTokenList"];
+                    };
                 };
             };
         };
@@ -884,7 +890,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ApiTokenCreateResponse"];
+                    };
                 };
             };
         };
@@ -1345,7 +1353,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["EventsSeriesResponse"];
+                    };
                 };
                 /** @description Нет country или невалидный диапазон */
                 400: {
@@ -1513,10 +1523,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            ok?: boolean;
-                            fingerprint?: string;
-                        };
+                        "application/json": components["schemas"]["AnomalyAckResponse"];
                     };
                 };
                 /** @description Невалидный fingerprint */
@@ -1574,11 +1581,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            ok?: boolean;
-                            fingerprint?: string;
-                            assigned_to?: string;
-                        };
+                        "application/json": components["schemas"]["AnomalyAssignResponse"];
                     };
                 };
                 /** @description Невалидный запрос */
@@ -1638,7 +1641,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["GeoMissingResponse"];
+                    };
                 };
                 /** @description unauthorized */
                 401: {
@@ -1704,7 +1709,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["GeoRangesResponse"];
+                    };
                 };
                 /** @description unauthorized */
                 401: {
@@ -1758,7 +1765,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": {
+                            updated?: string;
+                        };
+                    };
                 };
                 /** @description validation / overlap */
                 400: {
@@ -1831,7 +1842,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["GeoRangeCreateResponse"];
+                    };
                 };
                 /** @description validation error or overlapping range */
                 400: {
@@ -1945,7 +1958,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": {
+                            index_before?: number;
+                        };
+                    };
                 };
                 /** @description unauthorized */
                 401: {
@@ -1996,7 +2013,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["EnterpriseNetsResponse"];
+                    };
                 };
                 /** @description unauthorized */
                 401: {
@@ -2045,7 +2064,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": {
+                            item?: components["schemas"]["EnterpriseNet"];
+                        };
+                    };
                 };
                 /** @description validation */
                 400: {
@@ -2460,7 +2483,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": {
+                            lists?: components["schemas"]["ReputationListMeta"][];
+                        };
+                    };
                 };
                 /** @description unauthorized */
                 401: {
@@ -2552,7 +2579,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": {
+                            feeds?: components["schemas"]["ReputationFeed"][];
+                        };
+                    };
                 };
                 /** @description unauthorized */
                 401: {
@@ -2689,7 +2720,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": {
+                            feeds?: components["schemas"]["ReputationFeed"][];
+                        };
+                    };
                 };
                 /** @description unauthorized */
                 401: {
@@ -2737,7 +2772,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ReputationRefreshResult"];
+                    };
                 };
                 /** @description unauthorized */
                 401: {
@@ -2994,7 +3031,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["SystemHistoryResponse"];
+                    };
                 };
             };
         };
@@ -3247,7 +3286,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["TlsStatusResponse"];
+                    };
                 };
             };
         };
@@ -3279,7 +3320,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["TlsMutationResponse"];
+                    };
                 };
                 /** @description Невалидный PEM или несовпадение ключа */
                 400: {
@@ -3327,7 +3370,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["TlsMutationResponse"];
+                    };
                 };
             };
         };
@@ -3364,7 +3409,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["BackupCatalog"];
+                    };
                 };
             };
         };
@@ -3644,7 +3691,12 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": {
+                            ok?: boolean;
+                            schedule?: components["schemas"]["BackupSchedule"];
+                        };
+                    };
                 };
                 /** @description Невалидные поля */
                 400: {
@@ -4247,6 +4299,227 @@ export interface components {
             last_action?: string;
             src_reputation?: components["schemas"]["ReputationHit"][];
             dst_reputation?: components["schemas"]["ReputationHit"][];
+        };
+        AuthUserPublic: {
+            username: string;
+            full_name?: string;
+            /** @enum {string} */
+            role: "administrator" | "operator";
+            must_reset_password?: boolean;
+            created_at?: string;
+        };
+        AuthUserList: {
+            users?: components["schemas"]["AuthUserPublic"][];
+        };
+        ApiToken: {
+            id: string;
+            name: string;
+            /** @enum {string} */
+            scope: "read" | "ops" | "admin";
+            created_at?: string;
+        };
+        ApiTokenList: {
+            tokens?: components["schemas"]["ApiToken"][];
+        };
+        ApiTokenCreateResponse: {
+            token?: components["schemas"]["ApiToken"];
+            secret?: string;
+        };
+        EventsSeriesResponse: {
+            country?: string;
+            bucket_sec?: number;
+            period?: string;
+            points?: {
+                t?: string;
+                allowed?: number;
+                blocked?: number;
+                total?: number;
+            }[];
+        };
+        GeoRange: {
+            network?: string;
+            start_ip?: number;
+            end_ip?: number;
+            country?: string;
+            region?: string;
+            city?: string;
+            lat?: number;
+            lon?: number;
+        };
+        GeoRangesResponse: {
+            ranges?: components["schemas"]["GeoRange"][];
+            count?: number;
+            ip_hit?: boolean;
+            index_ready?: boolean;
+            limits?: {
+                upload_max_bytes?: number;
+                upload_max_ranges?: number;
+            };
+        };
+        GeoRangeCreateResponse: {
+            ranges?: number;
+            added?: string;
+            entry?: {
+                network?: string;
+            };
+        };
+        GeoMissingRow: {
+            ip: string;
+            kind?: string;
+            count?: number;
+            as_src?: number;
+            as_dst?: number;
+            sample_peer?: string;
+            log_country?: string;
+            log_city?: string;
+            action_hint?: string;
+            last_seen?: string;
+        };
+        GeoMissingResponse: {
+            items?: components["schemas"]["GeoMissingRow"][];
+            summary?: {
+                [key: string]: unknown;
+            };
+        };
+        EnterpriseNet: {
+            network?: string;
+            start_ip?: number;
+            end_ip?: number;
+            label?: string;
+            country?: string;
+            region?: string;
+            city?: string;
+            created_at?: string;
+        };
+        EnterpriseNetsResponse: {
+            items?: components["schemas"]["EnterpriseNet"][];
+            count?: number;
+            max?: number;
+        };
+        ReputationFeed: {
+            name: string;
+            url?: string;
+            category?: string;
+            format?: string;
+            enabled?: boolean;
+            last_refresh?: string;
+        };
+        ReputationListMeta: {
+            name: string;
+            category?: string;
+            count?: number;
+            source?: string;
+            updated_at?: string;
+            last_error?: string;
+        };
+        ReputationRefreshResult: {
+            updated?: string[];
+            skipped?: string[];
+            failed?: string[];
+            errors?: {
+                [key: string]: string;
+            };
+            counts?: {
+                [key: string]: number;
+            };
+        };
+        SystemHistoryResponse: {
+            period?: string;
+            from?: string;
+            to?: string;
+            series?: {
+                [key: string]: {
+                    t: string;
+                    v: number;
+                }[];
+            };
+        };
+        BackupSchedule: {
+            enabled?: boolean;
+            hour?: number;
+            minute?: number;
+            timezone?: string;
+            keep?: number;
+            include_edges?: boolean;
+            include_auth?: boolean;
+            updated_at?: string;
+            last_run_at?: string;
+            last_run_date?: string;
+        } & {
+            [key: string]: unknown;
+        };
+        BackupEntry: {
+            name: string;
+            created_at?: string;
+            size_bytes?: number;
+            has_auth?: boolean;
+            attached?: boolean;
+            source?: string;
+        };
+        BackupCatalog: {
+            ok?: boolean;
+            enabled?: boolean;
+            dir_ready?: boolean;
+            keep?: number;
+            include_edges?: boolean;
+            include_auth?: boolean;
+            attached?: string;
+            schedule?: components["schemas"]["BackupSchedule"];
+            next_run_at?: string;
+            backups?: components["schemas"]["BackupEntry"][];
+            status?: {
+                [key: string]: unknown;
+            };
+            hint?: string;
+        } & {
+            [key: string]: unknown;
+        };
+        TlsCertInfo: {
+            subject?: string;
+            issuer?: string;
+            not_before?: string;
+            not_after?: string;
+            days_left?: number;
+            sans?: string[];
+            fingerprint_sha256?: string;
+            self_signed?: boolean;
+        } & {
+            [key: string]: unknown;
+        };
+        TlsStatus: {
+            configured?: boolean;
+            writable?: boolean;
+            cert_present?: boolean;
+            key_present?: boolean;
+            https_enabled?: string;
+            https_port?: string;
+            http_redirect?: string;
+            cert_path?: string;
+            key_path?: string;
+            cert?: components["schemas"]["TlsCertInfo"];
+        } & {
+            [key: string]: unknown;
+        };
+        TlsStatusResponse: components["schemas"]["TlsStatus"] & {
+            tls?: components["schemas"]["TlsStatus"];
+        };
+        TlsMutationResponse: {
+            ok?: boolean;
+            reload?: {
+                reloaded?: boolean;
+                restart_required?: boolean;
+                message?: string;
+            };
+        };
+        AnomalyAckResponse: {
+            ok?: boolean;
+            fingerprint?: string;
+            ack_by?: string;
+        };
+        AnomalyAssignResponse: {
+            ok?: boolean;
+            fingerprint?: string;
+            assigned_to?: string;
         };
     };
     responses: never;

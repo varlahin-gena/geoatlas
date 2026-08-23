@@ -32,6 +32,8 @@ type backgroundParts struct {
 func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backgroundParts {
 	geo := geostore.NewReloadableGeoIndex(a.pools.Background, cfg.GeoSnapshotFile)
 	a.geoJobs = geojob.New(geo, chadapter.NewMaintenanceStore(a.pools.Background), cfg.GeoBackfillLookbackDays)
+	a.geoJobs.SetLimiter(a.heavy)
+	a.geoJobs.SetGate(a.skipGate)
 	// Disk snapshot: карта работает сразу после рестарта. Полный Reload из CH
 	// сверяет stamp и при расхождении перечитывает таблицу.
 	if geo.LoadDisk() {
@@ -83,6 +85,7 @@ func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backg
 		}
 		repUC = usecasereputation.New(repRepo, repIdx, reputationcodec.New(), nil, repFeedStore)
 		a.repJobs = reputationjob.New(repFeeds, cfg.ReputationFetchInterval, true, repUC)
+		a.repJobs.SetLimiter(a.heavy)
 		repUC.SetRefresher(a.repJobs)
 		if err := migrate.EnsureReputationRanges(ctx, a.pools.Background); err != nil {
 			slog.Warn("reputation_ranges ensure (early) failed", "err", err)
@@ -110,6 +113,7 @@ func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backg
 		bootstrap.RunStartup(bgCtx, bootstrap.Dependencies{
 			Schema: bgStore, Backfill: bgStore, Ready: bgStore,
 			Enrich: a.geoJobs, Geo: geo, Retention: retentionUC,
+			Gate: a.skipGate,
 		}, bootstrap.Options{
 			SkipStartupBackfill:     cfg.SkipStartupBackfill,
 			GeoBackfillLookbackDays: cfg.GeoBackfillLookbackDays,

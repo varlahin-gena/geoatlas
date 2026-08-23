@@ -72,7 +72,7 @@ func (h *GeoHandler) AddEnterpriseNet(w http.ResponseWriter, r *http.Request) {
 	}
 	var req addEnterpriseNetRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+		writeBadRequest(w, "invalid json")
 		return
 	}
 	n, err := h.geoUC.AddEnterpriseNet(r.Context(), usecasegeo.AddEnterpriseNetInput{
@@ -93,7 +93,7 @@ func (h *GeoHandler) DeleteEnterpriseNet(w http.ResponseWriter, r *http.Request)
 	start, err1 := strconv.ParseUint(strings.TrimSpace(r.PathValue("start_ip")), 10, 32)
 	end, err2 := strconv.ParseUint(strings.TrimSpace(r.PathValue("end_ip")), 10, 32)
 	if err1 != nil || err2 != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid start_ip/end_ip"})
+		writeBadRequest(w, "invalid start_ip/end_ip")
 		return
 	}
 	if err := h.geoUC.DeleteEnterpriseNet(r.Context(), uint32(start), uint32(end)); err != nil {

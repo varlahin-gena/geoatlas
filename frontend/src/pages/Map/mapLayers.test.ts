@@ -9,7 +9,7 @@ vi.mock('@deck.gl/layers', () => ({
   TextLayer: class TextLayer {},
 }));
 
-import { hasCoords, statusRGB, topByCount, normalizeLonLat, resolveNodeLonLat, buildLineCoordFallback, buildDisplayCoordMap } from './mapLayers';
+import { hasCoords, statusRGB, topByCount, normalizeLonLat, resolveNodeLonLat, buildLineCoordFallback, buildDisplayCoordMap, buildDeckLayers } from './mapLayers';
 import type { MapLine } from './mapTypes';
 
 describe('mapLayers helpers', () => {
@@ -97,5 +97,55 @@ describe('mapLayers helpers', () => {
     expect(b).toBeTruthy();
     expect(a![0]).not.toBeCloseTo(b![0], 3);
     expect(map.get('8.8.8.8')).toEqual([-122.1, 37.4]);
+  });
+});
+
+describe('buildDeckLayers truncation', () => {
+  const globeView = { longitude: 0, latitude: 0, zoom: 1, pitch: 0, bearing: 0 };
+
+  function makeLines(n: number): MapLine[] {
+    return Array.from({ length: n }, (_, i) => ({
+      src: `s${i}`,
+      dst: `d${i}`,
+      src_lat: 10,
+      src_lon: 10,
+      dst_lat: 20,
+      dst_lon: 20,
+      count: n - i,
+      status: 'allowed' as const,
+    }));
+  }
+
+  it('reports shown/total when maxArcs truncates', () => {
+    const lines = makeLines(5);
+    const points = Object.fromEntries(
+      lines.flatMap((l) => [
+        [l.src, { lat: 10, lon: 10, count: 1 }],
+        [l.dst, { lat: 20, lon: 20, count: 1 }],
+      ]),
+    );
+    const result = buildDeckLayers({
+      mode: 'map',
+      lines,
+      points,
+      countriesGeoJSON: null,
+      showHeatmap: false,
+      showCountryLabels: false,
+      monoArcColor: true,
+      repColorArcs: false,
+      groupBy: 'ip',
+      focusedCountry: null,
+      mapTilesFailed: false,
+      heavyCountryLayersAllowed: true,
+      theme: 'dark',
+      globeView,
+      maxArcs: 2,
+      onLineClick: () => {},
+      onPointClick: () => {},
+      onCountryClick: () => {},
+    });
+    expect(result.total).toBe(5);
+    expect(result.shown).toBe(2);
+    expect(result.layers.length).toBeGreaterThan(0);
   });
 });

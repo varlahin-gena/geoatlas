@@ -4,7 +4,11 @@ type Alert = components['schemas']['SystemAlert'];
 export type FailedLogin = components['schemas']['SystemFailedLogin'];
 export type EdgesAgg = components['schemas']['SystemEdgesAgg'];
 
-/** Nested UI fields. Wire envelope: OpenAPI SystemStats (`src/api/openapi.d.ts`). */
+/**
+ * UI view of GET /api/system/stats.
+ * Wire schema (`SystemStats` in openapi) is intentionally loose (additionalProperties);
+ * nestings below are the fields the System page actually reads.
+ */
 export interface SystemStats {
   alerts?: Alert[];
   containers?: Record<string, components['schemas']['SystemContainerStats']>;
@@ -25,89 +29,14 @@ export interface SystemStats {
   timestamp?: string;
 }
 
-export interface Retention {
-  traffic_logs_days?: number;
-  edges_days?: number;
-  parse_errors_days?: number;
-  system_metrics_days?: number;
-  updated_at?: string;
-}
-
-interface BackupStatus {
-  state?: string;
-  message?: string;
-  name?: string;
-  started_at?: string;
-  updated_at?: string;
-}
-
-export interface BackupEntry {
-  name: string;
-  created_at?: string;
-  size_bytes?: number;
-  has_auth?: boolean;
-  attached?: boolean;
-  /** manual | schedule | отсутствует у старых бэкапов */
-  source?: 'manual' | 'schedule' | string;
-}
-
-export interface BackupSchedule {
-  enabled?: boolean;
-  hour?: number;
-  minute?: number;
-  timezone?: string;
-  keep?: number;
-  include_edges?: boolean;
-  include_auth?: boolean;
-  updated_at?: string;
-  last_run_at?: string;
-  last_run_date?: string;
-}
-
-export interface BackupCatalog {
-  ok?: boolean;
-  enabled?: boolean;
-  dir_ready?: boolean;
-  keep?: number;
-  include_edges?: boolean;
-  include_auth?: boolean;
-  attached?: string;
-  schedule?: BackupSchedule;
-  next_run_at?: string;
-  backups?: BackupEntry[];
-  status?: BackupStatus;
-  hint?: string;
-}
-
-export interface DREvent {
-  timestamp?: string;
-  actor?: string;
-  action?: string;
-  target?: string;
-  status?: 'started' | 'succeeded' | 'failed' | string;
-  message?: string;
-  meta?: Record<string, unknown>;
-}
-
-export interface AuditEvent {
-  timestamp?: string;
-  actor?: string;
-  action?: string;
-  resource_type?: string;
-  resource_id?: string;
-  result?: 'succeeded' | 'failed' | string;
-  ip?: string;
-  details?: Record<string, unknown>;
-}
-
-export interface HistoryPoint {
+export type Retention = components['schemas']['RetentionSettings'];
+export type BackupCatalog = components['schemas']['BackupCatalog'];
+export type BackupSchedule = components['schemas']['BackupSchedule'];
+export type BackupEntry = components['schemas']['BackupEntry'];
+export type DREvent = components['schemas']['DREvent'];
+export type AuditEvent = components['schemas']['AuditEvent'];
+export type HistoryPayload = components['schemas']['SystemHistoryResponse'];
+export type HistoryPoint = {
   t: string;
   v: number;
-}
-
-export interface HistoryPayload {
-  period?: string;
-  from?: string;
-  to?: string;
-  series?: Record<string, HistoryPoint[]>;
-}
+};

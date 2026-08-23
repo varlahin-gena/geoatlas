@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: ГеоАтлас API
-  version: "1.13.0"
+  version: "1.14.0"
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
@@ -178,12 +178,20 @@ paths:
       responses:
         "200":
           description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUserList"
     post:
       tags: [auth]
       summary: Создать УЗ (обязательно must_reset_password)
       responses:
         "201":
           description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUserPublic"
   /api/users/directory:
     get:
       tags: [auth]
@@ -204,6 +212,7 @@ paths:
                     type: array
                     items:
                       type: object
+                      required: [username]
                       properties:
                         username: { type: string }
                         full_name: { type: string }
@@ -315,6 +324,10 @@ paths:
       responses:
         "200":
           description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiTokenList"
     post:
       tags: [auth]
       summary: Создать токен (secret возвращается один раз)
@@ -331,6 +344,10 @@ paths:
       responses:
         "201":
           description: Created (token metadata + secret)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiTokenCreateResponse"
   /api/tokens/{id}:
     delete:
       tags: [auth]
@@ -569,6 +586,10 @@ paths:
       responses:
         "200":
           description: points [{t, allowed, blocked, total}] + bucket_sec
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventsSeriesResponse"
         "400":
           description: Нет country или невалидный диапазон
 
@@ -656,10 +677,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  ok: { type: boolean }
-                  fingerprint: { type: string }
+                $ref: "#/components/schemas/AnomalyAckResponse"
         "400":
           description: Невалидный fingerprint
         "503":
@@ -692,11 +710,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  ok: { type: boolean }
-                  fingerprint: { type: string }
-                  assigned_to: { type: string }
+                $ref: "#/components/schemas/AnomalyAssignResponse"
         "400":
           description: Невалидный запрос
         "503":
@@ -738,6 +752,10 @@ paths:
       responses:
         "200":
           description: List of IPs missing geo (items, summary)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeoMissingResponse"
         "401":
           description: unauthorized
         "403":
@@ -773,6 +791,10 @@ paths:
           description: |
             ranges list; `count` — всего в базе/индексе; `index_ready` — in-memory индекс
             после стартового Reload готов (false пока идёт асинхронная загрузка).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeoRangesResponse"
         "401":
           description: unauthorized
         "403":
@@ -808,6 +830,10 @@ paths:
       responses:
         "200":
           description: range appended; index applied; backfill scheduled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeoRangeCreateResponse"
         "400":
           description: validation error or overlapping range
         "401":
@@ -844,6 +870,12 @@ paths:
       responses:
         "200":
           description: range updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updated: { type: string }
         "400":
           description: validation / overlap
         "404":
@@ -888,6 +920,12 @@ paths:
       responses:
         "200":
           description: cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  index_before: { type: integer }
         "401":
           description: unauthorized
         "403":
@@ -907,6 +945,10 @@ paths:
       responses:
         "200":
           description: items list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnterpriseNetsResponse"
         "401":
           description: unauthorized
         "403":
@@ -936,6 +978,13 @@ paths:
       responses:
         "200":
           description: net added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  item:
+                    $ref: "#/components/schemas/EnterpriseNet"
         "400":
           description: validation
         "401":
@@ -1130,6 +1179,15 @@ paths:
       responses:
         "200":
           description: lists metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  lists:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ReputationListMeta"
         "401":
           description: unauthorized
 
@@ -1166,6 +1224,15 @@ paths:
       responses:
         "200":
           description: feeds
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  feeds:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ReputationFeed"
         "401":
           description: unauthorized
     post:
@@ -1231,6 +1298,15 @@ paths:
       responses:
         "200":
           description: catalog presets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  feeds:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ReputationFeed"
         "401":
           description: unauthorized
 
@@ -1253,6 +1329,10 @@ paths:
       responses:
         "200":
           description: refresh result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReputationRefreshResult"
         "401":
           description: unauthorized
 
@@ -1363,6 +1443,10 @@ paths:
       responses:
         "200":
           description: Time series
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemHistoryResponse"
 
   /api/system/edges-agg:
     get:
@@ -1488,6 +1572,10 @@ paths:
       responses:
         "200":
           description: Статус TLS и метаданные сертификата
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TlsStatusResponse"
     put:
       tags: [system]
       summary: Загрузить HTTPS-сертификат и ключ
@@ -1515,6 +1603,10 @@ paths:
       responses:
         "200":
           description: Сертификаты сохранены
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TlsMutationResponse"
         "400":
           description: Невалидный PEM или несовпадение ключа
 
@@ -1536,6 +1628,10 @@ paths:
       responses:
         "200":
           description: Результат применения
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TlsMutationResponse"
 
   /api/system/backups:
     get:
@@ -1551,6 +1647,10 @@ paths:
       responses:
         "200":
           description: Каталог бэкапов
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BackupCatalog"
     post:
       tags: [system]
       summary: Запустить создание бэкапа
@@ -1696,6 +1796,14 @@ paths:
       responses:
         "200":
           description: Сохранено
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  schedule:
+                    $ref: "#/components/schemas/BackupSchedule"
         "400":
           description: Невалидные поля
 
@@ -2263,3 +2371,318 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ReputationHit"
+
+    AuthUserPublic:
+      type: object
+      required: [username, role]
+      properties:
+        username: { type: string }
+        full_name: { type: string }
+        role: { type: string, enum: [administrator, operator] }
+        must_reset_password: { type: boolean }
+        created_at: { type: string }
+
+    AuthUserList:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuthUserPublic"
+
+    ApiToken:
+      type: object
+      required: [id, name, scope]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        scope: { type: string, enum: [read, ops, admin] }
+        created_at: { type: string }
+
+    ApiTokenList:
+      type: object
+      properties:
+        tokens:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiToken"
+
+    ApiTokenCreateResponse:
+      type: object
+      properties:
+        token:
+          $ref: "#/components/schemas/ApiToken"
+        secret: { type: string }
+
+    EventsSeriesResponse:
+      type: object
+      properties:
+        country: { type: string }
+        bucket_sec: { type: integer }
+        period: { type: string }
+        points:
+          type: array
+          items:
+            type: object
+            properties:
+              t: { type: string }
+              allowed: { type: integer }
+              blocked: { type: integer }
+              total: { type: integer }
+
+    GeoRange:
+      type: object
+      properties:
+        network: { type: string }
+        start_ip: { type: integer }
+        end_ip: { type: integer }
+        country: { type: string }
+        region: { type: string }
+        city: { type: string }
+        lat: { type: number }
+        lon: { type: number }
+
+    GeoRangesResponse:
+      type: object
+      properties:
+        ranges:
+          type: array
+          items:
+            $ref: "#/components/schemas/GeoRange"
+        count: { type: integer }
+        ip_hit: { type: boolean }
+        index_ready: { type: boolean }
+        limits:
+          type: object
+          properties:
+            upload_max_bytes: { type: integer }
+            upload_max_ranges: { type: integer }
+
+    GeoRangeCreateResponse:
+      type: object
+      properties:
+        ranges: { type: integer }
+        added: { type: string }
+        entry:
+          type: object
+          properties:
+            network: { type: string }
+
+    GeoMissingRow:
+      type: object
+      required: [ip]
+      properties:
+        ip: { type: string }
+        kind: { type: string }
+        count: { type: integer }
+        as_src: { type: integer }
+        as_dst: { type: integer }
+        sample_peer: { type: string }
+        log_country: { type: string }
+        log_city: { type: string }
+        action_hint: { type: string }
+        last_seen: { type: string }
+
+    GeoMissingResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/GeoMissingRow"
+        summary:
+          type: object
+          additionalProperties: true
+
+    EnterpriseNet:
+      type: object
+      properties:
+        network: { type: string }
+        start_ip: { type: integer }
+        end_ip: { type: integer }
+        label: { type: string }
+        country: { type: string }
+        region: { type: string }
+        city: { type: string }
+        created_at: { type: string }
+
+    EnterpriseNetsResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnterpriseNet"
+        count: { type: integer }
+        max: { type: integer }
+
+    ReputationFeed:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        url: { type: string }
+        category: { type: string }
+        format: { type: string }
+        enabled: { type: boolean }
+        last_refresh: { type: string }
+
+    ReputationListMeta:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        category: { type: string }
+        count: { type: integer }
+        source: { type: string }
+        updated_at: { type: string }
+        last_error: { type: string }
+
+    ReputationRefreshResult:
+      type: object
+      properties:
+        updated:
+          type: array
+          items: { type: string }
+        skipped:
+          type: array
+          items: { type: string }
+        failed:
+          type: array
+          items: { type: string }
+        errors:
+          type: object
+          additionalProperties: { type: string }
+        counts:
+          type: object
+          additionalProperties: { type: integer }
+
+    SystemHistoryResponse:
+      type: object
+      properties:
+        period: { type: string }
+        from: { type: string }
+        to: { type: string }
+        series:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: object
+              required: [t, v]
+              properties:
+                t: { type: string }
+                v: { type: number }
+
+    BackupSchedule:
+      type: object
+      additionalProperties: true
+      properties:
+        enabled: { type: boolean }
+        hour: { type: integer }
+        minute: { type: integer }
+        timezone: { type: string }
+        keep: { type: integer }
+        include_edges: { type: boolean }
+        include_auth: { type: boolean }
+        updated_at: { type: string }
+        last_run_at: { type: string }
+        last_run_date: { type: string }
+
+    BackupEntry:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        created_at: { type: string }
+        size_bytes: { type: integer }
+        has_auth: { type: boolean }
+        attached: { type: boolean }
+        source: { type: string }
+
+    BackupCatalog:
+      type: object
+      additionalProperties: true
+      properties:
+        ok: { type: boolean }
+        enabled: { type: boolean }
+        dir_ready: { type: boolean }
+        keep: { type: integer }
+        include_edges: { type: boolean }
+        include_auth: { type: boolean }
+        attached: { type: string }
+        schedule:
+          $ref: "#/components/schemas/BackupSchedule"
+        next_run_at: { type: string }
+        backups:
+          type: array
+          items:
+            $ref: "#/components/schemas/BackupEntry"
+        status:
+          type: object
+          additionalProperties: true
+        hint: { type: string }
+
+    TlsCertInfo:
+      type: object
+      additionalProperties: true
+      properties:
+        subject: { type: string }
+        issuer: { type: string }
+        not_before: { type: string }
+        not_after: { type: string }
+        days_left: { type: integer }
+        sans:
+          type: array
+          items: { type: string }
+        fingerprint_sha256: { type: string }
+        self_signed: { type: boolean }
+
+    TlsStatus:
+      type: object
+      additionalProperties: true
+      properties:
+        configured: { type: boolean }
+        writable: { type: boolean }
+        cert_present: { type: boolean }
+        key_present: { type: boolean }
+        https_enabled: { type: string }
+        https_port: { type: string }
+        http_redirect: { type: string }
+        cert_path: { type: string }
+        key_path: { type: string }
+        cert:
+          $ref: "#/components/schemas/TlsCertInfo"
+
+    TlsStatusResponse:
+      allOf:
+        - $ref: "#/components/schemas/TlsStatus"
+        - type: object
+          properties:
+            tls:
+              $ref: "#/components/schemas/TlsStatus"
+
+    TlsMutationResponse:
+      type: object
+      properties:
+        ok: { type: boolean }
+        reload:
+          type: object
+          properties:
+            reloaded: { type: boolean }
+            restart_required: { type: boolean }
+            message: { type: string }
+
+    AnomalyAckResponse:
+      type: object
+      properties:
+        ok: { type: boolean }
+        fingerprint: { type: string }
+        ack_by: { type: string }
+
+    AnomalyAssignResponse:
+      type: object
+      properties:
+        ok: { type: boolean }
+        fingerprint: { type: string }
+        assigned_to: { type: string }

@@ -43,3 +43,14 @@ func TestWriteDomainErrorMapping(t *testing.T) {
 		})
 	}
 }
+
+func TestWriteBadRequestUsesDomainPath(t *testing.T) {
+	rec := httptest.NewRecorder()
+	writeBadRequest(rec, "nope")
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), `"error":"nope"`) {
+		t.Fatalf("body=%s", rec.Body.String())
+	}
+}

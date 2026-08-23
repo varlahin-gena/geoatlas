@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"network_monitor/internal/adapter/clickhouse/aggstate"
+	"network_monitor/internal/adapter/heavytask"
 	"network_monitor/internal/adapter/ingestnet"
 	usecaseanomaly "network_monitor/internal/usecase/anomaly"
 )
@@ -15,11 +16,20 @@ type Scheduler struct {
 	svc      *usecaseanomaly.Service
 	interval time.Duration
 	delay    time.Duration
+	heavy    *heavytask.Limiter
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
 	done   chan struct{}
 	busy   sync.Mutex
+}
+
+// SetLimiter — общий слот тяжёлых задач; при занятости тик пропускается.
+func (s *Scheduler) SetLimiter(l *heavytask.Limiter) {
+	if s == nil {
+		return
+	}
+	s.heavy = l
 }
 
 func New(svc *usecaseanomaly.Service, interval, startDelay time.Duration) *Scheduler {
@@ -83,6 +93,10 @@ func (s *Scheduler) tick(ctx context.Context) {
 		return
 	}
 	defer s.busy.Unlock()
+	if !s.heavy.TryAcquire() {
+		return
+	}
+	defer s.heavy.Release()
 	s.svc.Scan(ctx, time.Now().UTC())
 }
 

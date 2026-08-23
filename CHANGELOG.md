@@ -21,6 +21,8 @@
 - CI / образы: Go **1.25.13** (stdlib `net/url`, `crypto/tls`, `net/http`, `encoding/asn1`); `setup-go` `check-latest: true`, `golang:1.25.13-alpine`
 
 ### Changed
+- OpenAPI **1.14.0**: JSON schemas for users/tokens/events.series/geo/reputation/system history·backups·tls (frontend type-safety).
+- Frontend: API modules prefer OpenAPI-generated types (`ApiJson` supports 200/201); Map viz chrome hook + `MapChromeProvider`; System stats/charts hooks; Playwright `system.spec.ts`.
 - CI: GitHub Actions запинены по commit SHA (`checkout`, `setup-go`, `setup-node`, CodeQL, golangci-lint, buildx) — как Trivy/Hadolint/Syft
 - CI: `concurrency: cancel-in-progress`; на PR Playwright / ClickHouse / fuzz / docker — только если изменились их деревья (`dorny/paths-filter`); push в `main`/`develop` гоняет все job'ы
 - CI: Hadolint валит job на правилах severity `error` (`failure-threshold: error`); warning/info по-прежнему в Security tab

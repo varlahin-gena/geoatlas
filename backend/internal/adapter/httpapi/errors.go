@@ -10,6 +10,11 @@ import (
 	"network_monitor/internal/usecase/searchtemplates"
 )
 
+// writeBadRequest — клиентская 400 через apperr (единый путь с writeDomainError).
+func writeBadRequest(w http.ResponseWriter, msg string) {
+	writeDomainError(w, "bad request", apperr.InvalidInput(msg))
+}
+
 // writeDomainError maps application sentinel errors to HTTP status.
 // Unknown errors go through writeInternalError (logged 500).
 func writeDomainError(w http.ResponseWriter, logMsg string, err error) {

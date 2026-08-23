@@ -107,12 +107,12 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+		writeBadRequest(w, "invalid json")
 		return
 	}
 	req.Username = strings.TrimSpace(req.Username)
 	if req.Username == "" || req.Password == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "username and password required"})
+		writeBadRequest(w, "username and password required")
 		return
 	}
 
@@ -248,7 +248,7 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+		writeBadRequest(w, "invalid json")
 		return
 	}
 	if h.authUC == nil {
@@ -341,11 +341,11 @@ func (h *AuthHandler) DismissGeoWizard(w http.ResponseWriter, r *http.Request) {
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+		writeBadRequest(w, "invalid json")
 		return
 	}
 	if req.Dismissed == nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "dismissed required"})
+		writeBadRequest(w, "dismissed required")
 		return
 	}
 	if h.authUC == nil {
@@ -523,11 +523,11 @@ func (h *UsersHandler) Create(w http.ResponseWriter, r *http.Request) {
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+		writeBadRequest(w, "invalid json")
 		return
 	}
 	if req.MustResetPassword == nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "must_reset_password is required"})
+		writeBadRequest(w, "must_reset_password is required")
 		return
 	}
 	pub, err := h.authUC.CreateUser(usecaseauth.CreateUserInput{
@@ -575,7 +575,7 @@ func (h *UsersHandler) SetRole(w http.ResponseWriter, r *http.Request) {
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+		writeBadRequest(w, "invalid json")
 		return
 	}
 	pub, err := h.authUC.SetRole(username, req.Role)
@@ -617,7 +617,7 @@ func (h *UsersHandler) SetFullName(w http.ResponseWriter, r *http.Request) {
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+		writeBadRequest(w, "invalid json")
 		return
 	}
 	pub, err := h.authUC.SetFullName(username, req.FullName)
@@ -658,11 +658,11 @@ func (h *UsersHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+		writeBadRequest(w, "invalid json")
 		return
 	}
 	if req.MustResetPassword == nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "must_reset_password is required"})
+		writeBadRequest(w, "must_reset_password is required")
 		return
 	}
 	pub, err := h.authUC.ResetPassword(usecaseauth.ResetPasswordInput{
@@ -741,17 +741,17 @@ func writeUserStoreError(w http.ResponseWriter, err error) {
 	case errors.Is(err, auth.ErrUserNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": "user not found"})
 	case errors.Is(err, auth.ErrInvalidUsername):
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid username"})
+		writeBadRequest(w, "invalid username")
 	case errors.Is(err, auth.ErrInvalidPassword):
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid password"})
+		writeBadRequest(w, "invalid password")
 	case errors.Is(err, auth.ErrInvalidRole):
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid role"})
+		writeBadRequest(w, "invalid role")
 	case errors.Is(err, auth.ErrInvalidFullName):
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid full name"})
+		writeBadRequest(w, "invalid full name")
 	case errors.Is(err, auth.ErrLastAdmin):
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "cannot remove or demote the last administrator"})
+		writeBadRequest(w, "cannot remove or demote the last administrator")
 	case errors.Is(err, auth.ErrSelfDelete):
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "cannot delete your own account"})
+		writeBadRequest(w, "cannot delete your own account")
 	case errors.Is(err, auth.ErrBadOldPassword):
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "current password is incorrect"})
 	case errors.Is(err, usecaseauth.ErrNotConfigured):

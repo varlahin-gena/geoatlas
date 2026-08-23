@@ -49,6 +49,10 @@ func startIngest(a *app, cfg config.Config, geo *geostore.ReloadableGeoIndex, pa
 		InsertObs: insertObs,
 		Retryable: usecaseingest.InsertErrorClassifyFunc(ingeststore.IsRetryableInsertError),
 	})
+	if a.heavy != nil {
+		heavy := a.heavy
+		a.ingestSvc.SetDegradeProbe(func() bool { return heavy.Busy() })
+	}
 	a.ingestDone = make(chan error, 1)
 	go func() {
 		err := a.ingestSvc.Run(a.ctx)

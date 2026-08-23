@@ -52,14 +52,14 @@ func (h *IngestHandler) UploadLogs(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(ct, "multipart/form-data") {
 		file, _, err := r.FormFile("file")
 		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "missing file"})
+			writeBadRequest(w, "missing file")
 			return
 		}
 		defer file.Close()
 		reader = file
 	} else {
 		if r.Body == nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "empty body"})
+			writeBadRequest(w, "empty body")
 			return
 		}
 		defer r.Body.Close()

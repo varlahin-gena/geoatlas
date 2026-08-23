@@ -147,7 +147,7 @@ func (h *SystemHandler) PutRetention(w http.ResponseWriter, r *http.Request) {
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+		writeBadRequest(w, "invalid json")
 		return
 	}
 	timeout := h.cfg.QueryTimeout
@@ -289,7 +289,7 @@ func (h *SystemHandler) PutBackupSchedule(w http.ResponseWriter, r *http.Request
 		IncludeAuth  *bool  `json:"include_auth"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid JSON"})
+		writeBadRequest(w, "invalid JSON")
 		return
 	}
 	cur, err := h.backupUC.GetSchedule()
@@ -425,7 +425,7 @@ func (h *SystemHandler) PutTLS(w http.ResponseWriter, r *http.Request) {
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+		writeBadRequest(w, "invalid json")
 		return
 	}
 	err := h.tlsUC.Update(usecasetls.UpdateInput{CertPEM: req.CertPEM, KeyPEM: req.KeyPEM})
@@ -444,7 +444,7 @@ func (h *SystemHandler) PutTLS(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if errors.Is(err, usecasetls.ErrInvalidPEM) {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			writeBadRequest(w, err.Error())
 			return
 		}
 		writeInternalError(w, "tls update failed", err)

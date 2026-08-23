@@ -49,7 +49,7 @@ func (h *ParseHandler) DeleteParseErrors(w http.ResponseWriter, r *http.Request)
 		All bool     `json:"all"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+		writeBadRequest(w, "invalid json")
 		return
 	}
 

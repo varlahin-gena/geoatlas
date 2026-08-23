@@ -51,9 +51,11 @@ export function SystemOverviewTab({
           <h3 className="card-title">
             Профиль установки{' '}
             <span className="profile-badge">
-              {stats?.install_profile?.profile_label ||
-                stats?.install_profile?.profile ||
-                '—'}
+              {String(
+                stats?.install_profile?.profile_label ||
+                  stats?.install_profile?.profile ||
+                  '—',
+              )}
             </span>
           </h3>
           <div className="capacity-meter">

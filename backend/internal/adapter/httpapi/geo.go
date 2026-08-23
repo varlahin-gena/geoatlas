@@ -56,14 +56,14 @@ func (h *GeoHandler) UploadGeo(w http.ResponseWriter, r *http.Request) {
 				writeDomainError(w, "geo csv upload failed", err)
 				return
 			}
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "missing file"})
+			writeBadRequest(w, "missing file")
 			return
 		}
 		defer file.Close()
 		reader = file
 	} else {
 		if r.Body == nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "empty body"})
+			writeBadRequest(w, "empty body")
 			return
 		}
 		defer r.Body.Close()

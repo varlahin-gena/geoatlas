@@ -35,4 +35,28 @@ describe('buildLineDetail', () => {
     expect(dst?.rows.some((r) => r.key === 'City' && r.value === 'Красноярск')).toBe(true);
     expect(dst?.rows.some((r) => r.key === 'Country' && r.value === 'Россия')).toBe(true);
   });
+
+  it('prefers point city over empty line fields for both endpoints', () => {
+    const line: MapLine = {
+      src: '1.1.1.1',
+      dst: '8.8.8.8',
+      src_lat: 1,
+      src_lon: 2,
+      dst_lat: 3,
+      dst_lon: 4,
+      count: 1,
+      status: 'allowed',
+      src_country: 'A',
+      dst_country: 'B',
+    };
+    const points: Record<string, MapPoint> = {
+      '1.1.1.1': { lat: 1, lon: 2, country: 'A', city: 'AlphaCity', count: 1 },
+      '8.8.8.8': { lat: 3, lon: 4, country: 'B', city: 'BetaCity', count: 1 },
+    };
+    const detail = buildLineDetail(line, 'ip', [], points);
+    const src = detail.sections.find((s) => s.title === 'Источник');
+    const dst = detail.sections.find((s) => s.title === 'Назначение');
+    expect(src?.rows.some((r) => r.key === 'City' && r.value === 'AlphaCity')).toBe(true);
+    expect(dst?.rows.some((r) => r.key === 'City' && r.value === 'BetaCity')).toBe(true);
+  });
 });

@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+
+	"network_monitor/internal/adapter/heavytask"
 )
 
 type jobKind int
@@ -18,6 +20,11 @@ const (
 // DefaultLookbackDays — окно auto-backfill, если lookback не задан.
 const DefaultLookbackDays = 7
 
+// SkipGate — пропуск maintenance при open circuit / edges rebuild.
+type SkipGate interface {
+	SkipReason() string
+}
+
 // Scheduler сериализует reload GeoIP, agg backfill и geo enrich lookup.
 // Параллельные Schedule* не запускают несколько INSERT/DELETE сразу:
 // предыдущая работа отменяется по context, следующая ждёт workMu.
@@ -25,12 +32,30 @@ type Scheduler struct {
 	geo          GeoIndex
 	store        Store
 	lookbackDays int
+	heavy        *heavytask.Limiter
+	gate         SkipGate
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
 	gen    uint64
 	wg     sync.WaitGroup
 	workMu sync.Mutex
+}
+
+// SetLimiter — общий слот тяжёлых задач (geo/backup/anomaly/reputation).
+func (s *Scheduler) SetLimiter(l *heavytask.Limiter) {
+	if s == nil {
+		return
+	}
+	s.heavy = l
+}
+
+// SetGate — A2: не крутить maintenance backfill при circuit/rebuild.
+func (s *Scheduler) SetGate(g SkipGate) {
+	if s == nil {
+		return
+	}
+	s.gate = g
 }
 
 // New создаёт scheduler. lookbackDays ограничивает EnrichLogsMissingGeo
@@ -95,6 +120,17 @@ func detachTimeout(_ context.Context, d time.Duration) (context.Context, context
 }
 
 func (s *Scheduler) run(ctx context.Context, gen uint64, kind jobKind) {
+	if kind == jobMaintenanceBackfill && s.gate != nil {
+		if reason := s.gate.SkipReason(); reason != "" {
+			slog.Info("geo job: maintenance skipped", "reason", reason)
+			return
+		}
+	}
+	if err := s.heavy.Acquire(ctx); err != nil {
+		return
+	}
+	defer s.heavy.Release()
+
 	s.workMu.Lock()
 	defer s.workMu.Unlock()
 
@@ -106,6 +142,14 @@ func (s *Scheduler) run(ctx context.Context, gen uint64, kind jobKind) {
 	s.mu.Unlock()
 	if gen != current {
 		return
+	}
+
+	// Повторная проверка после ожидания слота: circuit мог открыться.
+	if kind == jobMaintenanceBackfill && s.gate != nil {
+		if reason := s.gate.SkipReason(); reason != "" {
+			slog.Info("geo job: maintenance skipped", "reason", reason)
+			return
+		}
 	}
 
 	switch kind {
