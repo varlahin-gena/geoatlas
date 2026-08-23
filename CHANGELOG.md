@@ -383,6 +383,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.0.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.0.1
 [2.0.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.0.0
 [1.4.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v1.4.2
 [1.4.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v1.4.1
