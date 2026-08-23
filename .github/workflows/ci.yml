@@ -229,8 +229,16 @@ jobs:
             ./internal/adapter/geojob/
             ./internal/mapagg/
             ./internal/adapter/httpapi/authmw/
+            ./internal/safeurl/
+            ./internal/mapsearch/
+            ./internal/auth/
+            ./internal/adapter/httpapi/loginthrottle/
           )
-          soft_pkgs=(./internal/adapter/clickhouse/trafficstore/)
+          soft_pkgs=(
+            ./internal/adapter/clickhouse/trafficstore/
+            ./internal/adapter/httpapi/
+          )
+          min_pkgs=(./internal/adapter/clickhouse/anomalystore/)
           fail=0
           for pkg in "${pkgs[@]}"; do
             line=$(go test -count=1 -cover "$pkg" 2>&1 | tee /dev/stderr | tail -n1)
@@ -253,8 +261,20 @@ jobs:
               fail=1
               continue
             fi
-            # trafficstore: soft floor 20% (цель 40% — отдельный debt); ловим только обнуление.
+            # trafficstore / httpapi / anomalystore: soft floor 20% — ловим обнуление.
             awk -v p="$pct" -v pkg="$pkg" 'BEGIN { if (p+0 < 20) { printf "ERROR: %s coverage %.1f%% < 20%%\n", pkg, p; exit 1 } }' \
+              || fail=1
+          done
+          for pkg in "${min_pkgs[@]}"; do
+            line=$(go test -count=1 -cover "$pkg" 2>&1 | tee /dev/stderr | tail -n1)
+            pct=$(echo "$line" | sed -n 's/.*coverage: \([0-9.]*\)% of statements.*/\1/p')
+            if [[ -z "$pct" ]]; then
+              echo "ERROR: no coverage for $pkg ($line)" >&2
+              fail=1
+              continue
+            fi
+            # anomalystore: CH-heavy; unit tests cover guards/SQL helpers only.
+            awk -v p="$pct" -v pkg="$pkg" 'BEGIN { if (p+0 < 10) { printf "ERROR: %s coverage %.1f%% < 10%%\n", pkg, p; exit 1 } }' \
               || fail=1
           done
           exit "$fail"
@@ -554,6 +574,12 @@ jobs:
       - name: vitest
         run: npm test
 
+      - name: vitest coverage (auth/api smoke)
+        run: npm run test:coverage
+
+      - name: npm audit (production, high+)
+        run: npm audit --omit=dev --audit-level=high
+
       - name: typecheck
         run: npm run typecheck
 
@@ -589,3 +615,48 @@ jobs:
           grep -q 'X-CSRF-Token' src/api/client.ts
           grep -q 'nm_csrf' src/api/client.ts
           grep -q 'nm-theme-change' src/auth/theme.ts
+
+  ci-ok:
+    name: CI status (required)
+    if: always()
+    needs:
+      - changes
+      - release-contract
+      - shellcheck
+      - backend
+      - chconn
+      - syslogngstats
+      - backend-integration
+      - stats-collector
+      - govulncheck
+      - docker-images
+      - frontend-smoke
+      - trivy
+      - frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: aggregate job results
+        env:
+          RELEASE_CONTRACT_RESULT: ${{ needs.release-contract.result }}
+          FRONTEND_SMOKE_RESULT: ${{ needs.frontend-smoke.result }}
+          TRIVY_RESULT: ${{ needs.trivy.result }}
+          SHELL_GATE: ${{ needs.changes.outputs.shell }}
+          SHELLCHECK_RESULT: ${{ needs.shellcheck.result }}
+          BACKEND_GATE: ${{ needs.changes.outputs.backend }}
+          BACKEND_RESULT: ${{ needs.backend.result }}
+          CHCONN_GATE: ${{ needs.changes.outputs.chconn }}
+          CHCONN_RESULT: ${{ needs.chconn.result }}
+          SYSLOGNGSTATS_GATE: ${{ needs.changes.outputs.syslogngstats }}
+          SYSLOGNGSTATS_RESULT: ${{ needs.syslogngstats.result }}
+          INTEGRATION_GATE: ${{ needs.changes.outputs.integration }}
+          BACKEND_INTEGRATION_RESULT: ${{ needs.backend-integration.result }}
+          STATS_GATE: ${{ needs.changes.outputs.stats }}
+          STATS_COLLECTOR_RESULT: ${{ needs.stats-collector.result }}
+          GOVULNCHECK_GATE: ${{ needs.changes.outputs.govulncheck }}
+          GOVULNCHECK_RESULT: ${{ needs.govulncheck.result }}
+          DOCKER_ANY_GATE: ${{ needs.changes.outputs.docker_any }}
+          DOCKER_IMAGES_RESULT: ${{ needs.docker-images.result }}
+          FRONTEND_GATE: ${{ needs.changes.outputs.frontend }}
+          FRONTEND_RESULT: ${{ needs.frontend.result }}
+        run: bash scripts/ci-aggregate.sh

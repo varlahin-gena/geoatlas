@@ -2,12 +2,12 @@ name: Hadolint
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "develop"]
     paths:
       - "**/Dockerfile"
       - ".github/workflows/hadolint.yml"
   pull_request:
-    branches: ["main"]
+    branches: ["main", "develop"]
     paths:
       - "**/Dockerfile"
       - ".github/workflows/hadolint.yml"

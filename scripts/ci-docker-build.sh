@@ -65,6 +65,50 @@ assert_user_entrypoint() {
   ok "${tag} user=${got_user} entrypoint=${got_ep}"
 }
 
+smoke_go_binary() {
+  local tag="$1" expect="$2"
+  shift 2
+  local out exit_code=0
+  set +e
+  if command -v timeout >/dev/null 2>&1; then
+    out="$(timeout 12 docker run --rm "$@" "$tag" 2>&1)"
+    exit_code=$?
+  else
+    out="$(docker run --rm "$@" "$tag" 2>&1)"
+    exit_code=$?
+  fi
+  set -e
+  if [[ "$exit_code" -eq 124 ]]; then
+    ok "${tag} binary smoke (timeout after start)"
+    return 0
+  fi
+  echo "$out" | grep -qE "$expect" \
+    || fail "${tag} binary smoke (exit=${exit_code}): ${out}"
+  ok "${tag} binary smoke"
+}
+
+smoke_backend() {
+  local tag="$1"
+  smoke_go_binary "$tag" 'network-monitor starting|build application|clickhouse|configuration|security config' \
+    -e NM_ALLOW_INSECURE=1 \
+    -e AUTH_DISABLED=1 \
+    -e API_AUTH_DISABLED=1 \
+    -e CLICKHOUSE_HOST=127.0.0.1 \
+    -e CLICKHOUSE_PASSWORD=ci-smoke-test-password-32ch \
+    -e SESSION_SECRET=ci-smoke-test-session-secret-32 \
+    -e API_AUTH_TOKEN=ci-smoke-test-api-auth-token-32ch \
+    -e INGEST_SHARED_SECRET=ci-smoke-test-ingest-secret-32ch
+}
+
+smoke_stats() {
+  local tag="$1"
+  smoke_go_binary "$tag" 'stats-collector starting|clickhouse connection|config:' \
+    -e NM_ALLOW_INSECURE=1 \
+    -e CLICKHOUSE_HOST=127.0.0.1 \
+    -e CLICKHOUSE_PASSWORD=ci-smoke-test-password-32ch \
+    -e API_AUTH_TOKEN=ci-smoke-test-api-auth-token-32ch
+}
+
 smoke_frontend() {
   local tag="$1"
   local cid="" port=8766
@@ -117,12 +161,14 @@ build_backend() {
   local tag="network_monitor-backend:ci"
   build_image backend backend/Dockerfile . "$tag"
   assert_user_entrypoint "$tag" app /app/network-monitor
+  smoke_backend "$tag"
 }
 
 build_stats() {
   local tag="network_monitor-stats-collector:ci"
   build_image stats-collector stats-collector/Dockerfile . "$tag"
   assert_user_entrypoint "$tag" app /app/stats-collector
+  smoke_stats "$tag"
 }
 
 build_frontend() {
