@@ -6,7 +6,6 @@ export type {
   DREvent,
   EdgesAgg,
   FailedLogin,
-  HistoryPayload,
   HistoryPoint,
   Retention,
   SystemStats,

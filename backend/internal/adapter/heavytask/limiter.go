@@ -40,9 +40,6 @@ func (l *Limiter) Acquire(ctx context.Context) error {
 	if l == nil {
 		return nil
 	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
 	select {
 	case l.sem <- struct{}{}:
 		l.busy.Store(true)

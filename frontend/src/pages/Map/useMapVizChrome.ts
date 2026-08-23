@@ -42,5 +42,3 @@ export function useMapVizChrome() {
     infoDockVisible: showLegend || showStats,
   };
 }
-
-export type MapVizChrome = ReturnType<typeof useMapVizChrome>;

@@ -1,6 +1,7 @@
 package authmw
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -150,9 +151,9 @@ func TestBearerScopeEnvIsAdmin(t *testing.T) {
 }
 
 func TestSessionFromContext(t *testing.T) {
-	_, ok := SessionFromContext(nil)
+	_, ok := SessionFromContext(context.TODO())
 	if ok {
-		t.Fatal("nil ctx")
+		t.Fatal("empty ctx")
 	}
 	ctx := withSession(httptest.NewRequest(http.MethodGet, "/", nil).Context(), auth.Session{Username: "x"})
 	s, ok := SessionFromContext(ctx)

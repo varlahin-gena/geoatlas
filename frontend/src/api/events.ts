@@ -1,7 +1,7 @@
 import { apiGetQuery } from './client';
 import type { EventsPayload, SeriesPayload } from './eventsTypes';
 
-export type { EventsPayload, SeriesPayload, MapLine, MapPoint, SeriesPoint } from './eventsTypes';
+export type { EventsPayload, SeriesPayload } from './eventsTypes';
 
 export async function fetchMapEvents(opts: {
   groupBy: string;
