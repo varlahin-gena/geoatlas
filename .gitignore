@@ -12,9 +12,16 @@ syslog-ng.d/zz_profile.conf
 syslog-ng.d/zz_ingest_auth.conf
 
 # TLS (свои сертификаты) — ключи не коммитить
+*.pem
 certs/*
 !certs/.gitkeep
 !certs/README.md
+
+# Локальные данные / загрузки (см. README GeoIP)
+/geoip.csv
+*.auth.tgz
+geo_index.snap
+.nm-package
 
 # Локальные инструменты разработки
 dist/
@@ -24,14 +31,26 @@ backend/.gotmp/
 *.exe
 *.test
 __debug_bin*
+/network-monitor
+/backend/network-monitor
+/stats-collector/stats-collector
+coverage/
 coverage.out
 coverage.html
+coverage.txt
+cover.out
+*.cover
+*.coverprofile
+*.cov
 *.prof
 *.log
+*.sarif
+.eslintcache
 
 # Frontend build artifacts
 frontend/node_modules/
 frontend/dist/
+frontend/coverage/
 frontend/test-results/
 frontend/playwright-report/
 frontend/blob-report/
