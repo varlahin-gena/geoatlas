@@ -101,10 +101,13 @@ describe('classifyEmptyMap', () => {
 });
 
 describe('buildGeoCurlSnippet', () => {
-  it('includes origin upload-geo path', () => {
+  it('includes origin upload-geo path and geoatlas install dir', () => {
     const snip = buildGeoCurlSnippet('http://10.0.0.5:8080');
     expect(snip).toContain('http://10.0.0.5:8080/upload-geo');
     expect(snip).toContain('Authorization: Bearer $API_AUTH_TOKEN');
+    expect(snip).toContain('cd /opt/geoatlas');
+    expect(snip).toContain('@/opt/geoatlas/geoip.csv');
+    expect(snip).not.toContain('network-monitor');
   });
 });
 

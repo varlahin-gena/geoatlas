@@ -281,6 +281,8 @@ if grep -q 'setGlobeView' frontend/src/pages/Map/useGlobeAutoRotate.ts; then
   fail "useGlobeAutoRotate: must not setGlobeView every frame"
 fi
 grep -q 'abortableSleep' frontend/src/pages/Map/geoWizard.ts || fail "geoWizard: abortableSleep"
+grep -q '/opt/geoatlas' frontend/src/pages/Map/geoWizard.ts || fail "geoWizard: /opt/geoatlas install path"
+grep -q 'network-monitor' frontend/src/pages/Map/geoWizard.ts && fail "geoWizard: must not mention network-monitor"
 grep -q 'apiFetchRaw' frontend/src/pages/Map/useGeoWizard.ts || fail "useGeoWizard: apiFetchRaw"
 grep -q 'Escape' frontend/src/pages/Map/GeoWizardModal.tsx || fail "GeoWizardModal: Escape"
 grep -q 'GA_SOURCEMAP' frontend/vite.config.ts || fail "vite: GA_SOURCEMAP gate"

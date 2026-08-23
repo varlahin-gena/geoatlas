@@ -5,6 +5,16 @@
 
 ## [Unreleased]
 
+## [2.0.1] — 2026-08-23
+
+### Fixed
+- Мастер GeoIP: регрессионные проверки curl-snippet — путь установки `/opt/geoatlas`, без `network-monitor` (unit, e2e, frontend-smoke).
+
+### Notes
+- OpenAPI API doc version: **1.14.0** (без изменений)
+- Продуктовая версия: **2.0.1**
+- После обновления с 2.0.0 пересоберите frontend: `docker compose build --no-cache frontend && docker compose up -d frontend`
+
 ## [2.0.0] — 2026-08-23
 
 ### Added

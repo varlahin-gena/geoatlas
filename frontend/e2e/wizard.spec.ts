@@ -20,4 +20,16 @@ test.describe('geo wizard', () => {
     await expect(page.locator('#map-main')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('dialog', { name: 'Мастер GeoIP' })).toHaveCount(0);
   });
+
+  test('upload step curl snippet uses /opt/geoatlas', async ({ page }) => {
+    await installSessionMocks(page, 'administrator');
+    await seedCsrf(page);
+    await loginAs(page, 'admin');
+    const dialog = page.getByRole('dialog', { name: 'Мастер GeoIP' });
+    await expect(dialog).toBeVisible({ timeout: 15_000 });
+    await dialog.getByRole('button', { name: 'Загрузить базу' }).click();
+    const curl = dialog.locator('.geo-wizard-curl');
+    await expect(curl).toContainText('/opt/geoatlas');
+    await expect(curl).not.toContainText('network-monitor');
+  });
 });
