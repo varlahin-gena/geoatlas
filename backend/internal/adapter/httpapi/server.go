@@ -60,7 +60,11 @@ func NewServer(p Params, opts ...ServerOption) *Server {
 	if cfg.APIAuthDisabled {
 		envTokens = nil
 	}
-	ba := newBearerAuth(envTokens, p.APITokens)
+	opsTokens := cfg.APIOpsTokens()
+	if cfg.APIAuthDisabled {
+		opsTokens = nil
+	}
+	ba := newBearerAuth(envTokens, opsTokens, p.APITokens)
 	uiAuthOff := cfg.AuthDisabled
 	apiAuthOff := cfg.APIAuthDisabled
 

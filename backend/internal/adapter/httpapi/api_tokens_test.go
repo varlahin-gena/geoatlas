@@ -51,7 +51,7 @@ func TestScopedBearerOpsVsAdmin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ba := newBearerAuth(nil, store)
+	ba := newBearerAuth(nil, nil, store)
 
 	opsOK := chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)

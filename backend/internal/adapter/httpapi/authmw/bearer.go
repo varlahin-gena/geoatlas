@@ -8,14 +8,22 @@ import (
 	"network_monitor/internal/auth"
 )
 
-// BearerAuth — env Bearer (всегда admin) + именованные токены из TokenStore.
+// BearerAuth — env admin Bearer + optional env ops Bearer + именованные токены из TokenStore.
 type BearerAuth struct {
-	envTokens []string
-	store     TokenStore
+	envAdminTokens []string
+	envOpsTokens   []string
+	store          TokenStore
 }
 
-func NewBearerAuth(envTokens []string, store TokenStore) BearerAuth {
-	return BearerAuth{envTokens: envTokens, store: store}
+// NewBearerAuth создаёт проверку Bearer.
+// envAdminTokens — API_AUTH_TOKEN(+previous), всегда scope=admin.
+// envOpsTokens — API_OPS_TOKEN(+previous), scope=ops (sidecars вроде stats-collector).
+func NewBearerAuth(envAdminTokens, envOpsTokens []string, store TokenStore) BearerAuth {
+	return BearerAuth{
+		envAdminTokens: envAdminTokens,
+		envOpsTokens:   envOpsTokens,
+		store:          store,
+	}
 }
 
 func (b BearerAuth) Scope(r *http.Request) (string, bool) {
@@ -24,7 +32,22 @@ func (b BearerAuth) Scope(r *http.Request) (string, bool) {
 		return "", false
 	}
 	gotb := []byte(got)
-	for _, token := range b.envTokens {
+	if matchEnvToken(gotb, b.envAdminTokens) {
+		return auth.ScopeAdmin, true
+	}
+	if matchEnvToken(gotb, b.envOpsTokens) {
+		return auth.ScopeOps, true
+	}
+	if b.store != nil {
+		if scope, ok := b.store.Verify(got); ok {
+			return scope, true
+		}
+	}
+	return "", false
+}
+
+func matchEnvToken(gotb []byte, tokens []string) bool {
+	for _, token := range tokens {
 		if token == "" {
 			continue
 		}
@@ -33,15 +56,10 @@ func (b BearerAuth) Scope(r *http.Request) (string, bool) {
 			continue
 		}
 		if subtle.ConstantTimeCompare(gotb, tb) == 1 {
-			return auth.ScopeAdmin, true
+			return true
 		}
 	}
-	if b.store != nil {
-		if scope, ok := b.store.Verify(got); ok {
-			return scope, true
-		}
-	}
-	return "", false
+	return false
 }
 
 func (b BearerAuth) OK(r *http.Request, need string) bool {

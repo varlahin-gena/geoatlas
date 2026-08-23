@@ -1,8 +1,10 @@
-package reputation
+// Package netutil — мелкие сетевые хелперы без доменных зависимостей.
+package netutil
 
 import "net"
 
-// IsNonPublicIPv4IP — частные/спец. адреса, для которых репутация не имеет смысла (hot path Lookup).
+// IsNonPublicIPv4IP — loopback / link-local / multicast / unspecified / RFC1918 / CGNAT (RFC 6598).
+// Non-IPv4 (incl. IPv6) считается non-public.
 func IsNonPublicIPv4IP(ip net.IP) bool {
 	ip4 := ip.To4()
 	if ip4 == nil {

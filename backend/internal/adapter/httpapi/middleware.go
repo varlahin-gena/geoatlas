@@ -195,8 +195,8 @@ func maxBytesMW(n int64) middleware {
 
 // Thin wrappers keep server/tests on httpapi names while auth lives in authmw.
 
-func newBearerAuth(envTokens []string, store APITokenStore) authmw.BearerAuth {
-	return authmw.NewBearerAuth(envTokens, store)
+func newBearerAuth(envAdmin, envOps []string, store APITokenStore) authmw.BearerAuth {
+	return authmw.NewBearerAuth(envAdmin, envOps, store)
 }
 
 func sessionLoader(sessions SessionParser) authmw.SessionLoader {

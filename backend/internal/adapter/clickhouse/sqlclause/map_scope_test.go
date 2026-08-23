@@ -3,11 +3,13 @@ package sqlclause
 import (
 	"strings"
 	"testing"
+
+	"network_monitor/internal/mapsearch"
 )
 
 func TestSanitizeMapScopeClipsAndStripsNUL(t *testing.T) {
 	long := strings.Repeat("я", 200)
-	if got := SanitizeMapCountry(long); got == "" || strings.Count(got, "я") != maxMapCountryRunes {
+	if got := SanitizeMapCountry(long); got == "" || strings.Count(got, "я") != mapsearch.MaxMapCountryRunes {
 		t.Fatalf("country clip: %q", got)
 	}
 	if got := SanitizeMapQuery("ab\x00c"); got != "abc" {

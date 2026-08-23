@@ -63,7 +63,7 @@ func TestRequireLoginUnauthorized(t *testing.T) {
 }
 
 func TestRequireLoginBearer(t *testing.T) {
-	ba := NewBearerAuth([]string{"secret-token"}, nil)
+	ba := NewBearerAuth([]string{"secret-token"}, nil, nil)
 	h := RequireLogin(ba, nil, nil, false)(okHandler(t))
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", "Bearer secret-token")
@@ -127,7 +127,7 @@ func TestRequireAdminOK(t *testing.T) {
 }
 
 func TestRequireOpsNamedToken(t *testing.T) {
-	ba := NewBearerAuth(nil, stubTokens{scope: auth.ScopeOps, ok: true})
+	ba := NewBearerAuth(nil, nil, stubTokens{scope: auth.ScopeOps, ok: true})
 	h := RequireOps(ba, nil, nil, false, false)(okHandler(t))
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", "Bearer named")
@@ -139,7 +139,7 @@ func TestRequireOpsNamedToken(t *testing.T) {
 }
 
 func TestBearerScopeEnvIsAdmin(t *testing.T) {
-	ba := NewBearerAuth([]string{"env"}, nil)
+	ba := NewBearerAuth([]string{"env"}, nil, nil)
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", "Bearer env")
 	if !ba.OK(req, auth.ScopeAdmin) {
@@ -147,6 +147,22 @@ func TestBearerScopeEnvIsAdmin(t *testing.T) {
 	}
 	if !ba.Any(req) {
 		t.Fatal("Any")
+	}
+}
+
+func TestBearerScopeEnvOps(t *testing.T) {
+	ba := NewBearerAuth([]string{"admin-tok"}, []string{"ops-tok-16chars!"}, nil)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer ops-tok-16chars!")
+	if !ba.OK(req, auth.ScopeOps) {
+		t.Fatal("ops env bearer should pass ops")
+	}
+	if ba.OK(req, auth.ScopeAdmin) {
+		t.Fatal("ops env bearer must not be admin")
+	}
+	scope, ok := ba.Scope(req)
+	if !ok || scope != auth.ScopeOps {
+		t.Fatalf("scope=%q ok=%v", scope, ok)
 	}
 }
 

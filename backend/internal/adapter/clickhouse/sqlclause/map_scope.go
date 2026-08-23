@@ -2,14 +2,8 @@ package sqlclause
 
 import (
 	"strings"
-	"unicode/utf8"
 
 	"network_monitor/internal/mapsearch"
-)
-
-const (
-	maxMapCountryRunes = 80
-	maxMapQueryRunes   = 400
 )
 
 // MapScope — country/q для карты. Значения только как bind-args, не в SQL-текст.
@@ -18,21 +12,9 @@ type MapScope struct {
 	Query   string
 }
 
-func clipRunes(s string, max int) string {
-	s = strings.TrimSpace(s)
-	if s == "" || max < 1 {
-		return ""
-	}
-	s = strings.ReplaceAll(s, "\x00", "")
-	if utf8.RuneCountInString(s) <= max {
-		return s
-	}
-	runes := []rune(s)
-	return string(runes[:max])
-}
-
-func SanitizeMapCountry(s string) string { return clipRunes(s, maxMapCountryRunes) }
-func SanitizeMapQuery(s string) string   { return clipRunes(s, maxMapQueryRunes) }
+// SanitizeMapCountry / SanitizeMapQuery — re-export mapsearch (единый clip для usecase и SQL).
+func SanitizeMapCountry(s string) string { return mapsearch.SanitizeMapCountry(s) }
+func SanitizeMapQuery(s string) string   { return mapsearch.SanitizeMapQuery(s) }
 
 func (s MapScope) sanitized() MapScope {
 	return MapScope{Country: SanitizeMapCountry(s.Country), Query: SanitizeMapQuery(s.Query)}

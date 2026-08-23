@@ -8,6 +8,7 @@ import (
 
 	"network_monitor/internal/geoip"
 	"network_monitor/internal/model"
+	"network_monitor/internal/netutil"
 )
 
 // Index — immutable snapshot диапазонов; Lookup допускает пересечения списков.
@@ -93,7 +94,7 @@ func (i *Index) Lookup(ipStr string) []model.ReputationHit {
 	if v4 == nil {
 		return nil
 	}
-	if IsNonPublicIPv4IP(v4) {
+	if netutil.IsNonPublicIPv4IP(v4) {
 		return nil
 	}
 	ip := geoip.IPv4ToUint32(v4)

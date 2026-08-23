@@ -25,6 +25,9 @@ type Config struct {
 	APIAuthToken         string
 	APIAuthPreviousToken string // API_AUTH_PREVIOUS_TOKEN — ротация Bearer без даунтайма
 	APIAuthDisabled      bool   // API_AUTH_DISABLED=1 — только local/dev; иначе токен обязателен
+	// APIOpsToken — env Bearer со scope=ops (sidecars: stats-collector). Не admin.
+	APIOpsToken         string
+	APIOpsPreviousToken string // API_OPS_PREVIOUS_TOKEN — ротация ops Bearer
 
 	// Локальная авторизация UI (логин/роли). AUTH_DISABLED=1 — без логина (dev).
 	AuthDisabled         bool
@@ -152,6 +155,8 @@ func FromEnv() Config {
 		APIAuthToken:         envOr("API_AUTH_TOKEN", ""),
 		APIAuthPreviousToken: envOr("API_AUTH_PREVIOUS_TOKEN", ""),
 		APIAuthDisabled:      parser.bool("API_AUTH_DISABLED", false),
+		APIOpsToken:          envOr("API_OPS_TOKEN", ""),
+		APIOpsPreviousToken:  envOr("API_OPS_PREVIOUS_TOKEN", ""),
 		AuthDisabled:         parser.bool("AUTH_DISABLED", false),
 		SessionSecret:        envOr("SESSION_SECRET", ""),
 		SessionTTLHours:      parser.int("SESSION_TTL_HOURS", 12),
@@ -211,7 +216,7 @@ func FromEnv() Config {
 		MaxReputationUploadSize:              parser.int64("MAX_REPUTATION_UPLOAD_SIZE", 1<<30),
 		ReputationFetchEnabled:               parser.bool("REPUTATION_FETCH_ENABLED", true),
 		ReputationFetchInterval:              parser.durationFlexible("REPUTATION_FETCH_INTERVAL", 6*time.Hour),
-		ReputationFeeds:                      parseReputationFeeds(os.Getenv("REPUTATION_FEEDS")),
+		ReputationFeeds:                      parser.reputationFeeds("REPUTATION_FEEDS"),
 		ReputationFeedsFile:                  envOr("REPUTATION_FEEDS_FILE", "/app/data/reputation_feeds.json"),
 		AnomalyEnabled:                       parser.bool("ANOMALY_ENABLED", true),
 		AnomalyScanInterval:                  parser.durationFlexible("ANOMALY_SCAN_INTERVAL", 5*time.Minute),
@@ -289,8 +294,17 @@ func (c Config) ClickHouseAddr() string {
 
 // APIAuthTokens — текущий Bearer и опциональный previous (ротация).
 func (c Config) APIAuthTokens() []string {
-	primary := strings.TrimSpace(c.APIAuthToken)
-	prev := strings.TrimSpace(c.APIAuthPreviousToken)
+	return tokenPair(c.APIAuthToken, c.APIAuthPreviousToken)
+}
+
+// APIOpsTokens — env Bearer со scope=ops (stats-collector и др. sidecars).
+func (c Config) APIOpsTokens() []string {
+	return tokenPair(c.APIOpsToken, c.APIOpsPreviousToken)
+}
+
+func tokenPair(primary, prev string) []string {
+	primary = strings.TrimSpace(primary)
+	prev = strings.TrimSpace(prev)
 	out := make([]string, 0, 2)
 	if primary != "" {
 		out = append(out, primary)
@@ -386,14 +400,23 @@ func (p *envParser) durationFlexible(key string, def time.Duration) time.Duratio
 	return def
 }
 
-func parseReputationFeeds(raw string) []ReputationFeed {
-	raw = strings.TrimSpace(raw)
+func (p *envParser) reputationFeeds(key string) []ReputationFeed {
+	raw := strings.TrimSpace(os.Getenv(key))
 	if raw == "" {
 		return nil
 	}
+	feeds, err := parseReputationFeedsJSON(raw)
+	if err != nil {
+		p.invalid(key)
+		return nil
+	}
+	return feeds
+}
+
+func parseReputationFeedsJSON(raw string) ([]ReputationFeed, error) {
 	var feeds []ReputationFeed
 	if err := json.Unmarshal([]byte(raw), &feeds); err != nil {
-		return nil
+		return nil, err
 	}
 	out := make([]ReputationFeed, 0, len(feeds))
 	for _, f := range feeds {
@@ -413,7 +436,7 @@ func parseReputationFeeds(raw string) []ReputationFeed {
 		out = append(out, f)
 	}
 	if len(out) == 0 {
-		return nil
+		return nil, nil
 	}
-	return out
+	return out, nil
 }

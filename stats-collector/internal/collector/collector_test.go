@@ -64,15 +64,41 @@ func TestCollectIngestMetricsPersistsQueueHealth(t *testing.T) {
 		"buffer_drops_total": 6, "circuit_open": 1,
 	}
 	got := map[string]float64{}
+	var up float64
+	var upSeen bool
 	for _, metric := range metrics {
 		if metric.Type == "pipeline" && metric.Target == "ingest" {
 			got[metric.Name] = metric.Value
 		}
+		if metric.Type == "health" && metric.Target == "ingest" && metric.Name == "up" {
+			up = metric.Value
+			upSeen = true
+		}
+	}
+	if !upSeen || up != 1 {
+		t.Fatalf("health.ingest.up=%v seen=%v", up, upSeen)
 	}
 	for name, value := range want {
 		if got[name] != value {
 			t.Errorf("metric %s = %v, want %v", name, got[name], value)
 		}
+	}
+}
+
+func TestCollectIngestMetricsScrapeFailureEmitsDown(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+
+	c := &Collector{cfg: config.Config{IngestStatsURL: srv.URL}, http: srv.Client()}
+	metrics := c.collectIngestMetrics(context.Background(), time.Now().UTC())
+	if len(metrics) != 1 {
+		t.Fatalf("len=%d want health.up only", len(metrics))
+	}
+	m := metrics[0]
+	if m.Type != "health" || m.Target != "ingest" || m.Name != "up" || m.Value != 0 {
+		t.Fatalf("%+v", m)
 	}
 }
 

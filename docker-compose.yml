@@ -141,6 +141,8 @@ services:
       SYSLOG_STATS_URL: "${SYSLOG_STATS_URL-http://syslog-ng:9577/stats}"
       # Обязателен, если API_AUTH_DISABLED не true. Генерируется в start.sh → .env
       API_AUTH_TOKEN: ${API_AUTH_TOKEN:?set API_AUTH_TOKEN in .env}
+      # Sidecar ops Bearer (stats-collector); optional — fallback на API_AUTH_TOKEN
+      API_OPS_TOKEN: ${API_OPS_TOKEN:-}
       API_AUTH_DISABLED: ${API_AUTH_DISABLED:-false}
       # Локальный логин (seed только admin). Operator — опционально, иначе УЗ в UI.
       AUTH_DISABLED: ${AUTH_DISABLED:-false}
@@ -225,6 +227,7 @@ services:
       BACKEND_HEALTH_URL: http://backend:8080/live
       INGEST_STATS_URL: http://backend:8080/api/ingest/stats
       SYSLOG_STATS_URL: "${SYSLOG_STATS_URL-http://syslog-ng:9577/stats}"
+      API_OPS_TOKEN: ${API_OPS_TOKEN:-}
       API_AUTH_TOKEN: ${API_AUTH_TOKEN:?set API_AUTH_TOKEN in .env}
       CGROUP_ROOT: /sys/fs/cgroup
       HOST_PROC: /host/proc

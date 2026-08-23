@@ -455,7 +455,7 @@ func (h *AuthHandler) bearerScopeOK(r *http.Request, need string) bool {
 		return false
 	}
 	env := h.cfg.APIAuthTokens()
-	ba := newBearerAuth(env, h.apiTokens)
+	ba := newBearerAuth(env, h.cfg.APIOpsTokens(), h.apiTokens)
 	return ba.OK(r, need)
 }
 

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"network_monitor/internal/mapagg"
+	"network_monitor/internal/mapsearch"
 	"network_monitor/internal/model"
 )
 
@@ -71,8 +72,8 @@ func New(traffic TrafficRepository, geo GeoLookuper, reputation ReputationLookup
 func (s *Service) GetMap(ctx context.Context, in GetMapInput) (GetMapResult, error) {
 	groupBy := normalizeGroupBy(in.GroupBy)
 	filter := normalizeFilter(in.Filter)
-	country := clipRunes(in.Country, 80)
-	queryText := clipRunes(in.Query, 400)
+	country := mapsearch.SanitizeMapCountry(in.Country)
+	queryText := mapsearch.SanitizeMapQuery(in.Query)
 	out := GetMapResult{
 		GroupBy: groupBy,
 		Filter:  filter,
@@ -311,19 +312,6 @@ func normalizeFilter(v string) string {
 	default:
 		return "all"
 	}
-}
-
-func clipRunes(s string, max int) string {
-	s = strings.TrimSpace(s)
-	if s == "" || max < 1 {
-		return ""
-	}
-	s = strings.ReplaceAll(s, "\x00", "")
-	r := []rune(s)
-	if len(r) <= max {
-		return s
-	}
-	return string(r[:max])
 }
 
 func buildMapFromIPRaws(raws []model.RawAgg, geo mapagg.GeoLookuper, groupBy string) ([]model.Line, map[string]model.Node, int) {

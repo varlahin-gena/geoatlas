@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -17,9 +18,12 @@ type Config struct {
 	BackendHealthURL string
 	IngestStatsURL   string
 	SyslogStatsURL   string
-	APIAuthToken     string
-	CgroupRoot       string
-	HostProcRoot     string
+	// APIOpsToken — предпочтительный Bearer (backend scope=ops).
+	APIOpsToken string
+	// APIAuthToken — fallback (admin); нежелателен для sidecar.
+	APIAuthToken string
+	CgroupRoot   string
+	HostProcRoot string
 }
 
 func envStr(k, d string) string {
@@ -38,6 +42,21 @@ func envInt(k string, d int) int {
 	return d
 }
 
+func envBool(k string, def bool) bool {
+	raw, ok := os.LookupEnv(k)
+	if !ok {
+		return def
+	}
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return def
+	}
+}
+
 func Load() Config {
 	host := envStr("CLICKHOUSE_HOST", "clickhouse")
 	port := envStr("CLICKHOUSE_PORT", "9000")
@@ -51,8 +70,48 @@ func Load() Config {
 		BackendHealthURL: envStr("BACKEND_HEALTH_URL", "http://backend:8080/live"),
 		IngestStatsURL:   envStr("INGEST_STATS_URL", "http://backend:8080/api/ingest/stats"),
 		SyslogStatsURL:   envStr("SYSLOG_STATS_URL", ""),
+		APIOpsToken:      envStr("API_OPS_TOKEN", ""),
 		APIAuthToken:     envStr("API_AUTH_TOKEN", ""),
 		CgroupRoot:       envStr("CGROUP_ROOT", "/sys/fs/cgroup"),
 		HostProcRoot:     envStr("HOST_PROC", "/host/proc"),
 	}
+}
+
+const minSecretLen = 16
+
+// BearerToken — ops если задан, иначе admin fallback.
+func (c Config) BearerToken() string {
+	if t := strings.TrimSpace(c.APIOpsToken); t != "" {
+		return t
+	}
+	return strings.TrimSpace(c.APIAuthToken)
+}
+
+// UsingAdminFallback — true, если scrape идёт под admin env Bearer.
+func (c Config) UsingAdminFallback() bool {
+	return strings.TrimSpace(c.APIOpsToken) == "" && strings.TrimSpace(c.APIAuthToken) != ""
+}
+
+// Validate — fail-closed на пустых/коротких секретах без NM_ALLOW_INSECURE=1.
+func (c Config) Validate() error {
+	allowInsecure := envBool("NM_ALLOW_INSECURE", false)
+	token := c.BearerToken()
+	if token == "" && !allowInsecure {
+		return fmt.Errorf("API_OPS_TOKEN (preferred) or API_AUTH_TOKEN is required (NM_ALLOW_INSECURE=1 to override for local/dev)")
+	}
+	if token != "" && !allowInsecure && len(token) < minSecretLen {
+		which := "API_OPS_TOKEN"
+		if strings.TrimSpace(c.APIOpsToken) == "" {
+			which = "API_AUTH_TOKEN"
+		}
+		return fmt.Errorf("%s must be at least %d characters", which, minSecretLen)
+	}
+	pass := strings.TrimSpace(c.ClickHousePass)
+	if pass == "" && !allowInsecure {
+		return fmt.Errorf("CLICKHOUSE_PASSWORD is required (NM_ALLOW_INSECURE=1 to override for local/dev)")
+	}
+	if pass != "" && !allowInsecure && len(pass) < minSecretLen {
+		return fmt.Errorf("CLICKHOUSE_PASSWORD must be at least %d characters", minSecretLen)
+	}
+	return nil
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"time"
 
@@ -62,10 +63,13 @@ func fetchIngestStats(ctx context.Context, client *http.Client, url, apiToken st
 func (c *Collector) collectIngestMetrics(ctx context.Context, ts time.Time) []Metric {
 	out := []Metric{}
 
-	status, err := fetchIngestStats(ctx, c.http, c.cfg.IngestStatsURL, c.cfg.APIAuthToken)
+	status, err := fetchIngestStats(ctx, c.http, c.cfg.IngestStatsURL, c.cfg.BearerToken())
 	if err != nil {
+		log.Printf("ingest stats scrape error: %v", err)
+		out = append(out, Metric{Timestamp: ts, Type: "health", Target: "ingest", Name: "up", Value: 0})
 		return out
 	}
+	out = append(out, Metric{Timestamp: ts, Type: "health", Target: "ingest", Name: "up", Value: 1})
 
 	out = append(out,
 		Metric{Timestamp: ts, Type: "pipeline", Target: "ingest", Name: "buffered_lines", Value: status.BufferedLines},

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"network_monitor/internal/reputation"
+	"network_monitor/internal/netutil"
 )
 
 const MaxRedirects = 3
@@ -89,7 +89,7 @@ func resolvePublicIPv4(host string) ([]net.IP, error) {
 		if ip.To4() == nil {
 			return nil, fmt.Errorf("ipv6 urls are not supported")
 		}
-		if reputation.IsNonPublicIPv4IP(ip) {
+		if netutil.IsNonPublicIPv4IP(ip) {
 			return nil, fmt.Errorf("url host resolves to a non-public address")
 		}
 		return []net.IP{ip.To4()}, nil
@@ -111,7 +111,7 @@ func resolvePublicIPv4(host string) ([]net.IP, error) {
 		if ip4 == nil {
 			continue
 		}
-		if reputation.IsNonPublicIPv4IP(ip4) {
+		if netutil.IsNonPublicIPv4IP(ip4) {
 			return nil, fmt.Errorf("url host resolves to a non-public address")
 		}
 		out = append(out, ip4)

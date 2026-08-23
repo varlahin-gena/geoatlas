@@ -13,6 +13,12 @@ import (
 
 func main() {
 	cfg := config.Load()
+	if err := cfg.Validate(); err != nil {
+		log.Fatalf("config: %v", err)
+	}
+	if cfg.UsingAdminFallback() {
+		log.Printf("WARNING: API_OPS_TOKEN unset — using API_AUTH_TOKEN (admin). Prefer API_OPS_TOKEN for least privilege")
+	}
 
 	log.Printf("stats-collector starting")
 	log.Printf("  ClickHouse:  %s", cfg.ClickHouseAddr)

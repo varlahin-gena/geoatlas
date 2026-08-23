@@ -341,7 +341,7 @@ _nm_ensure_admin_auth() {
 write_env_file() {
     local project_dir="$1" profile="$2"
     local env_file="${project_dir}/.env"
-    local ch_max_mem spill existing_token="" existing_session="" existing_ch="" existing_ingest="" token session ch_password ingest_secret
+    local ch_max_mem spill existing_token="" existing_session="" existing_ch="" existing_ingest="" existing_ops="" token session ch_password ingest_secret ops_token
 
     ch_max_mem="$(calc_ch_max_query_bytes "$CH_MEM_GB")"
     spill="$(calc_external_spill_bytes "$CH_MEM_GB")"
@@ -351,6 +351,7 @@ write_env_file() {
         existing_session="$(_nm_env_get "$env_file" SESSION_SECRET)"
         existing_ch="$(_nm_env_get "$env_file" CLICKHOUSE_PASSWORD)"
         existing_ingest="$(_nm_env_get "$env_file" INGEST_SHARED_SECRET)"
+        existing_ops="$(_nm_env_get "$env_file" API_OPS_TOKEN)"
     fi
     if [[ -n "$existing_token" ]]; then
         token="$existing_token"
@@ -358,6 +359,13 @@ write_env_file() {
         token="$(openssl rand -hex 32)"
     else
         token="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+    fi
+    if [[ -n "$existing_ops" ]]; then
+        ops_token="$existing_ops"
+    elif command -v openssl >/dev/null 2>&1; then
+        ops_token="$(openssl rand -hex 32)"
+    else
+        ops_token="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
     fi
     if [[ -n "$existing_session" ]]; then
         session="$existing_session"
@@ -525,6 +533,7 @@ CH_MAX_MEMORY_USAGE=${ch_max_mem}
 CH_EXTERNAL_GROUP_BY_BYTES=${spill}
 CH_EXTERNAL_SORT_BYTES=${spill}
 API_AUTH_TOKEN=${token}
+API_OPS_TOKEN=${ops_token}
 SESSION_SECRET=${session}
 CLICKHOUSE_PASSWORD=${ch_password}
 INGEST_SHARED_SECRET=${ingest_secret}
