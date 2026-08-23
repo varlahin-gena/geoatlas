@@ -13,7 +13,7 @@ import (
 	"geoatlas/internal/model"
 )
 
-const namespace = "nm"
+const namespace = "ga"
 
 // IngestStats — снимок live-ingest (реализация: *ingestnet.Service).
 type IngestStats interface {
