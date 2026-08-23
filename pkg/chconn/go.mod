@@ -1,4 +1,4 @@
-module network_monitor/pkg/chconn
+module geoatlas/pkg/chconn
 
 go 1.25.0
 

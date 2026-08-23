@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"network_monitor/internal/adapter/clickhouse/sqlclause"
+	"geoatlas/internal/adapter/clickhouse/sqlclause"
 )
 
 func TestScanGeoFromLogsSelectClauseOrder(t *testing.T) {
@@ -43,11 +43,11 @@ func TestScanGeoFromLogsSelectJoinsEnrichLookup(t *testing.T) {
 }
 
 func TestScanGeoFromLogsSelectBackupSkipsEnrich(t *testing.T) {
-	q := scanGeoFromLogsSelect("nm_bak_traffic_logs", "src_k", "dst_k", "src_l", "dst_l", "timestamp >= now()")
+	q := scanGeoFromLogsSelect("ga_bak_traffic_logs", "src_k", "dst_k", "src_l", "dst_l", "timestamp >= now()")
 	if strings.Contains(q, sqlclause.GeoEnrichIPTable) {
 		t.Fatalf("backup scan must not join enrich table:\n%s", q)
 	}
-	if !strings.Contains(q, "FROM nm_bak_traffic_logs") {
+	if !strings.Contains(q, "FROM ga_bak_traffic_logs") {
 		t.Fatalf("expected bare backup FROM:\n%s", q)
 	}
 }

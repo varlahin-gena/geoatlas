@@ -5,7 +5,7 @@
 #   bash scripts/ci-docker-build.sh              # все три
 #   bash scripts/ci-docker-build.sh frontend     # один образ
 #
-# В GitHub Actions: docker/setup-buildx-action + NM_DOCKER_CACHE=gha
+# В GitHub Actions: docker/setup-buildx-action + GA_DOCKER_CACHE=gha
 # (кэш слоёв между прогонами; --load, чтобы smoke видел образ).
 set -euo pipefail
 
@@ -32,8 +32,8 @@ grep -q 'context: ./frontend' docker-compose.yml \
 ok "compose build contexts"
 
 use_gha_cache=0
-if [[ "${NM_DOCKER_CACHE:-}" == "gha" ]]; then
-  docker buildx version >/dev/null 2>&1 || fail "NM_DOCKER_CACHE=gha requires docker buildx"
+if [[ "${GA_DOCKER_CACHE:-}" == "gha" ]]; then
+  docker buildx version >/dev/null 2>&1 || fail "GA_DOCKER_CACHE=gha requires docker buildx"
   use_gha_cache=1
 fi
 
@@ -45,8 +45,8 @@ build_image() {
       --load \
       --provenance=false \
       --sbom=false \
-      --cache-from "type=gha,scope=nm-docker-${name}" \
-      --cache-to "type=gha,mode=max,scope=nm-docker-${name}" \
+      --cache-from "type=gha,scope=ga-docker-${name}" \
+      --cache-to "type=gha,mode=max,scope=ga-docker-${name}" \
       -t "$tag" -f "$file" "$context"
   else
     docker build -t "$tag" -f "$file" "$context"
@@ -89,8 +89,8 @@ smoke_go_binary() {
 
 smoke_backend() {
   local tag="$1"
-  smoke_go_binary "$tag" 'network-monitor starting|build application|clickhouse|configuration|security config' \
-    -e NM_ALLOW_INSECURE=1 \
+  smoke_go_binary "$tag" 'geoatlas starting|build application|clickhouse|configuration|security config' \
+    -e GA_ALLOW_INSECURE=1 \
     -e AUTH_DISABLED=1 \
     -e API_AUTH_DISABLED=1 \
     -e CLICKHOUSE_HOST=127.0.0.1 \
@@ -103,7 +103,7 @@ smoke_backend() {
 smoke_stats() {
   local tag="$1"
   smoke_go_binary "$tag" 'stats-collector starting|clickhouse connection|config:' \
-    -e NM_ALLOW_INSECURE=1 \
+    -e GA_ALLOW_INSECURE=1 \
     -e CLICKHOUSE_HOST=127.0.0.1 \
     -e CLICKHOUSE_PASSWORD=ci-smoke-test-password-32ch \
     -e API_AUTH_TOKEN=ci-smoke-test-api-auth-token-32ch
@@ -158,21 +158,21 @@ smoke_frontend() {
 }
 
 build_backend() {
-  local tag="network_monitor-backend:ci"
+  local tag="geoatlas-backend:ci"
   build_image backend backend/Dockerfile . "$tag"
-  assert_user_entrypoint "$tag" app /app/network-monitor
+  assert_user_entrypoint "$tag" app /app/geoatlas
   smoke_backend "$tag"
 }
 
 build_stats() {
-  local tag="network_monitor-stats-collector:ci"
+  local tag="geoatlas-stats-collector:ci"
   build_image stats-collector stats-collector/Dockerfile . "$tag"
   assert_user_entrypoint "$tag" app /app/stats-collector
   smoke_stats "$tag"
 }
 
 build_frontend() {
-  local tag="network_monitor-frontend:ci"
+  local tag="geoatlas-frontend:ci"
   build_image frontend frontend/Dockerfile frontend "$tag"
   smoke_frontend "$tag"
 }

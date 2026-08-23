@@ -1,20 +1,20 @@
-module network_monitor
+module geoatlas
 
 go 1.25.0
 
 require (
+	geoatlas/pkg/chconn v0.0.0
+	geoatlas/pkg/syslogngstats v0.0.0
 	github.com/ClickHouse/clickhouse-go/v2 v2.48.0
 	github.com/prometheus/client_golang v1.22.0
 	golang.org/x/crypto v0.55.0
 	golang.org/x/sys v0.47.0
 	gopkg.in/yaml.v3 v3.0.1
-	network_monitor/pkg/chconn v0.0.0
-	network_monitor/pkg/syslogngstats v0.0.0
 )
 
-replace network_monitor/pkg/chconn => ../pkg/chconn
+replace geoatlas/pkg/chconn => ../pkg/chconn
 
-replace network_monitor/pkg/syslogngstats => ../pkg/syslogngstats
+replace geoatlas/pkg/syslogngstats => ../pkg/syslogngstats
 
 require (
 	github.com/ClickHouse/ch-go v0.74.0 // indirect

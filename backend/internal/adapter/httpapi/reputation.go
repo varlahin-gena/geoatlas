@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	usecasereputation "network_monitor/internal/usecase/reputation"
+	usecasereputation "geoatlas/internal/usecase/reputation"
 )
 
 type ReputationHandler struct{ *ReputationDeps }

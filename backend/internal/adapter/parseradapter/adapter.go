@@ -1,9 +1,9 @@
 package parseradapter
 
 import (
-	"network_monitor/internal/parser"
-	usecaseingest "network_monitor/internal/usecase/ingest"
-	"network_monitor/internal/usecase/parsetest"
+	"geoatlas/internal/parser"
+	usecaseingest "geoatlas/internal/usecase/ingest"
+	"geoatlas/internal/usecase/parsetest"
 )
 
 // Adapter wraps *parser.Registry for usecase/ingest.LineParser.

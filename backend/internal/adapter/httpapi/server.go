@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"network_monitor/internal/adapter/httpapi/loginthrottle"
+	"geoatlas/internal/adapter/httpapi/loginthrottle"
 )
 
 const (

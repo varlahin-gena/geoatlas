@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"network_monitor/internal/fileatomic"
-	"network_monitor/internal/usecase/backup"
+	"geoatlas/internal/fileatomic"
+	"geoatlas/internal/usecase/backup"
 )
 
 // Store — JSON-файл расписания бэкапов (/app/data/backup_schedule.json).

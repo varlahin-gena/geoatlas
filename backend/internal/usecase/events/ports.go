@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"network_monitor/internal/mapagg"
-	"network_monitor/internal/model"
+	"geoatlas/internal/mapagg"
+	"geoatlas/internal/model"
 )
 
 // TrafficRepository — чтение агрегатов для карты.

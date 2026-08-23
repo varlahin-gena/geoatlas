@@ -3,7 +3,7 @@ package sqlclause
 import (
 	"strings"
 
-	"network_monitor/internal/mapsearch"
+	"geoatlas/internal/mapsearch"
 )
 
 // MapScope — country/q для карты. Значения только как bind-args, не в SQL-текст.

@@ -8,8 +8,8 @@ import (
 	"net/url"
 	"strings"
 
-	"network_monitor/internal/adapter/httpapi/authmw"
-	"network_monitor/internal/auth"
+	"geoatlas/internal/adapter/httpapi/authmw"
+	"geoatlas/internal/auth"
 )
 
 // csrfMW — double-submit CSRF для cookie-сессий на небезопасных методах.

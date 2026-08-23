@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"network_monitor/internal/adapter/clickhouse/sqlclause"
+	"geoatlas/internal/adapter/clickhouse/sqlclause"
 )
 
 func TestNormalizeSortingKey(t *testing.T) {

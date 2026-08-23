@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"network_monitor/internal/mapagg"
-	"network_monitor/internal/mapsearch"
-	"network_monitor/internal/model"
+	"geoatlas/internal/mapagg"
+	"geoatlas/internal/mapsearch"
+	"geoatlas/internal/model"
 )
 
 // GetMapInput — параметры построения карты.

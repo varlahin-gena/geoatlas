@@ -37,7 +37,7 @@ out_dir="$(dirname -- "$tarball")"
 cdx="${out_dir}/${base}.cdx.json"
 spdx="${out_dir}/${base}.spdx.json"
 
-stage="$(mktemp -d "${TMPDIR:-/tmp}/nm-sbom.XXXXXX")"
+stage="$(mktemp -d "${TMPDIR:-/tmp}/ga-sbom.XXXXXX")"
 cleanup() { rm -rf "$stage"; }
 trap cleanup EXIT
 

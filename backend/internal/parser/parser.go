@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 type Parser interface {

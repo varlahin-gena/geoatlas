@@ -3,7 +3,7 @@ package chconn_test
 import (
 	"testing"
 
-	"network_monitor/pkg/chconn"
+	"geoatlas/pkg/chconn"
 )
 
 func TestAuthNormalized(t *testing.T) {

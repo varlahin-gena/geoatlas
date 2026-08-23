@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"network_monitor/internal/installprofile"
+	"geoatlas/internal/installprofile"
 )
 
 // GeoUploadDefaultsForBackendMemoryGB — безопасные лимиты upload/replace GeoIP

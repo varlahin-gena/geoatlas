@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"network_monitor/internal/adapter/datalock"
+	"geoatlas/internal/adapter/datalock"
 )
 
 func TestAcquireExclusive(t *testing.T) {
@@ -27,7 +27,7 @@ func TestAcquireExclusive(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer l2.Close()
-	if _, err := os.Stat(filepath.Join(dir, ".nm_backend.lock")); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, ".ga_backend.lock")); err != nil {
 		t.Fatal(err)
 	}
 }

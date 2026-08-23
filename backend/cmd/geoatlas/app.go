@@ -6,17 +6,17 @@ import (
 	"path/filepath"
 	"sync"
 
-	"network_monitor/internal/adapter/anomalyjob"
-	"network_monitor/internal/adapter/backupjob"
-	chadapter "network_monitor/internal/adapter/clickhouse"
-	"network_monitor/internal/adapter/datalock"
-	"network_monitor/internal/adapter/geojob"
-	"network_monitor/internal/adapter/heavytask"
-	httpapi "network_monitor/internal/adapter/httpapi"
-	"network_monitor/internal/adapter/ingestnet"
-	appmetrics "network_monitor/internal/adapter/metrics"
-	"network_monitor/internal/adapter/reputationjob"
-	"network_monitor/internal/config"
+	"geoatlas/internal/adapter/anomalyjob"
+	"geoatlas/internal/adapter/backupjob"
+	chadapter "geoatlas/internal/adapter/clickhouse"
+	"geoatlas/internal/adapter/datalock"
+	"geoatlas/internal/adapter/geojob"
+	"geoatlas/internal/adapter/heavytask"
+	httpapi "geoatlas/internal/adapter/httpapi"
+	"geoatlas/internal/adapter/ingestnet"
+	appmetrics "geoatlas/internal/adapter/metrics"
+	"geoatlas/internal/adapter/reputationjob"
+	"geoatlas/internal/config"
 )
 
 type app struct {
@@ -51,9 +51,9 @@ func buildApp(ctx context.Context, cfg config.Config) (*app, error) {
 			return nil, err
 		}
 		dataLock = lock
-		slog.Info("control-plane lock acquired", "dir", dataDir, "file", ".nm_backend.lock")
+		slog.Info("control-plane lock acquired", "dir", dataDir, "file", ".ga_backend.lock")
 	} else {
-		slog.Warn("NM_ALLOW_MULTI_INSTANCE=1 — control-plane file lock disabled (unsafe for shared /app/data)")
+		slog.Warn("GA_ALLOW_MULTI_INSTANCE=1 — control-plane file lock disabled (unsafe for shared /app/data)")
 	}
 
 	authParts, err := buildAuth(cfg)

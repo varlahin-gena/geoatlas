@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"network_monitor/internal/mapagg"
+	"geoatlas/internal/mapagg"
 )
 
 const MaxLines = 200 // защита от вставки огромного файла в тест

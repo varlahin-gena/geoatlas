@@ -2,20 +2,20 @@
 # Определяет ресурсы хоста и генерирует оптимальную конфигурацию для docker compose.
 # Использование:
 #   source deploy/common/detect_resources.sh
-#   apply_resource_profile /opt/network-monitor
+#   apply_resource_profile /opt/geoatlas
 #
 # Переменные окружения:
-#   NM_AUTO_PROFILE=1     — принять рекомендованный профиль без вопросов
-#   NM_FORCE_PROFILE=...  — принудительно выбрать профиль (tiny|small|medium|large|xlarge)
-#   NM_SKIP_PROFILE=1     — не генерировать override (оставить значения по умолчанию)
+#   GA_AUTO_PROFILE=1     — принять рекомендованный профиль без вопросов
+#   GA_FORCE_PROFILE=...  — принудительно выбрать профиль (tiny|small|medium|large|xlarge)
+#   GA_SKIP_PROFILE=1     — не генерировать override (оставить значения по умолчанию)
 # Модули (см. select_modules.sh) сохраняются в .env при пересчёте профиля.
 
 set -Eeuo pipefail
 
-_nm_log() { echo "[$(date +'%F %T')] [resources] $*"; }
+_ga_log() { echo "[$(date +'%F %T')] [resources] $*"; }
 
-_nm_res_ensure_ui() {
-    if ! declare -F nm_ui_radiolist >/dev/null 2>&1; then
+_ga_res_ensure_ui() {
+    if ! declare -F ga_ui_radiolist >/dev/null 2>&1; then
         local dir helper
         dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
         helper="${dir}/ui.sh"
@@ -26,8 +26,8 @@ _nm_res_ensure_ui() {
             return 1
         fi
     fi
-    if [[ -z "${NM_UI_BACKEND:-}" ]] && declare -F nm_ui_init >/dev/null 2>&1; then
-        nm_ui_init
+    if [[ -z "${GA_UI_BACKEND:-}" ]] && declare -F ga_ui_init >/dev/null 2>&1; then
+        ga_ui_init
     fi
     return 0
 }
@@ -137,7 +137,7 @@ profile_params() {
             SYSLOG_UDP_RCVBUF=134217728; SYSLOG_IW_SIZE=16000
             ;;
         *)
-            _nm_log "Неизвестный профиль: $profile"
+            _ga_log "Неизвестный профиль: $profile"
             return 1
             ;;
     esac
@@ -215,9 +215,9 @@ RAM: ${ram_gib} GiB (${ram_mb} MiB)
     echo "══════════════════════════════════════════════════════════"
     echo ""
 
-    _nm_res_ensure_ui || true
-    if declare -F nm_ui_msgbox >/dev/null 2>&1 && [[ "${NM_UI_BACKEND:-text}" != "text" ]]; then
-        nm_ui_msgbox "Анализ сервера" "$summary" || true
+    _ga_res_ensure_ui || true
+    if declare -F ga_ui_msgbox >/dev/null 2>&1 && [[ "${GA_UI_BACKEND:-text}" != "text" ]]; then
+        ga_ui_msgbox "Анализ сервера" "$summary" || true
     fi
 }
 
@@ -247,31 +247,31 @@ print_profile_options() {
 
 confirm_profile() {
     local recommended="$1"
-    NM_SELECTED_PROFILE="$recommended"
+    GA_SELECTED_PROFILE="$recommended"
 
-    if [[ "${NM_AUTO_PROFILE:-0}" == "1" ]]; then
-        _nm_log "NM_AUTO_PROFILE=1 — применяем профиль: $recommended"
+    if [[ "${GA_AUTO_PROFILE:-0}" == "1" ]]; then
+        _ga_log "GA_AUTO_PROFILE=1 — применяем профиль: $recommended"
         return 0
     fi
 
-    if [[ -n "${NM_FORCE_PROFILE:-}" ]]; then
-        if ! is_valid_profile "${NM_FORCE_PROFILE}"; then
-            _nm_log "ОШИБКА: NM_FORCE_PROFILE='${NM_FORCE_PROFILE}' — неизвестный профиль."
+    if [[ -n "${GA_FORCE_PROFILE:-}" ]]; then
+        if ! is_valid_profile "${GA_FORCE_PROFILE}"; then
+            _ga_log "ОШИБКА: GA_FORCE_PROFILE='${GA_FORCE_PROFILE}' — неизвестный профиль."
             return 1
         fi
-        NM_SELECTED_PROFILE="${NM_FORCE_PROFILE}"
-        _nm_log "NM_FORCE_PROFILE — применяем профиль: ${NM_SELECTED_PROFILE}"
+        GA_SELECTED_PROFILE="${GA_FORCE_PROFILE}"
+        _ga_log "GA_FORCE_PROFILE — применяем профиль: ${GA_SELECTED_PROFILE}"
         return 0
     fi
 
     if [[ ! -t 0 ]]; then
-        _nm_log "Нет TTY — применяем рекомендованный профиль: $recommended"
+        _ga_log "Нет TTY — применяем рекомендованный профиль: $recommended"
         return 0
     fi
 
-    _nm_res_ensure_ui || true
+    _ga_res_ensure_ui || true
 
-    if declare -F nm_ui_radiolist >/dev/null 2>&1; then
+    if declare -F ga_ui_radiolist >/dev/null 2>&1; then
         local -a items=()
         local p mark on_flag desc
         for p in tiny small medium large xlarge; do
@@ -285,47 +285,47 @@ confirm_profile() {
         done
 
         local answer
-        if answer="$(nm_ui_radiolist \
+        if answer="$(ga_ui_radiolist \
             "Профиль производительности" \
             "Рекомендация по ресурсам хоста: ${recommended}
 Выберите профиль:" \
             "${items[@]}")"; then
             case "$answer" in
                 tiny|small|medium|large|xlarge)
-                    NM_SELECTED_PROFILE="$answer"
+                    GA_SELECTED_PROFILE="$answer"
                     if [[ "$answer" == "$recommended" ]]; then
-                        _nm_log "Выбран профиль: ${NM_SELECTED_PROFILE} (рекомендация)"
+                        _ga_log "Выбран профиль: ${GA_SELECTED_PROFILE} (рекомендация)"
                     else
-                        _nm_log "Выбран профиль: ${NM_SELECTED_PROFILE}"
+                        _ga_log "Выбран профиль: ${GA_SELECTED_PROFILE}"
                     fi
                     return 0
                     ;;
                 *)
-                    _nm_log "Неизвестный ответ «${answer}» — применяем рекомендацию ${recommended}."
-                    NM_SELECTED_PROFILE="$recommended"
+                    _ga_log "Неизвестный ответ «${answer}» — применяем рекомендацию ${recommended}."
+                    GA_SELECTED_PROFILE="$recommended"
                     return 0
                     ;;
             esac
         else
-            _nm_log "Выбор профиля отменён — установка прервана."
+            _ga_log "Выбор профиля отменён — установка прервана."
             exit 0
         fi
     fi
 
-    _nm_log "UI недоступен — применяем рекомендованный профиль: ${recommended}"
-    NM_SELECTED_PROFILE="$recommended"
+    _ga_log "UI недоступен — применяем рекомендованный профиль: ${recommended}"
+    GA_SELECTED_PROFILE="$recommended"
     return 0
 }
 
-_nm_env_get() {
+_ga_env_get() {
     # Прочитать значение KEY= из .env (последнее вхождение). $1=file $2=key
     local file="$1" key="$2"
     [[ -f "$file" ]] || return 0
     grep -E "^[[:space:]]*${key}=" "$file" 2>/dev/null | tail -n1 | cut -d= -f2- || true
 }
 
-_nm_ensure_admin_auth() {
-    if declare -F nm_rand_hex >/dev/null 2>&1; then
+_ga_ensure_admin_auth() {
+    if declare -F ga_rand_hex >/dev/null 2>&1; then
         return 0
     fi
     local dir helper
@@ -347,11 +347,11 @@ write_env_file() {
     spill="$(calc_external_spill_bytes "$CH_MEM_GB")"
 
     if [[ -f "$env_file" ]]; then
-        existing_token="$(_nm_env_get "$env_file" API_AUTH_TOKEN)"
-        existing_session="$(_nm_env_get "$env_file" SESSION_SECRET)"
-        existing_ch="$(_nm_env_get "$env_file" CLICKHOUSE_PASSWORD)"
-        existing_ingest="$(_nm_env_get "$env_file" INGEST_SHARED_SECRET)"
-        existing_ops="$(_nm_env_get "$env_file" API_OPS_TOKEN)"
+        existing_token="$(_ga_env_get "$env_file" API_AUTH_TOKEN)"
+        existing_session="$(_ga_env_get "$env_file" SESSION_SECRET)"
+        existing_ch="$(_ga_env_get "$env_file" CLICKHOUSE_PASSWORD)"
+        existing_ingest="$(_ga_env_get "$env_file" INGEST_SHARED_SECRET)"
+        existing_ops="$(_ga_env_get "$env_file" API_OPS_TOKEN)"
     fi
     if [[ -n "$existing_token" ]]; then
         token="$existing_token"
@@ -397,17 +397,17 @@ write_env_file() {
     local operator_pass="${AUTH_OPERATOR_PASSWORD:-}"
     local operator_block=""
     local can_ask=0
-    NM_ADMIN_PASSWORD_PRINT="${NM_ADMIN_PASSWORD_PRINT:-0}"
+    GA_ADMIN_PASSWORD_PRINT="${GA_ADMIN_PASSWORD_PRINT:-0}"
     local auth_disabled="${AUTH_DISABLED:-false}"
     local api_auth_disabled="${API_AUTH_DISABLED:-false}"
-    local allow_insecure="${NM_ALLOW_INSECURE:-0}"
-    local mod_auth="${NM_MODULE_AUTH:-1}"
-    local mod_api_auth="${NM_MODULE_API_AUTH:-1}"
-    local mod_syslog="${NM_MODULE_SYSLOG:-1}"
-    local mod_stats="${NM_MODULE_STATS:-1}"
-    local mod_reputation="${NM_MODULE_REPUTATION:-1}"
+    local allow_insecure="${GA_ALLOW_INSECURE:-0}"
+    local mod_auth="${GA_MODULE_AUTH:-1}"
+    local mod_api_auth="${GA_MODULE_API_AUTH:-1}"
+    local mod_syslog="${GA_MODULE_SYSLOG:-1}"
+    local mod_stats="${GA_MODULE_STATS:-1}"
+    local mod_reputation="${GA_MODULE_REPUTATION:-1}"
     local reputation_fetch_enabled="${REPUTATION_FETCH_ENABLED:-true}"
-    local compose_profiles="${NM_COMPOSE_PROFILES:-${COMPOSE_PROFILES:-syslog,stats}}"
+    local compose_profiles="${GA_COMPOSE_PROFILES:-${COMPOSE_PROFILES:-syslog,stats}}"
     local http_port="${HTTP_PORT:-80}"
     local https_enabled="${HTTPS_ENABLED:-auto}"
     local https_port="${HTTPS_PORT:-443}"
@@ -415,52 +415,52 @@ write_env_file() {
 
     if [[ -f "$env_file" ]]; then
         local v
-        v="$(_nm_env_get "$env_file" AUTH_ADMIN_USER)"; [[ -n "$v" ]] && admin_user="$v"
+        v="$(_ga_env_get "$env_file" AUTH_ADMIN_USER)"; [[ -n "$v" ]] && admin_user="$v"
         if [[ -z "$admin_pass" ]]; then
-            v="$(_nm_env_get "$env_file" AUTH_ADMIN_PASSWORD)"; [[ -n "$v" ]] && admin_pass="$v"
+            v="$(_ga_env_get "$env_file" AUTH_ADMIN_PASSWORD)"; [[ -n "$v" ]] && admin_pass="$v"
         fi
         if [[ -z "$admin_must" ]]; then
-            v="$(_nm_env_get "$env_file" AUTH_ADMIN_MUST_RESET)"; [[ -n "$v" ]] && admin_must="$v"
+            v="$(_ga_env_get "$env_file" AUTH_ADMIN_MUST_RESET)"; [[ -n "$v" ]] && admin_must="$v"
         fi
         if [[ -z "$operator_pass" ]]; then
-            v="$(_nm_env_get "$env_file" AUTH_OPERATOR_PASSWORD)"; [[ -n "$v" ]] && operator_pass="$v"
+            v="$(_ga_env_get "$env_file" AUTH_OPERATOR_PASSWORD)"; [[ -n "$v" ]] && operator_pass="$v"
         fi
         if [[ -z "$operator_user" ]]; then
-            v="$(_nm_env_get "$env_file" AUTH_OPERATOR_USER)"; [[ -n "$v" ]] && operator_user="$v"
+            v="$(_ga_env_get "$env_file" AUTH_OPERATOR_USER)"; [[ -n "$v" ]] && operator_user="$v"
         fi
         # Флаги модулей: текущие env (после confirm_modules) имеют приоритет над файлом.
-        if [[ -z "${NM_MODULE_AUTH:-}" ]]; then
-            v="$(_nm_env_get "$env_file" NM_MODULE_AUTH)"; [[ -n "$v" ]] && mod_auth="$v"
-            v="$(_nm_env_get "$env_file" NM_MODULE_API_AUTH)"; [[ -n "$v" ]] && mod_api_auth="$v"
-            v="$(_nm_env_get "$env_file" NM_MODULE_SYSLOG)"; [[ -n "$v" ]] && mod_syslog="$v"
-            v="$(_nm_env_get "$env_file" NM_MODULE_STATS)"; [[ -n "$v" ]] && mod_stats="$v"
-            v="$(_nm_env_get "$env_file" NM_MODULE_REPUTATION)"; [[ -n "$v" ]] && mod_reputation="$v"
-            v="$(_nm_env_get "$env_file" AUTH_DISABLED)"; [[ -n "$v" ]] && auth_disabled="$v"
-            v="$(_nm_env_get "$env_file" API_AUTH_DISABLED)"; [[ -n "$v" ]] && api_auth_disabled="$v"
-            v="$(_nm_env_get "$env_file" REPUTATION_FETCH_ENABLED)"; [[ -n "$v" ]] && reputation_fetch_enabled="$v"
-            v="$(_nm_env_get "$env_file" NM_ALLOW_INSECURE)"; [[ -n "$v" ]] && allow_insecure="$v"
-            v="$(_nm_env_get "$env_file" HTTP_PORT)"; [[ -n "$v" ]] && http_port="$v"
-            v="$(_nm_env_get "$env_file" HTTPS_ENABLED)"; [[ -n "$v" ]] && https_enabled="$v"
-            v="$(_nm_env_get "$env_file" HTTPS_PORT)"; [[ -n "$v" ]] && https_port="$v"
-            v="$(_nm_env_get "$env_file" HTTP_REDIRECT)"; [[ -n "$v" ]] && http_redirect="$v"
+        if [[ -z "${GA_MODULE_AUTH:-}" ]]; then
+            v="$(_ga_env_get "$env_file" GA_MODULE_AUTH)"; [[ -n "$v" ]] && mod_auth="$v"
+            v="$(_ga_env_get "$env_file" GA_MODULE_API_AUTH)"; [[ -n "$v" ]] && mod_api_auth="$v"
+            v="$(_ga_env_get "$env_file" GA_MODULE_SYSLOG)"; [[ -n "$v" ]] && mod_syslog="$v"
+            v="$(_ga_env_get "$env_file" GA_MODULE_STATS)"; [[ -n "$v" ]] && mod_stats="$v"
+            v="$(_ga_env_get "$env_file" GA_MODULE_REPUTATION)"; [[ -n "$v" ]] && mod_reputation="$v"
+            v="$(_ga_env_get "$env_file" AUTH_DISABLED)"; [[ -n "$v" ]] && auth_disabled="$v"
+            v="$(_ga_env_get "$env_file" API_AUTH_DISABLED)"; [[ -n "$v" ]] && api_auth_disabled="$v"
+            v="$(_ga_env_get "$env_file" REPUTATION_FETCH_ENABLED)"; [[ -n "$v" ]] && reputation_fetch_enabled="$v"
+            v="$(_ga_env_get "$env_file" GA_ALLOW_INSECURE)"; [[ -n "$v" ]] && allow_insecure="$v"
+            v="$(_ga_env_get "$env_file" HTTP_PORT)"; [[ -n "$v" ]] && http_port="$v"
+            v="$(_ga_env_get "$env_file" HTTPS_ENABLED)"; [[ -n "$v" ]] && https_enabled="$v"
+            v="$(_ga_env_get "$env_file" HTTPS_PORT)"; [[ -n "$v" ]] && https_port="$v"
+            v="$(_ga_env_get "$env_file" HTTP_REDIRECT)"; [[ -n "$v" ]] && http_redirect="$v"
             if grep -qE '^[[:space:]]*COMPOSE_PROFILES=' "$env_file" 2>/dev/null; then
-                compose_profiles="$(_nm_env_get "$env_file" COMPOSE_PROFILES)"
+                compose_profiles="$(_ga_env_get "$env_file" COMPOSE_PROFILES)"
             fi
         else
             [[ "${mod_auth}" == "1" ]] && auth_disabled="false" || auth_disabled="true"
             [[ "${mod_api_auth}" == "1" ]] && api_auth_disabled="false" || api_auth_disabled="true"
             [[ "${mod_reputation}" == "1" ]] && reputation_fetch_enabled="true" || reputation_fetch_enabled="false"
-            compose_profiles="${NM_COMPOSE_PROFILES:-}"
+            compose_profiles="${GA_COMPOSE_PROFILES:-}"
             [[ -n "${HTTP_PORT:-}" ]] && http_port="$HTTP_PORT"
             [[ -n "${HTTPS_ENABLED:-}" ]] && https_enabled="$HTTPS_ENABLED"
             [[ -n "${HTTPS_PORT:-}" ]] && https_port="$HTTPS_PORT"
             [[ -n "${HTTP_REDIRECT:-}" ]] && http_redirect="$HTTP_REDIRECT"
         fi
-    elif [[ -n "${NM_MODULE_AUTH:-}" ]]; then
+    elif [[ -n "${GA_MODULE_AUTH:-}" ]]; then
         [[ "${mod_auth}" == "1" ]] && auth_disabled="false" || auth_disabled="true"
         [[ "${mod_api_auth}" == "1" ]] && api_auth_disabled="false" || api_auth_disabled="true"
         [[ "${mod_reputation}" == "1" ]] && reputation_fetch_enabled="true" || reputation_fetch_enabled="false"
-        compose_profiles="${NM_COMPOSE_PROFILES:-}"
+        compose_profiles="${GA_COMPOSE_PROFILES:-}"
         [[ -n "${HTTP_PORT:-}" ]] && http_port="$HTTP_PORT"
         [[ -n "${HTTPS_ENABLED:-}" ]] && https_enabled="$HTTPS_ENABLED"
         [[ -n "${HTTPS_PORT:-}" ]] && https_port="$HTTPS_PORT"
@@ -472,30 +472,30 @@ write_env_file() {
     fi
 
     if [[ -z "$admin_pass" ]]; then
-        _nm_res_ensure_ui || true
-        if ! _nm_ensure_admin_auth; then
-            _nm_log "ОШИБКА: не найден deploy/common/admin_auth.sh"
+        _ga_res_ensure_ui || true
+        if ! _ga_ensure_admin_auth; then
+            _ga_log "ОШИБКА: не найден deploy/common/admin_auth.sh"
             exit 1
         fi
-        if [[ "${NM_FULL_AUTO:-0}" != "1" ]] \
-            && [[ "${NM_UI_AVAILABLE:-0}" == "1" ]] \
-            && declare -F nm_ui_passwordbox >/dev/null 2>&1; then
+        if [[ "${GA_FULL_AUTO:-0}" != "1" ]] \
+            && [[ "${GA_UI_AVAILABLE:-0}" == "1" ]] \
+            && declare -F ga_ui_passwordbox >/dev/null 2>&1; then
             can_ask=1
         fi
         if (( can_ask == 1 )); then
-            admin_pass="$(nm_prompt_admin_password "$admin_user")" || {
-                _nm_log "Пароль администратора не задан — установка прервана."
+            admin_pass="$(ga_prompt_admin_password "$admin_user")" || {
+                _ga_log "Пароль администратора не задан — установка прервана."
                 exit 1
             }
             admin_must=0
         else
-            admin_pass="$(nm_rand_hex 12)"
+            admin_pass="$(ga_rand_hex 12)"
             admin_must=1
-            NM_ADMIN_PASSWORD_PRINT=1
-            _nm_log "Сгенерирован пароль администратора (один раз в конце установки / ./start.sh)."
+            GA_ADMIN_PASSWORD_PRINT=1
+            _ga_log "Сгенерирован пароль администратора (один раз в конце установки / ./start.sh)."
         fi
     elif [[ -z "$admin_must" ]]; then
-        if _nm_ensure_admin_auth && nm_password_is_weak "$admin_user" "$admin_pass"; then
+        if _ga_ensure_admin_auth && ga_password_is_weak "$admin_user" "$admin_pass"; then
             admin_must=1
         else
             admin_must=0
@@ -504,7 +504,7 @@ write_env_file() {
     export AUTH_ADMIN_USER="$admin_user"
     export AUTH_ADMIN_PASSWORD="$admin_pass"
     export AUTH_ADMIN_MUST_RESET="$admin_must"
-    export NM_ADMIN_PASSWORD_PRINT
+    export GA_ADMIN_PASSWORD_PRINT
 
     if [[ -n "$operator_pass" && -z "$operator_user" ]]; then
         operator_user="operator"
@@ -521,14 +521,14 @@ AUTH_OPERATOR_PASSWORD=${operator_pass}"
 
     cat >"$env_file" <<EOF
 # Сгенерировано detect_resources.sh — не редактируйте вручную, перезапустите tune-resources.sh
-NM_INSTALL_PROFILE=${profile}
-NM_CH_MEM_GB=${CH_MEM_GB}
-NM_BE_MEM_GB=${BE_MEM_GB}
-NM_BE_WORKERS=${BE_WORKERS}
-NM_BE_QUEUE=${BE_QUEUE}
-NM_BE_BATCH=${BE_BATCH}
-NM_BE_FLUSH=${BE_FLUSH}
-NM_BE_CH_CONNS=${BE_CH_CONNS}
+GA_INSTALL_PROFILE=${profile}
+GA_CH_MEM_GB=${CH_MEM_GB}
+GA_BE_MEM_GB=${BE_MEM_GB}
+GA_BE_WORKERS=${BE_WORKERS}
+GA_BE_QUEUE=${BE_QUEUE}
+GA_BE_BATCH=${BE_BATCH}
+GA_BE_FLUSH=${BE_FLUSH}
+GA_BE_CH_CONNS=${BE_CH_CONNS}
 CH_MAX_MEMORY_USAGE=${ch_max_mem}
 CH_EXTERNAL_GROUP_BY_BYTES=${spill}
 CH_EXTERNAL_SORT_BYTES=${spill}
@@ -538,22 +538,22 @@ SESSION_SECRET=${session}
 CLICKHOUSE_PASSWORD=${ch_password}
 INGEST_SHARED_SECRET=${ingest_secret}
 INGEST_ALLOW_FROM=${INGEST_ALLOW_FROM:-syslog-ng}
-NM_TRUSTED_PROXIES=${NM_TRUSTED_PROXIES:-frontend}
+GA_TRUSTED_PROXIES=${GA_TRUSTED_PROXIES:-frontend}
 AUTH_ADMIN_USER=${admin_user}
 AUTH_ADMIN_PASSWORD=${admin_pass}
 AUTH_ADMIN_MUST_RESET=${admin_must}
 ${operator_block}
 
 # --- Модули (select_modules.sh) ---
-NM_MODULE_AUTH=${mod_auth}
-NM_MODULE_API_AUTH=${mod_api_auth}
-NM_MODULE_SYSLOG=${mod_syslog}
-NM_MODULE_STATS=${mod_stats}
-NM_MODULE_REPUTATION=${mod_reputation}
+GA_MODULE_AUTH=${mod_auth}
+GA_MODULE_API_AUTH=${mod_api_auth}
+GA_MODULE_SYSLOG=${mod_syslog}
+GA_MODULE_STATS=${mod_stats}
+GA_MODULE_REPUTATION=${mod_reputation}
 AUTH_DISABLED=${auth_disabled}
 API_AUTH_DISABLED=${api_auth_disabled}
 REPUTATION_FETCH_ENABLED=${reputation_fetch_enabled}
-NM_ALLOW_INSECURE=${allow_insecure}
+GA_ALLOW_INSECURE=${allow_insecure}
 COMPOSE_PROFILES=${compose_profiles}
 SYSLOG_STATS_URL=${syslog_stats_url}
 
@@ -651,13 +651,13 @@ write_syslog_profile() {
 EOF
 
     local ingest_secret=""
-    ingest_secret="$(_nm_env_get "${project_dir}/.env" INGEST_SHARED_SECRET)"
+    ingest_secret="$(_ga_env_get "${project_dir}/.env" INGEST_SHARED_SECRET)"
     if [[ -n "$ingest_secret" ]]; then
         local esc="${ingest_secret//\\/\\\\}"
         esc="${esc//\"/\\\"}"
         cat >"${conf_dir}/zz_ingest_auth.conf" <<EOF
 # Generated by detect_resources.sh — do not commit.
-@define nm_ingest_token "${esc}"
+@define ga_ingest_token "${esc}"
 EOF
     fi
 }
@@ -767,23 +767,23 @@ warn_if_constraints() {
     local ram_mb="$1" disk_gb="$2" cgroup="$3"
 
     if (( disk_gb > 0 && disk_gb < 20 )); then
-        _nm_log "ВНИМАНИЕ: мало свободного места на диске (${disk_gb} GiB). Рекомендуется ≥20 GiB для ClickHouse и буферов syslog-ng."
+        _ga_log "ВНИМАНИЕ: мало свободного места на диске (${disk_gb} GiB). Рекомендуется ≥20 GiB для ClickHouse и буферов syslog-ng."
     fi
 
     if (( ram_mb > 0 && ram_mb < 3072 )); then
-        _nm_log "ВНИМАНИЕ: мало RAM (${ram_mb} MiB). Система будет работать, но при высокой нагрузке возможны OOM и отставание ingest."
+        _ga_log "ВНИМАНИЕ: мало RAM (${ram_mb} MiB). Система будет работать, но при высокой нагрузке возможны OOM и отставание ingest."
     fi
 
     if [[ "$cgroup" == "unknown" ]]; then
-        _nm_log "ВНИМАНИЕ: не удалось определить версию cgroup — stats-collector может не видеть метрики контейнеров."
+        _ga_log "ВНИМАНИЕ: не удалось определить версию cgroup — stats-collector может не видеть метрики контейнеров."
     fi
 }
 
 apply_resource_profile() {
     local project_dir="${1:-.}"
 
-    if [[ "${NM_SKIP_PROFILE:-0}" == "1" ]]; then
-        _nm_log "NM_SKIP_PROFILE=1 — генерация конфигурации пропущена."
+    if [[ "${GA_SKIP_PROFILE:-0}" == "1" ]]; then
+        _ga_log "GA_SKIP_PROFILE=1 — генерация конфигурации пропущена."
         return 0
     fi
 
@@ -805,13 +805,13 @@ apply_resource_profile() {
         return 1
     fi
 
-    profile="${NM_SELECTED_PROFILE:-}"
+    profile="${GA_SELECTED_PROFILE:-}"
     if [[ -z "$profile" ]]; then
         return 0
     fi
 
     if ! profile_params "$profile"; then
-        _nm_log "ОШИБКА: некорректный профиль '$profile', откат на $recommended"
+        _ga_log "ОШИБКА: некорректный профиль '$profile', откат на $recommended"
         profile="$recommended"
         profile_params "$profile"
     fi

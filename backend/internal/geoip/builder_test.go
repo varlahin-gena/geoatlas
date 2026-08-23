@@ -3,7 +3,7 @@ package geoip
 import (
 	"testing"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 func TestCompactBuilderBuildsSnapshotAndSkipsOverlaps(t *testing.T) {

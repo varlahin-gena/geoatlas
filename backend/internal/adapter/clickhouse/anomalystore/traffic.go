@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"network_monitor/internal/adapter/clickhouse/query"
-	"network_monitor/internal/adapter/clickhouse/sqlclause"
-	usecaseanomaly "network_monitor/internal/usecase/anomaly"
+	"geoatlas/internal/adapter/clickhouse/query"
+	"geoatlas/internal/adapter/clickhouse/sqlclause"
+	usecaseanomaly "geoatlas/internal/usecase/anomaly"
 )
 
 func (r *Repository) OldestLogTime(ctx context.Context) (time.Time, error) {

@@ -12,8 +12,8 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 
-	"network_monitor/internal/adapter/clickhouse/sqlclause"
-	"network_monitor/internal/model"
+	"geoatlas/internal/adapter/clickhouse/sqlclause"
+	"geoatlas/internal/model"
 )
 
 const geoBackfillIPLimit = 200_000
@@ -32,7 +32,7 @@ type geoEnrichRow struct {
 	lat, lon                  float64
 }
 
-// EnrichLogsMissingGeo готовит lookup-таблицу nm_geo_enrich_ip для IP без
+// EnrichLogsMissingGeo готовит lookup-таблицу ga_geo_enrich_ip для IP без
 // координат или без пригодной страны в traffic_logs (lookback).
 // Не пишет ALTER UPDATE в traffic_logs: исторические дыры закрывает
 // RebuildGeoEdgesLookback через JOIN к этой таблице.

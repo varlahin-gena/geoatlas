@@ -3,9 +3,9 @@ package geoipcodec
 import (
 	"io"
 
-	"network_monitor/internal/geoip"
-	"network_monitor/internal/model"
-	usecasegeo "network_monitor/internal/usecase/geo"
+	"geoatlas/internal/geoip"
+	"geoatlas/internal/model"
+	usecasegeo "geoatlas/internal/usecase/geo"
 )
 
 // Codec wraps geoip helpers for usecase/geo.RangeCodec.

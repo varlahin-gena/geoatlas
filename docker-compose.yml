@@ -3,7 +3,7 @@ services:
   # Нужно после смены backend с 10001→101 и для записи *.auth.tgz на clickhouse-backups.
   volume-perms:
     image: alpine:3.23
-    container_name: nm-volume-perms
+    container_name: ga-volume-perms
     volumes:
       - clickhouse-backups:/var/lib/clickhouse-backups
       - auth-users:/app/data
@@ -96,7 +96,7 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    image: network_monitor-backend:latest
+    image: geoatlas-backend:latest
     container_name: backend
     expose:
       - "8080"
@@ -116,7 +116,7 @@ services:
       INGEST_CONN_IDLE_SEC: "300"
       INGEST_SHARED_SECRET: ${INGEST_SHARED_SECRET:?set INGEST_SHARED_SECRET in .env}
       INGEST_ALLOW_FROM: ${INGEST_ALLOW_FROM:-syslog-ng}
-      NM_TRUSTED_PROXIES: ${NM_TRUSTED_PROXIES:-frontend}
+      GA_TRUSTED_PROXIES: ${GA_TRUSTED_PROXIES:-frontend}
       GOMAXPROCS: "4"
       CH_MAX_MEMORY_USAGE: "2147483648"
       CH_EXTERNAL_GROUP_BY_BYTES: "268435456"
@@ -170,7 +170,7 @@ services:
       HTTPS_PORT: ${HTTPS_PORT:-443}
       HTTP_REDIRECT: ${HTTP_REDIRECT:-1}
       # Только local/dev: legacy placeholders и/или AUTH_DISABLED / API_AUTH_DISABLED
-      NM_ALLOW_INSECURE: ${NM_ALLOW_INSECURE:-0}
+      GA_ALLOW_INSECURE: ${GA_ALLOW_INSECURE:-0}
       TZ: Europe/Moscow
     volumes:
       - ./install-profile.json:/app/install-profile.json:ro
@@ -209,7 +209,7 @@ services:
     build:
       context: .
       dockerfile: stats-collector/Dockerfile
-    image: network_monitor-stats-collector:latest
+    image: geoatlas-stats-collector:latest
     container_name: stats-collector
     profiles: ["stats"]
     depends_on:
@@ -258,11 +258,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    image: network_monitor-frontend:latest
+    image: geoatlas-frontend:latest
     container_name: frontend
     ports:
       - "${HTTP_PORT:-80}:80"
-      # HTTPS: см. docker-compose.https.yml (подключается start.sh / nm_compose)
+      # HTTPS: см. docker-compose.https.yml (подключается start.sh / ga_compose)
     environment:
       HTTPS_ENABLED: ${HTTPS_ENABLED:-auto}
       HTTP_REDIRECT: ${HTTP_REDIRECT:-1}
@@ -313,5 +313,5 @@ volumes:
 
 networks:
   default:
-    name: network-monitor
+    name: geoatlas
     driver: bridge

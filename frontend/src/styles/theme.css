@@ -1,7 +1,7 @@
 /* Общие токены и меню пользователя ГеоАтлас.
  *
  * Page scoping (no CSS modules): body.page-map | body.page-admin | body.page-auth;
- * system monitor extras live under #adminApp.nm-system (see system.css).
+ * system monitor extras live under #adminApp.ga-system (see system.css).
  */
 
 :root {
@@ -58,11 +58,11 @@ html[data-theme="light"] {
 }
 
 /* --- Меню пользователя --- */
-.nm-user-menu {
+.ga-user-menu {
   position: relative;
   flex-shrink: 0;
 }
-.nm-user-menu-trigger {
+.ga-user-menu-trigger {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -75,27 +75,27 @@ html[data-theme="light"] {
   cursor: pointer;
   max-width: 200px;
 }
-.nm-user-menu-trigger:hover {
+.ga-user-menu-trigger:hover {
   background: var(--panel-3);
   border-color: var(--border-strong);
 }
-.nm-user-menu-trigger .nm-user-name {
+.ga-user-menu-trigger .ga-user-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 500;
 }
-.nm-user-menu-trigger .nm-user-caret {
+.ga-user-menu-trigger .ga-user-caret {
   width: 10px;
   height: 10px;
   flex-shrink: 0;
   opacity: 0.6;
   transition: transform 0.15s ease;
 }
-.nm-user-menu.open .nm-user-caret {
+.ga-user-menu.open .ga-user-caret {
   transform: rotate(180deg);
 }
-.nm-user-menu-dropdown {
+.ga-user-menu-dropdown {
   display: none;
   position: absolute;
   top: calc(100% + 6px);
@@ -108,7 +108,7 @@ html[data-theme="light"] {
   box-shadow: var(--shadow);
   padding: 6px;
 }
-.nm-user-menu.open .nm-user-menu-dropdown {
+.ga-user-menu.open .ga-user-menu-dropdown {
   display: block;
   animation: nmMenuIn 0.15s ease;
 }
@@ -116,28 +116,28 @@ html[data-theme="light"] {
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.nm-user-menu-meta {
+.ga-user-menu-meta {
   padding: 8px 10px 10px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 4px;
 }
-.nm-user-menu-meta .nm-meta-name {
+.ga-user-menu-meta .ga-meta-name {
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
   word-break: break-word;
 }
-.nm-user-menu-meta .nm-meta-role {
+.ga-user-menu-meta .ga-meta-role {
   font-size: 11px;
   color: var(--text-muted);
   margin-top: 2px;
 }
-.nm-user-menu-meta .nm-meta-version {
+.ga-user-menu-meta .ga-meta-version {
   font-size: 11px;
   color: var(--text-muted);
   margin-top: 6px;
 }
-.nm-user-menu-item {
+.ga-user-menu-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -152,17 +152,17 @@ html[data-theme="light"] {
   cursor: pointer;
   text-align: left;
 }
-.nm-user-menu-item:hover {
+.ga-user-menu-item:hover {
   background: var(--panel-3);
 }
-.nm-user-menu-item.danger {
+.ga-user-menu-item.danger {
   color: var(--red);
 }
-.nm-user-menu-item .nm-theme-value {
+.ga-user-menu-item .ga-theme-value {
   color: var(--text-muted);
   font-size: 11px;
 }
-.nm-user-menu-sep {
+.ga-user-menu-sep {
   height: 1px;
   background: var(--border);
   margin: 4px 0;

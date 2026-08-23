@@ -77,7 +77,7 @@ $loginBody = (@{ username = $User; password = $Password } | ConvertTo-Json -Comp
 Invoke-Smoke -Name "login" -Method POST -Path "/api/auth/login" -Body $loginBody | Out-Null
 Invoke-Smoke -Name "me" -Method GET -Path "/api/auth/me" | Out-Null
 
-$csrf = ($session.Cookies.GetCookies($BaseUrl) | Where-Object { $_.Name -eq "nm_csrf" } | Select-Object -First 1).Value
+$csrf = ($session.Cookies.GetCookies($BaseUrl) | Where-Object { $_.Name -eq "ga_csrf" } | Select-Object -First 1).Value
 if (-not $csrf) {
   Write-Host "WARN csrf cookie missing - mutating calls may fail"
 }

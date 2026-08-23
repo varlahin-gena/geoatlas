@@ -1,8 +1,8 @@
 package parsetest
 
 import (
-	"network_monitor/internal/model"
-	"network_monitor/internal/parser"
+	"geoatlas/internal/model"
+	"geoatlas/internal/parser"
 )
 
 // VerboseParser — подробный разбор для тест-страницы.

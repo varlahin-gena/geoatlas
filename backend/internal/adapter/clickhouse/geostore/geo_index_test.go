@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"network_monitor/internal/geoip"
-	"network_monitor/internal/model"
+	"geoatlas/internal/geoip"
+	"geoatlas/internal/model"
 )
 
 func TestReloadableGeoIndexDiskRoundTrip(t *testing.T) {

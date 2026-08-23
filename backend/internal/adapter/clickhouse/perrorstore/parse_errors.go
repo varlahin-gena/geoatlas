@@ -7,7 +7,7 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 // ListParseErrors возвращает последние ошибки (с опциональным поиском по raw/reason).

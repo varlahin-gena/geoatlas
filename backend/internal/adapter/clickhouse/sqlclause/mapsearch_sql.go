@@ -3,7 +3,7 @@ package sqlclause
 import (
 	"strings"
 
-	"network_monitor/internal/mapsearch"
+	"geoatlas/internal/mapsearch"
 )
 
 // MapSearchColumns — выражения ClickHouse (не user input) для bind-предикатов mapsearch.

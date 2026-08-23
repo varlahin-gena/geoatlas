@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-PROJECT_DIR="/opt/network-monitor"
+PROJECT_DIR="/opt/geoatlas"
 if [[ -n "${ENABLE_FIREWALL+x}" ]]; then
-    NM_FIREWALL_FROM_ENV=1
+    GA_FIREWALL_FROM_ENV=1
 else
-    NM_FIREWALL_FROM_ENV=0
+    GA_FIREWALL_FROM_ENV=0
     ENABLE_FIREWALL=1
 fi
 DISABLE_SELINUX="${DISABLE_SELINUX:-0}"
@@ -16,12 +16,12 @@ log() { echo "[$(date +'%F %T')] $*"; }
 
 trap 'log "ОШИБКА на строке ${LINENO} (код выхода $?). Смотрите лог выше / docker compose logs."' ERR
 
-_nm_banner_text() {
+_ga_banner_text() {
     local src_line
-    if [[ -n "${NM_INSTALL_PACKAGE:-}" ]]; then
-        src_line="Пакет: ${NM_INSTALL_PACKAGE}"
+    if [[ -n "${GA_INSTALL_PACKAGE:-}" ]]; then
+        src_line="Пакет: ${GA_INSTALL_PACKAGE}"
     else
-        src_line="Пакет: каталог установщика (или NM_INSTALL_PACKAGE)"
+        src_line="Пакет: каталог установщика (или GA_INSTALL_PACKAGE)"
     fi
     cat <<EOF
 Каталог: ${PROJECT_DIR}
@@ -42,7 +42,7 @@ EOF
 
 print_banner() {
     local text
-    text="$(_nm_banner_text)"
+    text="$(_ga_banner_text)"
     echo ""
     echo "══════════════════════════════════════════════════════════"
     echo "  ГеоАтлас — установка (Oracle Linux)"
@@ -52,26 +52,26 @@ print_banner() {
     echo ""
 }
 
-_nm_run_gauge() {
+_ga_run_gauge() {
     local title="$1" text="$2"
     shift 2
-    if declare -F nm_ui_run_with_gauge >/dev/null 2>&1; then
-        nm_ui_run_with_gauge "$title" "$text" "$@"
+    if declare -F ga_ui_run_with_gauge >/dev/null 2>&1; then
+        ga_ui_run_with_gauge "$title" "$text" "$@"
     else
         "$@"
     fi
 }
 
-_nm_run_gauge_fn() {
+_ga_run_gauge_fn() {
     local title="$1" text="$2" fn="$3"
-    if declare -F nm_ui_run_with_gauge >/dev/null 2>&1; then
-        nm_ui_run_with_gauge "$title" "$text" "$fn"
+    if declare -F ga_ui_run_with_gauge >/dev/null 2>&1; then
+        ga_ui_run_with_gauge "$title" "$text" "$fn"
     else
         "$fn"
     fi
 }
 
-_nm_source_common() {
+_ga_source_common() {
     # $1 — имя файла в deploy/common (например ui.sh)
     local name="$1"
     local candidates=(
@@ -90,20 +90,20 @@ _nm_source_common() {
 }
 
 _source_ui() {
-    if ! _nm_source_common ui.sh; then
+    if ! _ga_source_common ui.sh; then
         return 1
     fi
-    nm_ui_init
+    ga_ui_init
     return 0
 }
 
 _source_full_auto_preset() {
-    _nm_source_common full_auto_preset.sh
+    _ga_source_common full_auto_preset.sh
 }
 
 # Тёмная тема whiptail до появления ui.sh (curl-установка / welcome).
 _ensure_dark_newt() {
-    if [[ "${NM_UI_DARK:-1}" == "0" ]]; then
+    if [[ "${GA_UI_DARK:-1}" == "0" ]]; then
         return 0
     fi
     if [[ -n "${NEWT_COLORS:-}" ]]; then
@@ -136,14 +136,14 @@ scale=white,black'
 
 _welcome_dialog() {
     # Уже выбран авто-режим (env / --full-auto / нет TTY) — без диалога.
-    if [[ "${NM_FULL_AUTO:-0}" == "1" ]] || [[ "${NM_AUTO_MODULES:-0}" == "1" ]] || [[ ! -t 0 ]]; then
+    if [[ "${GA_FULL_AUTO:-0}" == "1" ]] || [[ "${GA_AUTO_MODULES:-0}" == "1" ]] || [[ ! -t 0 ]]; then
         return 0
     fi
     _ensure_dark_newt
     _source_ui || true
-    if ! declare -F nm_ui_radiolist >/dev/null 2>&1; then
-        if declare -F nm_ui_msgbox >/dev/null 2>&1; then
-            nm_ui_msgbox "Установка ГеоАтлас" \
+    if ! declare -F ga_ui_radiolist >/dev/null 2>&1; then
+        if declare -F ga_ui_msgbox >/dev/null 2>&1; then
+            ga_ui_msgbox "Установка ГеоАтлас" \
 "Добро пожаловать в мастер установки.
 
 Каталог: ${PROJECT_DIR}
@@ -155,11 +155,11 @@ _welcome_dialog() {
 
     # Короткий tag+item: длинные UTF-8 строки в radiolist ломают рамку newt/whiptail.
     local mode
-    local _ui_w="${NM_UI_WIDTH:-72}" _ui_h="${NM_UI_HEIGHT:-18}" _ui_lh="${NM_UI_LIST_HEIGHT:-8}"
-    NM_UI_WIDTH=64
-    NM_UI_HEIGHT=14
-    NM_UI_LIST_HEIGHT=3
-    if ! mode="$(nm_ui_radiolist "Установка ГеоАтлас" \
+    local _ui_w="${GA_UI_WIDTH:-72}" _ui_h="${GA_UI_HEIGHT:-18}" _ui_lh="${GA_UI_LIST_HEIGHT:-8}"
+    GA_UI_WIDTH=64
+    GA_UI_HEIGHT=14
+    GA_UI_LIST_HEIGHT=3
+    if ! mode="$(ga_ui_radiolist "Установка ГеоАтлас" \
 "Режим установки
 
 auto — пакет, модули, :8080, firewalld ports
@@ -169,20 +169,20 @@ ${PROJECT_DIR}" \
         auto "Сделай мне хорошо" ON \
         step "Пошаговая" OFF \
     )"; then
-        NM_UI_WIDTH="$_ui_w"
-        NM_UI_HEIGHT="$_ui_h"
-        NM_UI_LIST_HEIGHT="$_ui_lh"
+        GA_UI_WIDTH="$_ui_w"
+        GA_UI_HEIGHT="$_ui_h"
+        GA_UI_LIST_HEIGHT="$_ui_lh"
         log "Установка отменена пользователем."
         exit 0
     fi
-    NM_UI_WIDTH="$_ui_w"
-    NM_UI_HEIGHT="$_ui_h"
-    NM_UI_LIST_HEIGHT="$_ui_lh"
+    GA_UI_WIDTH="$_ui_w"
+    GA_UI_HEIGHT="$_ui_h"
+    GA_UI_LIST_HEIGHT="$_ui_lh"
 
     if [[ "$mode" == "auto" || "$mode" == "full_auto" ]]; then
-        export NM_FULL_AUTO=1
-        if declare -F nm_apply_full_auto_preset >/dev/null 2>&1; then
-            nm_apply_full_auto_preset
+        export GA_FULL_AUTO=1
+        if declare -F ga_apply_full_auto_preset >/dev/null 2>&1; then
+            ga_apply_full_auto_preset
         fi
     fi
 }
@@ -309,9 +309,9 @@ configure_firewall() {
             firewall-cmd --permanent --add-port="${https_port}/tcp" || true
             ;;
     esac
-    if [[ "${NM_MODULE_SYSLOG:-1}" == "1" ]]; then
-        if declare -F nm_firewalld_allow_syslog >/dev/null 2>&1; then
-            nm_firewalld_allow_syslog
+    if [[ "${GA_MODULE_SYSLOG:-1}" == "1" ]]; then
+        if declare -F ga_firewalld_allow_syslog >/dev/null 2>&1; then
+            ga_firewalld_allow_syslog
         else
             firewall-cmd --permanent --add-port=514/tcp  || true
             firewall-cmd --permanent --add-port=514/udp  || true
@@ -324,11 +324,11 @@ configure_firewall() {
 }
 
 apply_install_package() {
-    if ! declare -F nm_fetch_project >/dev/null 2>&1; then
+    if ! declare -F ga_fetch_project >/dev/null 2>&1; then
         log "Нет apply_package.sh — запустите установщик из распакованного geoatlas-X.Y.Z."
         exit 1
     fi
-    nm_fetch_project "$PROJECT_DIR"
+    ga_fetch_project "$PROJECT_DIR"
 }
 
 _source_select_source() {
@@ -377,12 +377,12 @@ source_module_helper() {
     local helper
     if ! helper="$(find_module_helper)"; then
         log "Селектор модулей не найден — включены все модули."
-        NM_MODULE_AUTH=1
-        NM_MODULE_API_AUTH=1
-        NM_MODULE_SYSLOG=1
-        NM_MODULE_STATS=1
-        NM_MODULE_REPUTATION=1
-        NM_COMPOSE_PROFILES="syslog,stats"
+        GA_MODULE_AUTH=1
+        GA_MODULE_API_AUTH=1
+        GA_MODULE_SYSLOG=1
+        GA_MODULE_STATS=1
+        GA_MODULE_REPUTATION=1
+        GA_COMPOSE_PROFILES="syslog,stats"
         return 1
     fi
     # shellcheck source=deploy/common/select_modules.sh
@@ -398,7 +398,7 @@ configure_modules() {
 
 configure_http_port() {
     # Обычно уже вызван из confirm_https (цепочка). Повторно не спрашиваем.
-    if [[ "${NM_HTTP_PORT_CONFIRMED:-0}" == "1" ]]; then
+    if [[ "${GA_HTTP_PORT_CONFIRMED:-0}" == "1" ]]; then
         if declare -F apply_http_port >/dev/null 2>&1; then
             apply_http_port "$PROJECT_DIR"
             return 0
@@ -417,7 +417,7 @@ configure_http_port() {
     fi
     HTTP_PORT="${HTTP_PORT:-80}"
     export HTTP_PORT
-    export NM_HTTP_PORT_CONFIRMED=1
+    export GA_HTTP_PORT_CONFIRMED=1
     log "select_http_port.sh не найден — HTTP_PORT=${HTTP_PORT}."
 }
 
@@ -430,7 +430,7 @@ configure_https() {
         # shellcheck source=deploy/common/select_https.sh
         source "$helper"
         confirm_https "$PROJECT_DIR"
-        export NM_HTTPS_CONFIRMED=1
+        export GA_HTTPS_CONFIRMED=1
         apply_https "$PROJECT_DIR"
         return 0
     fi
@@ -509,11 +509,11 @@ ask_firewall() {
         confirm_firewall ENABLE_FIREWALL
         return
     fi
-    if [[ "${NM_FIREWALL_FROM_ENV}" == "1" ]] || [[ "${NM_AUTO_MODULES:-0}" == "1" ]] || [[ ! -t 0 ]]; then
+    if [[ "${GA_FIREWALL_FROM_ENV}" == "1" ]] || [[ "${GA_AUTO_MODULES:-0}" == "1" ]] || [[ ! -t 0 ]]; then
         return
     fi
     _source_ui || true
-    if declare -F nm_ui_yesno >/dev/null 2>&1; then
+    if declare -F ga_ui_yesno >/dev/null 2>&1; then
         local ports="${HTTP_PORT:-80}"
         local https_on=0
         case "${HTTPS_ENABLED:-}" in
@@ -526,7 +526,7 @@ ask_firewall() {
         if [[ "$https_on" == "1" ]]; then
             ports="${ports}, ${HTTPS_PORT:-443}"
         fi
-        if nm_ui_yesno "Файрвол" \
+        if ga_ui_yesno "Файрвол" \
             "Настроить правила firewalld (порты ${ports}, 514)?" 1; then
             ENABLE_FIREWALL=1
         else
@@ -554,24 +554,24 @@ main() {
     detect_os
     _ensure_dark_newt
     _source_full_auto_preset || true
-    if declare -F nm_parse_full_auto_argv >/dev/null 2>&1; then
-        nm_parse_full_auto_argv "$@"
+    if declare -F ga_parse_full_auto_argv >/dev/null 2>&1; then
+        ga_parse_full_auto_argv "$@"
     fi
-    if declare -F nm_apply_full_auto_preset >/dev/null 2>&1; then
-        nm_apply_full_auto_preset
+    if declare -F ga_apply_full_auto_preset >/dev/null 2>&1; then
+        ga_apply_full_auto_preset
     fi
     _source_ui || true
     print_banner
-    _nm_run_gauge_fn "Конфликты" "Удаление podman/buildah…" remove_conflicting_packages
-    _nm_run_gauge_fn "Пакеты" "Установка зависимостей (dnf)…" install_packages
+    _ga_run_gauge_fn "Конфликты" "Удаление podman/buildah…" remove_conflicting_packages
+    _ga_run_gauge_fn "Пакеты" "Установка зависимостей (dnf)…" install_packages
     _source_ui || true
     _source_full_auto_preset || true
     _welcome_dialog
-    _nm_run_gauge_fn "Docker" "Установка Docker Engine и Compose…" install_docker
-    _nm_run_gauge_fn "SELinux" "Настройка SELinux для Docker…" configure_selinux
+    _ga_run_gauge_fn "Docker" "Установка Docker Engine и Compose…" install_docker
+    _ga_run_gauge_fn "SELinux" "Настройка SELinux для Docker…" configure_selinux
     choose_install_source
     print_banner
-    _nm_run_gauge_fn "Пакет" "Наложение geoatlas-*.tar.gz…" apply_install_package
+    _ga_run_gauge_fn "Пакет" "Наложение geoatlas-*.tar.gz…" apply_install_package
     # После наложения — источник в .env + UI-слой из пакета
     if declare -F apply_install_source >/dev/null 2>&1; then
         apply_install_source "$PROJECT_DIR"
@@ -582,13 +582,13 @@ main() {
     fi
     _source_ui || true
     _source_full_auto_preset || true
-    if declare -F nm_apply_full_auto_preset >/dev/null 2>&1; then
-        nm_apply_full_auto_preset
+    if declare -F ga_apply_full_auto_preset >/dev/null 2>&1; then
+        ga_apply_full_auto_preset
     fi
     prepare_project
-    if [[ "${NM_FULL_AUTO:-0}" == "1" ]]; then
-        if [[ "${NM_DISABLE_HOST_FIREWALL:-0}" == "1" ]] && declare -F nm_disable_host_firewall >/dev/null 2>&1; then
-            nm_disable_host_firewall "$PROJECT_DIR"
+    if [[ "${GA_FULL_AUTO:-0}" == "1" ]]; then
+        if [[ "${GA_DISABLE_HOST_FIREWALL:-0}" == "1" ]] && declare -F ga_disable_host_firewall >/dev/null 2>&1; then
+            ga_disable_host_firewall "$PROJECT_DIR"
         else
             ENABLE_FIREWALL=1
             configure_firewall
@@ -596,14 +596,14 @@ main() {
     else
         ask_firewall
         if [[ "${ENABLE_FIREWALL}" == "1" ]]; then
-            _nm_run_gauge_fn "Файрвол" "Настройка правил firewalld…" configure_firewall
+            _ga_run_gauge_fn "Файрвол" "Настройка правил firewalld…" configure_firewall
         else
             configure_firewall
         fi
     fi
     start_stack
-    if [[ "${NM_FULL_AUTO:-0}" == "1" ]] && declare -F nm_full_auto_finish >/dev/null 2>&1; then
-        nm_full_auto_finish "$PROJECT_DIR"
+    if [[ "${GA_FULL_AUTO:-0}" == "1" ]] && declare -F ga_full_auto_finish >/dev/null 2>&1; then
+        ga_full_auto_finish "$PROJECT_DIR"
     fi
 }
 

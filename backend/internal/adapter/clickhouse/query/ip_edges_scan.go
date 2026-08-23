@@ -7,8 +7,8 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
-	"network_monitor/internal/adapter/clickhouse/sqlclause"
-	"network_monitor/internal/model"
+	"geoatlas/internal/adapter/clickhouse/sqlclause"
+	"geoatlas/internal/model"
 )
 
 func scanIPEdgesRelative(
@@ -140,7 +140,7 @@ func scanIPEdges(
 	return scanGeoEdgeRows(rows)
 }
 
-// ipEdgesEnrichOverlaySQL wraps an aggregated IP-edges subquery with nm_geo_enrich_ip.
+// ipEdgesEnrichOverlaySQL wraps an aggregated IP-edges subquery with ga_geo_enrich_ip.
 func ipEdgesEnrichOverlaySQL(inner string) string {
 	return fmt.Sprintf(`
 		SELECT

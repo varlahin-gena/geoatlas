@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Native ClickHouse BACKUP на disk `backups` (+ снимок /app/data с backend).
 #
-# Использование (на хосте appliance, из корня репо / /opt/network-monitor):
+# Использование (на хосте appliance, из корня репо / /opt/geoatlas):
 #   ./scripts/backup-clickhouse.sh
 #   BACKUP_KEEP=3 BACKUP_INCLUDE_EDGES=0 ./scripts/backup-clickhouse.sh
 #
@@ -15,7 +15,7 @@
 #   BACKEND_SERVICE    — имя сервиса backend (дефолт: backend)
 #
 # Cron (пример, ежедневно в 02:30):
-#   30 2 * * * cd /opt/network-monitor && ./scripts/backup-clickhouse.sh >>/var/log/nm-backup.log 2>&1
+#   30 2 * * * cd /opt/geoatlas && ./scripts/backup-clickhouse.sh >>/var/log/ga-backup.log 2>&1
 
 set -euo pipefail
 
@@ -47,7 +47,7 @@ if ! $COMPOSE ps --status running --services 2>/dev/null | grep -qx "$CLICKHOUSE
   exit 1
 fi
 
-NAME="nm-$(date -u +%Y%m%dT%H%M%SZ)"
+NAME="ga-$(date -u +%Y%m%dT%H%M%SZ)"
 echo "backup: starting name=$NAME keep=$BACKUP_KEEP edges=$BACKUP_INCLUDE_EDGES auth=$BACKUP_INCLUDE_AUTH"
 
 TABLES=(
@@ -106,9 +106,9 @@ if [[ "$BACKUP_INCLUDE_AUTH" == "1" || "$BACKUP_INCLUDE_AUTH" == "true" ]]; then
   fi
 fi
 
-# Prune: каталоги nm-* (полные бэкапы) и парные *.auth.tgz
+# Prune: каталоги ga-* (полные бэкапы) и парные *.auth.tgz
 mapfile -t ALL < <($COMPOSE exec -T "$CLICKHOUSE_SERVICE" sh -c \
-  "ls -1 '${BACKUP_ROOT}' 2>/dev/null | grep -E '^nm-[0-9]{8}T[0-9]{6}Z\$' | sort -r" || true)
+  "ls -1 '${BACKUP_ROOT}' 2>/dev/null | grep -E '^ga-[0-9]{8}T[0-9]{6}Z\$' | sort -r" || true)
 
 KEEP=$((BACKUP_KEEP))
 if [[ "$KEEP" -lt 1 ]]; then

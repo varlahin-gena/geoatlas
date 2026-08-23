@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 func TestSnapshotCodecRoundTrip(t *testing.T) {

@@ -1,9 +1,9 @@
-/* System monitor — scoped under #adminApp.nm-system (avoids .card/.row leak into other admin pages). */
+/* System monitor — scoped under #adminApp.ga-system (avoids .card/.row leak into other admin pages). */
 body.page-admin {
     overflow: hidden;
 }
 
-.nm-system {
+.ga-system {
     .header {
         background: var(--panel);
         border-bottom: 1px solid var(--border);

@@ -21,13 +21,13 @@
 //     migrate/query не импортируют parent clickhouse и не импортируют siblings
 //
 // Parent не импортирует geoip — EnrichLogsMissingGeo (geostore) принимает GeoResolver
-// и пишет nm_geo_enrich_ip (IPv4, без ALTER UPDATE traffic_logs);
+// и пишет ga_geo_enrich_ip (IPv4, без ALTER UPDATE traffic_logs);
 // ReplaceGeoRanges пишет готовые []model.GeoRange атомарно (staging + EXCHANGE).
 //
 // Источник правды по схеме: Go migrate.Ensure* / coldBootstrapStatements.
 // clickhouse/init.sql и migrate_*.sql генерируются (`go generate ./internal/adapter/clickhouse/migrate/...`)
 // и нужны только как cold bootstrap / ручной ops fallback.
-// IP: traffic_logs / traffic_edges_daily / traffic_edges_hourly / nm_geo_enrich_ip — IPv4;
+// IP: traffic_logs / traffic_edges_daily / traffic_edges_hourly / ga_geo_enrich_ip — IPv4;
 // traffic_logs ORDER BY (toStartOfHour(timestamp), src_ip, dst_ip); raw column dropped.
 // geo_ranges / reputation_ranges — UInt32 (без изменений).
 package clickhouse

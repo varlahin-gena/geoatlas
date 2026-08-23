@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 func TestListEnterpriseNetsRejectsNil(t *testing.T) {

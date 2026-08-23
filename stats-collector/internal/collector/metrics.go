@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"network_monitor/pkg/syslogngstats"
+	"geoatlas/pkg/syslogngstats"
 )
 
 type IngestStats struct {

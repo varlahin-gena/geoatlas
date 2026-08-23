@@ -7,7 +7,7 @@ import (
 	"io"
 	"math"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 const (

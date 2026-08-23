@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"network_monitor/internal/apperr"
-	"network_monitor/internal/usecase/parseerrors"
-	usecaseretention "network_monitor/internal/usecase/retention"
-	"network_monitor/internal/usecase/searchtemplates"
+	"geoatlas/internal/apperr"
+	"geoatlas/internal/usecase/parseerrors"
+	usecaseretention "geoatlas/internal/usecase/retention"
+	"geoatlas/internal/usecase/searchtemplates"
 )
 
 func TestWriteDomainErrorMapping(t *testing.T) {

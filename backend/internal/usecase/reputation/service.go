@@ -10,10 +10,10 @@ import (
 	"strings"
 	"sync"
 
-	"network_monitor/internal/apperr"
-	"network_monitor/internal/model"
-	reppkg "network_monitor/internal/reputation"
-	"network_monitor/internal/safeurl"
+	"geoatlas/internal/apperr"
+	"geoatlas/internal/model"
+	reppkg "geoatlas/internal/reputation"
+	"geoatlas/internal/safeurl"
 )
 
 var feedNameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$`)

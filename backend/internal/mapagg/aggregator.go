@@ -5,7 +5,7 @@ import (
 	"net"
 	"strings"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 // GeoLookuper — порт для группировки карты (реализация: *geoip.Index).

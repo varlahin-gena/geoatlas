@@ -7,14 +7,14 @@ import (
 	"path/filepath"
 )
 
-const lockName = ".nm_backend.lock"
+const lockName = ".ga_backend.lock"
 
 // Lock удерживает эксклюзивную блокировку файла в dataDir.
 type Lock struct {
 	f *os.File
 }
 
-// Acquire берёт non-blocking exclusive lock на dataDir/.nm_backend.lock.
+// Acquire берёт non-blocking exclusive lock на dataDir/.ga_backend.lock.
 // Второй процесс на том же томе получит ошибку — защита от dual-writer users.json и др.
 func Acquire(dataDir string) (*Lock, error) {
 	dataDir = filepath.Clean(dataDir)

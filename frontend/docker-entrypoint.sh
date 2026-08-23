@@ -104,6 +104,6 @@ else
 fi
 
 # UI-авторизация через cookie-сессии; API-токен в браузер не отдаём.
-printf 'window.NM_CONFIG={};\n' > /tmp/nm-config.js
+printf 'window.GA_CONFIG={};\n' > /tmp/ga-config.js
 
 exec nginx -g 'daemon off;'

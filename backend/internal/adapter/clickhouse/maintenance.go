@@ -5,9 +5,9 @@ import (
 
 	ch "github.com/ClickHouse/clickhouse-go/v2"
 
-	"network_monitor/internal/adapter/clickhouse/geostore"
-	"network_monitor/internal/adapter/clickhouse/migrate"
-	"network_monitor/internal/adapter/geojob"
+	"geoatlas/internal/adapter/clickhouse/geostore"
+	"geoatlas/internal/adapter/clickhouse/migrate"
+	"geoatlas/internal/adapter/geojob"
 )
 
 // MaintenanceStore — edges/geo backfill и enrich для geojob.Scheduler.

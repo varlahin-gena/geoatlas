@@ -91,13 +91,13 @@ export function abortableSleep(ms: number, signal?: AbortSignal): Promise<void> 
 export function buildGeoCurlSnippet(origin: string, tokenPlaceholder = '$API_AUTH_TOKEN'): string {
   const base = origin.replace(/\/$/, '') || 'http://127.0.0.1';
   return [
-    'cd /opt/network-monitor',
+    'cd /opt/geoatlas',
     'set -a; . ./.env; set +a',
     '',
     `curl -sS -w "\\nHTTP %{http_code}\\n" \\`,
     `  -H "Authorization: Bearer ${tokenPlaceholder}" \\`,
     `  -H "Content-Type: text/csv" \\`,
-    `  --data-binary @/opt/network-monitor/geoip.csv \\`,
+    `  --data-binary @/opt/geoatlas/geoip.csv \\`,
     `  "${base}/upload-geo"`,
   ].join('\n');
 }

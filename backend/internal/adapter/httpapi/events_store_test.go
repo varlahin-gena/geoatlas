@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"network_monitor/internal/config"
-	"network_monitor/internal/geoip"
-	"network_monitor/internal/model"
-	usecaseevents "network_monitor/internal/usecase/events"
+	"geoatlas/internal/config"
+	"geoatlas/internal/geoip"
+	"geoatlas/internal/model"
+	usecaseevents "geoatlas/internal/usecase/events"
 )
 
 type stubTraffic struct {

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"network_monitor/internal/apperr"
-	"network_monitor/internal/model"
+	"geoatlas/internal/apperr"
+	"geoatlas/internal/model"
 )
 
 func (s *Service) ListEnterpriseNets(ctx context.Context) ([]model.EnterpriseNet, error) {

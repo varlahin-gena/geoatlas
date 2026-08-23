@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"network_monitor/internal/auth"
+	"geoatlas/internal/auth"
 )
 
 func TestCSRFMiddlewareRejectsMissingToken(t *testing.T) {

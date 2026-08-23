@@ -1,8 +1,8 @@
 package systemlive
 
 import (
-	"network_monitor/internal/installprofile"
-	"network_monitor/internal/usecase/system"
+	"geoatlas/internal/installprofile"
+	"geoatlas/internal/usecase/system"
 )
 
 // ProfileAdapter loads installation profiles from disk.

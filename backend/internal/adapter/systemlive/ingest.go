@@ -1,8 +1,8 @@
 package systemlive
 
 import (
-	"network_monitor/internal/model"
-	"network_monitor/internal/usecase/system"
+	"geoatlas/internal/model"
+	"geoatlas/internal/usecase/system"
 )
 
 type IngestStatsSource interface {

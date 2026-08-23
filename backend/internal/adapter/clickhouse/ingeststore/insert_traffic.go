@@ -6,7 +6,7 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 func InsertTrafficLogs(ctx context.Context, ch clickhouse.Conn, logs []model.TrafficLog) error {

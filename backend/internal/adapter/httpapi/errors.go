@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"network_monitor/internal/apperr"
-	usecasebackup "network_monitor/internal/usecase/backup"
-	"network_monitor/internal/usecase/searchtemplates"
+	"geoatlas/internal/apperr"
+	usecasebackup "geoatlas/internal/usecase/backup"
+	"geoatlas/internal/usecase/searchtemplates"
 )
 
 // writeBadRequest — клиентская 400 через apperr (единый путь с writeDomainError).

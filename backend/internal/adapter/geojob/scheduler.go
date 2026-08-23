@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"network_monitor/internal/adapter/heavytask"
+	"geoatlas/internal/adapter/heavytask"
 )
 
 type jobKind int
@@ -227,7 +227,7 @@ func (s *Scheduler) runEnrich(ctx context.Context) {
 	if n > 0 {
 		slog.Info("geo job: enrich lookup ready", "ips", n, "lookback_days", s.lookbackDays)
 		// Skip edges rebuild here: on small CH hosts day INSERT+JOIN OOMs (~1.2 GiB)
-		// and flips edges_agg to error. Map reads already overlay nm_geo_enrich_ip.
+		// and flips edges_agg to error. Map reads already overlay ga_geo_enrich_ip.
 		slog.Info("geo job: skip edges lookback rebuild (map uses enrich overlay)")
 	}
 }

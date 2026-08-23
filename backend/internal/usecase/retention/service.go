@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"network_monitor/internal/apperr"
+	"geoatlas/internal/apperr"
 )
 
 const (

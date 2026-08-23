@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"network_monitor/internal/usecase/backup"
+	"geoatlas/internal/usecase/backup"
 )
 
 func TestStoreRoundTrip(t *testing.T) {

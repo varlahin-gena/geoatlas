@@ -12,11 +12,11 @@ import (
 	"sync"
 	"time"
 
-	"network_monitor/internal/adapter/heavytask"
-	"network_monitor/internal/model"
-	reppkg "network_monitor/internal/reputation"
-	"network_monitor/internal/safeurl"
-	usecasereputation "network_monitor/internal/usecase/reputation"
+	"geoatlas/internal/adapter/heavytask"
+	"geoatlas/internal/model"
+	reppkg "geoatlas/internal/reputation"
+	"geoatlas/internal/safeurl"
+	usecasereputation "geoatlas/internal/usecase/reputation"
 )
 
 // Applier — запись списка после успешного download.
@@ -214,7 +214,7 @@ func (s *Scheduler) fetchOne(ctx context.Context, feed usecasereputation.Feed, f
 	if err != nil {
 		return "failed", 0, err
 	}
-	req.Header.Set("User-Agent", "network-monitor-reputation/1.0")
+	req.Header.Set("User-Agent", "geoatlas-reputation/1.0")
 	s.mu.Lock()
 	if !force {
 		if et := s.etag[feed.Name]; et != "" {

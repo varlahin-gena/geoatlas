@@ -25,7 +25,7 @@ const schemaVersionHourlyEdges uint32 = 1
 
 func ensureSchemaVersionTable(ctx context.Context, ch clickhouse.Conn) error {
 	return execDDL(ctx, ch, `
-		CREATE TABLE IF NOT EXISTS nm_schema_version
+		CREATE TABLE IF NOT EXISTS ga_schema_version
 		(
 			component String,
 			version   UInt32,
@@ -42,7 +42,7 @@ func schemaVersion(ctx context.Context, ch clickhouse.Conn, component string) (u
 	var v uint32
 	err := ch.QueryRow(qctx, `
 		SELECT version
-		FROM nm_schema_version
+		FROM ga_schema_version
 		WHERE component = ?
 		ORDER BY updated_at DESC
 		LIMIT 1
@@ -72,7 +72,7 @@ func setSchemaVersion(ctx context.Context, ch clickhouse.Conn, component string,
 	qctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	return ch.Exec(qctx, `
-		INSERT INTO nm_schema_version (component, version, updated_at)
+		INSERT INTO ga_schema_version (component, version, updated_at)
 		VALUES (?, ?, now64(3))
 	`, component, version)
 }

@@ -17,7 +17,7 @@ export function AdminLayout({
   showSystemHealth?: boolean;
   /** Scrollable main region class (`page-content` for most admin pages, `content` for /system). */
   mainClassName?: string;
-  /** Extra class on #adminApp (e.g. nm-system for scoped system.css). */
+  /** Extra class on #adminApp (e.g. ga-system for scoped system.css). */
   className?: string;
 }) {
   useEffect(() => {

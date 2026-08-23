@@ -5,8 +5,8 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
-	"network_monitor/internal/adapter/clickhouse/migrate"
-	"network_monitor/internal/usecase/bootstrap"
+	"geoatlas/internal/adapter/clickhouse/migrate"
+	"geoatlas/internal/usecase/bootstrap"
 )
 
 // Storage — адаптер migrate.Ensure*/Backfill*/Refresh* для usecase/bootstrap.

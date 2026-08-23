@@ -5,6 +5,8 @@
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-08-23
+
 ### Added
 - **Anomaly Engine v1**: журнал аномалий на карте — `port_scan`, `horizontal_scan`, `blocked_surge`, `new_country_dst`, `rep_new_peer`; `GET /api/anomalies`, `/summary`, `/status`, `POST /ack`; фоновый скан каждые 5 мин; полоска и панель на карте. `ANOMALY_ENABLED` (по умолчанию true). OpenAPI **1.12.0**.
 - Аномалии: назначение на УЗ (`POST /api/anomalies/{fp}/assign`, таблица `anomaly_assignments`); в списке поля `assigned_to` / `ack_by`; `GET /api/users/directory` для выбора исполнителя. При закрытии УЗ закрывшего проставляется, если исполнитель ещё пуст. OpenAPI **1.13.0**.
@@ -29,18 +31,26 @@
 - Установка и обновление на сервере только из локального `geoatlas-X.Y.Z.tar.gz`: нет `git clone` / `git pull`, установщик не ставит пакет `git`, нет `--download` и curl-установки одним скриптом с GitHub. `install-meta.json` берёт версию из пакета, не из git.
 - ClickHouse image: `clickhouse/clickhouse-server:25.8.29.51` → `25.8.30.16` в compose, image scan и CI integration, чтобы подтянуть Ubuntu package security fixes для контейнерного образа.
 
+### Breaking
+- Полный rebrand **network-monitor → geoatlas**: Go-модуль `geoatlas`, бинарь `geoatlas`, каталог `/opt/geoatlas`, `COMPOSE_PROJECT_NAME=geoatlas`, env `GA_*`, cookie `ga_session` / `ga_csrf`, ingest-маркеры `@@ga/…`, бэкапы `ga-*`, пакет `.ga-package`. Обратной совместимости с `network_monitor`, `NM_*`, `@@nm/`, `nm-*` бэкапами и `/opt/network-monitor` нет — только чистая установка.
+
+### Notes
+- OpenAPI API doc version: **1.14.0**
+- Продуктовая версия: **2.0.0**
+- GitHub: репозиторий `varlahin-gena/geoatlas`
+
 ## [1.4.2] — 2026-08-18
 
-Патч-релиз: старт из `/opt/network_monitor` не создаёт пустые тома и не конфликтует с контейнерами проекта `network-monitor`.
+Патч-релиз: старт из `/opt/geoatlas` не создаёт пустые тома и не конфликтует с контейнерами проекта `geoatlas`.
 
 ### Fixed
-- `nm_compose`: если контейнеры `clickhouse` / `nm-volume-perms` уже принадлежат проекту `network-monitor`, а каталог — `/opt/network_monitor`, берём `COMPOSE_PROJECT_NAME` с существующих контейнеров и при необходимости пишем его в `.env` (иначе `up` создаёт пустые тома и падает на занятом имени).
+- `ga_compose`: если контейнеры `clickhouse` / `ga-volume-perms` уже принадлежат проекту `geoatlas`, а каталог — `/opt/geoatlas`, берём `COMPOSE_PROJECT_NAME` с существующих контейнеров и при необходимости пишем его в `.env` (иначе `up` создаёт пустые тома и падает на занятом имени).
 
 ### Notes
 - OpenAPI API doc version: **1.11.0** (без изменений)
 - Продуктовая версия: **1.4.2**
-- После обновления: скачать `geoatlas-1.4.2.tar.gz` (+ `.sha256`) с GitHub Release и `sudo /opt/network-monitor/update.sh ./geoatlas-1.4.2.tar.gz` (если каталог другой: `--project-dir /opt/network_monitor`). Health: `/api/ready`.
-- Не удаляйте тома `network-monitor_*`. Пустые `network_monitor_*`, если они уже появились при неудачном `up`, можно убрать после того, как стек снова работает на `network-monitor_*`.
+- После обновления: скачать `geoatlas-1.4.2.tar.gz` (+ `.sha256`) с GitHub Release и `sudo /opt/geoatlas/update.sh ./geoatlas-1.4.2.tar.gz` (если каталог другой: `--project-dir /opt/geoatlas`). Health: `/api/ready`.
+- Не удаляйте тома `geoatlas_*`. Пустые `geoatlas_*`, если они уже появились при неудачном `up`, можно убрать после того, как стек снова работает на `geoatlas_*`.
 - 1 коммит с `v1.4.1`
 
 ## [1.4.1] — 2026-08-18
@@ -53,7 +63,7 @@
 ### Notes
 - OpenAPI API doc version: **1.11.0** (без изменений)
 - Продуктовая версия: **1.4.1**
-- После обновления: скачать `geoatlas-1.4.1.tar.gz` (+ `.sha256`) с GitHub Release и `sudo /opt/network-monitor/update.sh ./geoatlas-1.4.1.tar.gz` (если каталог другой: `--project-dir /opt/network_monitor`). Health: `/api/ready`.
+- После обновления: скачать `geoatlas-1.4.1.tar.gz` (+ `.sha256`) с GitHub Release и `sudo /opt/geoatlas/update.sh ./geoatlas-1.4.1.tar.gz` (если каталог другой: `--project-dir /opt/geoatlas`). Health: `/api/ready`.
 - Не экспортируйте фиктивный `CLICKHOUSE_PASSWORD` на весь `update.sh` — `./start.sh` подхватит его вместо `.env`.
 - 1 коммит с `v1.4.0`
 
@@ -62,7 +72,7 @@
 Минорный релиз: обновление из установочного пакета без `git pull`, OpenAPI **1.11.0**, hardening и bootstrap схемы ClickHouse из `EnsureBaseSchema`.
 
 ### Added
-- Обновление из локального пакета: `geoatlas-1.4.0.tar.gz` в GitHub Release (один архив для Ubuntu и Oracle Linux / RHEL), `./update.sh` на сервере (без `git pull`); установщик умеет `NM_INSTALL_PACKAGE`
+- Обновление из локального пакета: `geoatlas-1.4.0.tar.gz` в GitHub Release (один архив для Ubuntu и Oracle Linux / RHEL), `./update.sh` на сервере (без `git pull`); установщик умеет `GA_INSTALL_PACKAGE`
 - Compact GeoIP snapshot на `/app/data/geo_index.snap`: карта после рестарта не ждёт полный скан `geo_ranges`; сверка stamp с ClickHouse, файл не входит в auth-tarball
 - Лицензия **Apache License 2.0** (`LICENSE`, `NOTICE`); продукт бесплатный, доработки через GitHub Issues
 - Политика уязвимостей: [`SECURITY.md`](SECURITY.md) (приватный GitHub advisory, ответ за 5 рабочих дней)
@@ -98,16 +108,16 @@
 - Password policy: минимум 10 символов, буква+цифра, blocklist common; UI + `admin_auth.sh` синхронизированы
 - CSP: `style-src-elem 'self'` + `style-src-attr 'unsafe-inline'` (React style={}), без inline `<style>` injection
 - Reputation feeds: IPv4-only SSRF guards (block private/metadata; safe redirects) on AddFeed и fetch
-- Ingest `:1514`: `INGEST_SHARED_SECRET` в маркере `@@nm/{udp|tcp}/<token>/@@` + peer allowlist `INGEST_ALLOW_FROM` (дефолт `syslog-ng`); генерирует `./start.sh`
+- Ingest `:1514`: `INGEST_SHARED_SECRET` в маркере `@@ga/{udp|tcp}/<token>/@@` + peer allowlist `INGEST_ALLOW_FROM` (дефолт `syslog-ng`); генерирует `./start.sh`
 - Публичный `/ready` без queue/drops/`last_error` (детали — `/api/ingest/stats`)
 - CSRF: Origin с literal IP только при совпадении с Host/X-Forwarded-Host
-- Login throttle: `X-Real-IP` только от trusted proxies (`NM_TRUSTED_PROXIES`, дефолт `frontend`)
+- Login throttle: `X-Real-IP` только от trusted proxies (`GA_TRUSTED_PROXIES`, дефолт `frontend`)
 - Seed только **admin**: установщик спрашивает пароль; full-auto / `./start.sh` без TTY берут `AUTH_ADMIN_PASSWORD` или генерируют одноразовый. Operator с завода не создаётся (UI `/users`). Нет литерала `admin`/`admin`.
 - nginx: CSP/XFO/HSTS на HTML-шелл (include security-headers в location с Cache-Control)
-- Full-auto больше не выключает host firewall: allowlist UI + `:514`; `NM_DISABLE_HOST_FIREWALL=1` — старое поведение; `NM_SYSLOG_ALLOW_FROM` сужает syslog
+- Full-auto больше не выключает host firewall: allowlist UI + `:514`; `GA_DISABLE_HOST_FIREWALL=1` — старое поведение; `GA_SYSLOG_ALLOW_FROM` сужает syslog
 - `CLICKHOUSE_PASSWORD` генерируется в `./start.sh` / `detect_resources.sh`; compose fail-closed; default user `from_env`
 - Мастер GeoIP: abort polling при закрытии, `apiFetchRaw` (401 → session expired), Escape / focus trap / клик по backdrop
-- nginx не отдаёт `*.map` (в т.ч. `/assets/`); Vite sourcemap только при `NM_SOURCEMAP=1`
+- nginx не отдаёт `*.map` (в т.ч. `/assets/`); Vite sourcemap только при `GA_SOURCEMAP=1`
 - Dependabot: ignore minor/major на экосистему (группа `patch` иначе открывает отдельные minor); Docker без minor/major; Actions без major; Trivy fs в CI + weekly scan образов; GitHub Release из CHANGELOG на тег `v*`
 
 ### Fixed
@@ -122,7 +132,7 @@
 ### Notes
 - OpenAPI API doc version: **1.11.0**
 - Продуктовая версия: **1.4.0**
-- После обновления: скачать `geoatlas-1.4.0.tar.gz` (+ `.sha256`) с GitHub Release и `sudo /opt/network-monitor/update.sh ./geoatlas-1.4.0.tar.gz` (тома Docker, `.env`, certs на месте). Health: `/api/ready`.
+- После обновления: скачать `geoatlas-1.4.0.tar.gz` (+ `.sha256`) с GitHub Release и `sudo /opt/geoatlas/update.sh ./geoatlas-1.4.0.tar.gz` (тома Docker, `.env`, certs на месте). Health: `/api/ready`.
 - В `.env` появится `CLICKHOUSE_PASSWORD`, если его ещё не было; ClickHouse перезапустится с паролем (данные на месте). `clickhouse-client` внутри контейнера: `sh -c 'clickhouse-client --password "$CLICKHOUSE_PASSWORD" -q "SELECT 1"'`.
 - Пустой том ClickHouse: базовые таблицы создаёт `migrate.EnsureBaseSchema` (`init.sql` generated).
 - Сгенерированный admin-пароль: `.admin_password_once` (не stdout); удалите после входа.
@@ -176,7 +186,7 @@
 
 ### Fixed
 - Установщик: вопрос HTTPS идёт **до** выбора HTTP-порта (цепочка `select_https` → `confirm_http_port`); full-auto согласован
-- Uninstall: cleanup firewall/томов по `NM_PROJECT_DIR` и составу volumes 1.2.0 (в т.ч. `clickhouse-backups`)
+- Uninstall: cleanup firewall/томов по `GA_PROJECT_DIR` и составу volumes 1.2.0 (в т.ч. `clickhouse-backups`)
 - Install: `chmod` на backup/ops-скрипты при установке
 
 ### Changed
@@ -195,9 +205,9 @@
 ### Added
 - **Frontend SPA**: React + TypeScript + Vite; clean routes (`/`, `/system`, …); legacy `*.html` редиректятся; unit-тесты карты (vitest) и `scripts/frontend-smoke.sh`
 - Опциональный **HTTPS** на nginx: свои PEM (`certs/`), `HTTPS_ENABLED` / `HTTPS_PORT` / `HTTP_REDIRECT`, `docker-compose.https.yml`, entrypoint генерирует `default.conf`; `deploy/common/compose.sh` подключает override
-- Установщик (Ubuntu / Oracle Linux): интерактивный шаг HTTPS (`select_https.sh`) в пошаговом и full-auto; env `NM_HTTPS_*` / `NM_SSL_*` / `NM_CERTS_DIR`
+- Установщик (Ubuntu / Oracle Linux): интерактивный шаг HTTPS (`select_https.sh`) в пошаговом и full-auto; env `GA_HTTPS_*` / `GA_SSL_*` / `GA_CERTS_DIR`
 - **Резервное копирование ClickHouse**: native `BACKUP`/`RESTORE` на том `clickhouse-backups`; CLI `scripts/backup-clickhouse.sh` / `restore-clickhouse.sh`; UI `/system` → «Резервное копирование» (список, создать, расписание, keep, edges/auth)
-- Неразрушающее **Подключить** бэкапа через shadow-таблицы `nm_bak_*` (карта Live / Бэкап); Отключить / Удалить; маркер источника `вручную` / `по расписанию`
+- Неразрушающее **Подключить** бэкапа через shadow-таблицы `ga_bak_*` (карта Live / Бэкап); Отключить / Удалить; маркер источника `вручную` / `по расписанию`
 - Расписание бэкапов: ежедневно `hour:minute` + IANA timezone, имена с локальным временем и UTC-offset; timestamps в UI в timezone расписания
 - **GeoIP**: лимиты размера/числа ranges из install-profile (`GEOIP_UPLOAD_MAX_*`); early **409** при опасном full-replace поверх крупного индекса; **Очистить базу** на `/geo-ranges` + загрузка CSV там же
 - `GET /api/system/version` + строка версии (`main` / тег) в меню пользователя (`install-meta.json`)
@@ -211,7 +221,7 @@
 - Firewall (UFW/firewalld) открывает HTTPS-порт при TLS
 
 ### Fixed
-- Вопрос HTTPS после whiptail не пропускается; установщик не пишет `.env` до `git clone` (непустой `/opt/network-monitor`)
+- Вопрос HTTPS после whiptail не пропускается; установщик не пишет `.env` до `git clone` (непустой `/opt/geoatlas`)
 - Scheduled backup: пропуск дня после failed/queued-only run; timezone UI; permission denied на `*.auth.tgz` (общий uid 101 / `volume-perms`)
 - Multi-table `BACKUP` SQL под ClickHouse 25; gosec/contextcheck в backup и action-vocab путях
 - Карта: race wipe basemap, globe GeoJSON fills, defaults/sidebar/globe visibility после SPA-миграции
@@ -229,7 +239,7 @@
 
 ### Fixed
 - CSRF: `csrf origin rejected` при UI на нестандартном порту / по IP за nginx (`Host` без порта или `backend:8080`); литеральный IP в Origin и `X-Forwarded-Host`
-- Установщик «Сделай мне хорошо»: если firewall не выключился — fallback `allow` на HTTP-порт; `NM_FULL_AUTO` всегда фиксирует **8080**; после старта — проверка `/login.html`, URL и учётки
+- Установщик «Сделай мне хорошо»: если firewall не выключился — fallback `allow` на HTTP-порт; `GA_FULL_AUTO` всегда фиксирует **8080**; после старта — проверка `/login.html`, URL и учётки
 
 ### Changed
 - nginx: `Host` / `X-Forwarded-Host` = `$http_host` (с портом клиента)
@@ -246,7 +256,7 @@
 Патч: установщик «Сделай мне хорошо», устойчивее GeoIP/старт backend, UX уведомлений и загрузки CSV.
 
 ### Added
-- Установщик: режим **«Сделай мне хорошо»** (`NM_FULL_AUTO=1` / `--full-auto` / пункт TUI) — релиз, все модули, порт **8080**, автопрофиль, firewall OFF, старт стека
+- Установщик: режим **«Сделай мне хорошо»** (`GA_FULL_AUTO=1` / `--full-auto` / пункт TUI) — релиз, все модули, порт **8080**, автопрофиль, firewall OFF, старт стека
 - UI: toast’ы без автоскрытия, крестик закрытия; незакрытые уведомления переживают смену страниц (`sessionStorage`)
 
 ### Fixed
@@ -343,7 +353,7 @@
 
 ## [1.0.0] — 2026-07-23
 
-Первый стабильный релиз ГеоАтлас (network_monitor).
+Первый стабильный релиз ГеоАтлас (geoatlas).
 
 ### Added
 - Именованные API-токены со scopes `read` | `ops` | `admin` (`/api/tokens`, UI `/api-tokens.html`, файл `API_TOKENS_FILE`)
@@ -357,22 +367,23 @@
 
 ### Security
 - CSRF, cookie-сессии, роли administrator/operator
-- `ValidateSecurity` блокирует insecure placeholders без `NM_ALLOW_INSECURE=1`
+- `ValidateSecurity` блокирует insecure placeholders без `GA_ALLOW_INSECURE=1`
 
 ### Notes
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
-[1.4.2]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.4.2
-[1.4.1]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.4.1
-[1.4.0]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.4.0
-[1.3.1]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.3.1
-[1.3.0]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.3.0
-[1.2.1]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.2.1
-[1.2.0]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.2.0
-[1.1.4]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.1.4
-[1.1.3]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.1.3
-[1.1.2]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.1.2
-[1.1.1]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.1.1
-[1.1.0]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.1.0
-[1.0.0]: https://github.com/varlahin-gena/network_monitor/releases/tag/v1.0.0
+[2.0.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.0.0
+[1.4.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v1.4.2
+[1.4.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v1.4.1
+[1.4.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v1.4.0
+[1.3.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v1.3.1
+[1.3.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v1.3.0
+[1.2.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v1.2.1
+[1.2.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v1.2.0
+[1.1.4]: https://github.com/varlahin-gena/geoatlas/releases/tag/v1.1.4
+[1.1.3]: https://github.com/varlahin-gena/geoatlas/releases/tag/v1.1.3
+[1.1.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v1.1.2
+[1.1.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v1.1.1
+[1.1.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v1.1.0
+[1.0.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v1.0.0

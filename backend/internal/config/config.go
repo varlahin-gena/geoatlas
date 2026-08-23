@@ -70,7 +70,7 @@ type Config struct {
 	IngestFlushSec       int
 	IngestMaxConnections int
 	IngestConnIdleSec    int
-	// IngestSharedSecret — токен в маркере @@nm/{udp|tcp}/<token>/@@ (syslog-ng → :1514).
+	// IngestSharedSecret — токен в маркере @@ga/{udp|tcp}/<token>/@@ (syslog-ng → :1514).
 	IngestSharedSecret string
 	// IngestAllowFrom — CSV hostnames/CIDRs peer для Accept (дефолт syslog-ng).
 	IngestAllowFrom string
@@ -174,9 +174,9 @@ func FromEnv() Config {
 		HTTPSEnabled:         envOr("HTTPS_ENABLED", "auto"),
 		HTTPSPort:            envOr("HTTPS_PORT", "443"),
 		HTTPRedirect:         envOr("HTTP_REDIRECT", "1"),
-		TLSReloadCmd:         strings.TrimSpace(os.Getenv("NM_TLS_RELOAD_CMD")),
+		TLSReloadCmd:         strings.TrimSpace(os.Getenv("GA_TLS_RELOAD_CMD")),
 		SearchTemplatesFile:  envOr("SEARCH_TEMPLATES_FILE", "/app/data/search_templates.json"),
-		AllowMultiInstance:   parser.bool("NM_ALLOW_MULTI_INSTANCE", false),
+		AllowMultiInstance:   parser.bool("GA_ALLOW_MULTI_INSTANCE", false),
 		MaxLogUploadSize:     parser.int64("MAX_LOG_UPLOAD_SIZE", 1<<30), // 1 GiB
 		// GeoIP: временные дефолты (small/2 GiB); ResolveGeoUploadLimits подставит профиль.
 		MaxGeoUploadSize:     firstEnvInt64(&parser, 512<<20, "GEOIP_UPLOAD_MAX_BYTES", "MAX_GEO_UPLOAD_SIZE"),
@@ -190,7 +190,7 @@ func FromEnv() Config {
 		IngestConnIdleSec:    parser.int("INGEST_CONN_IDLE_SEC", 300),
 		IngestSharedSecret:   envOr("INGEST_SHARED_SECRET", ""),
 		IngestAllowFrom:      envOr("INGEST_ALLOW_FROM", "syslog-ng"),
-		TrustedProxies:       envOr("NM_TRUSTED_PROXIES", "frontend"),
+		TrustedProxies:       envOr("GA_TRUSTED_PROXIES", "frontend"),
 		QueryTimeout:         parser.durationSeconds("QUERY_TIMEOUT_SEC", 3*time.Minute),
 		CHMaxMemoryUsage:     parser.int64("CH_MAX_MEMORY_USAGE", 2<<30),
 		CHExternalGroupBy:    parser.int64("CH_EXTERNAL_GROUP_BY_BYTES", 256<<20),

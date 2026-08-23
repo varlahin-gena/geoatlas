@@ -5,8 +5,8 @@ import (
 	"io"
 	"time"
 
-	"network_monitor/internal/auth"
-	"network_monitor/internal/model"
+	"geoatlas/internal/auth"
+	"geoatlas/internal/model"
 )
 
 // Ingester — live syslog ingest (реализация: *ingestnet.Service).

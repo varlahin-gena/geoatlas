@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"network_monitor/internal/adapter/clickhouse/sqlclause"
+	"geoatlas/internal/adapter/clickhouse/sqlclause"
 )
 
 func TestGeoEdgesAggSelectBodyNoAliasShadowing(t *testing.T) {

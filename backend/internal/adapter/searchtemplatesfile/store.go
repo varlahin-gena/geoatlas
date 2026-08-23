@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"network_monitor/internal/fileatomic"
-	"network_monitor/internal/usecase/searchtemplates"
+	"geoatlas/internal/fileatomic"
+	"geoatlas/internal/usecase/searchtemplates"
 )
 
 type fileData struct {

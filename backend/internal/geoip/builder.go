@@ -1,6 +1,6 @@
 package geoip
 
-import "network_monitor/internal/model"
+import "geoatlas/internal/model"
 
 // BuiltSnapshot — готовый compact snapshot для атомарной публикации в Index.
 type BuiltSnapshot struct {

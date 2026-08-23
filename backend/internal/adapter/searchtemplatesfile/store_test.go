@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"network_monitor/internal/usecase/searchtemplates"
+	"geoatlas/internal/usecase/searchtemplates"
 )
 
 func TestStoreCRUDAndIsolation(t *testing.T) {

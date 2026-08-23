@@ -209,7 +209,7 @@ jobs:
             pkg/chconn/go.mod
             pkg/syslogngstats/go.mod
 
-      # go mod verify не умеет local replace (нет ziphash у network_monitor/pkg/chconn).
+      # go mod verify не умеет local replace (нет ziphash у geoatlas/pkg/chconn).
       - name: go mod download
         run: go mod download
 
@@ -242,7 +242,7 @@ jobs:
           fail=0
           for pkg in "${pkgs[@]}"; do
             line=$(go test -count=1 -cover "$pkg" 2>&1 | tee /dev/stderr | tail -n1)
-            # ok   network_monitor/internal/adapter/ingestnet  0.123s  coverage: 67.8% of statements
+            # ok   geoatlas/internal/adapter/ingestnet  0.123s  coverage: 67.8% of statements
             pct=$(echo "$line" | sed -n 's/.*coverage: \([0-9.]*\)% of statements.*/\1/p')
             if [[ -z "$pct" ]]; then
               echo "ERROR: no coverage for $pkg ($line)" >&2
@@ -507,7 +507,7 @@ jobs:
 
       - name: build image
         env:
-          NM_DOCKER_CACHE: gha
+          GA_DOCKER_CACHE: gha
         run: bash scripts/ci-docker-build.sh ${{ matrix.image }}
 
   frontend-smoke:
@@ -613,8 +613,8 @@ jobs:
           grep -q '/api/auth/login' src/api/auth.ts
           grep -q '/api/auth/logout-all' src/api/auth.ts
           grep -q 'X-CSRF-Token' src/api/client.ts
-          grep -q 'nm_csrf' src/api/client.ts
-          grep -q 'nm-theme-change' src/auth/theme.ts
+          grep -q 'ga_csrf' src/api/client.ts
+          grep -q 'ga-theme-change' src/auth/theme.ts
 
   ci-ok:
     name: CI status (required)

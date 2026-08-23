@@ -23,14 +23,14 @@ func LiveTables() Tables {
 	}
 }
 
-// BackupTables — shadow после «Подключить» (RESTORE … AS nm_bak_*).
+// BackupTables — shadow после «Подключить» (RESTORE … AS ga_bak_*).
 func BackupTables() Tables {
 	return Tables{
-		Logs:         "nm_bak_traffic_logs",
-		EdgesDaily:   "nm_bak_traffic_edges_daily",
-		EdgesHourly:  "nm_bak_traffic_edges_hourly",
-		EdgesCity:    "nm_bak_traffic_edges_city_daily",
-		EdgesCountry: "nm_bak_traffic_edges_country_daily",
+		Logs:         "ga_bak_traffic_logs",
+		EdgesDaily:   "ga_bak_traffic_edges_daily",
+		EdgesHourly:  "ga_bak_traffic_edges_hourly",
+		EdgesCity:    "ga_bak_traffic_edges_city_daily",
+		EdgesCountry: "ga_bak_traffic_edges_country_daily",
 	}
 }
 
@@ -63,7 +63,7 @@ func TablesOf(ctx context.Context) Tables {
 	return LiveTables()
 }
 
-// MapShadowPairs — live → nm_bak_* для attach (только то, что нужно карте).
+// MapShadowPairs — live → ga_bak_* для attach (только то, что нужно карте).
 func MapShadowPairs() [][2]string {
 	live := LiveTables()
 	bak := BackupTables()

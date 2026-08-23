@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 type fakeStore struct {

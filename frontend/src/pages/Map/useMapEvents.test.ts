@@ -70,7 +70,7 @@ describe('useMapEvents', () => {
       points: { a: { lat: 1, lon: 2, count: 1 } },
       lines: [{ src: 'a', dst: 'b', count: 1 }],
       stats: { raw_pairs: 1 },
-      backup_attached: 'nm-bak',
+      backup_attached: 'ga-bak',
     });
 
     const toast = vi.fn();

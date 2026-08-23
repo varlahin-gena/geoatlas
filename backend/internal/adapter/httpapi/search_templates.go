@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"network_monitor/internal/usecase/searchtemplates"
+	"geoatlas/internal/usecase/searchtemplates"
 )
 
 type SearchTemplatesHandler struct{ *SearchTemplatesDeps }

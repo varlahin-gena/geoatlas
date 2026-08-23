@@ -5,7 +5,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 // ingestCollector читает IngestLiveStats на каждом scrape.

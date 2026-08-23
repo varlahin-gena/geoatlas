@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"network_monitor/internal/auth"
+	"geoatlas/internal/auth"
 )
 
 // SetCookie пишет session + CSRF cookies.

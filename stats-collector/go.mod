@@ -1,16 +1,16 @@
-module network_monitor/stats-collector
+module geoatlas/stats-collector
 
 go 1.25.0
 
 require (
+	geoatlas/pkg/chconn v0.0.0
+	geoatlas/pkg/syslogngstats v0.0.0
 	github.com/ClickHouse/clickhouse-go/v2 v2.48.0
-	network_monitor/pkg/chconn v0.0.0
-	network_monitor/pkg/syslogngstats v0.0.0
 )
 
-replace network_monitor/pkg/chconn => ../pkg/chconn
+replace geoatlas/pkg/chconn => ../pkg/chconn
 
-replace network_monitor/pkg/syslogngstats => ../pkg/syslogngstats
+replace geoatlas/pkg/syslogngstats => ../pkg/syslogngstats
 
 require (
 	github.com/ClickHouse/ch-go v0.74.0 // indirect

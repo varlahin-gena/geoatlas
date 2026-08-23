@@ -10,12 +10,12 @@ import (
 
 	ch "github.com/ClickHouse/clickhouse-go/v2"
 
-	"network_monitor/internal/adapter/clickhouse"
-	"network_monitor/internal/adapter/clickhouse/aggstate"
-	"network_monitor/internal/adapter/clickhouse/ingeststore"
-	"network_monitor/internal/adapter/clickhouse/perrorstore"
-	"network_monitor/internal/adapter/clickhouse/query"
-	"network_monitor/internal/model"
+	"geoatlas/internal/adapter/clickhouse"
+	"geoatlas/internal/adapter/clickhouse/aggstate"
+	"geoatlas/internal/adapter/clickhouse/ingeststore"
+	"geoatlas/internal/adapter/clickhouse/perrorstore"
+	"geoatlas/internal/adapter/clickhouse/query"
+	"geoatlas/internal/model"
 )
 
 func testCH(t *testing.T) ch.Conn {

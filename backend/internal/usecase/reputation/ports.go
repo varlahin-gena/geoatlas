@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 // RangeStore — персистентность reputation_ranges.

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 type stubGeo map[string]model.GeoLookup

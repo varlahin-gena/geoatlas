@@ -8,9 +8,9 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
-	"network_monitor/internal/adapter/clickhouse/aggstate"
-	"network_monitor/internal/adapter/clickhouse/sqlclause"
-	"network_monitor/internal/model"
+	"geoatlas/internal/adapter/clickhouse/aggstate"
+	"geoatlas/internal/adapter/clickhouse/sqlclause"
+	"geoatlas/internal/model"
 )
 
 // MapSelect — LIMIT + action-фильтр + опциональный country/q (bind-args).
@@ -149,7 +149,7 @@ func promoteMinutesToHours(tr model.TimeRange, prefer bool) model.TimeRange {
 func scanGeoFromLogsSelect(logsTable, srcKey, dstKey, srcLabel, dstLabel, whereExtra string) string {
 	// Не использовать any(src_city) AS src_city: ClickHouse подставит алиас
 	// внутрь any(cityLabelExpr), получится вложенный aggregate (code 184).
-	// Live traffic_logs — JOIN nm_geo_enrich_ip (дыры без ALTER UPDATE).
+	// Live traffic_logs — JOIN ga_geo_enrich_ip (дыры без ALTER UPDATE).
 	fromSQL := sqlclause.MapLogsFromSQL(logsTable, whereExtra)
 	return fmt.Sprintf(`
 		SELECT

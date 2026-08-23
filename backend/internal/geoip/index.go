@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"unsafe"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 type rangeRow struct {

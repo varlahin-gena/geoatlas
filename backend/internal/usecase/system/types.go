@@ -3,7 +3,7 @@ package system
 import (
 	"time"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 type SystemStatsResponse struct {

@@ -2,7 +2,7 @@
 # Seed-пароль администратора: генерация, проверка, TUI-запрос.
 # Source only — не запускать как скрипт.
 
-nm_rand_hex() {
+ga_rand_hex() {
     local nbytes="${1:-12}"
     if command -v openssl >/dev/null 2>&1; then
         openssl rand -hex "$nbytes"
@@ -11,7 +11,7 @@ nm_rand_hex() {
     fi
 }
 
-nm_password_is_weak() {
+ga_password_is_weak() {
     local user="${1:-}" pass="${2:-}"
     user="${user,,}"
     pass="${pass,,}"
@@ -24,7 +24,7 @@ nm_password_is_weak() {
 }
 
 # Пароль для неквотированного .env: без пробелов и символов, ломающих compose.
-nm_validate_admin_password() {
+ga_validate_admin_password() {
     local user="$1" pass="$2"
     local n=${#pass}
     if (( n < 10 )); then
@@ -47,7 +47,7 @@ nm_validate_admin_password() {
         echo "Пароль должен содержать хотя бы одну букву и одну цифру." >&2
         return 1
     fi
-    if nm_password_is_weak "$user" "$pass"; then
+    if ga_password_is_weak "$user" "$pass"; then
         echo "Пароль слишком простой (не совпадайте с логином; не password/changeme/qwerty…)." >&2
         return 1
     fi
@@ -55,33 +55,33 @@ nm_validate_admin_password() {
 }
 
 # Спросить пароль дважды. stdout = пароль. return 1 при отмене.
-nm_prompt_admin_password() {
+ga_prompt_admin_password() {
     local user="${1:-admin}"
     local a b
-    if ! declare -F nm_ui_passwordbox >/dev/null 2>&1; then
+    if ! declare -F ga_ui_passwordbox >/dev/null 2>&1; then
         echo "TUI passwordbox недоступен." >&2
         return 1
     fi
     while true; do
-        if ! a="$(nm_ui_passwordbox "Пароль администратора" \
+        if ! a="$(ga_ui_passwordbox "Пароль администратора" \
             "Учётка ${user} (роль administrator).
 Минимум 10 символов, буква и цифра, без пробелов и кавычек.
 Другие пользователи — после входа, в разделе «Пользователи».")"; then
             return 1
         fi
-        if ! nm_validate_admin_password "$user" "$a"; then
-            if declare -F nm_ui_msgbox >/dev/null 2>&1; then
-                nm_ui_msgbox "Пароль" "Пароль не принят. Повторите ввод." || true
+        if ! ga_validate_admin_password "$user" "$a"; then
+            if declare -F ga_ui_msgbox >/dev/null 2>&1; then
+                ga_ui_msgbox "Пароль" "Пароль не принят. Повторите ввод." || true
             fi
             continue
         fi
-        if ! b="$(nm_ui_passwordbox "Подтверждение пароля" \
+        if ! b="$(ga_ui_passwordbox "Подтверждение пароля" \
             "Повторите пароль для ${user}.")"; then
             return 1
         fi
         if [[ "$a" != "$b" ]]; then
-            if declare -F nm_ui_msgbox >/dev/null 2>&1; then
-                nm_ui_msgbox "Пароль" "Пароли не совпали." || true
+            if declare -F ga_ui_msgbox >/dev/null 2>&1; then
+                ga_ui_msgbox "Пароль" "Пароли не совпали." || true
             fi
             continue
         fi

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	usecaseaudit "network_monitor/internal/usecase/auditlog"
+	usecaseaudit "geoatlas/internal/usecase/auditlog"
 )
 
 func TestNormalizeListLimit(t *testing.T) {

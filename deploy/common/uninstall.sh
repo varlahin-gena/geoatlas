@@ -2,43 +2,43 @@
 # Общая логика удаления ГеоАтлас.
 # Подключается из deploy/ubuntu/uninstall_ubuntu.sh и deploy/oracle_linux/uninstall_oraclelinux.sh.
 #
-# Обёртка должна определить nm_remove_firewall_rules() до source.
-# Опционально: nm_audit_firewall() для строки аудита firewall.
+# Обёртка должна определить ga_remove_firewall_rules() до source.
+# Опционально: ga_audit_firewall() для строки аудита firewall.
 #
 # Переменные окружения:
-#   NM_PROJECT_DIR          — каталог проекта (по умолчанию /opt/network-monitor)
-#   NM_UNINSTALL_PRESET     — stop | clean | purge (без интерактива)
-#   NM_DRY_RUN=1            — только план, без изменений
-#   NM_FORCE / FORCE=1      — без подтверждения (CI/Ansible)
+#   GA_PROJECT_DIR          — каталог проекта (по умолчанию /opt/geoatlas)
+#   GA_UNINSTALL_PRESET     — stop | clean | purge (без интерактива)
+#   GA_DRY_RUN=1            — только план, без изменений
+#   GA_FORCE / FORCE=1      — без подтверждения (CI/Ansible)
 #   REMOVE_DOCKER_VOLUMES   — 1 = удалить тома ClickHouse / backups / auth-users / syslog-ng
 #   REMOVE_PROJECT_FILES    — 1 = удалить каталог проекта
 #   REMOVE_IMAGES           — 1 = docker compose down --rmi local
-#   REMOVE_FIREWALL_RULES   — 1 = вызвать nm_remove_firewall_rules (HTTP/HTTPS/514)
+#   REMOVE_FIREWALL_RULES   — 1 = вызвать ga_remove_firewall_rules (HTTP/HTTPS/514)
 #
 # CLI: --help --dry-run -y|--yes --preset --purge|--clean|--stop
 #      --volumes --images --keep-files --no-firewall
 
 set -Eeuo pipefail
 
-# NM_PROJECT_DIR — канон; PROJECT_DIR принимаем как legacy alias.
-if [[ -z "${NM_PROJECT_DIR:-}" && -n "${PROJECT_DIR:-}" ]]; then
-    NM_PROJECT_DIR="$PROJECT_DIR"
+# GA_PROJECT_DIR — канон; PROJECT_DIR принимаем как legacy alias.
+if [[ -z "${GA_PROJECT_DIR:-}" && -n "${PROJECT_DIR:-}" ]]; then
+    GA_PROJECT_DIR="$PROJECT_DIR"
 fi
-NM_PROJECT_DIR="${NM_PROJECT_DIR:-/opt/network-monitor}"
-PROJECT_DIR="${PROJECT_DIR:-$NM_PROJECT_DIR}"
-NM_DRY_RUN="${NM_DRY_RUN:-0}"
-NM_FORCE="${NM_FORCE:-${FORCE:-0}}"
-NM_PRESET="${NM_UNINSTALL_PRESET:-${NM_PRESET:-}}"
-NM_WIZARD_USED="${NM_WIZARD_USED:-0}"
+GA_PROJECT_DIR="${GA_PROJECT_DIR:-/opt/geoatlas}"
+PROJECT_DIR="${PROJECT_DIR:-$GA_PROJECT_DIR}"
+GA_DRY_RUN="${GA_DRY_RUN:-0}"
+GA_FORCE="${GA_FORCE:-${FORCE:-0}}"
+GA_PRESET="${GA_UNINSTALL_PRESET:-${GA_PRESET:-}}"
+GA_WIZARD_USED="${GA_WIZARD_USED:-0}"
 REMOVE_DOCKER_VOLUMES="${REMOVE_DOCKER_VOLUMES:-0}"
 REMOVE_PROJECT_FILES="${REMOVE_PROJECT_FILES:-1}"
 REMOVE_IMAGES="${REMOVE_IMAGES:-0}"
 REMOVE_FIREWALL_RULES="${REMOVE_FIREWALL_RULES:-1}"
 
-_nm_log() { echo "[$(date +'%F %T')] $*"; }
+_ga_log() { echo "[$(date +'%F %T')] $*"; }
 
-_nm_ensure_ui() {
-    if ! declare -F nm_ui_yesno >/dev/null 2>&1; then
+_ga_ensure_ui() {
+    if ! declare -F ga_ui_yesno >/dev/null 2>&1; then
         local dir helper
         dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
         helper="${dir}/ui.sh"
@@ -49,39 +49,39 @@ _nm_ensure_ui() {
             return 1
         fi
     fi
-    if [[ -z "${NM_UI_BACKEND:-}" ]] && declare -F nm_ui_init >/dev/null 2>&1; then
-        nm_ui_init
+    if [[ -z "${GA_UI_BACKEND:-}" ]] && declare -F ga_ui_init >/dev/null 2>&1; then
+        ga_ui_init
     fi
     return 0
 }
 
-_nm_run_gauge_fn() {
+_ga_run_gauge_fn() {
     local title="$1" text="$2" fn="$3"
-    if declare -F nm_ui_run_with_gauge >/dev/null 2>&1; then
-        nm_ui_run_with_gauge "$title" "$text" "$fn"
+    if declare -F ga_ui_run_with_gauge >/dev/null 2>&1; then
+        ga_ui_run_with_gauge "$title" "$text" "$fn"
     else
         "$fn"
     fi
 }
 
-_nm_trap_err() {
-    _nm_log "ОШИБКА в ${BASH_SOURCE[1]:-?}:${BASH_LINENO[0]:-${LINENO}} (код выхода $?)."
+_ga_trap_err() {
+    _ga_log "ОШИБКА в ${BASH_SOURCE[1]:-?}:${BASH_LINENO[0]:-${LINENO}} (код выхода $?)."
 }
 
-trap '_nm_trap_err' ERR
+trap '_ga_trap_err' ERR
 
-_nm_require_root() {
+_ga_require_root() {
     if [[ $EUID -ne 0 ]]; then
         echo "Запустите от имени root."
         exit 1
     fi
 }
 
-_nm_yesno() {
+_ga_yesno() {
     # $1 — текст; по умолчанию No.
     local prompt="$1"
-    if _nm_ensure_ui; then
-        nm_ui_yesno "Удаление ГеоАтлас" "$prompt" 0
+    if _ga_ensure_ui; then
+        ga_ui_yesno "Удаление ГеоАтлас" "$prompt" 0
         return
     fi
     local answer
@@ -89,11 +89,11 @@ _nm_yesno() {
     [[ "$answer" =~ ^([yY]|[yY][eE][sS])$ ]]
 }
 
-_nm_yesno_default_yes() {
+_ga_yesno_default_yes() {
     # $1 — текст; по умолчанию Yes.
     local prompt="$1"
-    if _nm_ensure_ui; then
-        nm_ui_yesno "Удаление ГеоАтлас" "$prompt" 1
+    if _ga_ensure_ui; then
+        ga_ui_yesno "Удаление ГеоАтлас" "$prompt" 1
         return
     fi
     local answer
@@ -101,15 +101,15 @@ _nm_yesno_default_yes() {
     [[ ! "$answer" =~ ^([nN]|[nN][oO])$ ]]
 }
 
-_nm_map_legacy_env() {
+_ga_map_legacy_env() {
     # Ubuntu: REMOVE_UFW_RULES → REMOVE_FIREWALL_RULES
     if [[ -n "${REMOVE_UFW_RULES:-}" ]]; then
         REMOVE_FIREWALL_RULES="$REMOVE_UFW_RULES"
     fi
-    NM_FORCE="${NM_FORCE:-${FORCE:-0}}"
+    GA_FORCE="${GA_FORCE:-${FORCE:-0}}"
 }
 
-_nm_show_help() {
+_ga_show_help() {
     cat <<'EOF'
 ГеоАтлас — удаление установки
 
@@ -137,7 +137,7 @@ _nm_show_help() {
   purge  — clean + volumes (CH/бэкапы/учётки) + локальные образы
 
 Переменные окружения (для Ansible/CI):
-  FORCE=1  NM_DRY_RUN=1  NM_UNINSTALL_PRESET=purge
+  FORCE=1  GA_DRY_RUN=1  GA_UNINSTALL_PRESET=purge
   REMOVE_DOCKER_VOLUMES=1  REMOVE_PROJECT_FILES=0  REMOVE_IMAGES=1
   REMOVE_FIREWALL_RULES=0  REMOVE_UFW_RULES=0 (Ubuntu, legacy)
 
@@ -145,40 +145,40 @@ _nm_show_help() {
   sudo bash deploy/uninstall.sh
   sudo bash deploy/uninstall.sh --dry-run
   sudo bash deploy/uninstall.sh --purge --yes
-  sudo NM_UNINSTALL_PRESET=clean FORCE=1 bash deploy/uninstall.sh
+  sudo GA_UNINSTALL_PRESET=clean FORCE=1 bash deploy/uninstall.sh
 EOF
 }
 
-_nm_parse_args() {
+_ga_parse_args() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -h|--help)
-                _nm_show_help
+                _ga_show_help
                 exit 0
                 ;;
             --dry-run)
-                NM_DRY_RUN=1
+                GA_DRY_RUN=1
                 shift
                 ;;
             -y|--yes)
-                NM_FORCE=1
+                GA_FORCE=1
                 FORCE=1
                 shift
                 ;;
             --preset)
-                NM_PRESET="${2:-}"
+                GA_PRESET="${2:-}"
                 shift 2
                 ;;
             --stop)
-                NM_PRESET="stop"
+                GA_PRESET="stop"
                 shift
                 ;;
             --clean)
-                NM_PRESET="clean"
+                GA_PRESET="clean"
                 shift
                 ;;
             --purge)
-                NM_PRESET="purge"
+                GA_PRESET="purge"
                 shift
                 ;;
             --volumes)
@@ -198,16 +198,16 @@ _nm_parse_args() {
                 shift
                 ;;
             *)
-                _nm_log "Неизвестная опция: $1 (используйте --help)"
+                _ga_log "Неизвестная опция: $1 (используйте --help)"
                 exit 1
                 ;;
         esac
     done
 }
 
-_nm_apply_preset() {
+_ga_apply_preset() {
     local preset="$1"
-    NM_PRESET="$preset"
+    GA_PRESET="$preset"
     case "$preset" in
         stop)
             REMOVE_DOCKER_VOLUMES=0
@@ -228,14 +228,14 @@ _nm_apply_preset() {
             REMOVE_FIREWALL_RULES=1
             ;;
         *)
-            _nm_log "ОШИБКА: неизвестный preset «${preset}». Допустимо: stop, clean, purge."
+            _ga_log "ОШИБКА: неизвестный preset «${preset}». Допустимо: stop, clean, purge."
             exit 1
             ;;
     esac
-    _nm_log "Применён preset: ${preset}"
+    _ga_log "Применён preset: ${preset}"
 }
 
-_nm_preset_label() {
+_ga_preset_label() {
     case "$1" in
         stop)  echo "только остановить стек" ;;
         clean) echo "безопасное удаление (volumes сохраняются)" ;;
@@ -244,12 +244,12 @@ _nm_preset_label() {
     esac
 }
 
-_nm_interactive_wizard() {
-    _nm_ensure_ui || true
+_ga_interactive_wizard() {
+    _ga_ensure_ui || true
 
-    if declare -F nm_ui_radiolist >/dev/null 2>&1; then
+    if declare -F ga_ui_radiolist >/dev/null 2>&1; then
         local choice
-        if ! choice="$(nm_ui_radiolist \
+        if ! choice="$(ga_ui_radiolist \
             "Удаление ГеоАтлас" \
             "Выберите режим удаления:" \
             clean "Безопасное удаление — стек, каталог и firewall (volumes сохраняются)" ON \
@@ -257,38 +257,38 @@ _nm_interactive_wizard() {
             stop "Только остановить стек (для обновления/отладки)" OFF \
             custom "Настроить вручную" OFF \
             cancel "Отмена" OFF)"; then
-            _nm_log "Отменено пользователем."
+            _ga_log "Отменено пользователем."
             exit 0
         fi
         case "${choice,,}" in
             clean)
-                _nm_apply_preset clean
-                NM_WIZARD_USED=1
+                _ga_apply_preset clean
+                GA_WIZARD_USED=1
                 return 0
                 ;;
             purge)
-                _nm_apply_preset purge
-                NM_WIZARD_USED=1
+                _ga_apply_preset purge
+                GA_WIZARD_USED=1
                 return 0
                 ;;
             stop)
-                _nm_apply_preset stop
-                NM_WIZARD_USED=1
+                _ga_apply_preset stop
+                GA_WIZARD_USED=1
                 return 0
                 ;;
             custom)
-                _nm_interactive_custom
-                NM_WIZARD_USED=1
+                _ga_interactive_custom
+                GA_WIZARD_USED=1
                 return 0
                 ;;
             cancel|q|quit|"")
-                _nm_log "Отменено пользователем."
+                _ga_log "Отменено пользователем."
                 exit 0
                 ;;
             *)
-                _nm_log "Неизвестный выбор «${choice}» — применяем clean."
-                _nm_apply_preset clean
-                NM_WIZARD_USED=1
+                _ga_log "Неизвестный выбор «${choice}» — применяем clean."
+                _ga_apply_preset clean
+                GA_WIZARD_USED=1
                 return 0
                 ;;
         esac
@@ -315,27 +315,27 @@ _nm_interactive_wizard() {
 
         case "$choice" in
             ""|1|clean)
-                _nm_apply_preset clean
-                NM_WIZARD_USED=1
+                _ga_apply_preset clean
+                GA_WIZARD_USED=1
                 return 0
                 ;;
             2|purge|full)
-                _nm_apply_preset purge
-                NM_WIZARD_USED=1
+                _ga_apply_preset purge
+                GA_WIZARD_USED=1
                 return 0
                 ;;
             3|stop)
-                _nm_apply_preset stop
-                NM_WIZARD_USED=1
+                _ga_apply_preset stop
+                GA_WIZARD_USED=1
                 return 0
                 ;;
             4|custom|manual)
-                _nm_interactive_custom
-                NM_WIZARD_USED=1
+                _ga_interactive_custom
+                GA_WIZARD_USED=1
                 return 0
                 ;;
             q|quit|cancel|отмена)
-                _nm_log "Отменено пользователем."
+                _ga_log "Отменено пользователем."
                 exit 0
                 ;;
             *)
@@ -345,17 +345,17 @@ _nm_interactive_wizard() {
     done
 }
 
-_nm_interactive_custom() {
-    _nm_log "Ручная настройка параметров удаления:"
-    _nm_ensure_ui || true
+_ga_interactive_custom() {
+    _ga_log "Ручная настройка параметров удаления:"
+    _ga_ensure_ui || true
 
-    if declare -F nm_ui_checklist >/dev/null 2>&1; then
+    if declare -F ga_ui_checklist >/dev/null 2>&1; then
         local selected=""
-        if selected="$(nm_ui_checklist \
+        if selected="$(ga_ui_checklist \
             "Параметры удаления" \
             "Отметьте, что удалить:" \
             volumes "Docker volumes (ClickHouse, бэкапы, auth-users) — НЕОБРАТИМО" OFF \
-            files "Каталог проекта ${NM_PROJECT_DIR}" ON \
+            files "Каталог проекта ${GA_PROJECT_DIR}" ON \
             firewall "Правила firewall (HTTP/HTTPS/514)" ON \
             images "Локально собранные Docker-образы стека" OFF)"; then
             REMOVE_DOCKER_VOLUMES=0
@@ -369,39 +369,39 @@ _nm_interactive_custom() {
             [[ "$list" == *",images,"* ]] && REMOVE_IMAGES=1
             return 0
         else
-            _nm_log "Отменено пользователем."
+            _ga_log "Отменено пользователем."
             exit 0
         fi
     fi
 
     echo ""
 
-    if _nm_yesno "Удалить Docker volumes (ClickHouse, бэкапы, auth-users)? НЕОБРАТИМО"; then
+    if _ga_yesno "Удалить Docker volumes (ClickHouse, бэкапы, auth-users)? НЕОБРАТИМО"; then
         REMOVE_DOCKER_VOLUMES=1
     else
         REMOVE_DOCKER_VOLUMES=0
     fi
 
-    if _nm_yesno_default_yes "Удалить каталог проекта ${NM_PROJECT_DIR}?"; then
+    if _ga_yesno_default_yes "Удалить каталог проекта ${GA_PROJECT_DIR}?"; then
         REMOVE_PROJECT_FILES=1
     else
         REMOVE_PROJECT_FILES=0
     fi
 
-    if _nm_yesno_default_yes "Удалить правила firewall (HTTP/HTTPS/514)?"; then
+    if _ga_yesno_default_yes "Удалить правила firewall (HTTP/HTTPS/514)?"; then
         REMOVE_FIREWALL_RULES=1
     else
         REMOVE_FIREWALL_RULES=0
     fi
 
-    if _nm_yesno "Удалить локально собранные Docker-образы стека?"; then
+    if _ga_yesno "Удалить локально собранные Docker-образы стека?"; then
         REMOVE_IMAGES=1
     else
         REMOVE_IMAGES=0
     fi
 }
 
-_nm_format_bytes() {
+_ga_format_bytes() {
     local bytes="$1"
     if (( bytes >= 1073741824 )); then
         awk -v b="$bytes" 'BEGIN { printf "%.1f GiB", b / 1073741824 }'
@@ -414,7 +414,7 @@ _nm_format_bytes() {
     fi
 }
 
-_nm_audit_compose() {
+_ga_audit_compose() {
     local dir="$1"
     if [[ ! -f "${dir}/docker-compose.yml" ]] || ! command -v docker >/dev/null 2>&1; then
         echo "  Docker Compose   : не найден или docker недоступен"
@@ -434,7 +434,7 @@ _nm_audit_compose() {
     fi
 }
 
-_nm_audit_volumes() {
+_ga_audit_volumes() {
     if ! command -v docker >/dev/null 2>&1; then
         echo "  Docker volumes   : docker недоступен"
         return
@@ -447,14 +447,14 @@ _nm_audit_volumes() {
     for vol in "${volumes[@]}"; do
         [[ -z "$vol" ]] && continue
         case "$vol" in
-            *network-monitor*|*network_monitor*|*clickhouse*|*syslog-ng*|*auth-users*) ;;
+            *geoatlas*|*clickhouse*|*syslog-ng*|*auth-users*) ;;
             *) continue ;;
         esac
         found=1
         mount="$(docker volume inspect "$vol" --format '{{.Mountpoint}}' 2>/dev/null || true)"
         if [[ -n "$mount" && -d "$mount" ]]; then
             du_size="$(du -sb "$mount" 2>/dev/null | cut -f1 || echo 0)"
-            echo "  Том              : ${vol} ($(_nm_format_bytes "${du_size:-0}"))"
+            echo "  Том              : ${vol} ($(_ga_format_bytes "${du_size:-0}"))"
         else
             echo "  Том              : ${vol}"
         fi
@@ -465,7 +465,7 @@ _nm_audit_volumes() {
     fi
 }
 
-_nm_audit_project_dir() {
+_ga_audit_project_dir() {
     local dir="$1"
     if [[ -d "$dir" ]]; then
         local size
@@ -476,17 +476,17 @@ _nm_audit_project_dir() {
     fi
 }
 
-nm_audit_installation() {
+ga_audit_installation() {
     local audit_text=""
     set +e
     audit_text="$(
         set +e
         set +o pipefail
-        _nm_audit_project_dir "$NM_PROJECT_DIR"
-        _nm_audit_compose "$NM_PROJECT_DIR"
-        _nm_audit_volumes
-        if declare -F nm_audit_firewall >/dev/null; then
-            nm_audit_firewall
+        _ga_audit_project_dir "$GA_PROJECT_DIR"
+        _ga_audit_compose "$GA_PROJECT_DIR"
+        _ga_audit_volumes
+        if declare -F ga_audit_firewall >/dev/null; then
+            ga_audit_firewall
         fi
     )"
     set -e
@@ -500,244 +500,244 @@ nm_audit_installation() {
     echo "══════════════════════════════════════════════════════════"
     echo ""
 
-    if [[ -t 0 && "$NM_FORCE" != "1" && "$NM_DRY_RUN" != "1" ]]; then
-        _nm_ensure_ui || true
-        if declare -F nm_ui_msgbox >/dev/null 2>&1 && [[ "${NM_UI_BACKEND:-text}" != "text" ]]; then
+    if [[ -t 0 && "$GA_FORCE" != "1" && "$GA_DRY_RUN" != "1" ]]; then
+        _ga_ensure_ui || true
+        if declare -F ga_ui_msgbox >/dev/null 2>&1 && [[ "${GA_UI_BACKEND:-text}" != "text" ]]; then
             local compact
             compact="$(echo "$audit_text" | sed 's/^  //')"
-            nm_ui_msgbox "Аудит установки" "$compact" || true
+            ga_ui_msgbox "Аудит установки" "$compact" || true
         fi
     fi
 }
 
-_nm_print_plan() {
+_ga_print_plan() {
     echo ""
-    _nm_log "==================== ПЛАН УДАЛЕНИЯ ===================="
-    _nm_log "Каталог проекта       : ${NM_PROJECT_DIR}"
-    _nm_log "Остановить стек (down): да"
+    _ga_log "==================== ПЛАН УДАЛЕНИЯ ===================="
+    _ga_log "Каталог проекта       : ${GA_PROJECT_DIR}"
+    _ga_log "Остановить стек (down): да"
     if [[ "$REMOVE_DOCKER_VOLUMES" == "1" ]]; then
-        _nm_log "Docker volumes        : БУДУТ УДАЛЕНЫ (CH data, бэкапы, auth-users)  <-- НЕОБРАТИМО"
+        _ga_log "Docker volumes        : БУДУТ УДАЛЕНЫ (CH data, бэкапы, auth-users)  <-- НЕОБРАТИМО"
     else
-        _nm_log "Docker volumes        : сохраняются (ClickHouse, бэкапы, auth-users)"
+        _ga_log "Docker volumes        : сохраняются (ClickHouse, бэкапы, auth-users)"
     fi
     if [[ "$REMOVE_IMAGES" == "1" ]]; then
-        _nm_log "Локальные образы      : будут удалены (--rmi local)"
+        _ga_log "Локальные образы      : будут удалены (--rmi local)"
     else
-        _nm_log "Локальные образы      : сохраняются"
+        _ga_log "Локальные образы      : сохраняются"
     fi
     if [[ "$REMOVE_FIREWALL_RULES" == "1" ]]; then
-        _nm_log "Правила firewall      : будут удалены"
+        _ga_log "Правила firewall      : будут удалены"
     else
-        _nm_log "Правила firewall      : сохраняются"
+        _ga_log "Правила firewall      : сохраняются"
     fi
     if [[ "$REMOVE_PROJECT_FILES" == "1" ]]; then
         if [[ "$REMOVE_DOCKER_VOLUMES" == "1" ]]; then
-            _nm_log "Каталог проекта       : БУДЕТ УДАЛЁН (rm -rf ${NM_PROJECT_DIR})"
+            _ga_log "Каталог проекта       : БУДЕТ УДАЛЁН (rm -rf ${GA_PROJECT_DIR})"
         else
-            _nm_log "Каталог проекта       : будет удалён (volumes ClickHouse/бэкапы/auth сохранятся)"
+            _ga_log "Каталог проекта       : будет удалён (volumes ClickHouse/бэкапы/auth сохранятся)"
         fi
     else
-        _nm_log "Каталог проекта       : сохраняется"
+        _ga_log "Каталог проекта       : сохраняется"
     fi
-    if [[ -n "$NM_PRESET" ]]; then
-        _nm_log "Preset                : ${NM_PRESET} ($(_nm_preset_label "$NM_PRESET"))"
+    if [[ -n "$GA_PRESET" ]]; then
+        _ga_log "Preset                : ${GA_PRESET} ($(_ga_preset_label "$GA_PRESET"))"
     fi
-    if [[ "$NM_DRY_RUN" == "1" ]]; then
-        _nm_log "Режим                 : DRY-RUN (изменения не будут применены)"
+    if [[ "$GA_DRY_RUN" == "1" ]]; then
+        _ga_log "Режим                 : DRY-RUN (изменения не будут применены)"
     fi
-    _nm_log "======================================================"
+    _ga_log "======================================================"
     echo ""
 }
 
-_nm_confirm() {
-    if [[ "$NM_FORCE" == "1" ]]; then
-        _nm_log "FORCE=1 — подтверждение пропущено."
+_ga_confirm() {
+    if [[ "$GA_FORCE" == "1" ]]; then
+        _ga_log "FORCE=1 — подтверждение пропущено."
         return 0
     fi
 
     if [[ ! -t 0 ]]; then
-        _nm_log "Нет интерактивного терминала, а FORCE не задан. Прерывание."
-        _nm_log "Запустите с --yes или FORCE=1 для неинтерактивного удаления."
+        _ga_log "Нет интерактивного терминала, а FORCE не задан. Прерывание."
+        _ga_log "Запустите с --yes или FORCE=1 для неинтерактивного удаления."
         exit 1
     fi
 
     # Выбор в wizard/custom — уже подтверждение; лишние вопросы не задаём.
-    if [[ "${NM_WIZARD_USED}" == "1" ]]; then
+    if [[ "${GA_WIZARD_USED}" == "1" ]]; then
         if [[ "$REMOVE_DOCKER_VOLUMES" == "1" ]]; then
-            if ! _nm_yesno "Будут удалены volumes: ClickHouse, бэкапы и auth-users. Это необратимо. Продолжить?"; then
-                _nm_log "Отменено пользователем."
+            if ! _ga_yesno "Будут удалены volumes: ClickHouse, бэкапы и auth-users. Это необратимо. Продолжить?"; then
+                _ga_log "Отменено пользователем."
                 exit 0
             fi
         fi
-        _nm_log "Запуск удаления (preset: ${NM_PRESET:-custom})..."
+        _ga_log "Запуск удаления (preset: ${GA_PRESET:-custom})..."
         return 0
     fi
 
-    if ! _nm_yesno "Продолжить удаление?"; then
-        _nm_log "Отменено пользователем."
+    if ! _ga_yesno "Продолжить удаление?"; then
+        _ga_log "Отменено пользователем."
         exit 0
     fi
 
     if [[ "$REMOVE_DOCKER_VOLUMES" == "1" ]]; then
-        if ! _nm_yesno "Будут удалены volumes: ClickHouse, бэкапы и auth-users. Это необратимо. Продолжить?"; then
-            _nm_log "Отменено пользователем."
+        if ! _ga_yesno "Будут удалены volumes: ClickHouse, бэкапы и auth-users. Это необратимо. Продолжить?"; then
+            _ga_log "Отменено пользователем."
             exit 0
         fi
     fi
 }
 
-_nm_step() {
-    _nm_log "[$1/3] $2"
+_ga_step() {
+    _ga_log "[$1/3] $2"
 }
 
-_nm_stop_stack() {
-    if [[ -d "$NM_PROJECT_DIR" ]] && command -v docker >/dev/null 2>&1 && [[ -f "${NM_PROJECT_DIR}/docker-compose.yml" ]]; then
-        cd "$NM_PROJECT_DIR"
-        _nm_log "Остановка стека Docker Compose..."
+_ga_stop_stack() {
+    if [[ -d "$GA_PROJECT_DIR" ]] && command -v docker >/dev/null 2>&1 && [[ -f "${GA_PROJECT_DIR}/docker-compose.yml" ]]; then
+        cd "$GA_PROJECT_DIR"
+        _ga_log "Остановка стека Docker Compose..."
 
         local down_args=(down --remove-orphans)
         if [[ "$REMOVE_DOCKER_VOLUMES" == "1" ]]; then
-            _nm_log "ВНИМАНИЕ: REMOVE_DOCKER_VOLUMES=1 — данные ClickHouse, бэкапы и auth-users будут УДАЛЕНЫ!"
+            _ga_log "ВНИМАНИЕ: REMOVE_DOCKER_VOLUMES=1 — данные ClickHouse, бэкапы и auth-users будут УДАЛЕНЫ!"
             down_args+=(-v)
         else
-            _nm_log "Docker volumes сохранены (удалить: --volumes или preset purge)."
+            _ga_log "Docker volumes сохранены (удалить: --volumes или preset purge)."
         fi
 
         if [[ "$REMOVE_IMAGES" == "1" ]]; then
-            _nm_log "Локально собранные образы будут удалены (--rmi local)."
+            _ga_log "Локально собранные образы будут удалены (--rmi local)."
             down_args+=(--rmi local)
         fi
 
-        if [[ "$NM_DRY_RUN" == "1" ]]; then
-            _nm_log "DRY-RUN: docker compose ${down_args[*]}"
+        if [[ "$GA_DRY_RUN" == "1" ]]; then
+            _ga_log "DRY-RUN: docker compose ${down_args[*]}"
         else
-            local compose_helper="${NM_PROJECT_DIR}/deploy/common/compose.sh"
+            local compose_helper="${GA_PROJECT_DIR}/deploy/common/compose.sh"
             if [[ -f "$compose_helper" ]]; then
                 # shellcheck source=deploy/common/compose.sh
                 source "$compose_helper"
-                nm_compose "$NM_PROJECT_DIR" "${down_args[@]}" || true
+                ga_compose "$GA_PROJECT_DIR" "${down_args[@]}" || true
             else
                 docker compose "${down_args[@]}" || true
             fi
         fi
         cd /
     else
-        _nm_log "Каталог проекта, compose-файл или docker не найдены — пропуск compose down."
+        _ga_log "Каталог проекта, compose-файл или docker не найдены — пропуск compose down."
     fi
 }
 
-_nm_remove_project_files() {
+_ga_remove_project_files() {
     if [[ "$REMOVE_PROJECT_FILES" != "1" ]]; then
-        _nm_log "Каталог проекта сохранён (REMOVE_PROJECT_FILES=0 / --keep-files)."
+        _ga_log "Каталог проекта сохранён (REMOVE_PROJECT_FILES=0 / --keep-files)."
         return
     fi
 
-    if [[ -d "$NM_PROJECT_DIR" ]]; then
+    if [[ -d "$GA_PROJECT_DIR" ]]; then
         # Не удалять каталог, пока cwd внутри него
         case "$(pwd -P)" in
-            "${NM_PROJECT_DIR}"|${NM_PROJECT_DIR}/*)
+            "${GA_PROJECT_DIR}"|${GA_PROJECT_DIR}/*)
                 cd / || cd "${TMPDIR:-/tmp}"
                 ;;
         esac
 
-        if [[ "$NM_DRY_RUN" == "1" ]]; then
-            _nm_log "DRY-RUN: rm -rf ${NM_PROJECT_DIR}"
+        if [[ "$GA_DRY_RUN" == "1" ]]; then
+            _ga_log "DRY-RUN: rm -rf ${GA_PROJECT_DIR}"
         else
-            _nm_log "Удаление каталога проекта: ${NM_PROJECT_DIR}"
-            rm -rf "$NM_PROJECT_DIR"
+            _ga_log "Удаление каталога проекта: ${GA_PROJECT_DIR}"
+            rm -rf "$GA_PROJECT_DIR"
         fi
     else
-        _nm_log "Каталог проекта уже удалён."
+        _ga_log "Каталог проекта уже удалён."
     fi
 }
 
-_nm_remove_firewall() {
+_ga_remove_firewall() {
     if [[ "$REMOVE_FIREWALL_RULES" != "1" ]]; then
-        _nm_log "Удаление правил файрвола пропущено."
+        _ga_log "Удаление правил файрвола пропущено."
         return
     fi
 
-    if [[ "$NM_DRY_RUN" == "1" ]]; then
-        _nm_log "DRY-RUN: nm_remove_firewall_rules"
+    if [[ "$GA_DRY_RUN" == "1" ]]; then
+        _ga_log "DRY-RUN: ga_remove_firewall_rules"
         return
     fi
 
-    if declare -F nm_remove_firewall_rules >/dev/null; then
-        nm_remove_firewall_rules
+    if declare -F ga_remove_firewall_rules >/dev/null; then
+        ga_remove_firewall_rules
     else
-        _nm_log "ВНИМАНИЕ: nm_remove_firewall_rules не определён — пропуск файрвола."
+        _ga_log "ВНИМАНИЕ: ga_remove_firewall_rules не определён — пропуск файрвола."
     fi
 }
 
-_nm_print_summary() {
-    _nm_log "Удаление завершено."
-    _nm_log "Docker Engine на хосте не удалялся."
+_ga_print_summary() {
+    _ga_log "Удаление завершено."
+    _ga_log "Docker Engine на хосте не удалялся."
     if [[ "$REMOVE_IMAGES" != "1" ]]; then
-        _nm_log "Примечание: локально собранные образы сохранены (удалить: --images или preset purge)."
+        _ga_log "Примечание: локально собранные образы сохранены (удалить: --images или preset purge)."
     fi
     if [[ "$REMOVE_DOCKER_VOLUMES" != "1" && "$REMOVE_PROJECT_FILES" == "1" ]]; then
-        _nm_log "Примечание: Docker volumes сохранены — ClickHouse, бэкапы и auth-users можно восстановить при повторной установке,"
-        _nm_log "      если тома не были удалены вручную."
+        _ga_log "Примечание: Docker volumes сохранены — ClickHouse, бэкапы и auth-users можно восстановить при повторной установке,"
+        _ga_log "      если тома не были удалены вручную."
     fi
-    _nm_ensure_ui || true
-    if declare -F nm_ui_msgbox >/dev/null 2>&1; then
+    _ga_ensure_ui || true
+    if declare -F ga_ui_msgbox >/dev/null 2>&1; then
         local note=""
         if [[ "$REMOVE_DOCKER_VOLUMES" != "1" && "$REMOVE_PROJECT_FILES" == "1" ]]; then
             note=$'\n\nDocker volumes (ClickHouse, бэкапы, auth-users) сохранены.'
         fi
-        nm_ui_msgbox "Удаление завершено" \
+        ga_ui_msgbox "Удаление завершено" \
 "ГеоАтлас удалён согласно выбранному режиму.
 Docker Engine на хосте не трогали.${note}" || true
     fi
 }
 
-nm_run_uninstall() {
-    _nm_require_root
-    _nm_parse_args "$@"
-    _nm_map_legacy_env
+ga_run_uninstall() {
+    _ga_require_root
+    _ga_parse_args "$@"
+    _ga_map_legacy_env
 
     # Preset из env без CLI
-    if [[ -z "$NM_PRESET" && -n "${NM_UNINSTALL_PRESET:-}" ]]; then
-        NM_PRESET="$NM_UNINSTALL_PRESET"
+    if [[ -z "$GA_PRESET" && -n "${GA_UNINSTALL_PRESET:-}" ]]; then
+        GA_PRESET="$GA_UNINSTALL_PRESET"
     fi
 
-    nm_audit_installation
+    ga_audit_installation
 
     # dry-run: без меню, показать план по preset (default: clean)
-    if [[ "$NM_DRY_RUN" == "1" && -z "$NM_PRESET" ]]; then
-        NM_PRESET="${NM_UNINSTALL_PRESET:-clean}"
+    if [[ "$GA_DRY_RUN" == "1" && -z "$GA_PRESET" ]]; then
+        GA_PRESET="${GA_UNINSTALL_PRESET:-clean}"
     fi
 
-    if [[ -n "$NM_PRESET" ]]; then
-        _nm_apply_preset "$NM_PRESET"
-    elif [[ -t 0 && "$NM_FORCE" != "1" ]]; then
-        _nm_interactive_wizard
+    if [[ -n "$GA_PRESET" ]]; then
+        _ga_apply_preset "$GA_PRESET"
+    elif [[ -t 0 && "$GA_FORCE" != "1" ]]; then
+        _ga_interactive_wizard
     else
         # Неинтерактивно без явного preset — поведение как раньше (clean-подобное через defaults env)
-        _nm_log "Неинтерактивный режим — используются переменные окружения / defaults."
+        _ga_log "Неинтерактивный режим — используются переменные окружения / defaults."
     fi
 
-    _nm_print_plan
+    _ga_print_plan
 
-    if [[ "$NM_DRY_RUN" == "1" ]]; then
-        _nm_log "DRY-RUN завершён — изменения не применены."
+    if [[ "$GA_DRY_RUN" == "1" ]]; then
+        _ga_log "DRY-RUN завершён — изменения не применены."
         return 0
     fi
 
-    _nm_confirm
+    _ga_confirm
 
-    _nm_ensure_ui || true
+    _ga_ensure_ui || true
 
-    _nm_step 1 "Остановка Docker Compose стека"
-    _nm_run_gauge_fn "Остановка стека" "docker compose down…" _nm_stop_stack
+    _ga_step 1 "Остановка Docker Compose стека"
+    _ga_run_gauge_fn "Остановка стека" "docker compose down…" _ga_stop_stack
 
-    _nm_step 2 "Удаление правил файрвола"
-    _nm_run_gauge_fn "Файрвол" "Удаление правил файрвола…" _nm_remove_firewall
+    _ga_step 2 "Удаление правил файрвола"
+    _ga_run_gauge_fn "Файрвол" "Удаление правил файрвола…" _ga_remove_firewall
 
-    _nm_step 3 "Удаление файлов проекта"
-    _nm_run_gauge_fn "Файлы проекта" "Удаление ${NM_PROJECT_DIR}…" _nm_remove_project_files
+    _ga_step 3 "Удаление файлов проекта"
+    _ga_run_gauge_fn "Файлы проекта" "Удаление ${GA_PROJECT_DIR}…" _ga_remove_project_files
 
-    _nm_print_summary
+    _ga_print_summary
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

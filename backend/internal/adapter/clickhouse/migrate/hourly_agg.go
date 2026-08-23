@@ -7,8 +7,8 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
-	"network_monitor/internal/adapter/clickhouse/aggstate"
-	"network_monitor/internal/adapter/clickhouse/sqlclause"
+	"geoatlas/internal/adapter/clickhouse/aggstate"
+	"geoatlas/internal/adapter/clickhouse/sqlclause"
 )
 
 // EnsureHourlyEdgesAggSchema создаёт hourly IP-агрегат без backfill.

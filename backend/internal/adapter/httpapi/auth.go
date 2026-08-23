@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"network_monitor/internal/adapter/httpapi/loginthrottle"
-	"network_monitor/internal/auth"
-	usecaseaudit "network_monitor/internal/usecase/auditlog"
-	usecaseauth "network_monitor/internal/usecase/auth"
+	"geoatlas/internal/adapter/httpapi/loginthrottle"
+	"geoatlas/internal/auth"
+	usecaseaudit "geoatlas/internal/usecase/auditlog"
+	usecaseauth "geoatlas/internal/usecase/auth"
 )
 
 type AuthHandler struct{ *AuthDeps }

@@ -7,8 +7,8 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
-	"network_monitor/internal/model"
-	"network_monitor/internal/usecase/geo"
+	"geoatlas/internal/model"
+	"geoatlas/internal/usecase/geo"
 )
 
 func (r *GeoRepository) ListEnterpriseNets(ctx context.Context) ([]model.EnterpriseNet, error) {

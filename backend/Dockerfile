@@ -13,7 +13,7 @@ RUN go mod download
 
 COPY backend/ .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
-    -o /out/network-monitor ./cmd/network-monitor
+    -o /out/geoatlas ./cmd/geoatlas
 
 # ---------- runtime stage ----------
 FROM alpine:3.23
@@ -25,6 +25,6 @@ RUN apk add --no-cache ca-certificates=20260611-r0 tzdata=2026c-r0 && \
     mkdir -p /app/data && chown -R app:app /app
 USER app
 WORKDIR /app
-COPY --from=build /out/network-monitor /app/network-monitor
+COPY --from=build /out/geoatlas /app/geoatlas
 EXPOSE 8080 1514
-ENTRYPOINT ["/app/network-monitor"]
+ENTRYPOINT ["/app/geoatlas"]

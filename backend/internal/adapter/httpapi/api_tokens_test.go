@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"network_monitor/internal/auth"
-	"network_monitor/internal/config"
+	"geoatlas/internal/auth"
+	"geoatlas/internal/config"
 )
 
 func TestCheckOpsAllowsOpsBearer(t *testing.T) {

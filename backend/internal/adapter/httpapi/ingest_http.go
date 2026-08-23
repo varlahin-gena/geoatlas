@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 var errIngestUnavailable = errors.New("ingest unavailable")

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 func TestIPv4ToUint32MatchesIPToUint32(t *testing.T) {

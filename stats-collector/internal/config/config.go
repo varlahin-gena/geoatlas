@@ -92,12 +92,12 @@ func (c Config) UsingAdminFallback() bool {
 	return strings.TrimSpace(c.APIOpsToken) == "" && strings.TrimSpace(c.APIAuthToken) != ""
 }
 
-// Validate — fail-closed на пустых/коротких секретах без NM_ALLOW_INSECURE=1.
+// Validate — fail-closed на пустых/коротких секретах без GA_ALLOW_INSECURE=1.
 func (c Config) Validate() error {
-	allowInsecure := envBool("NM_ALLOW_INSECURE", false)
+	allowInsecure := envBool("GA_ALLOW_INSECURE", false)
 	token := c.BearerToken()
 	if token == "" && !allowInsecure {
-		return fmt.Errorf("API_OPS_TOKEN (preferred) or API_AUTH_TOKEN is required (NM_ALLOW_INSECURE=1 to override for local/dev)")
+		return fmt.Errorf("API_OPS_TOKEN (preferred) or API_AUTH_TOKEN is required (GA_ALLOW_INSECURE=1 to override for local/dev)")
 	}
 	if token != "" && !allowInsecure && len(token) < minSecretLen {
 		which := "API_OPS_TOKEN"
@@ -108,7 +108,7 @@ func (c Config) Validate() error {
 	}
 	pass := strings.TrimSpace(c.ClickHousePass)
 	if pass == "" && !allowInsecure {
-		return fmt.Errorf("CLICKHOUSE_PASSWORD is required (NM_ALLOW_INSECURE=1 to override for local/dev)")
+		return fmt.Errorf("CLICKHOUSE_PASSWORD is required (GA_ALLOW_INSECURE=1 to override for local/dev)")
 	}
 	if pass != "" && !allowInsecure && len(pass) < minSecretLen {
 		return fmt.Errorf("CLICKHOUSE_PASSWORD must be at least %d characters", minSecretLen)

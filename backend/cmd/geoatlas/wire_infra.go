@@ -7,9 +7,9 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
-	chadapter "network_monitor/internal/adapter/clickhouse"
-	"network_monitor/internal/adapter/clickhouse/query"
-	"network_monitor/internal/config"
+	chadapter "geoatlas/internal/adapter/clickhouse"
+	"geoatlas/internal/adapter/clickhouse/query"
+	"geoatlas/internal/config"
 )
 
 func connectPools(ctx context.Context, cfg config.Config) (*chadapter.Pools, error) {

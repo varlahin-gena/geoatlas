@@ -6,9 +6,9 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
-	"network_monitor/internal/model"
-	"network_monitor/internal/reputation"
-	usecasereputation "network_monitor/internal/usecase/reputation"
+	"geoatlas/internal/model"
+	"geoatlas/internal/reputation"
+	usecasereputation "geoatlas/internal/usecase/reputation"
 )
 
 // ReputationRepository реализует reputation.RangeStore.

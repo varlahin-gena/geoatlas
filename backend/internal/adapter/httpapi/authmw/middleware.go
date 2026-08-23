@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"network_monitor/internal/auth"
+	"geoatlas/internal/auth"
 )
 
 type ctxKey int

@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"network_monitor/internal/adapter/httpapi"
-	"network_monitor/internal/auth"
-	"network_monitor/internal/config"
-	usecaseauth "network_monitor/internal/usecase/auth"
-	usecasesystem "network_monitor/internal/usecase/system"
+	"geoatlas/internal/adapter/httpapi"
+	"geoatlas/internal/auth"
+	"geoatlas/internal/config"
+	usecaseauth "geoatlas/internal/usecase/auth"
+	usecasesystem "geoatlas/internal/usecase/system"
 )
 
 func TestReputationEnabledOnMe(t *testing.T) {

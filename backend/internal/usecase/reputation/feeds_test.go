@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"network_monitor/internal/adapter/reputationcodec"
-	"network_monitor/internal/adapter/reputationfeedsfile"
-	"network_monitor/internal/model"
-	"network_monitor/internal/safeurl"
-	usecasereputation "network_monitor/internal/usecase/reputation"
+	"geoatlas/internal/adapter/reputationcodec"
+	"geoatlas/internal/adapter/reputationfeedsfile"
+	"geoatlas/internal/model"
+	"geoatlas/internal/safeurl"
+	usecasereputation "geoatlas/internal/usecase/reputation"
 )
 
 type memStore struct {

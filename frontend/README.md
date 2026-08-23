@@ -12,7 +12,7 @@ npm test             # vitest
 npm run build        # dist/
 ```
 
-Runtime `/config.js` is injected by the nginx entrypoint in Docker (`window.NM_CONFIG={}`).
+Runtime `/config.js` is injected by the nginx entrypoint in Docker (`window.GA_CONFIG={}`).
 
 ## Routes
 

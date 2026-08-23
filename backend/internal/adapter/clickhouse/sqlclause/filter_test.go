@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 func TestActionWhereSQL(t *testing.T) {

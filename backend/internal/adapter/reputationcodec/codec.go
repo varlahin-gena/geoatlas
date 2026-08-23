@@ -4,9 +4,9 @@ import (
 	"io"
 	"time"
 
-	"network_monitor/internal/model"
-	"network_monitor/internal/reputation"
-	usecasereputation "network_monitor/internal/usecase/reputation"
+	"geoatlas/internal/model"
+	"geoatlas/internal/reputation"
+	usecasereputation "geoatlas/internal/usecase/reputation"
 )
 
 // Codec wraps reputation parsers for usecase/reputation.Codec.

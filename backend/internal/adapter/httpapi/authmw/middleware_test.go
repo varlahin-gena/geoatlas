@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"network_monitor/internal/auth"
+	"geoatlas/internal/auth"
 )
 
 type stubUsers struct {

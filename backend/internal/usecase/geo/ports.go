@@ -5,9 +5,9 @@ import (
 	"io"
 	"time"
 
-	"network_monitor/internal/geoip"
-	"network_monitor/internal/model"
-	"network_monitor/internal/mapagg"
+	"geoatlas/internal/geoip"
+	"geoatlas/internal/model"
+	"geoatlas/internal/mapagg"
 )
 
 const MaxEnterpriseNets = 200

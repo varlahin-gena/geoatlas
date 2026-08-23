@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 func TestParseNetset(t *testing.T) {

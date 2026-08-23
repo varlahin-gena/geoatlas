@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	domain "network_monitor/internal/auth"
+	domain "geoatlas/internal/auth"
 )
 
 type fakeUsers struct {

@@ -7,8 +7,8 @@ import (
 	"syscall"
 	"time"
 
-	"network_monitor/stats-collector/internal/collector"
-	"network_monitor/stats-collector/internal/config"
+	"geoatlas/stats-collector/internal/collector"
+	"geoatlas/stats-collector/internal/config"
 )
 
 func main() {

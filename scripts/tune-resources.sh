@@ -20,9 +20,9 @@ log "Пересчёт конфигурации по ресурсам серве�
 apply_resource_profile "$PROJECT_DIR"
 
 if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
-    if nm_compose "$PROJECT_DIR" ps --status running -q 2>/dev/null | grep -q .; then
+    if ga_compose "$PROJECT_DIR" ps --status running -q 2>/dev/null | grep -q .; then
         log "Стек уже запущен — перезапускаем с новыми лимитами..."
-        nm_compose "$PROJECT_DIR" up -d
+        ga_compose "$PROJECT_DIR" up -d
         log "Готово. Проверьте install-profile.json для деталей."
     else
         log "Стек не запущен. Запустите: ./start.sh"

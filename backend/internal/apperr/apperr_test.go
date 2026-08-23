@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"network_monitor/internal/apperr"
+	"geoatlas/internal/apperr"
 )
 
 func TestMarkedPreservesMessageAndKind(t *testing.T) {

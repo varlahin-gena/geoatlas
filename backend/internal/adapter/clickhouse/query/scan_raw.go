@@ -8,8 +8,8 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
-	"network_monitor/internal/adapter/clickhouse/sqlclause"
-	"network_monitor/internal/model"
+	"geoatlas/internal/adapter/clickhouse/sqlclause"
+	"geoatlas/internal/model"
 )
 
 func scanEdgesDailyAsRaw(ctx context.Context, ch clickhouse.Conn, table string, days int, sel MapSelect, timeout time.Duration) ([]model.RawAgg, error) {

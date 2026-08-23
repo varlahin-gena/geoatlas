@@ -6,7 +6,7 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
-	usecaseanomaly "network_monitor/internal/usecase/anomaly"
+	usecaseanomaly "geoatlas/internal/usecase/anomaly"
 )
 
 const zeroIPv4 = "0.0.0.0"

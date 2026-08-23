@@ -6,7 +6,7 @@ import (
 	"io"
 	"strings"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 // TryEnqueue кладёт строку в общую очередь (тот же путь, что TCP ingest).

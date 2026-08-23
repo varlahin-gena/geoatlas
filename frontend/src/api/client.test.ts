@@ -43,18 +43,18 @@ describe('isAuthApiPath', () => {
 
 describe('csrfToken / authHeaders', () => {
   afterEach(() => {
-    document.cookie = 'nm_csrf=; Max-Age=0; path=/';
-    delete (window as { NM_CONFIG?: unknown }).NM_CONFIG;
+    document.cookie = 'ga_csrf=; Max-Age=0; path=/';
+    delete (window as { GA_CONFIG?: unknown }).GA_CONFIG;
   });
 
-  it('reads nm_csrf cookie', () => {
-    document.cookie = 'nm_csrf=' + encodeURIComponent('tok&1');
+  it('reads ga_csrf cookie', () => {
+    document.cookie = 'ga_csrf=' + encodeURIComponent('tok&1');
     expect(csrfToken()).toBe('tok&1');
   });
 
   it('adds CSRF and optional Bearer', () => {
-    document.cookie = 'nm_csrf=abc';
-    window.NM_CONFIG = { apiAuthToken: 'secret' };
+    document.cookie = 'ga_csrf=abc';
+    window.GA_CONFIG = { apiAuthToken: 'secret' };
     expect(authHeaders()).toEqual({
       Authorization: 'Bearer secret',
       'X-CSRF-Token': 'abc',
@@ -65,11 +65,11 @@ describe('csrfToken / authHeaders', () => {
 describe('apiFetch', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
-    document.cookie = 'nm_csrf=; Max-Age=0; path=/';
+    document.cookie = 'ga_csrf=; Max-Age=0; path=/';
   });
 
   it('sends same-origin credentials and CSRF on JSON POST', async () => {
-    document.cookie = 'nm_csrf=csrf-xyz';
+    document.cookie = 'ga_csrf=csrf-xyz';
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ ok: true }), {
         status: 200,
@@ -106,7 +106,7 @@ describe('apiFetch', () => {
 
   it('dispatches session-expired on 401 outside /api/auth', async () => {
     const spy = vi.fn();
-    window.addEventListener('nm-session-expired', spy);
+    window.addEventListener('ga-session-expired', spy);
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -118,12 +118,12 @@ describe('apiFetch', () => {
     );
     await expect(apiFetch('/api/events')).rejects.toMatchObject({ status: 401 });
     expect(spy).toHaveBeenCalledOnce();
-    window.removeEventListener('nm-session-expired', spy);
+    window.removeEventListener('ga-session-expired', spy);
   });
 
   it('does not dispatch session-expired on /api/auth/login 401', async () => {
     const spy = vi.fn();
-    window.addEventListener('nm-session-expired', spy);
+    window.addEventListener('ga-session-expired', spy);
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -137,7 +137,7 @@ describe('apiFetch', () => {
       status: 401,
     });
     expect(spy).not.toHaveBeenCalled();
-    window.removeEventListener('nm-session-expired', spy);
+    window.removeEventListener('ga-session-expired', spy);
   });
 });
 
@@ -148,7 +148,7 @@ describe('apiFetchRaw', () => {
 
   it('dispatches session-expired on /upload-geo 401', async () => {
     const spy = vi.fn();
-    window.addEventListener('nm-session-expired', spy);
+    window.addEventListener('ga-session-expired', spy);
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -161,7 +161,7 @@ describe('apiFetchRaw', () => {
     const res = await apiFetchRaw('/upload-geo', { method: 'POST' });
     expect(res.status).toBe(401);
     expect(spy).toHaveBeenCalledOnce();
-    window.removeEventListener('nm-session-expired', spy);
+    window.removeEventListener('ga-session-expired', spy);
   });
 });
 
@@ -172,7 +172,7 @@ describe('apiGet / apiPost', () => {
 
   it('GET /api/auth/me does not dispatch session-expired on 401', async () => {
     const spy = vi.fn();
-    window.addEventListener('nm-session-expired', spy);
+    window.addEventListener('ga-session-expired', spy);
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -184,7 +184,7 @@ describe('apiGet / apiPost', () => {
     );
     await expect(apiGet('/api/auth/me')).rejects.toMatchObject({ status: 401 });
     expect(spy).not.toHaveBeenCalled();
-    window.removeEventListener('nm-session-expired', spy);
+    window.removeEventListener('ga-session-expired', spy);
   });
 
   it('POST /api/auth/login sends JSON body', async () => {

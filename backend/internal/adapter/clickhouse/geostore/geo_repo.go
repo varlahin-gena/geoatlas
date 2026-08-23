@@ -5,8 +5,8 @@ import (
 
 	ch "github.com/ClickHouse/clickhouse-go/v2"
 
-	"network_monitor/internal/model"
-	"network_monitor/internal/usecase/geo"
+	"geoatlas/internal/model"
+	"geoatlas/internal/usecase/geo"
 )
 
 // GeoRepository реализует geo.RangeStore.

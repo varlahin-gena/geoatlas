@@ -3,7 +3,7 @@ package systemlive
 import (
 	"testing"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 type stubIngestStats struct {

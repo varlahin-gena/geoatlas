@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 // EventStore — журнал аномалий.

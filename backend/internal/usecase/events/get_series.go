@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 // GetSeriesInput — параметры временного ряда для страны.

@@ -1,7 +1,7 @@
 import type { paths } from './openapi';
 
 export function csrfToken(): string {
-  const m = document.cookie.match(/(?:^|;\s*)nm_csrf=([^;]*)/);
+  const m = document.cookie.match(/(?:^|;\s*)ga_csrf=([^;]*)/);
   return m ? decodeURIComponent(m[1]) : '';
 }
 
@@ -13,7 +13,7 @@ export function authHeaders(extra?: HeadersInit): Record<string, string> {
       h[k] = v;
     });
   }
-  const token = window.NM_CONFIG?.apiAuthToken || '';
+  const token = window.GA_CONFIG?.apiAuthToken || '';
   if (token) h.Authorization = `Bearer ${token}`;
   const csrf = csrfToken();
   if (csrf) h['X-CSRF-Token'] = csrf;
@@ -38,7 +38,7 @@ export function isAbortError(e: unknown): boolean {
   return name === 'AbortError';
 }
 
-export const SESSION_EXPIRED_EVENT = 'nm-session-expired';
+export const SESSION_EXPIRED_EVENT = 'ga-session-expired';
 
 /** Auth endpoints where 401 means "bad credentials" / "not logged in", not an expired SPA session. */
 export function isAuthApiPath(path: string): boolean {

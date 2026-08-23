@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"log/slog"
-	"network_monitor/internal/config"
-	"network_monitor/internal/logging"
+	"geoatlas/internal/config"
+	"geoatlas/internal/logging"
 	"os"
 	"os/signal"
 	"syscall"
@@ -30,7 +30,7 @@ func main() {
 		slog.Warn("API auth disabled — mutating endpoints are open")
 	}
 
-	slog.Info("network-monitor starting", "edges_agg", true, "geo_enrich_on_ingest", cfg.GeoEnrichOnIngest)
+	slog.Info("geoatlas starting", "edges_agg", true, "geo_enrich_on_ingest", cfg.GeoEnrichOnIngest)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

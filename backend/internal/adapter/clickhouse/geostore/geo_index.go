@@ -12,9 +12,9 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
-	"network_monitor/internal/fileatomic"
-	"network_monitor/internal/geoip"
-	"network_monitor/internal/model"
+	"geoatlas/internal/fileatomic"
+	"geoatlas/internal/geoip"
+	"geoatlas/internal/model"
 )
 
 // ReloadableGeoIndex — *geoip.Index + Reload из ClickHouse + disk snapshot.

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"network_monitor/internal/config"
+	"geoatlas/internal/config"
 )
 
 // authTier documents the middleware wrapping each route in NewServer.

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"network_monitor/internal/auth"
+	"geoatlas/internal/auth"
 )
 
 func TestSessionCookieRoundTrip(t *testing.T) {

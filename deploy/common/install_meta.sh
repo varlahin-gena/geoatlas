@@ -2,7 +2,7 @@
 # Пишет install-meta.json: продуктовая версия из пакета.
 # Использование:
 #   source deploy/common/install_meta.sh
-#   nm_write_install_meta /opt/network-monitor
+#   ga_write_install_meta /opt/geoatlas
 #
 # Поля JSON:
 #   version  — из VERSION (продуктовая semver)
@@ -11,9 +11,9 @@
 #   commit   — пусто (на сервере нет git)
 #   display  — строка для UI («v1.4.2»)
 
-_nm_meta_log() { echo "[$(date +'%F %T')] [install-meta] $*"; }
+_ga_meta_log() { echo "[$(date +'%F %T')] [install-meta] $*"; }
 
-_nm_meta_json_escape() {
+_ga_meta_json_escape() {
     local s="${1:-}"
     s="${s//\\/\\\\}"
     s="${s//\"/\\\"}"
@@ -21,7 +21,7 @@ _nm_meta_json_escape() {
     printf '%s' "$s"
 }
 
-_nm_meta_env_get() {
+_ga_meta_env_get() {
     local file="$1" key="$2" v=""
     [[ -f "$file" ]] || { echo ""; return 0; }
     v="$(grep -E "^[[:space:]]*${key}=" "$file" 2>/dev/null | tail -n1 | cut -d= -f2- || true)"
@@ -29,7 +29,7 @@ _nm_meta_env_get() {
 }
 
 # $1 — корень проекта
-nm_write_install_meta() {
+ga_write_install_meta() {
     local root="${1:-.}"
     local out="${root}/install-meta.json"
     local version="unknown" source="package" ref="" display=""
@@ -39,16 +39,16 @@ nm_write_install_meta() {
         version="$(tr -d '[:space:]' <"${root}/VERSION" || true)"
         [[ -z "$version" ]] && version="unknown"
     fi
-    if [[ -f "${root}/.nm-package" ]]; then
+    if [[ -f "${root}/.ga-package" ]]; then
         local pkg_ver
-        pkg_ver="$(grep -E '^[[:space:]]*version=' "${root}/.nm-package" 2>/dev/null | tail -n1 | cut -d= -f2- || true)"
+        pkg_ver="$(grep -E '^[[:space:]]*version=' "${root}/.ga-package" 2>/dev/null | tail -n1 | cut -d= -f2- || true)"
         pkg_ver="$(echo "$pkg_ver" | tr -d '[:space:]')"
         if [[ -n "$pkg_ver" ]]; then
             version="$pkg_ver"
         fi
     fi
 
-    env_ref="$(_nm_meta_env_get "${root}/.env" NM_INSTALL_REF)"
+    env_ref="$(_ga_meta_env_get "${root}/.env" GA_INSTALL_REF)"
     if [[ -n "$env_ref" && "$env_ref" != "package" && "$env_ref" != "main" && "$env_ref" != "master" ]]; then
         ref="$env_ref"
     elif [[ "$version" != "unknown" ]]; then
@@ -62,12 +62,12 @@ nm_write_install_meta() {
 
     cat >"$out" <<EOF
 {
-  "version": "$(_nm_meta_json_escape "$version")",
-  "source": "$(_nm_meta_json_escape "$source")",
-  "ref": "$(_nm_meta_json_escape "$ref")",
+  "version": "$(_ga_meta_json_escape "$version")",
+  "source": "$(_ga_meta_json_escape "$source")",
+  "ref": "$(_ga_meta_json_escape "$ref")",
   "commit": "",
-  "display": "$(_nm_meta_json_escape "$display")"
+  "display": "$(_ga_meta_json_escape "$display")"
 }
 EOF
-    _nm_meta_log "Записано ${out}: display=${display} source=${source} ref=${ref}"
+    _ga_meta_log "Записано ${out}: display=${display} source=${source} ref=${ref}"
 }

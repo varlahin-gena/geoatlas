@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"network_monitor/internal/fileatomic"
+	"geoatlas/internal/fileatomic"
 )
 
 var (
@@ -284,8 +284,8 @@ func generateAPIToken() (string, error) {
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
-	// nm_ prefix — удобно различать в логах/конфигах.
-	return "nm_" + base64.RawURLEncoding.EncodeToString(b), nil
+	// GA_ prefix — удобно различать в логах/конфигах.
+	return "GA_" + base64.RawURLEncoding.EncodeToString(b), nil
 }
 
 func generateTokenID() (string, error) {

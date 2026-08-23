@@ -7,7 +7,7 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
-	"network_monitor/pkg/chconn"
+	"geoatlas/pkg/chconn"
 )
 
 // Auth — учётные данные native-протокола ClickHouse.

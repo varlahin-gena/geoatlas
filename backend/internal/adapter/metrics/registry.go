@@ -10,7 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 const namespace = "nm"

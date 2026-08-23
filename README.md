@@ -52,12 +52,12 @@
 - Веб-интерфейс — **React SPA** (Vite + TypeScript)
 - Опциональный **HTTPS** на nginx со своими PEM-сертификатами (редирект HTTP→HTTPS)
 - Загрузка и правка **GeoIP-базы** (CSV SIEM KUMA, `/geo-ranges`, IP без координат на `/geo-missing`)
-- Установка **«Сделай мне хорошо»** (`NM_FULL_AUTO` / `--full-auto`): релиз, все модули, порт 8080, автопрофиль, firewall allowlist (UI + :514)
+- Установка **«Сделай мне хорошо»** (`GA_FULL_AUTO` / `--full-auto`): релиз, все модули, порт 8080, автопрофиль, firewall allowlist (UI + :514)
 - **Один установочный пакет** `geoatlas-X.Y.Z.tar.gz` для Ubuntu и Oracle Linux / RHEL; установка и обновление только через этот архив на сервере (`./update.sh`)
 - Toast-уведомления без автоскрытия (крестик), сохраняются при смене страниц до ручного закрытия
 - **Репутация IP** (модуль опционален при установке): offline-списки и URL-фиды (`/reputation`), каталог публичных источников, фильтр и подсветка дуг на карте; приватные IP не помечаются
 - Хранение и аналитика в **ClickHouse**; дневные geo-агрегаты для пресетов `1d+` (city/country)
-- **Резервное копирование ClickHouse**: расписание из UI, CLI backup/restore, неразрушающее «Подключить» (shadow `nm_bak_*`) для просмотра на карте
+- **Резервное копирование ClickHouse**: расписание из UI, CLI backup/restore, неразрушающее «Подключить» (shadow `ga_bak_*`) для просмотра на карте
 - **Настраиваемый TTL (retention)** таблиц из UI `/system`
 - Построение связей на карте (2D MapLibre) и глобусе (3D MapLibre Globe); на карту попадают только узлы/рёбра с координатами
 - Полный mesh дуг + viewport-fit zoom; heatmap стран (на глобусе отключён) + sparkline по клику на страну; экспорт PNG; светлая/тёмная тема
@@ -83,7 +83,7 @@
 МСЭ (UserGate, FortiGate, …) или SIEM
       │ syslog (514/tcp, 514/udp)          [профиль syslog]
       ▼
- ┌───────────┐   TCP :1514 (@@nm/udp/@@, @@nm/tcp/@@)                      ┌───────────┐
+ ┌───────────┐   TCP :1514 (@@ga/udp/@@, @@ga/tcp/@@)                      ┌───────────┐
  │ syslog-ng │ ──────────────────────────────────────────────────────────► │ backend   │
  └───────────┘                                                             │ (Go)      │
                                                                            │ parser +  │
@@ -113,7 +113,7 @@
 ### Поток данных
 
 1. **Syslog**: МСЭ отправляет события на `<IP_сервера>:514` (TCP или UDP).
-2. **syslog-ng** принимает сообщения и пересылает их по TCP на `backend:1514` с маркерами транспорта (`@@nm/udp/@@` / `@@nm/tcp/@@`).
+2. **syslog-ng** принимает сообщения и пересылает их по TCP на `backend:1514` с маркерами транспорта (`@@ga/udp/@@` / `@@ga/tcp/@@`).
 3. **backend** снимает маркеры транспорта, парсит строки, обогащает GeoIP, пишет в ClickHouse; при старте `EnsureBaseSchema` / `Ensure*` создаёт базовые таблицы и агрегаты (`traffic_edges_*`, geo), применяет TTL из `retention.json` и при необходимости делает backfill. **Delivery contract — at-most-once / best-effort:** полная очередь ingest **не блокирует** TCP — лишние строки дропаются (`dropped_total`); при outage ClickHouse insert circuit ставит dequeue на паузу (очередь растёт → admission drops), а потери из processor-буфера учитываются отдельно (`buffer_drops_total`). Перед backend **syslog-ng уже буферизует** (см. ниже). Алерты и live-метрики drops — на `/system`.
 4. **frontend** отдаёт статику и проксирует API-запросы на backend.
 5. **stats-collector** каждые 30 секунд собирает метрики CPU/RAM контейнеров и состояние пайплайна (включая разбивку UDP/TCP).
@@ -127,7 +127,7 @@ syslog-ng **4.11** (`balabit/syslog-ng:4.11.0`): healthcheck `syslog-ng-ctl stat
 | Ограничение                   | Суть                                                                                                                                           |
 |-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
 | **IPv4-only**                 | Success path GeoIP / карта / lookup — IPv4. IPv6 не обогащается и не строится на карте.                                                        |
-| **Single-host control plane** | Учётки, API-токены, retention, reputation feeds, schedules — JSON на `/app/data`. Backend берёт exclusive lock (`/app/data/.nm_backend.lock`). |
+| **Single-host control plane** | Учётки, API-токены, retention, reputation feeds, schedules — JSON на `/app/data`. Backend берёт exclusive lock (`/app/data/.ga_backend.lock`). |
 | **Один процесс backend**      | Ingest TCP, HTTP API, GeoIP RAM и background jobs (geo/backup/anomaly/reputation) — один контейнер. OOM/рестарт = пауза и приёма, и UI.       |
 
 Тяжёлые фоновые задачи сериализуются общим слотом (`heavytask`): пока идёт geo enrich/replace, backup или reputation apply, ingest **замедляет** dequeue (admission drops остаются видимыми в SLO). Maintenance backfill и startup agg backfill **не стартуют**, пока insert circuit open (как anomaly scan).
@@ -160,7 +160,7 @@ Runbook кратко: warn drops → проверить стадию Syslog-NG (
 | `parse_errors`                      | 7 дней            | EnsureBaseSchema / retention `parse_errors_days`   |
 | `system_metrics`                    | 7 дней            | EnsureBaseSchema / retention `system_metrics_days` |
 | `geo_ranges`                        | без TTL           | EnsureBaseSchema (не настраивается)                |
-| `nm_schema_version`                 | без TTL           | `Ensure*` (метаданные схемы)                       |
+| `ga_schema_version`                 | без TTL           | `Ensure*` (метаданные схемы)                       |
 
 Допустимый диапазон настраиваемых дней: **1…730**. На `traffic_logs` / `parse_errors` / `system_metrics` / `traffic_edges_*` включён `ttl_only_drop_parts` при **дневных** партициях: истечение удаляет дневную партицию целиком (без дорогих row-level TTL merges). Уменьшение TTL удалит старые партиции при следующем TTL merge/drop в ClickHouse.
 
@@ -223,10 +223,10 @@ HTTP_REDIRECT=1
 
 | Env | Назначение |
 |-----|------------|
-| `NM_HTTPS_ENABLED` / `HTTPS_ENABLED` | `1` / `0` / `auto` |
-| `NM_HTTPS_PORT` / `HTTPS_PORT` | порт TLS (по умолчанию 443) |
-| `NM_SSL_CERT_SRC` + `NM_SSL_KEY_SRC` | пути к PEM для копирования в `certs/` |
-| `NM_CERTS_DIR` | каталог с `fullchain.pem`+`privkey.pem` (или `cert.pem`+`key.pem`) |
+| `GA_HTTPS_ENABLED` / `HTTPS_ENABLED` | `1` / `0` / `auto` |
+| `GA_HTTPS_PORT` / `HTTPS_PORT` | порт TLS (по умолчанию 443) |
+| `GA_SSL_CERT_SRC` + `GA_SSL_KEY_SRC` | пути к PEM для копирования в `certs/` |
+| `GA_CERTS_DIR` | каталог с `fullchain.pem`+`privkey.pem` (или `cert.pem`+`key.pem`) |
 
 3. Запуск через `./start.sh` / `./stop.sh` (или `deploy/common/compose.sh`) — подхватывает `docker-compose.https.yml` и публикует `:443`. Голый `docker compose` без `-f docker-compose.https.yml` порт `:443` не опубликует.
 4. UI: `https://<host>/`. HTTP при `HTTP_REDIRECT=1` уходит на HTTPS.
@@ -256,25 +256,25 @@ http://<IP_сервера>/
 
 ## Установка
 
-Каталог установки по умолчанию: **`/opt/network-monitor`**. На сервере git не ставится и не используется — только архив релиза.
+Каталог установки по умолчанию: **`/opt/geoatlas`**. На сервере git не ставится и не используется — только архив релиза.
 
 ### Установочный пакет
 
-Один архив **`geoatlas-X.Y.Z.tar.gz`** (плюс `.sha256`; SBOM `.cdx.json` / `.spdx.json` — для аудита, не для установки) с [GitHub Releases](https://github.com/varlahin-gena/network_monitor/releases) — исходники стека, **оба** установщика (`deploy/ubuntu/…`, `deploy/oracle_linux/…`) и `update.sh`. Это не `.deb`/`.rpm`: Docker и файрвол хоста ставит OS-скрипт из пакета.
+Один архив **`geoatlas-X.Y.Z.tar.gz`** (плюс `.sha256`; SBOM `.cdx.json` / `.spdx.json` — для аудита, не для установки) с [GitHub Releases](https://github.com/varlahin-gena/geoatlas/releases) — исходники стека, **оба** установщика (`deploy/ubuntu/…`, `deploy/oracle_linux/…`) и `update.sh`. Это не `.deb`/`.rpm`: Docker и файрвол хоста ставит OS-скрипт из пакета.
 
 | Задача | Что запускать |
 |--------|----------------|
 | Первая установка, Ubuntu | `deploy/ubuntu/install_ubuntu.sh` из распакованного пакета |
 | Первая установка, Oracle Linux / RHEL | `deploy/oracle_linux/install_oraclelinux.sh` из пакета |
-| Обновление | `/opt/network-monitor/update.sh` + новый tar.gz |
+| Обновление | `/opt/geoatlas/update.sh` + новый tar.gz |
 
 **Общий первый шаг на сервере** (Ubuntu и Oracle Linux одинаково):
 
 ```bash
 VER=1.4.2   # или нужный релиз
 cd /tmp
-curl -fLO "https://github.com/varlahin-gena/network_monitor/releases/download/v${VER}/geoatlas-${VER}.tar.gz"
-curl -fLO "https://github.com/varlahin-gena/network_monitor/releases/download/v${VER}/geoatlas-${VER}.tar.gz.sha256"
+curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz"
+curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz.sha256"
 sha256sum -c "geoatlas-${VER}.tar.gz.sha256"
 tar -xzf "geoatlas-${VER}.tar.gz"
 cd "geoatlas-${VER}"
@@ -291,14 +291,14 @@ cd "geoatlas-${VER}"
 sudo ./deploy/ubuntu/install_ubuntu.sh
 ```
 
-Скрипт устанавливает Docker, накладывает пакет в `/opt/network-monitor`, **интерактивно предлагает модули** и профиль производительности, настраивает UFW и запускает стек.
+Скрипт устанавливает Docker, накладывает пакет в `/opt/geoatlas`, **интерактивно предлагает модули** и профиль производительности, настраивает UFW и запускает стек.
 
 Диалоги установки и удаления — **TUI** (`whiptail` → `dialog` → текст). Долгие шаги (apt/Docker) показывают **gauge**.
 
-**«Сделай мне хорошо» (полный авто):** без вопросов — все модули, порт **8080**, автопрофиль по ресурсам, **включает** host firewall с allowlist портов (UI и при syslog `:514/tcp+udp`) и запускает стек. `:514` без TLS/auth — ограничьте источником МСЭ или `NM_SYSLOG_ALLOW_FROM=CIDR`. Выключить firewall: `NM_DISABLE_HOST_FIREWALL=1`. HTTPS при TTY спрашивается первым среди сетевых шагов (или задайте `NM_HTTPS_ENABLED` / сертификаты через env).
+**«Сделай мне хорошо» (полный авто):** без вопросов — все модули, порт **8080**, автопрофиль по ресурсам, **включает** host firewall с allowlist портов (UI и при syslog `:514/tcp+udp`) и запускает стек. `:514` без TLS/auth — ограничьте источником МСЭ или `GA_SYSLOG_ALLOW_FROM=CIDR`. Выключить firewall: `GA_DISABLE_HOST_FIREWALL=1`. HTTPS при TTY спрашивается первым среди сетевых шагов (или задайте `GA_HTTPS_ENABLED` / сертификаты через env).
 
 ```bash
-sudo NM_FULL_AUTO=1 ./deploy/ubuntu/install_ubuntu.sh
+sudo GA_FULL_AUTO=1 ./deploy/ubuntu/install_ubuntu.sh
 # или
 sudo ./deploy/ubuntu/install_ubuntu.sh --full-auto
 ```
@@ -310,7 +310,7 @@ sudo ./deploy/ubuntu/install_ubuntu.sh --full-auto
 1. Обновляет списки пакетов
 2. Устанавливает `curl`, `ufw`, `whiptail` (опционально `dialog`)
 3. Устанавливает Docker Engine и compose plugin (если ещё нет)
-4. Накладывает пакет из текущего каталога в `/opt/network-monitor`
+4. Накладывает пакет из текущего каталога в `/opt/geoatlas`
 5. Спрашивает, какие модули ставить (checklist: авторизация, API-токен, syslog-ng, stats-collector, репутация IP)
 6. Спрашивает **HTTPS** (свои PEM; можно оставить только HTTP)
 7. Спрашивает **порт(ы)**: при HTTPS — порт TLS, затем HTTP (редирект); при HTTP-only — порт UI (80 / 8080 или свой)
@@ -322,16 +322,16 @@ sudo ./deploy/ubuntu/install_ubuntu.sh --full-auto
 
 | Переменная | Назначение |
 |------------|------------|
-| `NM_UI=whiptail\|dialog\|text` | принудительный бэкенд диалогов |
-| `NM_FULL_AUTO=1` / `--full-auto` | «Сделай мне хорошо»: все модули, порт 8080, автопрофиль, firewall allowlist, старт стека |
-| `NM_DISABLE_HOST_FIREWALL=1` | full-auto: выключить UFW/firewalld (небезопасно на публичном IP) |
-| `NM_SYSLOG_ALLOW_FROM` | CIDR/IP: открыть `:514` только с этого источника (UFW/firewalld) |
+| `GA_UI=whiptail\|dialog\|text` | принудительный бэкенд диалогов |
+| `GA_FULL_AUTO=1` / `--full-auto` | «Сделай мне хорошо»: все модули, порт 8080, автопрофиль, firewall allowlist, старт стека |
+| `GA_DISABLE_HOST_FIREWALL=1` | full-auto: выключить UFW/firewalld (небезопасно на публичном IP) |
+| `GA_SYSLOG_ALLOW_FROM` | CIDR/IP: открыть `:514` только с этого источника (UFW/firewalld) |
 | `AUTH_ADMIN_PASSWORD` | пароль admin для full-auto / без TTY; иначе установщик спросит или сгенерирует |
-| `NM_AUTO_MODULES=1` | без вопросов: модули по умолчанию, порт 80 |
-| `NM_INSTALL_PACKAGE` | путь к `.tar.gz` или распакованному каталогу (если install запускают не из корня пакета) |
-| `NM_INSTALL_PACKAGE_SHA256=<hex>` | проверить контрольную сумму пакета |
+| `GA_AUTO_MODULES=1` | без вопросов: модули по умолчанию, порт 80 |
+| `GA_INSTALL_PACKAGE` | путь к `.tar.gz` или распакованному каталогу (если install запускают не из корня пакета) |
+| `GA_INSTALL_PACKAGE_SHA256=<hex>` | проверить контрольную сумму пакета |
 | нет TTY (CI/pipe) | то же, что авто-режим; gauge пишет прогресс в лог |
-**Порт UI:** `HTTP_PORT=8080` (или `NM_HTTP_PORT`) — без вопроса; в compose: `${HTTP_PORT:-80}:80`. HTTPS спрашивается **до** HTTP-порта (или через env: `NM_HTTPS_ENABLED`, `NM_HTTPS_PORT`, `NM_SSL_CERT_SRC` / `NM_SSL_KEY_SRC`, `NM_CERTS_DIR`; см. [HTTPS](#https-свои-сертификаты)).
+**Порт UI:** `HTTP_PORT=8080` (или `GA_HTTP_PORT`) — без вопроса; в compose: `${HTTP_PORT:-80}:80`. HTTPS спрашивается **до** HTTP-порта (или через env: `GA_HTTPS_ENABLED`, `GA_HTTPS_PORT`, `GA_SSL_CERT_SRC` / `GA_SSL_KEY_SRC`, `GA_CERTS_DIR`; см. [HTTPS](#https-свои-сертификаты)).
 
 **Выбор модулей (интерактивно или через env):**
 
@@ -357,14 +357,14 @@ sudo ./deploy/ubuntu/install_ubuntu.sh --full-auto
 sudo ./deploy/oracle_linux/install_oraclelinux.sh
 ```
 
-Полный авто (как на Ubuntu): `sudo NM_FULL_AUTO=1 ./deploy/oracle_linux/install_oraclelinux.sh` или `sudo ./deploy/oracle_linux/install_oraclelinux.sh --full-auto` → UI на порту **8080**, firewalld включён (порты UI + :514).
+Полный авто (как на Ubuntu): `sudo GA_FULL_AUTO=1 ./deploy/oracle_linux/install_oraclelinux.sh` или `sudo ./deploy/oracle_linux/install_oraclelinux.sh --full-auto` → UI на порту **8080**, firewalld включён (порты UI + :514).
 
 **Что делает скрипт:**
 
 1. Удаляет конфликтующие пакеты (`podman`, `buildah`, `runc`) при необходимости
 2. Устанавливает Docker CE из официального репозитория
 3. Настраивает SELinux (`container_manage_cgroup`) или переводит в permissive (опционально)
-4. Накладывает пакет в `/opt/network-monitor`, предлагает модули, HTTPS, HTTP-порт, профиль, настраивает firewalld и запускает стек
+4. Накладывает пакет в `/opt/geoatlas`, предлагает модули, HTTPS, HTTP-порт, профиль, настраивает firewalld и запускает стек
 
 ---
 
@@ -375,8 +375,8 @@ sudo ./deploy/oracle_linux/install_oraclelinux.sh
 ```bash
 # Пакет уже скачан и распакован (см. «Установочный пакет»)
 sudo mkdir -p /opt
-sudo cp -a "$PWD" /opt/network-monitor
-cd /opt/network-monitor
+sudo cp -a "$PWD" /opt/geoatlas
+cd /opt/geoatlas
 
 chmod +x start.sh stop.sh update.sh scripts/tune-resources.sh \
   deploy/common/detect_resources.sh deploy/common/select_modules.sh deploy/common/ui.sh \
@@ -386,8 +386,8 @@ chmod +x start.sh stop.sh update.sh scripts/tune-resources.sh \
 ./deploy/common/select_modules.sh .
 ./scripts/tune-resources.sh
 # или неинтерактивно:
-# NM_ENABLE_AUTH=0 NM_AUTO_MODULES=1 ./deploy/common/select_modules.sh .
-# NM_AUTO_PROFILE=1 ./deploy/common/detect_resources.sh .
+# GA_ENABLE_AUTH=0 GA_AUTO_MODULES=1 ./deploy/common/select_modules.sh .
+# GA_AUTO_PROFILE=1 ./deploy/common/detect_resources.sh .
 
 ./start.sh
 ```
@@ -416,7 +416,7 @@ sudo firewall-cmd --reload
 ### Быстрый старт (автоопределение ОС)
 
 ```bash
-cd /opt/network-monitor   # или каталог, откуда запускали скрипт
+cd /opt/geoatlas   # или каталог, откуда запускали скрипт
 sudo bash deploy/uninstall.sh
 ```
 
@@ -426,7 +426,7 @@ sudo bash deploy/uninstall.sh
 3. Только остановить стек
 4. Настроить вручную
 
-Долгие шаги (compose down, rm, firewall) идут через **gauge**. Бэкенд диалогов тот же, что при установке (`NM_UI`).
+Долгие шаги (compose down, rm, firewall) идут через **gauge**. Бэкенд диалогов тот же, что при установке (`GA_UI`).
 
 ### Ubuntu / Debian
 
@@ -443,7 +443,7 @@ sudo bash deploy/oracle_linux/uninstall_oraclelinux.sh
 ### Остановка без удаления проекта
 
 ```bash
-cd /opt/network-monitor
+cd /opt/geoatlas
 ./stop.sh
 ```
 
@@ -452,7 +452,7 @@ cd /opt/network-monitor
 ## Запуск и остановка
 
 ```bash
-cd /opt/network-monitor
+cd /opt/geoatlas
 
 # Запуск (с пересборкой образов)
 ./start.sh
@@ -474,7 +474,7 @@ DO_BUILD=0 ./start.sh
 > Без `-f docker-compose.https.yml` порт `:443` не публикуется.
 
 ```bash
-cd /opt/network-monitor
+cd /opt/geoatlas
 
 # Статус контейнеров
 docker compose ps
@@ -544,16 +544,16 @@ sysctl -w net.core.wmem_max=16777216
 **Пересчёт профиля после изменения ресурсов сервера:**
 
 ```bash
-cd /opt/network-monitor
+cd /opt/geoatlas
 
 # Интерактивный выбор
 ./scripts/tune-resources.sh 
 
 # Автоматически — рекомендованный профиль
-NM_AUTO_PROFILE=1 ./scripts/tune-resources.sh
+GA_AUTO_PROFILE=1 ./scripts/tune-resources.sh
 
 # Принудительно задать профиль
-NM_FORCE_PROFILE=large ./scripts/tune-resources.sh
+GA_FORCE_PROFILE=large ./scripts/tune-resources.sh
 
 ```
 
@@ -562,7 +562,7 @@ NM_FORCE_PROFILE=large ./scripts/tune-resources.sh
 Просмотр текущего профиля:
 
 ```bash
-cat /opt/network-monitor/install-profile.json | jq .
+cat /opt/geoatlas/install-profile.json | jq .
 # или через API:
 TOKEN="$(grep -E '^API_AUTH_TOKEN=' .env | cut -d= -f2-)"
 curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1/api/system/install-profile | jq .
@@ -600,7 +600,7 @@ Native `BACKUP` / `RESTORE` на отдельный Docker-том `clickhouse-ba
 | Том                  | `clickhouse-backups` (отдельно от `clickhouse-data`)                                                                     |
 | Скрипты              | `scripts/backup-clickhouse.sh`, `scripts/restore-clickhouse.sh`                                                          |
 | По умолчанию в бэкап | `traffic_logs`, `geo_ranges`, `reputation_ranges`, `parse_errors`, `system_metrics`, `traffic_edges_*`                   |
-| Рядом                | `*.auth.tgz` — снимок `/app/data` (users, retention, feeds, schedule); без `geo_index.snap`, `.nm_backend.lock`, `*.tmp` |
+| Рядом                | `*.auth.tgz` — снимок `/app/data` (users, retention, feeds, schedule); без `geo_index.snap`, `.ga_backend.lock`, `*.tmp` |
 
 Backend и ClickHouse пишут в `clickhouse-backups` под **одним uid 101**. Сервис `volume-perms` при старте делает `chown 101:101` на томах `clickhouse-backups` и `auth-users` (миграция со старого backend uid 10001). Если снова `permission denied` на `*.auth.tgz`:
 
@@ -624,7 +624,7 @@ docker compose up -d backend
 **Cron (альтернатива, если UI-schedule выключен):**
 
 ```bash
-30 2 * * * cd /opt/network-monitor && ./scripts/backup-clickhouse.sh >>/var/log/nm-backup.log 2>&1
+30 2 * * * cd /opt/geoatlas && ./scripts/backup-clickhouse.sh >>/var/log/ga-backup.log 2>&1
 ```
 
 **Restore:**
@@ -632,7 +632,7 @@ docker compose up -d backend
 ```bash
 docker compose exec clickhouse ls -1 /var/lib/clickhouse-backups
 # при непустых таблицах:
-RESTORE_ALLOW_NONEMPTY=1 ./scripts/restore-clickhouse.sh nm-20260411T023000Z
+RESTORE_ALLOW_NONEMPTY=1 ./scripts/restore-clickhouse.sh ga-20260411T023000Z
 ```
 
 Скрипт по умолчанию останавливает `backend` / `syslog-ng` на время restore и поднимает их обратно. Если edges не было в бэкапе — `POST /api/system/maintenance/backfill` (admin).
@@ -641,8 +641,8 @@ RESTORE_ALLOW_NONEMPTY=1 ./scripts/restore-clickhouse.sh nm-20260411T023000Z
 
 **UI:** `/system` → вкладка **Резервное копирование** (administrator): список, статус, «Создать бэкап», расписание, **Подключить / Отключить / Удалить**. В списке колонка **Источник** — `вручную` / `по расписанию` (маркер `{name}.source` на томе; старые бэкапы без маркера — «—»).
 
-- **Подключить** — `RESTORE … AS nm_bak_*` (shadow для карты). Live и ingest не трогаются.
-- **Отключить** — `DROP nm_bak_*`; бэкап на диске и live сохраняются.
+- **Подключить** — `RESTORE … AS ga_bak_*` (shadow для карты). Live и ingest не трогаются.
+- **Отключить** — `DROP ga_bak_*`; бэкап на диске и live сохраняются.
 - **Удалить** — стереть бэкап с тома (нельзя, пока подключён).
 - На карте: переключатель **Live / Бэкап** (после Подключить).
 - Колонка **Auth** — есть ли `*.auth.tgz` (снимок `/app/data`), не трафик.
@@ -656,7 +656,7 @@ RESTORE_ALLOW_NONEMPTY=1 ./scripts/restore-clickhouse.sh nm-20260411T023000Z
 Удаляет все события, GeoIP, ошибки парсинга и метрики. **Схема таблиц сохраняется.**
 
 ```bash
-cd /opt/network-monitor
+cd /opt/geoatlas
 bash clickhouse/reset_data.sh
 ```
 
@@ -667,7 +667,7 @@ bash clickhouse/reset_data.sh
 Скрипт для наблюдения за скоростью приёма событий:
 
 ```bash
-cd /opt/network-monitor
+cd /opt/geoatlas
 ./scripts/watch-ingest.sh          # интервал 2 сек (по умолчанию)
 ./scripts/watch-ingest.sh 5        # интервал 5 сек
 ```
@@ -679,7 +679,7 @@ cd /opt/network-monitor
 ### Логи и диагностика
 
 ```bash
-cd /opt/network-monitor
+cd /opt/geoatlas
 
 # Все сервисы (последние 100 строк)
 docker compose logs --tail=100
@@ -720,11 +720,11 @@ docker compose exec clickhouse sh -c 'clickhouse-client --password "$CLICKHOUSE_
 | Нет метрик на странице «Система» | `docker compose logs stats-collector`, cgroup, `/proc` и `/sys/fs/cgroup` на хосте |
 | Превышена расчётная ёмкость      | `/system` → алёрты `capacity_high` / `capacity_exceeded`, пересчёт профиля |
 | Drops под нагрузкой / очередь полная | `/system` (плитка Drops, стадии Syslog-NG и Backend Ingest); `pipeline.syslogng.dropped_total` / `queued`; `/api/ingest/stats` → `dropped_total`, `buffer_drops_total`; алёрты `syslogng_dropping*`, `ingest_dropping*`; `./scripts/watch-ingest.sh` |
-| UDP/TCP EPS не разделяются       | Перезапустить `syslog-ng` (маркеры `@@nm/udp/@@` / `@@nm/tcp/@@`) |
+| UDP/TCP EPS не разделяются       | Перезапустить `syslog-ng` (маркеры `@@ga/udp/@@` / `@@ga/tcp/@@`) |
 | syslog-ng: kernel refused SO_RCVBUF | `net.core.rmem_max` / `wmem_max` на хосте (см. буферы профиля) |
 | git на сервере | Установщик больше не ставит git и не клонирует репозиторий. Только `geoatlas-X.Y.Z.tar.gz` + install / `./update.sh`. |
-| `container name "/nm-volume-perms" is already in use` / сеть `network-monitor` не от этого проекта | Два каталога: `/opt/network-monitor` и `/opt/network_monitor`. Не `docker volume rm`. Пакет **1.4.2+** подхватывает `COMPOSE_PROJECT_NAME` с живых контейнеров. Вручную: в `.env` `COMPOSE_PROJECT_NAME=network-monitor`, затем `./start.sh`. |
-| syslog-ng ругается на `log-iw-size` / `flush_timeout` / нет `zz_profile.conf` | Старая версия в `/opt/network-monitor`. Обновите пакетом релиза (`./update.sh`), проверьте `grep flow-control-window-size syslog-ng.conf` и наличие `syslog-ng.d/zz_profile.conf`. |
+| `container name "/ga-volume-perms" is already in use` / сеть `geoatlas` не от этого проекта | Не `docker volume rm`. В `.env` задайте `COMPOSE_PROJECT_NAME=geoatlas`, затем `./start.sh`. |
+| syslog-ng ругается на `log-iw-size` / `flush_timeout` / нет `zz_profile.conf` | Старая версия в `/opt/geoatlas`. Обновите пакетом релиза (`./update.sh`), проверьте `grep flow-control-window-size syslog-ng.conf` и наличие `syslog-ng.d/zz_profile.conf`. |
 | GeoIP upload → 502 / OOM, backend перезапускается | Не заливать большой CSV поверх уже загруженного индекса через браузер; `dmesg`/`oom-kill`; см. [GeoIP](#geoip) |
 | GeoIP: `Failed to fetch` при смене страницы | Уход со страницы во время POST обрывает `fetch`; дождитесь окончания или `curl` с сервера |
 | После рестарта backend страницы 500 (auth) | Обновить до ≥1.1.3 (индекс GeoIP грузится асинхронно); дождаться `geo index loaded` |
@@ -734,7 +734,7 @@ docker compose exec clickhouse sh -c 'clickhouse-client --password "$CLICKHOUSE_
 
 ### Обновление системы
 
-Данные ClickHouse и учётки UI сохраняются (тома Docker не трогаем), меняется только код в `/opt/network-monitor`.
+Данные ClickHouse и учётки UI сохраняются (тома Docker не трогаем), меняется только код в `/opt/geoatlas`.
 Не используйте `REMOVE_DOCKER_VOLUMES=1` / `docker compose down -v` при обновлении.
 
 Один **`geoatlas-X.Y.Z.tar.gz`** на Ubuntu и на Oracle Linux / RHEL. `update.sh` не затирает:
@@ -752,14 +752,14 @@ docker compose exec clickhouse sh -c 'clickhouse-client --password "$CLICKHOUSE_
 ```bash
 VER=1.4.2   # нужный релиз
 cd /tmp
-curl -fLO "https://github.com/varlahin-gena/network_monitor/releases/download/v${VER}/geoatlas-${VER}.tar.gz"
-curl -fLO "https://github.com/varlahin-gena/network_monitor/releases/download/v${VER}/geoatlas-${VER}.tar.gz.sha256"
+curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz"
+curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz.sha256"
 sha256sum -c "geoatlas-${VER}.tar.gz.sha256"
 
 tar -xzf "geoatlas-${VER}.tar.gz"
-sudo ./geoatlas-${VER}/update.sh --package "$PWD/geoatlas-${VER}.tar.gz" --project-dir /opt/network-monitor
+sudo ./geoatlas-${VER}/update.sh --package "$PWD/geoatlas-${VER}.tar.gz" --project-dir /opt/geoatlas
 # если каталог с подчёркиванием:
-# sudo ./geoatlas-${VER}/update.sh --package "$PWD/geoatlas-${VER}.tar.gz" --project-dir /opt/network_monitor
+# sudo ./geoatlas-${VER}/update.sh --package "$PWD/geoatlas-${VER}.tar.gz" --project-dir /opt/geoatlas
 ```
 
 Если `update.sh` уже есть в каталоге установки:
@@ -767,10 +767,10 @@ sudo ./geoatlas-${VER}/update.sh --package "$PWD/geoatlas-${VER}.tar.gz" --proje
 ```bash
 cd /tmp
 # … скачать и sha256sum -c, как выше …
-sudo /opt/network-monitor/update.sh ./geoatlas-${VER}.tar.gz
+sudo /opt/geoatlas/update.sh ./geoatlas-${VER}.tar.gz
 ```
 
-Полезные опции: `--no-start`, `--no-stop`, `--project-dir DIR`. Контрольная сумма: файл `.sha256` рядом с tar.gz или `NM_INSTALL_PACKAGE_SHA256=<hex>`.
+Полезные опции: `--no-start`, `--no-stop`, `--project-dir DIR`. Контрольная сумма: файл `.sha256` рядом с tar.gz или `GA_INSTALL_PACKAGE_SHA256=<hex>`.
 
 Остановка при обновлении не требует реальных секретов (`compose down` с заглушками в процессе). `./start.sh` по-прежнему читает `.env` и не стартует без `CLICKHOUSE_PASSWORD` / токенов.
 
@@ -779,7 +779,7 @@ sudo /opt/network-monitor/update.sh ./geoatlas-${VER}.tar.gz
 ```bash
 tar -xzf geoatlas-${VER}.tar.gz
 cd geoatlas-${VER}
-sudo NM_INSTALL_SOURCE=package NM_INSTALL_PACKAGE="$PWD" ./deploy/ubuntu/install_ubuntu.sh
+sudo GA_INSTALL_SOURCE=package GA_INSTALL_PACKAGE="$PWD" ./deploy/ubuntu/install_ubuntu.sh
 # Oracle Linux / RHEL: ./deploy/oracle_linux/install_oraclelinux.sh
 ```
 
@@ -794,19 +794,19 @@ sudo ./deploy/oracle_linux/install_oraclelinux.sh
 #### Переключение: релиз → `main`
 
 ```bash
-cd /opt/network-monitor
+cd /opt/geoatlas
 ./stop.sh
 git fetch origin --tags
 git checkout main
 git pull --ff-only origin main
 
 # чтобы в меню УЗ отображалось «main»
-grep -q '^NM_INSTALL_SOURCE=' .env \
-  && sed -i 's/^NM_INSTALL_SOURCE=.*/NM_INSTALL_SOURCE=main/' .env \
-  || echo 'NM_INSTALL_SOURCE=main' >> .env
-grep -q '^NM_INSTALL_REF=' .env \
-  && sed -i 's/^NM_INSTALL_REF=.*/NM_INSTALL_REF=main/' .env \
-  || echo 'NM_INSTALL_REF=main' >> .env
+grep -q '^GA_INSTALL_SOURCE=' .env \
+  && sed -i 's/^GA_INSTALL_SOURCE=.*/GA_INSTALL_SOURCE=main/' .env \
+  || echo 'GA_INSTALL_SOURCE=main' >> .env
+grep -q '^GA_INSTALL_REF=' .env \
+  && sed -i 's/^GA_INSTALL_REF=.*/GA_INSTALL_REF=main/' .env \
+  || echo 'GA_INSTALL_REF=main' >> .env
 
 ./start.sh
 ```
@@ -816,7 +816,7 @@ grep -q '^NM_INSTALL_REF=' .env \
 Предпочтительнее пакет того релиза: `sudo ./update.sh /path/to/geoatlas-X.Y.Z.tar.gz`. Через git:
 
 ```bash
-cd /opt/network-monitor
+cd /opt/geoatlas
 ./stop.sh
 git fetch origin --tags
 
@@ -825,12 +825,12 @@ TAG=$(git tag -l 'v*' --sort=-v:refname | head -1)
 echo "Откат на $TAG"
 git checkout --force "$TAG"
 
-grep -q '^NM_INSTALL_SOURCE=' .env \
-  && sed -i "s/^NM_INSTALL_SOURCE=.*/NM_INSTALL_SOURCE=release/" .env \
-  || echo 'NM_INSTALL_SOURCE=release' >> .env
-grep -q '^NM_INSTALL_REF=' .env \
-  && sed -i "s/^NM_INSTALL_REF=.*/NM_INSTALL_REF=${TAG}/" .env \
-  || echo "NM_INSTALL_REF=${TAG}" >> .env
+grep -q '^GA_INSTALL_SOURCE=' .env \
+  && sed -i "s/^GA_INSTALL_SOURCE=.*/GA_INSTALL_SOURCE=release/" .env \
+  || echo 'GA_INSTALL_SOURCE=release' >> .env
+grep -q '^GA_INSTALL_REF=' .env \
+  && sed -i "s/^GA_INSTALL_REF=.*/GA_INSTALL_REF=${TAG}/" .env \
+  || echo "GA_INSTALL_REF=${TAG}" >> .env
 
 ./start.sh
 ```
@@ -839,14 +839,14 @@ grep -q '^NM_INSTALL_REF=' .env \
 `./start.sh` пересоберёт образы и обновит `install-meta.json` (строка версии в меню пользователя).
 
 ---
-Проверка после обновления: `cat VERSION .nm-package`, `/api/ready`, вход admin, карта.
+Проверка после обновления: `cat VERSION .ga-package`, `/api/ready`, вход admin, карта.
 
 ### Пересборка образов
 
 Backend и stats-collector собираются из исходников. После изменения кода:
 
 ```bash
-cd /opt/network-monitor
+cd /opt/geoatlas
 docker compose build --no-cache backend stats-collector
 ./start.sh
 # или
@@ -881,16 +881,16 @@ Network,Country,Region,City,Latitude,Longitude
 Надёжнее положить CSV на сам хост и залить через API локально (нужен `API_AUTH_TOKEN` из `.env` или именованный токен scope **ops**/**admin**):
 
 ```bash
-cd /opt/network-monitor
+cd /opt/geoatlas
 # скопировать файл на сервер, например:
-# scp geoip.csv root@сервер:/opt/network-monitor/geoip.csv
+# scp geoip.csv root@сервер:/opt/geoatlas/geoip.csv
 
 set -a; . ./.env; set +a
 
 curl -sS -w "\nHTTP %{http_code}\n" \
   -H "Authorization: Bearer $API_AUTH_TOKEN" \
   -H "Content-Type: text/csv" \
-  --data-binary @/opt/network-monitor/geoip.csv \
+  --data-binary @/opt/geoatlas/geoip.csv \
   "http://127.0.0.1/upload-geo"
 # если UI на 8080 (full-auto): http://127.0.0.1:8080/upload-geo
 
@@ -960,7 +960,7 @@ Unit-тесты карты (репутация / heatmap focus / coords helpers)
 
 ГеоАтлас распространяется под [Apache License 2.0](LICENSE). Продукт бесплатный и общедоступный; релизы публикуются на GitHub.
 
-Баги, вопросы и заказ доработок — через [Issues](https://github.com/varlahin-gena/network_monitor/issues).
+Баги, вопросы и заказ доработок — через [Issues](https://github.com/varlahin-gena/geoatlas/issues).
 
 ## Безопасность
 
@@ -973,7 +973,7 @@ Unit-тесты карты (репутация / heatmap focus / coords helpers)
 - Одноразовый пароль admin: `.admin_password_once` (600), не stdout
 - UI за HTTPS при доступе из сети; не публиковать ClickHouse `8123`/`9000` и backend `1514`
 - ClickHouse `default`: networks loopback+RFC1918 (не `::/0`)
-- Syslog `:514` **без TLS/auth** — ограничьте источником МСЭ (`NM_SYSLOG_ALLOW_FROM` / Security Group / firewall)
+- Syslog `:514` **без TLS/auth** — ограничьте источником МСЭ (`GA_SYSLOG_ALLOW_FROM` / Security Group / firewall)
 - Ingest внутри docker: маркер с `INGEST_SHARED_SECRET` + `INGEST_ALLOW_FROM=syslog-ng` (HTTP upload API — без маркера)
 - Reputation URL-фиды: только публичные IPv4-хосты (private/metadata блокируются)
 - Установка и обновление: только `geoatlas-X.Y.Z.tar.gz` с GitHub Releases; проверяйте `.sha256` до `./update.sh`
@@ -981,10 +981,10 @@ Unit-тесты карты (репутация / heatmap focus / coords helpers)
 ## Структура репозитория
 
 ```
-network_monitor/
+geoatlas/
 ├── go.work                           # workspace: backend + stats-collector + pkg/chconn + pkg/syslogngstats
 ├── backend/                          # Go: API, парсеры, geoip, ingest
-│   ├── cmd/network-monitor/main.go
+│   ├── cmd/geoatlas/main.go
 │   ├── Dockerfile
 │   └── internal/
 │       ├── adapter/
@@ -1075,7 +1075,7 @@ network_monitor/
 **Генерируемые при установке (не в git). `update.sh` сохраняет runtime; `install-meta.json` заново пишет `./start.sh`:**
 
 ```
-/opt/network-monitor/
+/opt/geoatlas/
 ├── docker-compose.override.yml   # Лимиты по профилю
 ├── .env                          # COMPOSE_PROFILES, секреты, лимиты
 ├── .admin_password_once          # одноразовый пароль admin (если генерировали)

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"network_monitor/internal/model"
-	usecaseevents "network_monitor/internal/usecase/events"
+	"geoatlas/internal/model"
+	usecaseevents "geoatlas/internal/usecase/events"
 )
 
 func parseDays(v string) int {

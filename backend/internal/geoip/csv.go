@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 func ParseNetworkField(network string) (uint32, uint32, bool) {

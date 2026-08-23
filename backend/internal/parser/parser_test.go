@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 // ============================================================
@@ -58,7 +58,7 @@ func checkTL(t *testing.T, name string, got model.TrafficLog, w tlWant) {
 	eqU64("packets_recv", got.PacketsRecv, w.pktRecv)
 }
 
-// testRegistry — тот же порядок парсеров, что и в cmd/network-monitor/main.go.
+// testRegistry — тот же порядок парсеров, что и в cmd/geoatlas/main.go.
 func testRegistry() *Registry {
 	return NewRegistry(
 		&UserGateCEF{},

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"network_monitor/internal/model"
-	"network_monitor/internal/parser"
+	"geoatlas/internal/model"
+	"geoatlas/internal/parser"
 )
 
 type registryParser struct{ reg *parser.Registry }

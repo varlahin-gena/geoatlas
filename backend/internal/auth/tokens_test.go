@@ -24,7 +24,7 @@ func TestTokenStoreCreateVerifyRevoke(t *testing.T) {
 	if !ok || scope != ScopeOps {
 		t.Fatalf("verify got %q ok=%v", scope, ok)
 	}
-	if _, ok := s.Verify("nm_wrong"); ok {
+	if _, ok := s.Verify("ga_wrong"); ok {
 		t.Fatal("expected reject")
 	}
 	if err := s.Revoke(pub.ID); err != nil {

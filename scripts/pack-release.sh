@@ -27,7 +27,7 @@ mkdir -p "$OUT_DIR"
 OUT_DIR="$(cd "$OUT_DIR" && pwd)"
 OUT="${OUT_DIR}/${TARBALL_NAME}"
 
-stage="$(mktemp -d "${TMPDIR:-/tmp}/nm-pack.XXXXXX")"
+stage="$(mktemp -d "${TMPDIR:-/tmp}/ga-pack.XXXXXX")"
 cleanup() { rm -rf "$stage"; }
 trap cleanup EXIT
 
@@ -44,7 +44,7 @@ done < <({ git diff -z --name-only HEAD; git ls-files -z --others --exclude-stan
 
 [[ -f "${stage}/${PREFIX}/start.sh" ]] || fail "в staging нет start.sh"
 
-cat >"${stage}/${PREFIX}/.nm-package" <<EOF
+cat >"${stage}/${PREFIX}/.ga-package" <<EOF
 product=geoatlas
 version=${VERSION}
 format=1

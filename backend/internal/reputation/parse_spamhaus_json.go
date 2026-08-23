@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 // ParseSpamhausJSON читает DROP JSON (NDJSON или JSON-массив).

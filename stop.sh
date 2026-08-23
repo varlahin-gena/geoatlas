@@ -28,9 +28,9 @@ stop_stack() {
     log "Остановка стека Docker Compose..."
     if [[ "$REMOVE_DOCKER_VOLUMES" == "1" ]]; then
         log "ВНИМАНИЕ: REMOVE_DOCKER_VOLUMES=1 — данные ClickHouse будут УДАЛЕНЫ!"
-        nm_compose "$SCRIPT_DIR" down -v --remove-orphans
+        ga_compose "$SCRIPT_DIR" down -v --remove-orphans
     else
-        nm_compose "$SCRIPT_DIR" down --remove-orphans
+        ga_compose "$SCRIPT_DIR" down --remove-orphans
         log "Docker volumes сохранены (удалить: REMOVE_DOCKER_VOLUMES=1)."
     fi
 }

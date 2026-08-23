@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"network_monitor/internal/adapter/httpapi/loginthrottle"
-	usecaseaudit "network_monitor/internal/usecase/auditlog"
+	"geoatlas/internal/adapter/httpapi/loginthrottle"
+	usecaseaudit "geoatlas/internal/usecase/auditlog"
 )
 
 func actorFromRequest(r *http.Request) string {

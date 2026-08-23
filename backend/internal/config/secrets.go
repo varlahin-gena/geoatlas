@@ -19,11 +19,11 @@ var (
 )
 
 // ValidateSecurity проверяет секреты перед стартом.
-// Legacy placeholders, короткие секреты и флаги *_DISABLED запрещены без NM_ALLOW_INSECURE=1.
+// Legacy placeholders, короткие секреты и флаги *_DISABLED запрещены без GA_ALLOW_INSECURE=1.
 // Слабые seed-пароли (литерал admin) не блокируют старт — у них must_reset_password;
 // см. SecurityWarnings.
 func (c Config) ValidateSecurity() error {
-	allowInsecure := envBool("NM_ALLOW_INSECURE", false)
+	allowInsecure := envBool("GA_ALLOW_INSECURE", false)
 
 	if (c.APIAuthDisabled || c.AuthDisabled) && !allowInsecure {
 		which := "AUTH_DISABLED"
@@ -32,16 +32,16 @@ func (c Config) ValidateSecurity() error {
 		} else if c.APIAuthDisabled {
 			which = "API_AUTH_DISABLED"
 		}
-		return fmt.Errorf("%s requires NM_ALLOW_INSECURE=1 (local/dev only)", which)
+		return fmt.Errorf("%s requires GA_ALLOW_INSECURE=1 (local/dev only)", which)
 	}
 
 	if !c.APIAuthDisabled {
 		token := strings.TrimSpace(c.APIAuthToken)
 		if token == "" {
-			return fmt.Errorf("API_AUTH_TOKEN is required; set API_AUTH_DISABLED=1 only for local/dev (with NM_ALLOW_INSECURE=1)")
+			return fmt.Errorf("API_AUTH_TOKEN is required; set API_AUTH_DISABLED=1 only for local/dev (with GA_ALLOW_INSECURE=1)")
 		}
 		if !allowInsecure && isListed(token, insecureAPIAuthTokens) {
-			return fmt.Errorf("API_AUTH_TOKEN is a known insecure legacy placeholder; generate via start.sh or set a unique token (NM_ALLOW_INSECURE=1 to override)")
+			return fmt.Errorf("API_AUTH_TOKEN is a known insecure legacy placeholder; generate via start.sh or set a unique token (GA_ALLOW_INSECURE=1 to override)")
 		}
 		if err := requireMinSecretLen("API_AUTH_TOKEN", token, allowInsecure); err != nil {
 			return err
@@ -63,7 +63,7 @@ func (c Config) ValidateSecurity() error {
 			return fmt.Errorf("SESSION_SECRET is required when AUTH_DISABLED is not set")
 		}
 		if !allowInsecure && isListed(secret, insecureSessionSecrets) {
-			return fmt.Errorf("SESSION_SECRET is a known insecure legacy placeholder; generate via start.sh (NM_ALLOW_INSECURE=1 to override)")
+			return fmt.Errorf("SESSION_SECRET is a known insecure legacy placeholder; generate via start.sh (GA_ALLOW_INSECURE=1 to override)")
 		}
 		if err := requireMinSecretLen("SESSION_SECRET", secret, allowInsecure); err != nil {
 			return err
@@ -72,7 +72,7 @@ func (c Config) ValidateSecurity() error {
 
 	ingestSecret := strings.TrimSpace(c.IngestSharedSecret)
 	if ingestSecret == "" && !allowInsecure {
-		return fmt.Errorf("INGEST_SHARED_SECRET is required; generate via start.sh (NM_ALLOW_INSECURE=1 to override for local/dev)")
+		return fmt.Errorf("INGEST_SHARED_SECRET is required; generate via start.sh (GA_ALLOW_INSECURE=1 to override for local/dev)")
 	}
 	if ingestSecret != "" {
 		if err := requireMinSecretLen("INGEST_SHARED_SECRET", ingestSecret, allowInsecure); err != nil {
@@ -82,7 +82,7 @@ func (c Config) ValidateSecurity() error {
 
 	chPass := strings.TrimSpace(c.ClickHousePassword)
 	if chPass == "" && !allowInsecure {
-		return fmt.Errorf("CLICKHOUSE_PASSWORD is required; generate via start.sh (NM_ALLOW_INSECURE=1 to override for local/dev)")
+		return fmt.Errorf("CLICKHOUSE_PASSWORD is required; generate via start.sh (GA_ALLOW_INSECURE=1 to override for local/dev)")
 	}
 	if chPass != "" {
 		if err := requireMinSecretLen("CLICKHOUSE_PASSWORD", chPass, allowInsecure); err != nil {
@@ -114,12 +114,12 @@ func requireMinSecretLen(name, value string, allowInsecure bool) error {
 	if allowInsecure || len(value) >= minSecretLen {
 		return nil
 	}
-	return fmt.Errorf("%s must be at least %d characters (got %d); generate via start.sh (NM_ALLOW_INSECURE=1 to override)", name, minSecretLen, len(value))
+	return fmt.Errorf("%s must be at least %d characters (got %d); generate via start.sh (GA_ALLOW_INSECURE=1 to override)", name, minSecretLen, len(value))
 }
 
 // SecurityWarnings — нефатальные замечания (слабые seed-пароли).
 func (c Config) SecurityWarnings() []string {
-	if c.AuthDisabled || envBool("NM_ALLOW_INSECURE", false) {
+	if c.AuthDisabled || envBool("GA_ALLOW_INSECURE", false) {
 		return nil
 	}
 	var out []string

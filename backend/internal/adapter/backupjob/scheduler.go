@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	usecasebackup "network_monitor/internal/usecase/backup"
+	usecasebackup "geoatlas/internal/usecase/backup"
 )
 
 // Runner — минимум для автобэкапа.

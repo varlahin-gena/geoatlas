@@ -51,7 +51,7 @@ export async function installSessionMocks(
     await route.fulfill({
       status: 200,
       contentType: 'application/javascript',
-      body: 'window.NM_CONFIG={};',
+      body: 'window.GA_CONFIG={};',
     });
   });
 
@@ -169,7 +169,7 @@ export async function installSessionMocks(
 export async function seedCsrf(page: Page) {
   await page.context().addCookies([
     {
-      name: 'nm_csrf',
+      name: 'ga_csrf',
       value: CSRF,
       domain: '127.0.0.1',
       path: '/',

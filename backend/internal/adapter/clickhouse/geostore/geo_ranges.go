@@ -13,8 +13,8 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 
-	"network_monitor/internal/geoip"
-	"network_monitor/internal/model"
+	"geoatlas/internal/geoip"
+	"geoatlas/internal/model"
 )
 
 const geoRangesInsertBatchSize = 25_000

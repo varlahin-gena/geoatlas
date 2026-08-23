@@ -3,7 +3,7 @@ package sqlclause
 import (
 	"fmt"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 // ActionWhereSQL — WHERE-фрагмент фильтрации по action (пустая строка = all).

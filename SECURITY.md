@@ -4,10 +4,10 @@
 
 ## Как сообщить
 
-Откройте [приватный advisory](https://github.com/varlahin-gena/network_monitor/security/advisories/new) в этом репозитории.
+Откройте [приватный advisory](https://github.com/varlahin-gena/geoatlas/security/advisories/new) в этом репозитории.
 
 В отчёте желательно:
-- затронутая версия (`GET /api/system/version` или `VERSION` / `.nm-package` из пакета `geoatlas-X.Y.Z.tar.gz`);
+- затронутая версия (`GET /api/system/version` или `VERSION` / `.ga-package` из пакета `geoatlas-X.Y.Z.tar.gz`);
 - шаги воспроизведения или PoC (без массового сканирования чужих установок);
 - ожидаемый и фактический эффект (обход auth, утечка данных, RCE и т.п.).
 
@@ -35,9 +35,9 @@
 
 **Не скоуп** (не уязвимости ГеоАтласа, пока не просим «исправить как CVE»):
 
-- известные ограничения продукта: syslog на `:514` без TLS/auth (рекомендуется host firewall / `NM_SYSLOG_ALLOW_FROM`), IPv4-only, at-most-once ingest (drops при переполнении) — см. README;
+- известные ограничения продукта: syslog на `:514` без TLS/auth (рекомендуется host firewall / `GA_SYSLOG_ALLOW_FROM`), IPv4-only, at-most-once ingest (drops при переполнении) — см. README;
 - CVE ClickHouse, syslog-ng, nginx, Docker, ядра хоста — кроме случая, когда в compose/Dockerfile сознательно закреплён уязвимый тег и его можно поднять;
-- отключённая защита (`AUTH_DISABLED`, `API_AUTH_DISABLED`, `NM_ALLOW_INSECURE`, `NM_ALLOW_MULTI_INSTANCE`);
+- отключённая защита (`AUTH_DISABLED`, `API_AUTH_DISABLED`, `GA_ALLOW_INSECURE`, `GA_ALLOW_MULTI_INSTANCE`);
 - учётные записи с паролем по умолчанию после того, как `must_reset_password` уже можно было сменить;
 - DoS нагрузкой выше заявленного профиля EPS.
 

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	usecasereputation "network_monitor/internal/usecase/reputation"
+	usecasereputation "geoatlas/internal/usecase/reputation"
 )
 
 func TestLoadOrSeedAndSave(t *testing.T) {

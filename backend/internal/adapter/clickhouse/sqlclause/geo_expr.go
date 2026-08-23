@@ -4,7 +4,7 @@ import "fmt"
 
 // GeoEnrichIPTable — ephemeral IP→geo lookup для rebuild geo-edges без ALTER UPDATE
 // на traffic_logs. Заполняется EnrichLogsMissingGeo, читается INSERT SELECT.
-const GeoEnrichIPTable = "nm_geo_enrich_ip"
+const GeoEnrichIPTable = "ga_geo_enrich_ip"
 
 const (
 	IPEdgesDailyTable  = "traffic_edges_daily"
@@ -33,7 +33,7 @@ func CityNeedsSQL(col string) string {
 	return fmt.Sprintf(`(%[1]s = '' OR lower(%[1]s) IN ('unknown', 'неизвестно'))`, col)
 }
 
-// TrafficLogsEnrichedFromSQL — FROM-подзапрос: traffic_logs + LEFT JOIN nm_geo_enrich_ip.
+// TrafficLogsEnrichedFromSQL — FROM-подзапрос: traffic_logs + LEFT JOIN ga_geo_enrich_ip.
 // Исторические дыры закрываются на чтении без ALTER UPDATE.
 // Пустая lookup-таблица → поведение как FROM traffic_logs.
 func TrafficLogsEnrichedFromSQL(wherePred string) string {
@@ -80,7 +80,7 @@ func TrafficLogsEnrichedFromSQL(wherePred string) string {
 		CityNeedsSQL("traffic_logs.src_city"), CityNeedsSQL("traffic_logs.dst_city"))
 }
 
-// MapLogsFromSQL — FROM для скана карты. Live traffic_logs — с overlay nm_geo_enrich_ip.
+// MapLogsFromSQL — FROM для скана карты. Live traffic_logs — с overlay ga_geo_enrich_ip.
 func MapLogsFromSQL(logsTable, wherePred string) string {
 	if logsTable == "traffic_logs" {
 		return TrafficLogsEnrichedFromSQL(wherePred)

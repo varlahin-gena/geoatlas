@@ -3,7 +3,7 @@ package geojob
 import (
 	"context"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 // Store — порт maintenance/backfill (реализация: *clickhouse.MaintenanceStore).

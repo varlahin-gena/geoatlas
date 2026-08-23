@@ -5,8 +5,8 @@ import (
 	"errors"
 	"net/http"
 
-	"network_monitor/internal/auth"
-	usecaseaudit "network_monitor/internal/usecase/auditlog"
+	"geoatlas/internal/auth"
+	usecaseaudit "geoatlas/internal/usecase/auditlog"
 )
 
 // APITokensHandler — CRUD именованных Bearer-токенов со scope.

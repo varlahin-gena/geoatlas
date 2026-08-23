@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"network_monitor/internal/apperr"
+	"geoatlas/internal/apperr"
 )
 
 func (h *GeoHandler) UploadGeo(w http.ResponseWriter, r *http.Request) {

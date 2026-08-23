@@ -1,9 +1,9 @@
 /// <reference types="vite/client" />
 
-interface NmConfig {
+interface GaConfig {
   apiAuthToken?: string;
 }
 
 interface Window {
-  NM_CONFIG?: NmConfig;
+  GA_CONFIG?: GaConfig;
 }

@@ -10,8 +10,7 @@ import (
 )
 
 var commToTarget = map[string]string{
-	"network-monitor": "backend",
-	"network-monito":  "backend",
+	"geoatlas": "backend",
 	"clickhouse-serv": "clickhouse",
 	"clickhouse":      "clickhouse",
 	"syslog-ng":       "syslog-ng",

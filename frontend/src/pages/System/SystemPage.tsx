@@ -59,8 +59,8 @@ export default function SystemPage() {
 
   useEffect(() => {
     const onTheme = () => setThemeTick((n) => n + 1);
-    document.addEventListener('nm-theme-change', onTheme);
-    return () => document.removeEventListener('nm-theme-change', onTheme);
+    document.addEventListener('ga-theme-change', onTheme);
+    return () => document.removeEventListener('ga-theme-change', onTheme);
   }, []);
 
   async function saveRetention(e: FormEvent) {
@@ -141,7 +141,7 @@ export default function SystemPage() {
 
   return (
     <AdminLayout
-      className="nm-system"
+      className="ga-system"
       title="Мониторинг системы"
       subtitle="pipeline / containers / storage"
       mainClassName="content"

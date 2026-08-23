@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 // NormalizeRanges сортирует диапазоны и отбрасывает пересекающиеся / вложенные.

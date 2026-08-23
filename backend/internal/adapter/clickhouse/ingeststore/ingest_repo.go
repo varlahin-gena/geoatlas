@@ -5,8 +5,8 @@ import (
 
 	ch "github.com/ClickHouse/clickhouse-go/v2"
 
-	"network_monitor/internal/model"
-	usecaseingest "network_monitor/internal/usecase/ingest"
+	"geoatlas/internal/model"
+	usecaseingest "geoatlas/internal/usecase/ingest"
 )
 
 // IngestRepository реализует insert-порты usecase/ingest.

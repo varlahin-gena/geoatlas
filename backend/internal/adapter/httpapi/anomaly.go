@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	usecaseanomaly "network_monitor/internal/usecase/anomaly"
+	usecaseanomaly "geoatlas/internal/usecase/anomaly"
 )
 
 type AnomalyHandler struct{ *AnomalyDeps }

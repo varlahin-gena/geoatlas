@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"network_monitor/internal/adapter/parseradapter"
-	"network_monitor/internal/model"
-	"network_monitor/internal/parser"
-	usecaseingest "network_monitor/internal/usecase/ingest"
+	"geoatlas/internal/adapter/parseradapter"
+	"geoatlas/internal/model"
+	"geoatlas/internal/parser"
+	usecaseingest "geoatlas/internal/usecase/ingest"
 )
 
 func testLineParser() usecaseingest.LineParser {

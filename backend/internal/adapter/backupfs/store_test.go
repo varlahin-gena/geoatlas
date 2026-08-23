@@ -33,7 +33,7 @@ func TestWriteAuthTarballSkipsSymlinkEscape(t *testing.T) {
 	}
 
 	store := New(backups)
-	name := "nm-20260101T000000Z"
+	name := "ga-20260101T000000Z"
 	if err := store.WriteAuthTarball(name, data); err != nil {
 		t.Fatal(err)
 	}
@@ -86,12 +86,12 @@ func TestWriteAuthTarballSkipsSnapLockTmp(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(data, "users.json.tmp"), []byte("tmp"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(data, ".nm_backend.lock"), []byte("1\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(data, ".ga_backend.lock"), []byte("1\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
 	store := New(backups)
-	name := "nm-20260101T000000Z"
+	name := "ga-20260101T000000Z"
 	if err := store.WriteAuthTarball(name, data); err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestWriteAuthTarballSkipsSnapLockTmp(t *testing.T) {
 		}
 		base := filepath.Base(hdr.Name)
 		switch base {
-		case "geo_index.snap", "users.json.tmp", ".nm_backend.lock":
+		case "geo_index.snap", "users.json.tmp", ".ga_backend.lock":
 			t.Fatalf("control-plane cache leaked into auth tarball: %s", hdr.Name)
 		case "users.json":
 			seenUsers = true
@@ -129,26 +129,26 @@ func TestWriteAuthTarballSkipsSnapLockTmp(t *testing.T) {
 }
 
 func TestParseBackupNameTimeOffset(t *testing.T) {
-	tUTC, ok := parseBackupNameTime("nm-20260811T072119Z")
+	tUTC, ok := parseBackupNameTime("ga-20260811T072119Z")
 	if !ok || !tUTC.Equal(time.Date(2026, 8, 11, 7, 21, 19, 0, time.UTC)) {
 		t.Fatalf("utc: ok=%v t=%v", ok, tUTC)
 	}
-	tOff, ok := parseBackupNameTime("nm-20260811T102119+0300")
+	tOff, ok := parseBackupNameTime("ga-20260811T102119+0300")
 	if !ok || !tOff.Equal(time.Date(2026, 8, 11, 7, 21, 19, 0, time.UTC)) {
 		t.Fatalf("offset: ok=%v t=%v", ok, tOff)
 	}
-	if !nameRe.MatchString("nm-20260811T102119+0300") {
-		t.Fatal("regex should accept offset name")
+	if !nameRe.MatchString("ga-20260811T102119+0300") {
+		t.Fatal("regex should accept ga offset name")
 	}
-	if !nameRe.MatchString("nm-20260811T072119Z") {
-		t.Fatal("regex should accept legacy Z name")
+	if !nameRe.MatchString("ga-20260811T072119Z") {
+		t.Fatal("regex should accept ga UTC name")
 	}
 }
 
 func TestWriteSourceAndList(t *testing.T) {
 	root := t.TempDir()
 	store := New(root)
-	name := "nm-20260101T120000Z"
+	name := "ga-20260101T120000Z"
 	if err := os.MkdirAll(filepath.Join(root, name), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +173,7 @@ func TestWriteSourceAndList(t *testing.T) {
 func TestAttachedMarkerAndDelete(t *testing.T) {
 	root := t.TempDir()
 	store := New(root)
-	name := "nm-20260101T000000Z"
+	name := "ga-20260101T000000Z"
 	if err := os.MkdirAll(filepath.Join(root, name), 0o755); err != nil {
 		t.Fatal(err)
 	}

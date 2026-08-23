@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	usecaseanomaly "network_monitor/internal/usecase/anomaly"
+	usecaseanomaly "geoatlas/internal/usecase/anomaly"
 )
 
 func TestDisplayIP(t *testing.T) {

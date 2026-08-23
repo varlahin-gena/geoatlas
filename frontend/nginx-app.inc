@@ -34,7 +34,7 @@
 
     # Токен для мутирующих запросов UI (пишется entrypoint'ом контейнера).
     location = /config.js {
-        alias /tmp/nm-config.js;
+        alias /tmp/ga-config.js;
         default_type application/javascript;
         add_header Cache-Control "no-store" always;
         include /etc/nginx/includes/security-headers.inc;
@@ -276,7 +276,7 @@
         try_files $uri =404;
     }
 
-    # Vite source maps are not published (build sourcemap off unless NM_SOURCEMAP=1).
+    # Vite source maps are not published (build sourcemap off unless GA_SOURCEMAP=1).
     location ~* \.map$ {
         return 404;
     }

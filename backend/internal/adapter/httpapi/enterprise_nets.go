@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"network_monitor/internal/model"
-	usecasegeo "network_monitor/internal/usecase/geo"
+	"geoatlas/internal/model"
+	usecasegeo "geoatlas/internal/usecase/geo"
 )
 
 type enterpriseNetDTO struct {

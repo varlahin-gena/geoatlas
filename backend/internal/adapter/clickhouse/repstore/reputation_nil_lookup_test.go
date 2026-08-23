@@ -3,8 +3,8 @@ package repstore_test
 import (
 	"testing"
 
-	"network_monitor/internal/adapter/clickhouse/repstore"
-	"network_monitor/internal/model"
+	"geoatlas/internal/adapter/clickhouse/repstore"
+	"geoatlas/internal/model"
 )
 
 func TestReloadableReputationIndexLookupNilReceiver(t *testing.T) {

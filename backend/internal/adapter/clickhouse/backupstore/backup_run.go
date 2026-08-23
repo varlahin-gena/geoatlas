@@ -8,7 +8,7 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
-	"network_monitor/internal/adapter/clickhouse/query"
+	"geoatlas/internal/adapter/clickhouse/query"
 )
 
 // BackupRunner — native BACKUP TABLE … TO Disk('backups', name).
@@ -121,7 +121,7 @@ func (r *BackupRunner) RestoreTablesAs(ctx context.Context, name string, pairs [
 	return nil
 }
 
-// RestoreMapShadow — RESTORE live-таблиц карты в nm_bak_* (имена из query.MapShadowPairs).
+// RestoreMapShadow — RESTORE live-таблиц карты в ga_bak_* (имена из query.MapShadowPairs).
 func (r *BackupRunner) RestoreMapShadow(ctx context.Context, name string) error {
 	return r.RestoreTablesAs(ctx, name, query.MapShadowPairs())
 }

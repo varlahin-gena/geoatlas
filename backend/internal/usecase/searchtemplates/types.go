@@ -5,7 +5,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"network_monitor/internal/apperr"
+	"geoatlas/internal/apperr"
 )
 
 const (

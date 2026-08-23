@@ -88,10 +88,10 @@ export function UserMenu() {
   const roleRu = user.role === ROLE_ADMIN ? 'Администратор' : 'Оператор';
 
   return (
-    <div className={`nm-user-menu${open ? ' open' : ''}`} ref={ref}>
+    <div className={`ga-user-menu${open ? ' open' : ''}`} ref={ref}>
       <button
         type="button"
-        className="nm-user-menu-trigger"
+        className="ga-user-menu-trigger"
         aria-haspopup="menu"
         aria-expanded={open}
         title={
@@ -104,27 +104,27 @@ export function UserMenu() {
           setOpen((v) => !v);
         }}
       >
-        <span className="nm-user-name">{displayName}</span>
-        <svg className="nm-user-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <span className="ga-user-name">{displayName}</span>
+        <svg className="ga-user-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M6 9l6 6 6-6" />
         </svg>
       </button>
-      <div className="nm-user-menu-dropdown" role="menu">
-        <div className="nm-user-menu-meta">
-          <div className="nm-meta-name">{displayName}</div>
-          <div className="nm-meta-role">
+      <div className="ga-user-menu-dropdown" role="menu">
+        <div className="ga-user-menu-meta">
+          <div className="ga-meta-name">{displayName}</div>
+          <div className="ga-meta-role">
             {fio ? `@${user.username} · ` : ''}
             {roleRu}
           </div>
           {versionText ? (
-            <div className="nm-meta-version" title={versionTitle}>
+            <div className="ga-meta-version" title={versionTitle}>
               {versionText}
             </div>
           ) : null}
         </div>
         <button
           type="button"
-          className="nm-user-menu-item"
+          className="ga-user-menu-item"
           role="menuitem"
           onClick={(e) => {
             e.stopPropagation();
@@ -132,12 +132,12 @@ export function UserMenu() {
           }}
         >
           <span>Тема</span>
-          <span className="nm-theme-value">{themeLabel(theme)}</span>
+          <span className="ga-theme-value">{themeLabel(theme)}</span>
         </button>
-        <div className="nm-user-menu-sep" />
+        <div className="ga-user-menu-sep" />
         <button
           type="button"
-          className="nm-user-menu-item danger"
+          className="ga-user-menu-item danger"
           role="menuitem"
           title="Инвалидирует сессии на всех устройствах"
           onClick={(e) => {
@@ -157,7 +157,7 @@ export function UserMenu() {
         </button>
         <button
           type="button"
-          className="nm-user-menu-item danger"
+          className="ga-user-menu-item danger"
           role="menuitem"
           onClick={(e) => {
             e.stopPropagation();

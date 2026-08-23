@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 // ReadCSV ожидает колонки Network,List,Category.

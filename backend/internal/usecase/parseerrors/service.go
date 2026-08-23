@@ -5,8 +5,8 @@ import (
 	"errors"
 	"strings"
 
-	"network_monitor/internal/apperr"
-	"network_monitor/internal/model"
+	"geoatlas/internal/apperr"
+	"geoatlas/internal/model"
 )
 
 // Repository — журнал ошибок парсинга.

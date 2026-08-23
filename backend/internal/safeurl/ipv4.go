@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"network_monitor/internal/netutil"
+	"geoatlas/internal/netutil"
 )
 
 const MaxRedirects = 3

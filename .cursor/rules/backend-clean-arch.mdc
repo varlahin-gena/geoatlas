@@ -11,7 +11,7 @@ New backend features follow the Events/Geo/Ingest/System/Auth/ParseTest/Bootstra
 ## Layers
 
 ```
-cmd/network-monitor     → composition root (wire only)
+cmd/geoatlas     → composition root (wire only)
 internal/adapter/httpapi → HTTP: parse request → usecase → JSON (cookies/CSRF helpers here)
 internal/usecase/<mod>  → application logic + ports (interfaces)
 internal/adapter/*      → ClickHouse (SQL/DDL SoT), geojob, parser, geoip reload, live ingest, bootstrap
@@ -26,7 +26,7 @@ internal/mapagg         → map edge/node aggregation
 - Ports live in `usecase/<mod>` (or adjacent `ports.go`); adapters implement them under `internal/adapter/`.
 - HTTP handlers in `adapter/httpapi` stay thin: no ClickHouse conn, no SQL, no map/geo/ingest/auth orchestration beyond cookies/CSRF.
 - Cookie/CSRF helpers live in `adapter/httpapi`; `auth` keeps CookieName/CSRF* constants and SessionManager.Issue/Parse/TTL.
-- Wire new services in `cmd/network-monitor/main.go`, pass usecases into `httpapi.NewDeps` / `NewServer`.
+- Wire new services in `cmd/geoatlas/main.go`, pass usecases into `httpapi.NewDeps` / `NewServer`.
 - Prefer domain types from `model` directly.
 - SQL/DDL SoT: `adapter/clickhouse` (+ `migrate` / `query` / `sqlclause` / `aggstate`).
 - Startup Ensure*/Backfill belongs in `usecase/bootstrap` (+ `adapter/bootstrapadapter`); geo jobs under `adapter/geojob`.
@@ -43,7 +43,7 @@ out, err := h.eventsUC.GetMap(ctx, events.GetMapInput{...})
 
 ```go
 // ❌ BAD — usecase imports adapter
-import "network_monitor/internal/adapter/clickhouse"
+import "geoatlas/internal/adapter/clickhouse"
 
 // ✅ GOOD — usecase defines a port
 type TrafficRepository interface {

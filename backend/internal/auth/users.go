@@ -14,7 +14,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"network_monitor/internal/fileatomic"
+	"geoatlas/internal/fileatomic"
 )
 
 var (

@@ -4,7 +4,7 @@ import (
 	"net"
 	"strings"
 
-	"network_monitor/internal/geoip"
+	"geoatlas/internal/geoip"
 )
 
 // ParseNetworkField — CIDR / a-b / single IPv4 (тот же контракт, что geoip).

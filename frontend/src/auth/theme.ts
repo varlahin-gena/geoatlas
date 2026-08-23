@@ -22,7 +22,7 @@ function applyTheme(theme: Theme): Theme {
   } catch {
     /* ignore */
   }
-  document.dispatchEvent(new CustomEvent('nm-theme-change', { detail: { theme: t } }));
+  document.dispatchEvent(new CustomEvent('ga-theme-change', { detail: { theme: t } }));
   return t;
 }
 

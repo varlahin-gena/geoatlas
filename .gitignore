@@ -21,7 +21,7 @@ certs/*
 /geoip.csv
 *.auth.tgz
 geo_index.snap
-.nm-package
+.ga-package
 
 # Локальные инструменты разработки
 dist/
@@ -31,8 +31,8 @@ backend/.gotmp/
 *.exe
 *.test
 __debug_bin*
-/network-monitor
-/backend/network-monitor
+/geoatlas
+/backend/geoatlas
 /stats-collector/stats-collector
 coverage/
 coverage.out

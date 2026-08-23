@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"network_monitor/internal/mapsearch"
+	"geoatlas/internal/mapsearch"
 )
 
 func TestMapSearchSQLAdvancedAND(t *testing.T) {

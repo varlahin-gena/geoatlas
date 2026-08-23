@@ -8,7 +8,7 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 // ScanGeoMissingIPsForTimeRange — лёгкий отчёт: IP с нулевыми lat/lon в логах.

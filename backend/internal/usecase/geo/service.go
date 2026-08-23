@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"network_monitor/internal/apperr"
-	"network_monitor/internal/geoip"
-	"network_monitor/internal/mapagg"
-	"network_monitor/internal/model"
+	"geoatlas/internal/apperr"
+	"geoatlas/internal/geoip"
+	"geoatlas/internal/mapagg"
+	"geoatlas/internal/model"
 )
 
 // HeavySlot — общий слот тяжёлых задач (heavytask.Limiter).

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"network_monitor/internal/adapter/httpapi/authmw"
-	"network_monitor/internal/auth"
+	"geoatlas/internal/adapter/httpapi/authmw"
+	"geoatlas/internal/auth"
 )
 
 type ctxKey int

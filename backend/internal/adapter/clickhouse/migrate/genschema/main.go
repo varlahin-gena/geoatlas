@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"strings"
 
-	"network_monitor/internal/adapter/clickhouse/migrate"
+	"geoatlas/internal/adapter/clickhouse/migrate"
 )
 
 func main() {

@@ -7,17 +7,17 @@
 #
 # Опции:
 #   --package PATH     пакет (.tar.gz или каталог)
-#   --project-dir DIR  каталог установки (по умолчанию /opt/network-monitor)
+#   --project-dir DIR  каталог установки (по умолчанию /opt/geoatlas)
 #   --no-stop          не вызывать ./stop.sh
 #   --no-start         не вызывать ./start.sh после наложения
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 
-PROJECT_DIR="${NM_PROJECT_DIR:-/opt/network-monitor}"
+PROJECT_DIR="${GA_PROJECT_DIR:-/opt/geoatlas}"
 DO_STOP=1
 DO_START=1
-PACKAGE="${NM_INSTALL_PACKAGE:-}"
+PACKAGE="${GA_INSTALL_PACKAGE:-}"
 
 log() { echo "[$(date +'%F %T')] [update] $*"; }
 
@@ -32,7 +32,7 @@ usage() {
 
 Опции:
   --package PATH      tar.gz или распакованный каталог
-  --project-dir DIR   каталог установки (по умолчанию /opt/network-monitor)
+  --project-dir DIR   каталог установки (по умолчанию /opt/geoatlas)
   --no-stop           не останавливать стек
   --no-start          не запускать ./start.sh
   -h, --help          эта справка
@@ -112,7 +112,7 @@ parse_args() {
 # Остановка до наложения пакета. Берём compose.sh из *этого* архива:
 # установленный stop.sh ещё старый и падает на пустом CLICKHOUSE_PASSWORD.
 # Заглушки только в subshell — иначе docker compose up подхватит их вместо .env.
-nm_update_stop_stack() {
+ga_update_stop_stack() {
     local dir="$1"
     local compose="${SCRIPT_DIR}/deploy/common/compose.sh"
     log "Остановка стека…"
@@ -120,7 +120,7 @@ nm_update_stop_stack() {
         if (
             # shellcheck source=deploy/common/compose.sh
             source "$compose"
-            nm_compose "$dir" down --remove-orphans
+            ga_compose "$dir" down --remove-orphans
         ); then
             return 0
         fi
@@ -130,8 +130,8 @@ nm_update_stop_stack() {
         if (
             # shellcheck source=deploy/common/compose.sh
             [[ -f "$compose" ]] && source "$compose"
-            if declare -F _nm_compose_fill_stop_placeholders >/dev/null 2>&1; then
-                _nm_compose_fill_stop_placeholders "$dir"
+            if declare -F _ga_compose_fill_stop_placeholders >/dev/null 2>&1; then
+                _ga_compose_fill_stop_placeholders "$dir"
             fi
             "${dir}/stop.sh"
         ); then
@@ -149,9 +149,9 @@ resolve_default_package() {
     fi
     # Распакованный пакет: ./geoatlas-X.Y.Z/update.sh без аргументов.
     # Не брать сам каталог установки (/opt/...) — иначе «обновление» будет no-op.
-    if declare -F nm_package_looks_like_tree >/dev/null 2>&1 \
-        && nm_package_looks_like_tree "$SCRIPT_DIR"; then
-        if ! _nm_pkg_same_dir "$SCRIPT_DIR" "$PROJECT_DIR"; then
+    if declare -F ga_package_looks_like_tree >/dev/null 2>&1 \
+        && ga_package_looks_like_tree "$SCRIPT_DIR"; then
+        if ! _ga_pkg_same_dir "$SCRIPT_DIR" "$PROJECT_DIR"; then
             PACKAGE="$SCRIPT_DIR"
             log "Пакет не указан — используем каталог скрипта (${SCRIPT_DIR})."
             return 0
@@ -166,7 +166,7 @@ main() {
     require_root
 
     _source_helpers "$SCRIPT_DIR"
-    if ! declare -F nm_apply_install_payload >/dev/null 2>&1; then
+    if ! declare -F ga_apply_install_payload >/dev/null 2>&1; then
         echo "Не найден deploy/common/apply_package.sh рядом с update.sh." >&2
         exit 1
     fi
@@ -184,24 +184,24 @@ main() {
     local payload="$PACKAGE"
     local ver=""
 
-    ver="$(nm_package_read_version "$payload" || true)"
+    ver="$(ga_package_read_version "$payload" || true)"
     if [[ -n "$ver" ]]; then
         log "Версия пакета: ${ver}"
     fi
 
     if [[ "$DO_STOP" == "1" ]]; then
-        nm_update_stop_stack "$PROJECT_DIR"
+        ga_update_stop_stack "$PROJECT_DIR"
     fi
 
-    nm_apply_install_payload "$payload" "$PROJECT_DIR"
+    ga_apply_install_payload "$payload" "$PROJECT_DIR"
 
-    export NM_INSTALL_SOURCE=package
+    export GA_INSTALL_SOURCE=package
     if [[ -n "$ver" ]]; then
         export BRANCH="v${ver}"
-        export NM_INSTALL_IS_TAG=1
+        export GA_INSTALL_IS_TAG=1
     else
         export BRANCH="${BRANCH:-package}"
-        export NM_INSTALL_IS_TAG=0
+        export GA_INSTALL_IS_TAG=0
     fi
 
     if declare -F apply_install_source >/dev/null 2>&1; then

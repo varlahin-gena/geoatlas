@@ -11,7 +11,7 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: process.env.NM_SOURCEMAP === '1',
+    sourcemap: process.env.GA_SOURCEMAP === '1',
     rollupOptions: {
       output: {
         manualChunks: {

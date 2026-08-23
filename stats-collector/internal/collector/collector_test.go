@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"network_monitor/stats-collector/internal/config"
+	"geoatlas/stats-collector/internal/config"
 )
 
 func TestCollectHealthMetricsUp(t *testing.T) {

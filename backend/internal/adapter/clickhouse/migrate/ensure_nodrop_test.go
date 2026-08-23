@@ -7,7 +7,7 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
-	"network_monitor/internal/adapter/clickhouse/aggstate"
+	"geoatlas/internal/adapter/clickhouse/aggstate"
 )
 
 func TestEnsureEdgesAggNoDropWhenSchemaVersionErrors(t *testing.T) {

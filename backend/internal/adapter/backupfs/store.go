@@ -13,12 +13,12 @@ import (
 	"strings"
 	"time"
 
-	"network_monitor/internal/usecase/backup"
+	"geoatlas/internal/usecase/backup"
 )
 
-var nameRe = regexp.MustCompile(`^nm-\d{8}T\d{6}(Z|[+-]\d{4})$`)
+var nameRe = regexp.MustCompile(`^ga-\d{8}T\d{6}(?:Z|[+-]\d{4})$`)
 
-const attachedFile = ".nm-attached"
+const attachedFile = ".ga-attached"
 
 // DirStore — каталог бэкапов на смонтированном томе clickhouse-backups.
 type DirStore struct {
@@ -87,11 +87,10 @@ func (d *DirStore) List() ([]backup.Entry, error) {
 }
 
 func parseBackupNameTime(name string) (time.Time, bool) {
-	// nm-20060102T150405Z  или  nm-20060102T150405+0300
-	if !strings.HasPrefix(name, "nm-") {
+	if !strings.HasPrefix(name, "ga-") {
 		return time.Time{}, false
 	}
-	suffix := strings.TrimPrefix(name, "nm-")
+	suffix := strings.TrimPrefix(name, "ga-")
 	if t, err := time.Parse("20060102T150405Z", suffix); err == nil {
 		return t.UTC(), true
 	}
@@ -281,7 +280,7 @@ func (d *DirStore) Prune(keep int) error {
 
 func skipAuthTarballName(base string) bool {
 	switch base {
-	case "", ".", ".nm_backend.lock":
+	case "", ".", ".ga_backend.lock":
 		return true
 	}
 	return strings.HasSuffix(base, ".snap") || strings.HasSuffix(base, ".tmp")

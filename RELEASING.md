@@ -6,7 +6,7 @@
 |-----|-----|----------------|
 | Продукт | `VERSION`, git tag `vX.Y.Z`, `install-meta.json` | Только в коммите релиза. На сервере UI показывает версию из пакета (`vX.Y.Z`). |
 | HTTP API | `openapi.yaml` → `info.version` | Новый путь / поле / breaking schema. Не за лицензию, баг парсера или описание. |
-| Схема CH | `nm_schema_version` (`Ensure*`) | Как сейчас, независимо. В Notes релиза — строка, если Ensure* менялся. |
+| Схема CH | `ga_schema_version` (`Ensure*`) | Как сейчас, независимо. В Notes релиза — строка, если Ensure* менялся. |
 
 CI: `bash scripts/check-release-contract.sh` (job **release-contract**). Инвариант: если OpenAPI на дереве новее, чем в Notes секции текущего `VERSION`, блок **Unreleased** обязан содержать эту цифру. README цитирует `OpenAPI **N**` = `info.version`.
 

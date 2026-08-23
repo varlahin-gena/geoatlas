@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"network_monitor/internal/adapter/httpapi/loginthrottle"
-	usecaseaudit "network_monitor/internal/usecase/auditlog"
-	usecasebackup "network_monitor/internal/usecase/backup"
-	usecaseretention "network_monitor/internal/usecase/retention"
-	usecasetls "network_monitor/internal/usecase/tls"
-	"network_monitor/internal/usecase/system"
+	"geoatlas/internal/adapter/httpapi/loginthrottle"
+	usecaseaudit "geoatlas/internal/usecase/auditlog"
+	usecasebackup "geoatlas/internal/usecase/backup"
+	usecaseretention "geoatlas/internal/usecase/retention"
+	usecasetls "geoatlas/internal/usecase/tls"
+	"geoatlas/internal/usecase/system"
 )
 
 type systemStatsPayload struct {

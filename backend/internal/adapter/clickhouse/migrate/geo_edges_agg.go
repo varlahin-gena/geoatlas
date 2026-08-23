@@ -8,9 +8,9 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
-	"network_monitor/internal/adapter/clickhouse/aggstate"
-	"network_monitor/internal/adapter/clickhouse/query"
-	"network_monitor/internal/adapter/clickhouse/sqlclause"
+	"geoatlas/internal/adapter/clickhouse/aggstate"
+	"geoatlas/internal/adapter/clickhouse/query"
+	"geoatlas/internal/adapter/clickhouse/sqlclause"
 )
 
 // EnsureGeoEdgesAggSchema добавляет geo-колонки и создаёт daily-таблицы/MV без backfill.
@@ -336,7 +336,7 @@ func insertGeoEdgesDays(ctx context.Context, ch clickhouse.Conn, groupBy string,
 	table := sqlclause.GeoEdgesTable(groupBy)
 	srcKey, dstKey, srcLabel, dstLabel := sqlclause.GeoGroupExprsPrefixed("traffic_logs", groupBy)
 	selectBody := geoEdgesAggSelectBody(srcKey, dstKey, srcLabel, dstLabel, sqlclause.GeoCoordOK)
-	// Plain traffic_logs: enrich JOIN OOMs on small CH hosts; map overlays nm_geo_enrich_ip on read.
+	// Plain traffic_logs: enrich JOIN OOMs on small CH hosts; map overlays ga_geo_enrich_ip on read.
 	fromSQL := fmt.Sprintf("FROM traffic_logs\n\t\tWHERE %s", sqlclause.HourTimestampRangeSQL("traffic_logs.timestamp"))
 
 	insertTpl := fmt.Sprintf(`

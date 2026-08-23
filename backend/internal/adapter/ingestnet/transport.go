@@ -6,17 +6,18 @@ import (
 )
 
 const (
-	markerPrefix = "@@nm/"
-	markerMid    = "/@@"
+	markerPrefix       = "@@ga/"
+	legacyMarkerPrefix = "@@nm/"
+	markerMid          = "/@@"
 )
 
 // ResolveTransport снимает маркер транспорта (+ опциональный shared secret).
 // Форматы:
 //
-//	@@nm/udp/<token>/@@payload
-//	@@nm/tcp/<token>/@@payload
-//	@@nm/udp/@@payload          — legacy (только если expectedToken пуст / insecure)
-//	@@nm/tcp/@@payload
+//	@@ga/udp/<token>/@@payload
+//	@@ga/tcp/<token>/@@payload
+//	@@ga/udp/@@payload          — без token (только если expectedToken пуст / insecure)
+//	@@ga/tcp/@@payload
 //
 // Plain lines with fallback "http" skip the shared secret (API already auth'd).
 func ResolveTransport(line, fallback string) (transport, payload string) {
@@ -26,19 +27,20 @@ func ResolveTransport(line, fallback string) (transport, payload string) {
 
 // ResolveTransportAuth как ResolveTransport, но проверяет token.
 // ok=false — строку нужно дропнуть (неверный/отсутствующий секрет).
-// Если expectedToken пуст — принимаем legacy @@nm/{udp|tcp}/@@ и новый формат с любым token
-// (dev / NM_ALLOW_INSECURE); иначе требуется точное совпадение token.
+// Если expectedToken пуст — принимаем @@ga/{udp|tcp}/@@ и формат с любым token
+// (dev / GA_ALLOW_INSECURE); иначе требуется точное совпадение token.
 // Plain (no marker) lines with fallback "http" always ok — secret is for :1514 only.
 func ResolveTransportAuth(line, fallback, expectedToken string) (transport, payload string, ok bool) {
+	if strings.HasPrefix(line, legacyMarkerPrefix) {
+		return "", "", false
+	}
 	if !strings.HasPrefix(line, markerPrefix) {
-		// HTTP upload already passed Bearer/session+CSRF; marker secret is for :1514 only.
 		if fallback == "http" {
 			return "http", line, true
 		}
 		return fallback, line, expectedToken == ""
 	}
 	rest := strings.TrimPrefix(line, markerPrefix)
-	// rest: udp/<token>/@@payload  or  udp/@@payload
 	slash := strings.IndexByte(rest, '/')
 	if slash <= 0 {
 		return fallback, line, expectedToken == ""
@@ -48,7 +50,6 @@ func ResolveTransportAuth(line, fallback, expectedToken string) (transport, payl
 		return fallback, line, expectedToken == ""
 	}
 	after := rest[slash+1:]
-	// legacy: @@payload
 	if strings.HasPrefix(after, "@@") {
 		if expectedToken != "" {
 			return tr, "", false

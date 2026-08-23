@@ -15,7 +15,7 @@ func okSecurityCfg() Config {
 }
 
 func TestValidateSecurityRejectsPlaceholders(t *testing.T) {
-	t.Setenv("NM_ALLOW_INSECURE", "")
+	t.Setenv("GA_ALLOW_INSECURE", "")
 
 	cfg := okSecurityCfg()
 	cfg.APIAuthToken = "dev-insecure-change-me"
@@ -31,33 +31,33 @@ func TestValidateSecurityRejectsPlaceholders(t *testing.T) {
 }
 
 func TestValidateSecurityRequiresIngestSecret(t *testing.T) {
-	t.Setenv("NM_ALLOW_INSECURE", "")
+	t.Setenv("GA_ALLOW_INSECURE", "")
 	cfg := okSecurityCfg()
 	cfg.IngestSharedSecret = ""
 	if err := cfg.ValidateSecurity(); err == nil {
 		t.Fatal("expected error for missing INGEST_SHARED_SECRET")
 	}
-	t.Setenv("NM_ALLOW_INSECURE", "1")
+	t.Setenv("GA_ALLOW_INSECURE", "1")
 	if err := cfg.ValidateSecurity(); err != nil {
-		t.Fatalf("NM_ALLOW_INSECURE should permit empty ingest secret: %v", err)
+		t.Fatalf("GA_ALLOW_INSECURE should permit empty ingest secret: %v", err)
 	}
 }
 
 func TestValidateSecurityRequiresClickHousePassword(t *testing.T) {
-	t.Setenv("NM_ALLOW_INSECURE", "")
+	t.Setenv("GA_ALLOW_INSECURE", "")
 	cfg := okSecurityCfg()
 	cfg.ClickHousePassword = ""
 	if err := cfg.ValidateSecurity(); err == nil {
 		t.Fatal("expected error for missing CLICKHOUSE_PASSWORD")
 	}
-	t.Setenv("NM_ALLOW_INSECURE", "1")
+	t.Setenv("GA_ALLOW_INSECURE", "1")
 	if err := cfg.ValidateSecurity(); err != nil {
-		t.Fatalf("NM_ALLOW_INSECURE should permit empty CH password: %v", err)
+		t.Fatalf("GA_ALLOW_INSECURE should permit empty CH password: %v", err)
 	}
 }
 
 func TestValidateSecurityRejectsShortSecrets(t *testing.T) {
-	t.Setenv("NM_ALLOW_INSECURE", "")
+	t.Setenv("GA_ALLOW_INSECURE", "")
 	cfg := okSecurityCfg()
 	cfg.SessionSecret = "short"
 	if err := cfg.ValidateSecurity(); err == nil || !strings.Contains(err.Error(), "SESSION_SECRET") {
@@ -68,16 +68,16 @@ func TestValidateSecurityRejectsShortSecrets(t *testing.T) {
 	if err := cfg.ValidateSecurity(); err == nil || !strings.Contains(err.Error(), "API_AUTH_TOKEN") {
 		t.Fatalf("want API_AUTH_TOKEN min length error, got %v", err)
 	}
-	t.Setenv("NM_ALLOW_INSECURE", "1")
+	t.Setenv("GA_ALLOW_INSECURE", "1")
 	cfg = okSecurityCfg()
 	cfg.SessionSecret = "x"
 	if err := cfg.ValidateSecurity(); err != nil {
-		t.Fatalf("NM_ALLOW_INSECURE should permit short secrets: %v", err)
+		t.Fatalf("GA_ALLOW_INSECURE should permit short secrets: %v", err)
 	}
 }
 
 func TestSecurityWarningsWeakSeedPasswords(t *testing.T) {
-	t.Setenv("NM_ALLOW_INSECURE", "")
+	t.Setenv("GA_ALLOW_INSECURE", "")
 	cfg := Config{
 		AuthAdminUser:        "admin",
 		AuthAdminPassword:    "admin",
@@ -91,18 +91,18 @@ func TestSecurityWarningsWeakSeedPasswords(t *testing.T) {
 }
 
 func TestValidateSecurityAllowsOverride(t *testing.T) {
-	t.Setenv("NM_ALLOW_INSECURE", "1")
+	t.Setenv("GA_ALLOW_INSECURE", "1")
 	cfg := Config{
 		APIAuthToken:  "dev-insecure-change-me",
 		SessionSecret: "dev-session-secret-change-me",
 	}
 	if err := cfg.ValidateSecurity(); err != nil {
-		t.Fatalf("NM_ALLOW_INSECURE should permit placeholders: %v", err)
+		t.Fatalf("GA_ALLOW_INSECURE should permit placeholders: %v", err)
 	}
 }
 
 func TestValidateSecurityDisabledAuthRequiresInsecure(t *testing.T) {
-	t.Setenv("NM_ALLOW_INSECURE", "")
+	t.Setenv("GA_ALLOW_INSECURE", "")
 	cfg := Config{
 		APIAuthDisabled:    true,
 		AuthDisabled:       true,
@@ -110,17 +110,17 @@ func TestValidateSecurityDisabledAuthRequiresInsecure(t *testing.T) {
 		ClickHousePassword: "clickhouse-pass1",
 	}
 	if err := cfg.ValidateSecurity(); err == nil {
-		t.Fatal("expected error when *_DISABLED without NM_ALLOW_INSECURE")
+		t.Fatal("expected error when *_DISABLED without GA_ALLOW_INSECURE")
 	}
 
-	t.Setenv("NM_ALLOW_INSECURE", "1")
+	t.Setenv("GA_ALLOW_INSECURE", "1")
 	if err := cfg.ValidateSecurity(); err != nil {
-		t.Fatalf("NM_ALLOW_INSECURE should permit *_DISABLED: %v", err)
+		t.Fatalf("GA_ALLOW_INSECURE should permit *_DISABLED: %v", err)
 	}
 }
 
 func TestValidateSecurityAPIAuthDisabledAlone(t *testing.T) {
-	t.Setenv("NM_ALLOW_INSECURE", "")
+	t.Setenv("GA_ALLOW_INSECURE", "")
 	cfg := Config{
 		APIAuthDisabled:    true,
 		SessionSecret:      "unique-session-secret",
@@ -128,7 +128,7 @@ func TestValidateSecurityAPIAuthDisabledAlone(t *testing.T) {
 		ClickHousePassword: "clickhouse-pass1",
 	}
 	if err := cfg.ValidateSecurity(); err == nil {
-		t.Fatal("expected error for API_AUTH_DISABLED without NM_ALLOW_INSECURE")
+		t.Fatal("expected error for API_AUTH_DISABLED without GA_ALLOW_INSECURE")
 	}
 }
 
@@ -146,7 +146,7 @@ func TestAPIAuthTokensIncludesPrevious(t *testing.T) {
 }
 
 func TestValidateSecurityRejectsPreviousPlaceholder(t *testing.T) {
-	t.Setenv("NM_ALLOW_INSECURE", "")
+	t.Setenv("GA_ALLOW_INSECURE", "")
 	cfg := okSecurityCfg()
 	cfg.APIAuthPreviousToken = "dev-insecure-change-me"
 	if err := cfg.ValidateSecurity(); err == nil {
@@ -155,7 +155,7 @@ func TestValidateSecurityRejectsPreviousPlaceholder(t *testing.T) {
 }
 
 func TestValidateSecurityRejectsOpsEqualsAdmin(t *testing.T) {
-	t.Setenv("NM_ALLOW_INSECURE", "")
+	t.Setenv("GA_ALLOW_INSECURE", "")
 	cfg := okSecurityCfg()
 	cfg.APIOpsToken = cfg.APIAuthToken
 	if err := cfg.ValidateSecurity(); err == nil || !strings.Contains(err.Error(), "API_OPS_TOKEN") {
@@ -164,7 +164,7 @@ func TestValidateSecurityRejectsOpsEqualsAdmin(t *testing.T) {
 }
 
 func TestValidateSecurityOK(t *testing.T) {
-	t.Setenv("NM_ALLOW_INSECURE", "")
+	t.Setenv("GA_ALLOW_INSECURE", "")
 	cfg := okSecurityCfg()
 	cfg.APIOpsToken = "ops-token-sixteen"
 	if err := cfg.ValidateSecurity(); err != nil {

@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"network_monitor/internal/adapter/metrics"
-	"network_monitor/internal/model"
+	"geoatlas/internal/adapter/metrics"
+	"geoatlas/internal/model"
 )
 
 type stubIngest struct {
@@ -34,20 +34,20 @@ func TestMetricsHandlerExposesIngestAndHTTP(t *testing.T) {
 	body, _ := io.ReadAll(rec.Body)
 	text := string(body)
 	for _, want := range []string{
-		"nm_ingest_queue_depth",
-		"nm_ingest_dropped_total",
-		"nm_ingest_circuit_open",
-		"nm_http_request_duration_seconds",
-		"nm_ingest_insert_duration_seconds",
+		"ga_ingest_queue_depth",
+		"ga_ingest_dropped_total",
+		"ga_ingest_circuit_open",
+		"ga_http_request_duration_seconds",
+		"ga_ingest_insert_duration_seconds",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("missing %q in:\n%s", want, text)
 		}
 	}
-	if !strings.Contains(text, `nm_ingest_queue_depth 7`) {
+	if !strings.Contains(text, `ga_ingest_queue_depth 7`) {
 		t.Fatalf("queue depth not scraped:\n%s", text)
 	}
-	if !strings.Contains(text, `nm_ingest_circuit_open 1`) {
+	if !strings.Contains(text, `ga_ingest_circuit_open 1`) {
 		t.Fatalf("circuit not open:\n%s", text)
 	}
 }
@@ -57,7 +57,7 @@ func TestSetIngestUpdatesScrape(t *testing.T) {
 	reg.SetIngest(stubIngest{snap: model.IngestLiveStats{DroppedTotal: 42}})
 	rec := httptest.NewRecorder()
 	reg.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
-	if !strings.Contains(rec.Body.String(), "nm_ingest_dropped_total 42") {
+	if !strings.Contains(rec.Body.String(), "ga_ingest_dropped_total 42") {
 		t.Fatalf("unexpected body:\n%s", rec.Body.String())
 	}
 }

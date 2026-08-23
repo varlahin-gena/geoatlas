@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"network_monitor/internal/usecase/parseerrors"
+	"geoatlas/internal/usecase/parseerrors"
 )
 
 func (h *ParseHandler) ListParseErrors(w http.ResponseWriter, r *http.Request) {

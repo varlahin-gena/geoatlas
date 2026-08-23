@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"network_monitor/internal/geoip"
-	"network_monitor/internal/model"
+	"geoatlas/internal/geoip"
+	"geoatlas/internal/model"
 )
 
 type memEnterprise struct {

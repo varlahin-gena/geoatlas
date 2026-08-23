@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"network_monitor/internal/apperr"
-	"network_monitor/internal/geoip"
-	"network_monitor/internal/model"
+	"geoatlas/internal/apperr"
+	"geoatlas/internal/geoip"
+	"geoatlas/internal/model"
 )
 
 type uploadCodec struct {

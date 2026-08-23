@@ -3,7 +3,7 @@ package migrate
 import (
 	"fmt"
 
-	"network_monitor/internal/adapter/clickhouse/sqlclause"
+	"geoatlas/internal/adapter/clickhouse/sqlclause"
 )
 
 const (

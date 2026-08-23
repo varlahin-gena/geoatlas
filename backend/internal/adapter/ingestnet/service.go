@@ -12,8 +12,8 @@ import (
 	"syscall"
 	"time"
 
-	"network_monitor/internal/model"
-	usecaseingest "network_monitor/internal/usecase/ingest"
+	"geoatlas/internal/model"
+	usecaseingest "geoatlas/internal/usecase/ingest"
 )
 
 type Binding struct {
@@ -36,7 +36,7 @@ type Config struct {
 	MaxConnections  int
 	ConnIdleTimeout time.Duration
 
-	// SharedSecret — токен в @@nm/{udp|tcp}/<token>/@@; пусто = legacy (только insecure/dev).
+	// SharedSecret — токен в @@ga/{udp|tcp}/<token>/@@; пусто = legacy (только insecure/dev).
 	SharedSecret string
 	// AllowFrom — CSV peer allowlist; пусто = любой peer (не рекомендуется).
 	AllowFrom string

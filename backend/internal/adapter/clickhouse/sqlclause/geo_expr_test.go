@@ -130,11 +130,11 @@ func TestMapLogsFromSQL(t *testing.T) {
 	if !strings.Contains(live, GeoEnrichIPTable) {
 		t.Fatalf("live must join enrich:\n%s", live)
 	}
-	bak := MapLogsFromSQL("nm_bak_traffic_logs", "timestamp >= now()")
+	bak := MapLogsFromSQL("ga_bak_traffic_logs", "timestamp >= now()")
 	if strings.Contains(bak, GeoEnrichIPTable) {
 		t.Fatalf("backup must skip enrich:\n%s", bak)
 	}
-	if !strings.Contains(bak, "FROM nm_bak_traffic_logs") {
+	if !strings.Contains(bak, "FROM ga_bak_traffic_logs") {
 		t.Fatalf("backup FROM missing:\n%s", bak)
 	}
 }

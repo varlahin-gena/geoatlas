@@ -10,8 +10,8 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
-	"network_monitor/pkg/chconn"
-	"network_monitor/stats-collector/internal/config"
+	"geoatlas/pkg/chconn"
+	"geoatlas/stats-collector/internal/config"
 )
 
 type Metric struct {

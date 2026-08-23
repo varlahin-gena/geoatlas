@@ -8,7 +8,7 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
-	usecaseaudit "network_monitor/internal/usecase/auditlog"
+	usecaseaudit "geoatlas/internal/usecase/auditlog"
 )
 
 type Repository struct {

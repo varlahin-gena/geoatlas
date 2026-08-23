@@ -11,8 +11,8 @@ func TestResolveTransportLegacy(t *testing.T) {
 		wantT    string
 		wantP    string
 	}{
-		{"@@nm/udp/@@hello", "", "udp", "hello"},
-		{"@@nm/tcp/@@hello", "", "tcp", "hello"},
+		{"@@ga/udp/@@hello", "", "udp", "hello"},
+		{"@@ga/tcp/@@hello", "", "tcp", "hello"},
 		{"plain message", "udp", "udp", "plain message"},
 		{"plain message", "", "", "plain message"},
 	}
@@ -27,21 +27,21 @@ func TestResolveTransportLegacy(t *testing.T) {
 
 func TestResolveTransportAuth(t *testing.T) {
 	const secret = "s3cret"
-	tr, payload, ok := ResolveTransportAuth("@@nm/udp/"+secret+"/@@hello", "", secret)
+	tr, payload, ok := ResolveTransportAuth("@@ga/udp/"+secret+"/@@hello", "", secret)
 	if !ok || tr != "udp" || payload != "hello" {
 		t.Fatalf("got tr=%q payload=%q ok=%v", tr, payload, ok)
 	}
-	_, _, ok = ResolveTransportAuth("@@nm/udp/wrong/@@hello", "", secret)
+	_, _, ok = ResolveTransportAuth("@@ga/udp/wrong/@@hello", "", secret)
 	if ok {
 		t.Fatal("bad token must fail")
 	}
-	_, _, ok = ResolveTransportAuth("@@nm/udp/@@hello", "", secret)
+	_, _, ok = ResolveTransportAuth("@@ga/udp/@@hello", "", secret)
 	if ok {
-		t.Fatal("legacy without token must fail when secret set")
+		t.Fatal("without token must fail when secret set")
 	}
-	tr, payload, ok = ResolveTransportAuth("@@nm/tcp/@@hello", "tcp", "")
+	tr, payload, ok = ResolveTransportAuth("@@ga/tcp/@@hello", "tcp", "")
 	if !ok || tr != "tcp" || payload != "hello" {
-		t.Fatalf("legacy ok when secret empty: tr=%q payload=%q ok=%v", tr, payload, ok)
+		t.Fatalf("no secret: tr=%q payload=%q ok=%v", tr, payload, ok)
 	}
 	_, _, ok = ResolveTransportAuth("plain", "", secret)
 	if ok {
@@ -50,5 +50,9 @@ func TestResolveTransportAuth(t *testing.T) {
 	tr, payload, ok = ResolveTransportAuth("plain http body", "http", secret)
 	if !ok || tr != "http" || payload != "plain http body" {
 		t.Fatalf("http fallback must skip marker secret: tr=%q payload=%q ok=%v", tr, payload, ok)
+	}
+	_, _, ok = ResolveTransportAuth("@@nm/udp/@@hello", "", "")
+	if ok {
+		t.Fatal("old nm marker must be rejected")
 	}
 }

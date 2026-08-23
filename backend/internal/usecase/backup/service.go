@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"network_monitor/internal/apperr"
-	usecaseaudit "network_monitor/internal/usecase/auditlog"
+	"geoatlas/internal/apperr"
+	usecaseaudit "geoatlas/internal/usecase/auditlog"
 )
 
 var (
@@ -210,11 +210,11 @@ func (s *Service) Catalog() (Catalog, error) {
 	}
 	cat.Backups = entries
 	if attached != "" {
-		cat.Hint = "Подключён " + attached + ": данные в shadow-таблицах nm_bak_*. Live и ingest не трогаются. На карте переключите источник на «Бэкап»."
+		cat.Hint = "Подключён " + attached + ": данные в shadow-таблицах ga_bak_*. Live и ingest не трогаются. На карте переключите источник на «Бэкап»."
 	} else if sch.Enabled && cat.Enabled {
 		cat.Hint = "Автобэкап включён. Внешний cron scripts/backup-clickhouse.sh не обязателен."
 	} else {
-		cat.Hint = "«Подключить» копирует данные бэкапа в nm_bak_* (live не меняется). Расписание — в блоке ниже."
+		cat.Hint = "«Подключить» копирует данные бэкапа в ga_bak_* (live не меняется). Расписание — в блоке ниже."
 	}
 	return cat, nil
 }
@@ -411,7 +411,7 @@ func (s *Service) ScheduleCreate(parent context.Context, source string, actor st
 	return nil
 }
 
-// ScheduleAttach: RESTORE map-таблиц в nm_bak_* (live не трогаем).
+// ScheduleAttach: RESTORE map-таблиц в ga_bak_* (live не трогаем).
 func (s *Service) ScheduleAttach(parent context.Context, name string, actor string) error {
 	if err := s.readyForJob(); err != nil {
 		return err
@@ -430,7 +430,7 @@ func (s *Service) ScheduleAttach(parent context.Context, name string, actor stri
 	return nil
 }
 
-// ScheduleDetach: DROP nm_bak_*; бэкап на диске и live остаются.
+// ScheduleDetach: DROP ga_bak_*; бэкап на диске и live остаются.
 func (s *Service) ScheduleDetach(parent context.Context, name string, actor string) error {
 	if err := s.readyForJob(); err != nil {
 		return err
@@ -541,7 +541,7 @@ func (s *Service) runCreate(ctx context.Context, source string, actor string) {
 		s.clearLastFireDate()
 	}()
 
-	name := "nm-" + time.Now().UTC().Format("20060102T150405Z")
+	name := "ga-" + time.Now().UTC().Format("20060102T150405Z")
 	if sch, err := s.GetSchedule(); err == nil {
 		name = FormatBackupName(time.Now(), sch.Timezone)
 	}
@@ -630,7 +630,7 @@ func (s *Service) runAttach(ctx context.Context, name string, actor string) {
 	}
 	defer s.releaseHeavy()
 
-	s.job.SetRunning(name, "RESTORE в nm_bak_*…")
+	s.job.SetRunning(name, "RESTORE в ga_bak_*…")
 	s.logDREvent(ctx, usecaseaudit.DREvent{
 		Actor:   safeActor(actor),
 		Action:  "backup.attach",
@@ -678,7 +678,7 @@ func (s *Service) runDetach(ctx context.Context, name string, actor string) {
 	}
 	defer s.releaseHeavy()
 
-	s.job.SetRunning(name, "DROP nm_bak_*…")
+	s.job.SetRunning(name, "DROP ga_bak_*…")
 	s.logDREvent(ctx, usecaseaudit.DREvent{
 		Actor:   safeActor(actor),
 		Action:  "backup.detach",

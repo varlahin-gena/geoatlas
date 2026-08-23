@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 // ParseNetset читает FireHOL .netset / plaintext IP+CIDR (комментарии #).

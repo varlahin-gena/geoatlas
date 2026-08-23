@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"network_monitor/internal/usecase/system"
-	"network_monitor/pkg/syslogngstats"
+	"geoatlas/internal/usecase/system"
+	"geoatlas/pkg/syslogngstats"
 )
 
 // SyslogNGAdapter scrapes syslog-ng stats-exporter (fail-open).

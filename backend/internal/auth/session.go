@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	CookieName     = "nm_session"
-	CSRFCookieName = "nm_csrf"
+	CookieName     = "ga_session"
+	CSRFCookieName = "ga_csrf"
 	CSRFHeaderName = "X-CSRF-Token"
 )
 

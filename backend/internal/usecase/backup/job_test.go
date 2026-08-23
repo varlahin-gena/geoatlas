@@ -13,7 +13,7 @@ func TestJobTryStartBusy(t *testing.T) {
 	if j.TryStart() {
 		t.Fatal("second start must fail")
 	}
-	j.SetOK("nm-x", "done")
+	j.SetOK("ga-x", "done")
 	j.Finish()
 	// After finish, allow next.
 	deadline := time.Now().Add(time.Second)

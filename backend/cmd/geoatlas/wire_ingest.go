@@ -4,13 +4,13 @@ import (
 	"log/slog"
 	"time"
 
-	"network_monitor/internal/adapter/clickhouse/geostore"
-	"network_monitor/internal/adapter/clickhouse/ingeststore"
-	"network_monitor/internal/adapter/ingestnet"
-	"network_monitor/internal/adapter/parseradapter"
-	"network_monitor/internal/config"
-	"network_monitor/internal/parser"
-	usecaseingest "network_monitor/internal/usecase/ingest"
+	"geoatlas/internal/adapter/clickhouse/geostore"
+	"geoatlas/internal/adapter/clickhouse/ingeststore"
+	"geoatlas/internal/adapter/ingestnet"
+	"geoatlas/internal/adapter/parseradapter"
+	"geoatlas/internal/config"
+	"geoatlas/internal/parser"
+	usecaseingest "geoatlas/internal/usecase/ingest"
 )
 
 func newParserRegistry() *parser.Registry {

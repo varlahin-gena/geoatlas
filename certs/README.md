@@ -21,7 +21,7 @@ HTTP_REDIRECT=1
 
 `HTTPS_ENABLED=auto` (по умолчанию в entrypoint) тоже включит HTTPS, если оба PEM на месте.
 
-3. Перезапустите стек: `./start.sh` (или `docker compose … up -d` через `start.sh` / `nm_compose`, чтобы подхватился `docker-compose.https.yml`).
+3. Перезапустите стек: `./start.sh` (или `docker compose … up -d` через `start.sh` / `ga_compose`, чтобы подхватился `docker-compose.https.yml`).
 
 4. Откройте `https://<host>/`. При `HTTP_REDIRECT=1` HTTP перенаправляется на HTTPS.
 

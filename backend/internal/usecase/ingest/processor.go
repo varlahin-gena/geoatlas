@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 const (

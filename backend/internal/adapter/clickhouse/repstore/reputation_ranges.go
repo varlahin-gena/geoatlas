@@ -9,7 +9,7 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 const reputationRangesInsertBatchSize = 25_000

@@ -1,5 +1,5 @@
 # Пример того, что генерирует ./scripts/tune-resources.sh для small (4 CPU / 8 GiB).
-# Не копируйте вручную — лучше: NM_FORCE_PROFILE=small ./scripts/tune-resources.sh
+# Не копируйте вручную — лучше: GA_FORCE_PROFILE=small ./scripts/tune-resources.sh
 
 services:
   clickhouse:

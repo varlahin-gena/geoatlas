@@ -6,7 +6,7 @@ import (
 )
 
 func TestValidateRequiresSecrets(t *testing.T) {
-	t.Setenv("NM_ALLOW_INSECURE", "")
+	t.Setenv("GA_ALLOW_INSECURE", "")
 	cfg := Config{}
 	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "API_OPS_TOKEN") {
 		t.Fatalf("want token error, got %v", err)
@@ -22,7 +22,7 @@ func TestValidateRequiresSecrets(t *testing.T) {
 }
 
 func TestValidateAllowsAdminFallback(t *testing.T) {
-	t.Setenv("NM_ALLOW_INSECURE", "")
+	t.Setenv("GA_ALLOW_INSECURE", "")
 	cfg := Config{
 		APIAuthToken:   "unique-token-xyz0",
 		ClickHousePass: "clickhouse-pass1",
@@ -46,14 +46,14 @@ func TestValidatePrefersOps(t *testing.T) {
 }
 
 func TestValidateAllowsInsecureOverride(t *testing.T) {
-	t.Setenv("NM_ALLOW_INSECURE", "1")
+	t.Setenv("GA_ALLOW_INSECURE", "1")
 	if err := (Config{}).Validate(); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestValidateRejectsShortToken(t *testing.T) {
-	t.Setenv("NM_ALLOW_INSECURE", "")
+	t.Setenv("GA_ALLOW_INSECURE", "")
 	cfg := Config{APIOpsToken: "short", ClickHousePass: "clickhouse-pass1"}
 	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "API_OPS_TOKEN") {
 		t.Fatalf("got %v", err)

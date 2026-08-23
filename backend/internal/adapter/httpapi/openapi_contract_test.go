@@ -9,7 +9,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"network_monitor/internal/config"
+	"geoatlas/internal/config"
 )
 
 type openAPIDoc struct {

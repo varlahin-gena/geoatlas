@@ -8,7 +8,7 @@ info:
   description: |
     Backend API для приёма syslog/логов МСЭ, GeoIP и карты трафика.
 
-    Локальная авторизация (cookie `nm_session` после `POST /api/auth/login`):
+    Локальная авторизация (cookie `ga_session` после `POST /api/auth/login`):
     - **administrator** — полный доступ (карта, загрузки, система, парсеры, УЗ, API-токены);
     - **operator** — карта (`GET /api/events`) и аномалии (`GET /api/anomalies*`); без загрузок, мониторинга и парсеров.
     - Cookie содержит `session_version`; смена пароля / `logout-all` / admin reset инвалидируют
@@ -26,7 +26,7 @@ info:
       (system/*, parse-*, управление УЗ/токенами);
     - **ops** — administrator или Bearer≥ops для мутаций и pipeline (`POST /api/ingest`,
       `/upload-logs`, `/upload-geo`, `/upload-reputation`, `GET /api/ingest/stats`, `GET /metrics`).
-      При `AUTH_DISABLED=1` / `API_AUTH_DISABLED=1` ops открыты; старт только с `NM_ALLOW_INSECURE=1`.
+      При `AUTH_DISABLED=1` / `API_AUTH_DISABLED=1` ops открыты; старт только с `GA_ALLOW_INSECURE=1`.
 
 servers:
   - url: /
@@ -47,7 +47,7 @@ paths:
   /api/auth/login:
     post:
       tags: [auth]
-      summary: Вход (логин/пароль → cookie nm_session)
+      summary: Вход (логин/пароль → cookie ga_session)
       requestBody:
         required: true
         content:
@@ -103,7 +103,7 @@ paths:
       tags: [auth]
       summary: Смена своего пароля (revoke старых сессий, выдаёт новый cookie)
       description: |
-        Bump `session_version` и перевыпускает `nm_session` для текущего браузера.
+        Bump `session_version` и перевыпускает `ga_session` для текущего браузера.
         Остальные сессии того же пользователя перестают быть валидными.
       responses:
         "200":
@@ -1538,7 +1538,7 @@ paths:
           in: header
           required: false
           schema: { type: string }
-          description: Обязателен для cookie-сессии (см. nm_csrf)
+          description: Обязателен для cookie-сессии (см. ga_csrf)
       requestBody:
         required: true
         content:
@@ -1616,7 +1616,7 @@ paths:
       summary: Применить сертификаты (reload nginx)
       description: |
         Только administrator или Bearer (+ CSRF).
-        Выполняет NM_TLS_RELOAD_CMD, если задан, иначе возвращает подсказку о перезапуске frontend.
+        Выполняет GA_TLS_RELOAD_CMD, если задан, иначе возвращает подсказку о перезапуске frontend.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -1678,7 +1678,7 @@ paths:
       tags: [system]
       summary: Подключить бэкап (данные → живые таблицы)
       description: |
-        Только administrator. Асинхронно: RESTORE map-таблиц в shadow `nm_bak_*`
+        Только administrator. Асинхронно: RESTORE map-таблиц в shadow `ga_bak_*`
         (live и ingest не трогаются). На карте переключатель Live / Бэкап.
       security:
         - bearerAuth: []
@@ -1705,7 +1705,7 @@ paths:
       tags: [system]
       summary: Отключить подключённый бэкап (очистить таблицы)
       description: |
-        Только administrator. DROP shadow `nm_bak_*`; файлы бэкапа и live остаются.
+        Только administrator. DROP shadow `ga_bak_*`; файлы бэкапа и live остаются.
         Доступно только для текущего attached бэкапа.
       security:
         - bearerAuth: []
@@ -1957,7 +1957,7 @@ components:
     cookieAuth:
       type: apiKey
       in: cookie
-      name: nm_session
+      name: ga_session
       description: Сессия после POST /api/auth/login
 
   schemas:

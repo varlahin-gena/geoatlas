@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"network_monitor/internal/apperr"
+	"geoatlas/internal/apperr"
 )
 
 const (
@@ -16,7 +16,7 @@ const (
 var ErrInvalidSchedule = apperr.InvalidInput("invalid backup schedule")
 
 // FormatBackupName — имя каталога бэкапа: локальное время пояса + числовой оффсет.
-// Пример Europe/Moscow: nm-20260811T102119+0300. Старые nm-…Z (UTC) остаются валидны на диске.
+// Пример Europe/Moscow: ga-20260811T102119+0300.
 func FormatBackupName(now time.Time, timezone string) string {
 	loc := time.UTC
 	if tz := strings.TrimSpace(timezone); tz != "" {
@@ -24,7 +24,7 @@ func FormatBackupName(now time.Time, timezone string) string {
 			loc = l
 		}
 	}
-	return "nm-" + now.In(loc).Format("20060102T150405Z0700")
+	return "ga-" + now.In(loc).Format("20060102T150405Z0700")
 }
 
 // Schedule — ежедневное автосоздание + политика keep/edges/auth.

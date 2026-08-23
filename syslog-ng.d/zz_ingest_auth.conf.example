@@ -1,3 +1,3 @@
 # Placeholder: start.sh writes zz_ingest_auth.conf with the real token.
 # Without it syslog-ng fails closed (empty token) and backend rejects lines.
-@define nm_ingest_token ""
+@define ga_ingest_token ""

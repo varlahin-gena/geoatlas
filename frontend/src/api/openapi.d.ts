@@ -13,7 +13,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Вход (логин/пароль → cookie nm_session) */
+        /** Вход (логин/пароль → cookie ga_session) */
         post: {
             parameters: {
                 query?: never;
@@ -186,7 +186,7 @@ export interface paths {
         put?: never;
         /**
          * Смена своего пароля (revoke старых сессий, выдаёт новый cookie)
-         * @description Bump `session_version` и перевыпускает `nm_session` для текущего браузера.
+         * @description Bump `session_version` и перевыпускает `ga_session` для текущего браузера.
          *     Остальные сессии того же пользователя перестают быть валидными.
          */
         post: {
@@ -3220,7 +3220,7 @@ export interface paths {
             parameters: {
                 query?: never;
                 header?: {
-                    /** @description Обязателен для cookie-сессии (см. nm_csrf) */
+                    /** @description Обязателен для cookie-сессии (см. ga_csrf) */
                     "X-CSRF-Token"?: string;
                 };
                 path?: never;
@@ -3352,7 +3352,7 @@ export interface paths {
         /**
          * Применить сертификаты (reload nginx)
          * @description Только administrator или Bearer (+ CSRF).
-         *     Выполняет NM_TLS_RELOAD_CMD, если задан, иначе возвращает подсказку о перезапуске frontend.
+         *     Выполняет GA_TLS_RELOAD_CMD, если задан, иначе возвращает подсказку о перезапуске frontend.
          */
         post: {
             parameters: {
@@ -3472,7 +3472,7 @@ export interface paths {
         put?: never;
         /**
          * Подключить бэкап (данные → живые таблицы)
-         * @description Только administrator. Асинхронно: RESTORE map-таблиц в shadow `nm_bak_*`
+         * @description Только administrator. Асинхронно: RESTORE map-таблиц в shadow `ga_bak_*`
          *     (live и ingest не трогаются). На карте переключатель Live / Бэкап.
          */
         post: {
@@ -3528,7 +3528,7 @@ export interface paths {
         put?: never;
         /**
          * Отключить подключённый бэкап (очистить таблицы)
-         * @description Только administrator. DROP shadow `nm_bak_*`; файлы бэкапа и live остаются.
+         * @description Только administrator. DROP shadow `ga_bak_*`; файлы бэкапа и live остаются.
          *     Доступно только для текущего attached бэкапа.
          */
         post: {

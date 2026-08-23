@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 func TestWriteIngestAcceptedOK(t *testing.T) {

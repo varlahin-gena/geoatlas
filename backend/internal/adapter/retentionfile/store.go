@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"network_monitor/internal/fileatomic"
-	"network_monitor/internal/usecase/retention"
+	"geoatlas/internal/fileatomic"
+	"geoatlas/internal/usecase/retention"
 )
 
 // Store — JSON-файл с TTL (том /app/data рядом с users.json).

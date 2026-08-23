@@ -6,9 +6,9 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"network_monitor/internal/geoip"
-	"network_monitor/internal/model"
-	"network_monitor/internal/netutil"
+	"geoatlas/internal/geoip"
+	"geoatlas/internal/model"
+	"geoatlas/internal/netutil"
 )
 
 // Index — immutable snapshot диапазонов; Lookup допускает пересечения списков.

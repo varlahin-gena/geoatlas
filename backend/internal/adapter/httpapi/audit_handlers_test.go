@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	domainauth "network_monitor/internal/auth"
-	"network_monitor/internal/config"
-	usecaseaudit "network_monitor/internal/usecase/auditlog"
-	usecaseauth "network_monitor/internal/usecase/auth"
+	domainauth "geoatlas/internal/auth"
+	"geoatlas/internal/config"
+	usecaseaudit "geoatlas/internal/usecase/auditlog"
+	usecaseauth "geoatlas/internal/usecase/auth"
 )
 
 type fakeAuditStore struct {
@@ -44,7 +44,7 @@ func TestGetDRHistoryReturnsItems(t *testing.T) {
 			Timestamp: time.Date(2026, 8, 19, 9, 0, 0, 0, time.UTC),
 			Actor:     "admin",
 			Action:    "backup.create",
-			Target:    "nm-1",
+			Target:    "ga-1",
 			Status:    "succeeded",
 			Message:   "backup created",
 		}},

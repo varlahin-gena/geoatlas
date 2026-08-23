@@ -5,10 +5,10 @@ import (
 	"sync"
 	"time"
 
-	"network_monitor/internal/adapter/clickhouse/aggstate"
-	"network_monitor/internal/adapter/heavytask"
-	"network_monitor/internal/adapter/ingestnet"
-	usecaseanomaly "network_monitor/internal/usecase/anomaly"
+	"geoatlas/internal/adapter/clickhouse/aggstate"
+	"geoatlas/internal/adapter/heavytask"
+	"geoatlas/internal/adapter/ingestnet"
+	usecaseanomaly "geoatlas/internal/usecase/anomaly"
 )
 
 // Scheduler периодически запускает Scan.

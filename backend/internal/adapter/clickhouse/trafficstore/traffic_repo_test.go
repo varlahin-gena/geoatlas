@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"network_monitor/internal/adapter/clickhouse/query"
-	"network_monitor/internal/model"
+	"geoatlas/internal/adapter/clickhouse/query"
+	"geoatlas/internal/model"
 )
 
 func TestComposeMapAggGeoPathWinsEvenIfEmpty(t *testing.T) {

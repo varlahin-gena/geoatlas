@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	domain "network_monitor/internal/auth"
+	domain "geoatlas/internal/auth"
 )
 
 var (

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	usecaseanomaly "network_monitor/internal/usecase/anomaly"
+	usecaseanomaly "geoatlas/internal/usecase/anomaly"
 )
 
 func TestTouchNetsSQLEmpty(t *testing.T) {

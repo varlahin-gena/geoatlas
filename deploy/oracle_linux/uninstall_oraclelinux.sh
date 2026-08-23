@@ -4,7 +4,7 @@ set -Eeuo pipefail
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _COMMON="${_SCRIPT_DIR}/../common/uninstall.sh"
 
-nm_audit_firewall() {
+ga_audit_firewall() {
     if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld 2>/dev/null; then
         echo "  Файрвол          : firewalld активен, порты HTTP/HTTPS/514/8080 будут проверены при удалении"
     elif command -v firewall-cmd >/dev/null 2>&1; then
@@ -14,15 +14,15 @@ nm_audit_firewall() {
     fi
 }
 
-nm_remove_firewall_rules() {
+ga_remove_firewall_rules() {
     if [[ "${REMOVE_FIREWALL_RULES:-1}" != "1" ]]; then
         return
     fi
 
     local http_port="80"
     local https_port=""
-    # NM_PROJECT_DIR — канон common/uninstall.sh; PROJECT_DIR — legacy alias.
-    local project_dir="${NM_PROJECT_DIR:-${PROJECT_DIR:-/opt/network-monitor}}"
+    # GA_PROJECT_DIR — канон common/uninstall.sh; PROJECT_DIR — legacy alias.
+    local project_dir="${GA_PROJECT_DIR:-${PROJECT_DIR:-/opt/geoatlas}}"
     if [[ -f "${project_dir}/.env" ]]; then
         local v
         v="$(grep -E '^[[:space:]]*HTTP_PORT=' "${project_dir}/.env" 2>/dev/null | tail -n1 | cut -d= -f2- || true)"
@@ -50,4 +50,4 @@ nm_remove_firewall_rules() {
 
 # shellcheck source=deploy/common/uninstall.sh
 source "$_COMMON"
-nm_run_uninstall "$@"
+ga_run_uninstall "$@"

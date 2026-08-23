@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"network_monitor/internal/fileatomic"
-	usecasereputation "network_monitor/internal/usecase/reputation"
+	"geoatlas/internal/fileatomic"
+	usecasereputation "geoatlas/internal/usecase/reputation"
 )
 
 // fileDoc — JSON на диске.

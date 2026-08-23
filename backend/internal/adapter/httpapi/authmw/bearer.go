@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"network_monitor/internal/auth"
+	"geoatlas/internal/auth"
 )
 
 // BearerAuth — env admin Bearer + optional env ops Bearer + именованные токены из TokenStore.

@@ -4,7 +4,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 type transportStats struct {

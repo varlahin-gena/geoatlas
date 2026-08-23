@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"network_monitor/internal/model"
-	"network_monitor/internal/parser"
+	"geoatlas/internal/model"
+	"geoatlas/internal/parser"
 )
 
 // TrafficLogInserter — batch INSERT в traffic_logs.

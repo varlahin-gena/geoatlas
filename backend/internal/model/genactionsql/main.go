@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"network_monitor/internal/model"
+	"geoatlas/internal/model"
 )
 
 func main() {

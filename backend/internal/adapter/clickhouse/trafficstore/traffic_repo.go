@@ -8,10 +8,10 @@ import (
 
 	ch "github.com/ClickHouse/clickhouse-go/v2"
 
-	"network_monitor/internal/adapter/clickhouse/aggstate"
-	"network_monitor/internal/adapter/clickhouse/query"
-	"network_monitor/internal/model"
-	"network_monitor/internal/usecase/events"
+	"geoatlas/internal/adapter/clickhouse/aggstate"
+	"geoatlas/internal/adapter/clickhouse/query"
+	"geoatlas/internal/model"
+	"geoatlas/internal/usecase/events"
 )
 
 // TrafficRepository реализует events.TrafficRepository и geo.MissingIPStore.

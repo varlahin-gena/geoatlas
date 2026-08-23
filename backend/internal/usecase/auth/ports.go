@@ -3,7 +3,7 @@ package auth
 import (
 	"time"
 
-	domain "network_monitor/internal/auth"
+	domain "geoatlas/internal/auth"
 )
 
 // UserRepository — хранилище учётных записей (реализация: *auth.UserStore).
