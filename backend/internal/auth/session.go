@@ -22,6 +22,12 @@ var (
 	ErrExpiredSession = errors.New("session expired")
 )
 
+// SessionNeverExpires — Expires=-1 в токене: сессия не протухает по TTL (только revoke).
+const SessionNeverExpires int64 = -1
+
+// PersistentCookieTTL — Max-Age cookie для роли dashboard (~10 лет).
+const PersistentCookieTTL = 10 * 365 * 24 * time.Hour
+
 // Session — содержимое cookie после успешного логина.
 type Session struct {
 	Username       string `json:"u"`
@@ -49,14 +55,26 @@ func NewSessionManager(secret string, ttl time.Duration) (*SessionManager, error
 
 func (m *SessionManager) TTL() time.Duration { return m.ttl }
 
+// CookieTTLForRole — TTL для Set-Cookie: dashboard получает длительную сессию.
+func CookieTTLForRole(role string, defaultTTL time.Duration) time.Duration {
+	if HasPersistentSession(role) {
+		return PersistentCookieTTL
+	}
+	return defaultTTL
+}
+
 func (m *SessionManager) Issue(username, role string, sessionVersion int64) (string, Session, error) {
 	if m == nil {
 		return "", Session{}, ErrInvalidSession
 	}
+	expires := time.Now().Add(m.ttl).Unix()
+	if HasPersistentSession(role) {
+		expires = SessionNeverExpires
+	}
 	sess := Session{
 		Username:       username,
 		Role:           role,
-		Expires:        time.Now().Add(m.ttl).Unix(),
+		Expires:        expires,
 		SessionVersion: sessionVersion,
 	}
 	raw, err := json.Marshal(sess)
@@ -90,7 +108,7 @@ func (m *SessionManager) Parse(token string) (Session, error) {
 	if sess.Username == "" || !ValidRole(sess.Role) {
 		return Session{}, ErrInvalidSession
 	}
-	if time.Now().Unix() > sess.Expires {
+	if sess.Expires > 0 && time.Now().Unix() > sess.Expires {
 		return Session{}, ErrExpiredSession
 	}
 	return sess, nil
@@ -120,6 +138,9 @@ func LiveSession(users UserLookup, sess Session) (Session, bool) {
 	}
 	sess.Role = pub.Role
 	sess.SessionVersion = sv
+	if sess.Expires == SessionNeverExpires && !HasPersistentSession(sess.Role) {
+		return Session{}, false
+	}
 	return sess, true
 }
 

@@ -284,3 +284,58 @@ func TestValidatePasswordPolicy(t *testing.T) {
 		t.Fatal("expected username==password reject")
 	}
 }
+
+func TestDashboardPersistentSession(t *testing.T) {
+	mgr, err := NewSessionManager("test-secret-key-32bytes-minimum!!", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, sess, err := mgr.Issue("wall", RoleDashboard, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sess.Expires != SessionNeverExpires {
+		t.Fatalf("expires = %d, want -1 (never)", sess.Expires)
+	}
+
+	// Token stays valid long after default TTL.
+	time.Sleep(10 * time.Millisecond)
+	got, err := mgr.Parse(token)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if got.Role != RoleDashboard {
+		t.Fatalf("role = %q", got.Role)
+	}
+
+	hash, err := HashPassword("wallpass1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := NewUserStore(User{Username: "wall", PasswordHash: string(hash), Role: RoleDashboard})
+	if err != nil {
+		t.Fatal(err)
+	}
+	live, ok := LiveSession(store, got)
+	if !ok {
+		t.Fatal("expected live session")
+	}
+	if live.Role != RoleDashboard {
+		t.Fatalf("live role = %q", live.Role)
+	}
+
+	// Demotion revokes persistent session.
+	if _, err := store.SetRole("wall", RoleOperator); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := LiveSession(store, got); ok {
+		t.Fatal("persistent token must fail after demotion from dashboard")
+	}
+
+	if CookieTTLForRole(RoleDashboard, time.Hour) != PersistentCookieTTL {
+		t.Fatal("dashboard cookie TTL should be persistent")
+	}
+	if CookieTTLForRole(RoleOperator, time.Hour) != time.Hour {
+		t.Fatal("operator cookie TTL should follow default")
+	}
+}

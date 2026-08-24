@@ -11,6 +11,7 @@ info:
     Локальная авторизация (cookie `ga_session` после `POST /api/auth/login`):
     - **administrator** — полный доступ (карта, загрузки, система, парсеры, УЗ, API-токены);
     - **operator** — карта (`GET /api/events`) и аномалии (`GET /api/anomalies*`); без загрузок, мониторинга и парсеров.
+    - **dashboard** — как operator (карта и аномалии); сессия не протухает по TTL (для видеостены).
     - Cookie содержит `session_version`; смена пароля / `logout-all` / admin reset инвалидируют
       все ранее выданные сессии пользователя.
 
@@ -2145,7 +2146,7 @@ components:
         full_name: { type: string }
         role:
           type: string
-          enum: [administrator, operator]
+          enum: [administrator, operator, dashboard]
         must_reset_password: { type: boolean }
         geo_wizard_dismissed: { type: boolean }
         authDisabled: { type: boolean }

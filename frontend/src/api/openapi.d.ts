@@ -4122,7 +4122,7 @@ export interface components {
             username: string;
             full_name?: string;
             /** @enum {string} */
-            role: "administrator" | "operator";
+            role: "administrator" | "operator" | "dashboard";
             must_reset_password?: boolean;
             geo_wizard_dismissed?: boolean;
             authDisabled?: boolean;

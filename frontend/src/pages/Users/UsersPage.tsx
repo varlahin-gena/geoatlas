@@ -165,6 +165,7 @@ export default function UsersPage() {
                             }}
                           >
                             <option value="operator">Оператор</option>
+                            <option value="dashboard">Дэшборд</option>
                             <option value="administrator">Администратор</option>
                           </select>
                         </td>
@@ -265,6 +266,7 @@ export default function UsersPage() {
               <label htmlFor="cRole">Роль</label>
               <select id="cRole" value={role} onChange={(e) => setRole(e.target.value)}>
                 <option value="operator">Оператор</option>
+                <option value="dashboard">Дэшборд</option>
                 <option value="administrator">Администратор</option>
               </select>
             </div>

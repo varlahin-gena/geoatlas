@@ -172,7 +172,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if h.sessions != nil {
-		SetCookie(w, r, out.Token, h.sessions.TTL())
+		SetCookie(w, r, out.Token, auth.CookieTTLForRole(out.User.Role, h.sessions.TTL()))
 	}
 	writeJSON(w, http.StatusOK, userResponse(out.User))
 }
@@ -223,7 +223,7 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "auth not configured"})
 		return
 	}
-	EnsureCSRFCookie(w, r, h.authUC.SessionTTL())
+	EnsureCSRFCookie(w, r, auth.CookieTTLForRole(sess.Role, h.authUC.SessionTTL()))
 	writeJSON(w, http.StatusOK, h.withModuleFlags(userPublicResponse(pub)))
 }
 
@@ -270,7 +270,7 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.sessions != nil {
-		SetCookie(w, r, out.Token, h.sessions.TTL())
+		SetCookie(w, r, out.Token, auth.CookieTTLForRole(out.User.Role, h.sessions.TTL()))
 	}
 	writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
 		Actor:        sess.Username,

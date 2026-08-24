@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthContext';
 import { isAbortError } from '@/api/client';
 import { fetchSystemStatus, fetchSystemVersion } from '@/api/system';
-import { ROLE_ADMIN } from '@/api/types';
+import { roleLabelRu } from '@/auth/roles';
 import { themeLabel } from '@/auth/theme';
 import { usePolling } from '@/lib/usePolling';
 import { filterNav, PAGE_NAV } from './nav';
@@ -85,7 +85,7 @@ export function UserMenu() {
 
   const fio = (user.full_name || '').trim();
   const displayName = fio || user.username;
-  const roleRu = user.role === ROLE_ADMIN ? 'Администратор' : 'Оператор';
+  const roleRu = roleLabelRu(user.role);
 
   return (
     <div className={`ga-user-menu${open ? ' open' : ''}`} ref={ref}>

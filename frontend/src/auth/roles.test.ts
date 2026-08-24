@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ROLE_ADMIN, ROLE_OPERATOR, type AuthUser } from '@/api/types';
-import { deriveIsAdmin, deriveReputationEnabled, deriveUiAuthEnabled } from './roles';
+import { ROLE_ADMIN, ROLE_DASHBOARD, ROLE_OPERATOR, type AuthUser } from '@/api/types';
+import { deriveIsAdmin, deriveReputationEnabled, deriveUiAuthEnabled, roleLabelRu } from './roles';
 
 function user(partial: Partial<AuthUser> & Pick<AuthUser, 'username' | 'role'>): AuthUser {
   return { reputationEnabled: true, ...partial };
@@ -18,6 +18,10 @@ describe('deriveIsAdmin', () => {
 
   it('is false for operator', () => {
     expect(deriveIsAdmin(user({ username: 'o', role: ROLE_OPERATOR }))).toBe(false);
+  });
+
+  it('is false for dashboard', () => {
+    expect(deriveIsAdmin(user({ username: 'd', role: ROLE_DASHBOARD }))).toBe(false);
   });
 
   it('is true when auth is disabled (appliance mode)', () => {
@@ -41,5 +45,13 @@ describe('deriveReputationEnabled / deriveUiAuthEnabled', () => {
       deriveUiAuthEnabled(user({ username: 'a', role: ROLE_ADMIN, authDisabled: true })),
     ).toBe(false);
     expect(deriveUiAuthEnabled(user({ username: 'a', role: ROLE_ADMIN }))).toBe(true);
+  });
+});
+
+describe('roleLabelRu', () => {
+  it('maps roles to Russian labels', () => {
+    expect(roleLabelRu(ROLE_ADMIN)).toBe('Администратор');
+    expect(roleLabelRu(ROLE_OPERATOR)).toBe('Оператор');
+    expect(roleLabelRu(ROLE_DASHBOARD)).toBe('Дэшборд');
   });
 });
