@@ -10,7 +10,8 @@ import {
 } from '@/api/users';
 import { useAuth } from '@/auth/AuthContext';
 import type { UserRole } from '@/api/types';
-import { ROLE_OPERATOR, USER_ROLE_OPTIONS } from '@/auth/roles';
+import { ROLE_OPERATOR } from '@/api/types';
+import { USER_ROLE_OPTIONS } from '@/auth/roles';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useToast } from '@/components/Toast';
 import { fmtDate } from '@/lib/format';
