@@ -4,11 +4,13 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"testing"
 
 	"gopkg.in/yaml.v3"
 
+	"geoatlas/internal/auth"
 	"geoatlas/internal/config"
 )
 
@@ -269,5 +271,46 @@ func TestOpenAPIAuthEventsStatusCodes(t *testing.T) {
 	ref, ok = appJSON["schema"].(map[string]any)["$ref"].(string)
 	if !ok || !strings.HasSuffix(ref, "EventsResponse") {
 		t.Fatalf("events 200 schema ref = %v", appJSON["schema"])
+	}
+}
+
+func roleEnumFromSchema(t *testing.T, doc openAPIDoc, schemaName string) []string {
+	t.Helper()
+	props := schemaProps(t, doc, schemaName)
+	roleProp, ok := props["role"].(map[string]any)
+	if !ok {
+		t.Fatalf("schema %q: role property missing", schemaName)
+	}
+	raw, ok := roleProp["enum"].([]any)
+	if !ok || len(raw) == 0 {
+		t.Fatalf("schema %q: role.enum missing", schemaName)
+	}
+	out := make([]string, 0, len(raw))
+	for _, v := range raw {
+		s, ok := v.(string)
+		if !ok || s == "" {
+			t.Fatalf("schema %q: invalid role enum entry %v", schemaName, v)
+		}
+		out = append(out, s)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func TestOpenAPIRoleEnumsMatchAuth(t *testing.T) {
+	doc := loadOpenAPIDoc(t)
+	want := append([]string(nil), auth.AllRoles()...)
+	sort.Strings(want)
+
+	for _, schema := range []string{"AuthUser", "AuthUserPublic"} {
+		got := roleEnumFromSchema(t, doc, schema)
+		if len(got) != len(want) {
+			t.Fatalf("%s role enum = %v, want %v", schema, got, want)
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Fatalf("%s role enum = %v, want %v", schema, got, want)
+			}
+		}
 	}
 }

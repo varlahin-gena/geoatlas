@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ROLE_ADMIN, ROLE_DASHBOARD, ROLE_OPERATOR, type AuthUser } from '@/api/types';
-import { deriveIsAdmin, deriveReputationEnabled, deriveUiAuthEnabled, roleLabelRu } from './roles';
+import { deriveIsAdmin, deriveReputationEnabled, deriveUiAuthEnabled, roleLabelRu, USER_ROLES } from './roles';
 
 function user(partial: Partial<AuthUser> & Pick<AuthUser, 'username' | 'role'>): AuthUser {
   return { reputationEnabled: true, ...partial };
@@ -45,6 +45,12 @@ describe('deriveReputationEnabled / deriveUiAuthEnabled', () => {
       deriveUiAuthEnabled(user({ username: 'a', role: ROLE_ADMIN, authDisabled: true })),
     ).toBe(false);
     expect(deriveUiAuthEnabled(user({ username: 'a', role: ROLE_ADMIN }))).toBe(true);
+  });
+});
+
+describe('USER_ROLES', () => {
+  it('matches OpenAPI role enum order used in /users UI', () => {
+    expect(USER_ROLES).toEqual([ROLE_OPERATOR, ROLE_DASHBOARD, ROLE_ADMIN]);
   });
 });
 

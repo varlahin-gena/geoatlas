@@ -18,3 +18,8 @@ func HasPersistentSession(role string) bool {
 func ValidRole(role string) bool {
 	return role == RoleAdministrator || role == RoleOperator || role == RoleDashboard
 }
+
+// AllRoles — канонический список UI-ролей (SoT для OpenAPI enum и тестов).
+func AllRoles() []string {
+	return []string{RoleAdministrator, RoleOperator, RoleDashboard}
+}

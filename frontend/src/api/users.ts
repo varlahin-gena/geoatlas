@@ -19,7 +19,7 @@ export function listUserDirectory(): Promise<{ users?: UserDirectoryEntry[] }> {
 export function createUser(body: {
   username: string;
   password: string;
-  role: string;
+  role: UserRole;
   full_name?: string;
   must_reset_password?: boolean;
 }): Promise<UserRow> {

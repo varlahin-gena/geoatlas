@@ -213,6 +213,69 @@ func TestRequireAdminMWDeniesStickyAdminAfterDemote(t *testing.T) {
 	}
 }
 
+func TestRequireAdminMWForbiddenForDashboard(t *testing.T) {
+	mgr, err := auth.NewSessionManager("mw-secret", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, _, err := mgr.Issue("wall", auth.RoleDashboard, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}), requireAdminMW(newBearerAuth([]string{"api-token"}, nil, nil), mgr, nil, false))
+	req := httptest.NewRequest(http.MethodGet, "/api/system/stats", nil)
+	req.AddCookie(&http.Cookie{Name: auth.CookieName, Value: token})
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", rec.Code)
+	}
+}
+
+func TestRequireLoginMWAllowsDashboard(t *testing.T) {
+	mgr, err := auth.NewSessionManager("mw-secret", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, _, err := mgr.Issue("wall", auth.RoleDashboard, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}), requireLoginMW(newBearerAuth([]string{"api-token"}, nil, nil), mgr, nil, false))
+	req := httptest.NewRequest(http.MethodGet, "/api/events", nil)
+	req.AddCookie(&http.Cookie{Name: auth.CookieName, Value: token})
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want 204", rec.Code)
+	}
+}
+
+func TestOpsMWForbidsDashboard(t *testing.T) {
+	mgr, err := auth.NewSessionManager("mw-secret", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, _, err := mgr.Issue("wall", auth.RoleDashboard, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}), requireOpsMW(newBearerAuth([]string{"api-token"}, nil, nil), mgr, nil, false, false))
+	req := httptest.NewRequest(http.MethodPost, "/upload-logs", nil)
+	req.AddCookie(&http.Cookie{Name: auth.CookieName, Value: token})
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", rec.Code)
+	}
+}
+
 func TestRequireLoginMWAllowsSession(t *testing.T) {
 	mgr, err := auth.NewSessionManager("mw-secret", time.Hour)
 	if err != nil {

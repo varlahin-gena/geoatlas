@@ -9,6 +9,8 @@ import {
   type UserRow,
 } from '@/api/users';
 import { useAuth } from '@/auth/AuthContext';
+import type { UserRole } from '@/api/types';
+import { ROLE_OPERATOR, USER_ROLE_OPTIONS } from '@/auth/roles';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useToast } from '@/components/Toast';
 import { fmtDate } from '@/lib/format';
@@ -23,7 +25,7 @@ export default function UsersPage() {
   const [fio, setFio] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('operator');
+  const [role, setRole] = useState<UserRole>(ROLE_OPERATOR);
   const [mustReset, setMustReset] = useState(true);
   const [resetTarget, setResetTarget] = useState<string | null>(null);
   const [resetPass, setResetPass] = useState('');
@@ -48,7 +50,7 @@ export default function UsersPage() {
     setUsername('');
     setPassword('');
     setFio('');
-    setRole('operator');
+    setRole(ROLE_OPERATOR);
     setMustReset(true);
   }
 
@@ -164,9 +166,11 @@ export default function UsersPage() {
                               }
                             }}
                           >
-                            <option value="operator">Оператор</option>
-                            <option value="dashboard">Дэшборд</option>
-                            <option value="administrator">Администратор</option>
+                            {USER_ROLE_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
                           </select>
                         </td>
                         <td>
@@ -264,10 +268,12 @@ export default function UsersPage() {
             </div>
             <div className="field">
               <label htmlFor="cRole">Роль</label>
-              <select id="cRole" value={role} onChange={(e) => setRole(e.target.value)}>
-                <option value="operator">Оператор</option>
-                <option value="dashboard">Дэшборд</option>
-                <option value="administrator">Администратор</option>
+              <select id="cRole" value={role} onChange={(e) => setRole(e.target.value as UserRole)}>
+                {USER_ROLE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
               </select>
             </div>
             <label className="checkbox">

@@ -30,6 +30,17 @@ test.describe('auth / CSRF / roles', () => {
     await expect(page.locator('#map-main')).toBeVisible({ timeout: 15_000 });
   });
 
+  test('dashboard is blocked from /system like operator', async ({ page }) => {
+    await installSessionMocks(page, 'dashboard');
+    await seedCsrf(page);
+    await loginAs(page, 'wall');
+    await expect(page).toHaveURL(/\/$/);
+
+    await page.goto('/system');
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.locator('#map-main')).toBeVisible({ timeout: 15_000 });
+  });
+
   test('admin can open /system', async ({ page }) => {
     await installSessionMocks(page, 'administrator');
     await seedCsrf(page);

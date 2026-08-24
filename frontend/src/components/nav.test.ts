@@ -8,6 +8,19 @@ import {
   type NavItem,
 } from './nav';
 
+describe('filterNav role access', () => {
+  it('operator and dashboard share non-admin nav (map + anomalies, no system)', () => {
+    const opts = { isAdmin: false, reputationEnabled: true, uiAuthEnabled: true };
+    const operatorNav = filterNav(PAGE_NAV, opts);
+    const dashboardNav = filterNav(PAGE_NAV, opts);
+    expect(operatorNav.map((i) => i.href)).toEqual(dashboardNav.map((i) => i.href));
+    expect(operatorNav.some((i) => i.href === '/')).toBe(true);
+    expect(operatorNav.some((i) => i.href === '/anomalies')).toBe(true);
+    expect(operatorNav.some((i) => i.href === '/system')).toBe(false);
+    expect(operatorNav.some((i) => i.href === '/users')).toBe(false);
+  });
+});
+
 describe('groupNav', () => {
   it('orders sections and skips empty groups', () => {
     const items = filterNav(PAGE_NAV, {

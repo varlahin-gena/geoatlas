@@ -2379,7 +2379,7 @@ components:
       properties:
         username: { type: string }
         full_name: { type: string }
-        role: { type: string, enum: [administrator, operator] }
+        role: { type: string, enum: [administrator, operator, dashboard] }
         must_reset_password: { type: boolean }
         created_at: { type: string }
 
