@@ -17,7 +17,8 @@ export async function ensureCsrfCookie(): Promise<void> {
   if (csrfToken() || window.GA_CONFIG?.apiAuthToken) return;
   if (!csrfEnsurePromise) {
     csrfEnsurePromise = fetch('/api/auth/me', { credentials: 'same-origin' })
-      .catch(() => undefined)
+      .catch(() => {})
+      .then(() => {})
       .finally(() => {
         csrfEnsurePromise = null;
       });
