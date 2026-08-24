@@ -9,6 +9,14 @@ import (
 	"geoatlas/internal/installprofile"
 )
 
+// BackendSoftMemLimitBytes — 75% cgroup backend для проверки peak HeapAlloc при GeoIP replace.
+func BackendSoftMemLimitBytes(memoryGB int) uint64 {
+	if memoryGB <= 0 {
+		return 0
+	}
+	return uint64(memoryGB) * 3 * (1 << 30) / 4
+}
+
 // GeoUploadDefaultsForBackendMemoryGB — безопасные лимиты upload/replace GeoIP
 // относительно cgroup backend (пиковый RAM ≈ старый индекс + новый CSV в памяти).
 func GeoUploadDefaultsForBackendMemoryGB(gb int) (maxBytes int64, maxRanges int) {

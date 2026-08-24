@@ -49,8 +49,7 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 	geoUC.SetEnterpriseStore(geoRepo)
 	geoUC.SetHeavySlot(a.heavy)
 	if p, err := installprofile.Load(cfg.InstallProfilePath); err == nil && p != nil && p.Limits.Backend.MemoryGB > 0 {
-		// 75% cgroup backend → soft ceiling для HeapAlloc+upload snapshot.
-		geoUC.SetSoftMemLimitBytes(uint64(p.Limits.Backend.MemoryGB) * 3 / 4 * (1 << 30))
+		geoUC.SetSoftMemLimitBytes(config.BackendSoftMemLimitBytes(p.Limits.Backend.MemoryGB))
 	}
 	parseErrorsUC := parseerrors.New(perrorstore.NewParseErrorRepository(a.pools.API, a.pools.Ingest))
 	parseTestAdapter := parseradapter.NewParseTest(parsers)

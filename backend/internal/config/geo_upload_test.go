@@ -21,3 +21,14 @@ func TestGeoUploadDefaultsForBackendMemoryGB(t *testing.T) {
 		}
 	}
 }
+
+func TestBackendSoftMemLimitBytes(t *testing.T) {
+	if got := BackendSoftMemLimitBytes(0); got != 0 {
+		t.Fatalf("zero gb: got=%d", got)
+	}
+	// 2 GiB profile → 1.5 GiB soft (не 1 GiB из-за uint64*3/4 до умножения на GiB).
+	want := uint64(2) * 3 * (1 << 30) / 4
+	if got := BackendSoftMemLimitBytes(2); got != want {
+		t.Fatalf("gb=2 got=%d want=%d", got, want)
+	}
+}

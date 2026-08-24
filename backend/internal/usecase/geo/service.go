@@ -195,28 +195,66 @@ func (s *Service) checkUploadLimits(n int, dryRun bool) error {
 	return nil
 }
 
-// rejectInsufficientMemHeadroom — A3: не коммитить replace, если HeapAlloc+new≈peak не влезает.
+// rejectInsufficientMemHeadroom — A3: не коммитить replace, если оценка peak не влезает в soft limit.
+// CSV уже распарсен: HeapAlloc включает working set; при replace кратковременно держим old+new snapshot.
 func (s *Service) rejectInsufficientMemHeadroom(built *geoip.BuiltSnapshot, n int) error {
 	if s == nil || s.softMemLimit == 0 {
 		return nil
 	}
-	var newBytes uint64
-	if built != nil {
-		newBytes = built.ApproxBytes()
-	} else if n > 0 {
-		newBytes = uint64(n) * 48
-	}
+	newBytes := snapshotApproxBytes(built, n)
+	oldBytes := s.indexApproxBytes()
+
 	var ms runtime.MemStats
 	runtime.ReadMemStats(&ms)
-	const reserve = 512 << 20 // 512 MiB запас под ingest/HTTP
-	peak := ms.HeapAlloc + newBytes
+
+	peak := ms.HeapAlloc
+	if oldBytes > 0 && newBytes > 0 {
+		peak = estimateReplacePeak(ms.HeapAlloc, oldBytes, newBytes)
+	}
+
+	reserve := headroomReserve(s.softMemLimit)
 	if peak+reserve > s.softMemLimit {
 		return apperr.Conflict(fmt.Sprintf(
-			"geo replace would exceed memory headroom (heap=%d MiB, upload≈%d MiB, soft_limit=%d MiB); clear geo_ranges first, use smaller CSV, or raise backend memory profile",
-			ms.HeapAlloc>>20, newBytes>>20, s.softMemLimit>>20,
+			"geo replace would exceed memory headroom (peak=%d MiB, reserve=%d MiB, soft_limit=%d MiB); clear geo_ranges first, use smaller CSV, or raise backend memory profile",
+			peak>>20, reserve>>20, s.softMemLimit>>20,
 		))
 	}
 	return nil
+}
+
+func snapshotApproxBytes(built *geoip.BuiltSnapshot, n int) uint64 {
+	if built != nil {
+		return built.ApproxBytes()
+	}
+	if n > 0 {
+		return uint64(n) * 48
+	}
+	return 0
+}
+
+// estimateReplacePeak — кратковременный overlap old+new compact snapshot + parse overhead (ranges slice).
+func estimateReplacePeak(heapAlloc, oldBytes, newBytes uint64) uint64 {
+	parseOverhead := uint64(0)
+	if heapAlloc > oldBytes+newBytes {
+		parseOverhead = heapAlloc - oldBytes - newBytes
+	}
+	return parseOverhead + oldBytes + newBytes
+}
+
+func headroomReserve(softLimit uint64) uint64 {
+	if softLimit == 0 {
+		return 0
+	}
+	reserve := softLimit / 8
+	const minReserve = 128 << 20
+	const maxReserve = 384 << 20
+	if reserve < minReserve {
+		return minReserve
+	}
+	if reserve > maxReserve {
+		return maxReserve
+	}
+	return reserve
 }
 
 // --- Ranges ---

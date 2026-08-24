@@ -187,6 +187,7 @@ describe('apiFetchRaw', () => {
 describe('apiGet / apiPost', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    document.cookie = 'ga_csrf=; Max-Age=0; path=/';
   });
 
   it('GET /api/auth/me does not dispatch session-expired on 401', async () => {
@@ -207,6 +208,7 @@ describe('apiGet / apiPost', () => {
   });
 
   it('POST /api/auth/login sends JSON body', async () => {
+    document.cookie = 'ga_csrf=test-csrf';
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ username: 'admin', role: 'administrator', reputationEnabled: true }), {
         status: 200,

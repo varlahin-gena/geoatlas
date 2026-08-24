@@ -5,6 +5,17 @@
 
 ## [Unreleased]
 
+## [2.0.2] — 2026-08-24
+
+### Fixed
+- GeoIP upload через UI: CSRF (`X-CSRF-Token` через nginx, `ensureCsrfCookie` перед POST) — ошибка «csrf token missing or invalid».
+- GeoIP re-upload: проверка memory headroom не блокировала commit на профиле 2 GiB — исправлен soft limit (1.5 GiB вместо 1 GiB), убран двойной подсчёт upload поверх HeapAlloc, reserve 128–384 MiB.
+
+### Notes
+- OpenAPI API doc version: **1.14.0** (без изменений)
+- Продуктовая версия: **2.0.2**
+- После обновления: `docker compose build backend frontend && docker compose up -d`
+
 ## [2.0.1] — 2026-08-23
 
 ### Fixed
@@ -383,6 +394,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.0.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.0.2
 [2.0.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.0.1
 [2.0.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.0.0
 [1.4.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v1.4.2

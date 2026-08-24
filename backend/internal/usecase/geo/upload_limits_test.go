@@ -206,3 +206,31 @@ func TestUploadCSVRejectsMemHeadroom(t *testing.T) {
 		t.Fatalf("dry_run must skip headroom: %v", err)
 	}
 }
+
+func TestEstimateReplacePeak(t *testing.T) {
+	const mib = 1 << 20
+	got := estimateReplacePeak(1070*mib, 200*mib, 131*mib)
+	if got != 1070*mib {
+		t.Fatalf("peak=%d MiB want 1070", got>>20)
+	}
+	if estimateReplacePeak(500*mib, 0, 100*mib) != 500*mib {
+		t.Fatal("empty old index should use heap as-is")
+	}
+}
+
+func TestUploadCSVReplaceWithinHeadroom(t *testing.T) {
+	idx := geoip.New()
+	idx.ReplaceRanges(nRanges(2))
+	store := &uploadStore{}
+	codec := &uploadCodec{ranges: nRanges(3)}
+	svc := New(store, uploadMissing{}, idx, nil, codec, 10)
+	svc.SetSoftMemLimitBytes(2 << 30) // 2 GiB — типичный re-upload после parse не должен резаться
+
+	res, err := svc.UploadCSV(context.Background(), bytes.NewReader(nil), false)
+	if err != nil {
+		t.Fatalf("replace within headroom: %v", err)
+	}
+	if res.Count != 3 || store.replaced != 3 {
+		t.Fatalf("res=%+v replaced=%d", res, store.replaced)
+	}
+}
