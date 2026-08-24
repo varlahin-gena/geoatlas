@@ -5,6 +5,27 @@
 
 ## [Unreleased]
 
+## [2.1.0] — 2026-08-24
+
+Минорный релиз: роль **dashboard** для видеостены и единый контракт ролей API ↔ UI.
+
+### Added
+- Роль **dashboard**: доступ как у operator (карта и аномалии, без `/system` и админ-страниц); cookie-сессия не протухает по TTL (~10 лет / `Expires=-1`). Создаётся в UI `/users`. Смена пароля, `logout-all` и смена роли по-прежнему инвалидируют сессию.
+- Единый контракт ролей: backend `AllRoles()`, UI `USER_ROLE_OPTIONS`, OpenAPI enum `AuthUser` / `AuthUserPublic` — `administrator` | `operator` | `dashboard`.
+- CI: `scripts/check-module-identity.sh` — один Go-модуль `geoatlas`, вход `cmd/geoatlas` (без форка `network_monitor`).
+
+### Fixed
+- Frontend typecheck: `ROLE_OPERATOR` импортируется из `@/api/types`, а не как несуществующий re-export из `@/auth/roles`.
+- Тип промиса `ensureCsrfCookie` для `tsc`.
+
+### Changed
+- OpenAPI **1.15.0**: роль `dashboard` в схемах пользователя.
+
+### Notes
+- OpenAPI API doc version: **1.15.0**
+- Продуктовая версия: **2.1.0**
+- После обновления пересоберите frontend и backend: `docker compose build backend frontend && docker compose up -d`
+
 ## [2.0.2] — 2026-08-24
 
 ### Fixed
@@ -394,6 +415,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.1.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.0
 [2.0.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.0.2
 [2.0.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.0.1
 [2.0.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.0.0

@@ -48,7 +48,7 @@
 - Ручная загрузка логов через веб-интерфейс
 - Парсинг **UserGate, FortiGate, Cisco ASA, Cisco FTD (FirePower), Cowrie (honeypot)** и универсальный фолбэк (Generic KV)
 - **Осознанный пропуск** событий: распознанные, но несетевые строки (например, часть `cowrie.*`) не попадают в `parse_errors`
-- **Авторизация по умолчанию**: одна seed-учётка `admin`; роли `administrator` / `operator` (operator — через UI `/users`); cookie-сессии, CSRF, Bearer `API_AUTH_TOKEN` (+ `API_AUTH_PREVIOUS_TOKEN`); именованные API-токены со scopes `read`/`ops`/`admin` (UI `/api-tokens`); управление УЗ в UI
+- **Авторизация по умолчанию**: одна seed-учётка `admin`; роли `administrator` / `operator` / `dashboard` (operator и dashboard — через UI `/users`); cookie-сессии, CSRF, Bearer `API_AUTH_TOKEN` (+ `API_AUTH_PREVIOUS_TOKEN`); именованные API-токены со scopes `read`/`ops`/`admin` (UI `/api-tokens`); управление УЗ в UI. **dashboard** — карта и аномалии как у operator, сессия не протухает (видеостена)
 - Веб-интерфейс — **React SPA** (Vite + TypeScript)
 - Опциональный **HTTPS** на nginx со своими PEM-сертификатами (редирект HTTP→HTTPS)
 - Загрузка и правка **GeoIP-базы** (CSV SIEM KUMA, `/geo-ranges`, IP без координат на `/geo-missing`)
@@ -69,7 +69,7 @@
 - Страница системного мониторинга (Обзор / Pipeline / Безопасность / Графики / **Резервное копирование**): метрики контейнеров, пайплайна (в т.ч. **UDP/TCP EPS**, drops, circuit breaker), **форма TTL**, неуспешные логины, хранилище, профиль установки, **индикатор ёмкости**, алёрты; ручной maintenance backfill агрегатов
 - Индикатор здоровья системы на главной странице (ссылка на `/system`); **версия установки** (из пакета / `install-meta.json`) в меню пользователя
 - Docker: fail-closed секреты в compose, hardened контейнеры (`cap_drop: ALL`); запуск через `./start.sh`
-- Контракт HTTP API: [`openapi.yaml`](openapi.yaml) (OpenAPI **1.14.0**)
+- Контракт HTTP API: [`openapi.yaml`](openapi.yaml) (OpenAPI **1.15.0**)
 
 ---
 
@@ -248,7 +248,7 @@ http://<IP_сервера>/
 - пошаговая установка спрашивает пароль (дважды, мин. 8 символов);
 - `--full-auto` / нет TTY / голый `./start.sh` — берут `AUTH_ADMIN_PASSWORD` из окружения или генерируют одноразовый и пишут его в `.admin_password_once` (права 600; удалите после входа).
 
-Если пароль сгенерирован, при входе его нужно сменить (`must_reset_password`). Operator в процессе установки не создаётся — создайте в UI `/users`.
+Если пароль сгенерирован, при входе его нужно сменить (`must_reset_password`). Operator и dashboard в процессе установки не создаются — создайте в UI `/users` (dashboard — для видеостены: долгая сессия, только карта и аномалии).
 `./start.sh` при необходимости генерирует `API_AUTH_TOKEN`, `SESSION_SECRET`, пароль admin и `CLICKHOUSE_PASSWORD` в `.env` (ключи без значений — [`.env.example`](.env.example)).
 Голый `docker compose up` без `AUTH_ADMIN_PASSWORD` / `CLICKHOUSE_PASSWORD` в `.env` не стартует (fail-closed).
 
@@ -271,7 +271,7 @@ http://<IP_сервера>/
 **Общий первый шаг на сервере** (Ubuntu и Oracle Linux одинаково):
 
 ```bash
-VER=1.4.2   # или нужный релиз
+VER=2.1.0   # или нужный релиз
 cd /tmp
 curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz"
 curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz.sha256"
@@ -337,7 +337,7 @@ sudo ./deploy/ubuntu/install_ubuntu.sh --full-auto
 
 | Модуль           | По умолчанию | Что даёт                                                                        |
 |------------------|--------------|---------------------------------------------------------------------------------|
-| UI-авторизация   | вкл.         | логин, роли admin/operator (`AUTH_DISABLED` при отказе)                         |
+| UI-авторизация   | вкл.         | логин, роли admin/operator/dashboard (`AUTH_DISABLED` при отказе)               |
 | API Bearer-токен | вкл.         | защита мутирующих API (`API_AUTH_DISABLED` при отказе)                          |
 | syslog-ng        | вкл.         | приём syslog на `:514` (Compose profile `syslog`)                               |
 | stats-collector  | вкл.         | метрики / `/system` (Compose profile `stats`)                                   |
@@ -750,7 +750,7 @@ docker compose exec clickhouse sh -c 'clickhouse-client --password "$CLICKHOUSE_
 **Единственный путь обновления** — скачать пакет на сервер, проверить SHA-256, `./update.sh`:
 
 ```bash
-VER=1.4.2   # нужный релиз
+VER=2.1.0   # нужный релиз
 cd /tmp
 curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz"
 curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz.sha256"
@@ -936,7 +936,7 @@ Compact-снимок индекса пишется в `/app/data/geo_index.snap`
 
 | URL                    | Страница              | Основные возможности                                                                                                                                 |
 |------------------------|-----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `/login`               | Вход                  | Логин (роли admin / operator); смена пароля при `must_reset_password`                                                                                |
+| `/login`               | Вход                  | Логин (роли admin / operator / dashboard); смена пароля при `must_reset_password`                                                                    |
 | `/`                    | Карта / глобус        | 2D/3D, группировка, фильтры status/репутации, конструктор поиска и шаблоны, порог событий, mono-дуги, экспорт PNG, загрузка логов/GeoIP, health pill |
 | `/reputation`          | Репутация IP          | Списки и URL-фиды, каталог источников, refresh по расписанию, ручная загрузка; модуль можно отключить при установке                                  |
 | `/parse-errors`        | Журнал ошибок парсинга| Поиск, удаление выбранных / всех, отправка в тест парсеров                                                                                           |
@@ -944,17 +944,17 @@ Compact-снимок индекса пишется в `/app/data/geo_index.snap`
 | `/geo-ranges`          | База GeoIP            | Просмотр/правка диапазонов, выгрузка CSV                                                                                                             |
 | `/parser-test`         | Тест парсеров         | До 200 строк за запрос, пресеты по вендорам, статусы parsed/skipped/error                                                                            |
 | `/system`              | Системный мониторинг  | Обзор / Pipeline (Syslog-NG queued/drops + ingest EPS) / Безопасность / Графики / Резервное копирование; алёрты, ёмкость, профиль установки          |
-| `/users`               | Учётные записи        | Список/создание УЗ (скрыто, если UI-auth выключен)                                                                                                   |
+| `/users`               | Учётные записи        | Список/создание УЗ: administrator, operator, dashboard (скрыто, если UI-auth выключен)                                                               |
 | `/api-tokens`          | API-токены            | Именованные Bearer со scope read/ops/admin; секрет показывается один раз                                                                             |
 | `/change-password`     | Смена пароля          | Смена своего пароля                                                                                                                                  |
 
-SPA (React Router): page-auth в UI; nginx `auth_request` для `/api/*`. Карта и смена пароля — любой залогиненный; system / parsers / geo / reputation / users / api-tokens — только **administrator**. Legacy `*.html` редиректятся на clean paths.
+SPA (React Router): page-auth в UI; nginx `auth_request` для `/api/*`. Карта и смена пароля — любой залогиненный (**administrator**, **operator**, **dashboard**); system / parsers / geo / reputation / users / api-tokens — только **administrator**. Роль **dashboard** отличается от operator длительной cookie-сессией (видеостена). Legacy `*.html` редиректятся на clean paths.
 
 Unit-тесты карты (репутация / heatmap focus / coords helpers): `cd frontend && npm test` (vitest). Контрактные grep-проверки UI: `bash scripts/frontend-smoke.sh`.
 
 ### HTTP API
 
-Контракт REST API (в т.ч. auth, events, geo, reputation, retention, tokens, search-templates, backups, аномалии, `/metrics`): [`openapi.yaml`](openapi.yaml), версия документа OpenAPI **1.14.0**. Пробы: `GET /api/live` (процесс), `GET /api/ready` (ClickHouse + ingest); `GET /api/health` — alias live. Остальные эндпоинты — cookie-сессия и/или Bearer (`API_AUTH_TOKEN` / именованный токен со scope). Prometheus scrape: `GET /metrics` (Bearer≥ops / administrator).
+Контракт REST API (в т.ч. auth, events, geo, reputation, retention, tokens, search-templates, backups, аномалии, `/metrics`): [`openapi.yaml`](openapi.yaml), версия документа OpenAPI **1.15.0**. Пробы: `GET /api/live` (процесс), `GET /api/ready` (ClickHouse + ingest); `GET /api/health` — alias live. Остальные эндпоинты — cookie-сессия и/или Bearer (`API_AUTH_TOKEN` / именованный токен со scope). Prometheus scrape: `GET /metrics` (Bearer≥ops / administrator).
 
 ## Лицензия
 
@@ -984,7 +984,7 @@ Unit-тесты карты (репутация / heatmap focus / coords helpers)
 geoatlas/
 ├── go.work                           # workspace: backend + stats-collector + pkg/chconn + pkg/syslogngstats
 ├── backend/                          # Go: API, парсеры, geoip, ingest
-│   ├── cmd/geoatlas/main.go
+│   ├── cmd/geoatlas/main.go          # единственный вход (модуль geoatlas)
 │   ├── Dockerfile
 │   └── internal/
 │       ├── adapter/
@@ -1030,6 +1030,7 @@ geoatlas/
 │   └── reset_data.sql / reset_data.sh
 ├── scripts/
 │   ├── check-release-contract.sh     # CI: VERSION / CHANGELOG / OpenAPI
+│   ├── check-module-identity.sh      # CI: один модуль geoatlas, cmd/geoatlas
 │   ├── ci-docker-build.sh            # CI: docker build backend / frontend / stats
 │   ├── ci-govulncheck.sh             # CI: govulncheck по Go-модулям
 │   ├── ci-sbom.sh                    # релиз: CycloneDX + SPDX из geoatlas-*.tar.gz
@@ -1061,7 +1062,7 @@ geoatlas/
 │   └── internal/
 │       ├── config/
 │       └── collector/
-├── openapi.yaml                      # контракт HTTP API (OpenAPI 1.11.0)
+├── openapi.yaml                      # контракт HTTP API (OpenAPI 1.15.0)
 ├── LICENSE / NOTICE                  # Apache License 2.0
 ├── SECURITY.md                       # как сообщать об уязвимостях
 ├── VERSION / CHANGELOG.md / RELEASING.md
