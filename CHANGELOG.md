@@ -5,6 +5,15 @@
 
 ## [Unreleased]
 
+## [2.1.2] — 2026-08-25
+
+### Fixed
+- GeoIP base search: text was client-side on first ~2000 rows; now server `?q=` for country/region/city; IP field accepts IPv4/CIDR/range.
+
+### Notes
+- OpenAPI API doc version: **1.15.0** (без изменений)
+- Продуктовая версия: **2.1.2**
+
 ## [2.1.1] — 2026-08-25
 
 Патч: офлайн-пакет с готовыми Docker-образами, только пошаговый установщик, фикс сборки syslog-ng.

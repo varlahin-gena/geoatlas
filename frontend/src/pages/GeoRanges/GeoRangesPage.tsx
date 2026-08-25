@@ -11,6 +11,7 @@ import {
   updateGeoRange,
   type EnterpriseNet,
   type GeoRange,
+  type GeoRangesResponse,
 } from '@/api/geo';
 import { AdminLayout } from '@/components/AdminLayout';
 import { DataSectionNav } from '@/components/DataSectionNav';
@@ -28,6 +29,63 @@ function isIPv4(s: string): boolean {
   return true;
 }
 
+/** IP / CIDR / start-end → lookup params. Empty input → null. */
+function parseIPOrSubnet(
+  raw: string,
+):
+  | { mode: 'ip'; ip: string; label: string }
+  | { mode: 'network'; q: string; label: string }
+  | { mode: 'pending' }
+  | { mode: 'invalid'; message: string }
+  | null {
+  const v = String(raw || '').trim();
+  if (!v) return null;
+  if (isIPv4(v)) return { mode: 'ip', ip: v, label: v };
+
+  const cidr = v.match(/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\/(\d{1,2})$/);
+  if (cidr) {
+    const ip = cidr[1];
+    const bits = Number(cidr[2]);
+    if (isIPv4(ip) && bits >= 0 && bits <= 32) {
+      return { mode: 'ip', ip, label: v };
+    }
+  }
+
+  const range = v.match(
+    /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s*-\s*(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/,
+  );
+  if (range && isIPv4(range[1]) && isIPv4(range[2])) {
+    return { mode: 'network', q: `${range[1]}-${range[2]}`, label: v };
+  }
+
+  // Ещё дописывают IP/CIDR/range — не считаем ошибкой.
+  if (/^[\d./\s-]+$/.test(v)) return { mode: 'pending' };
+
+  return {
+    mode: 'invalid',
+    message: 'Введите IPv4, CIDR (a.b.c.d/n) или диапазон a.b.c.d-e.f.g.h',
+  };
+}
+
+type GeoListParams = { ip?: string; q?: string; limit?: number };
+
+function resolveGeoSearch(textQ: string, ipOrSubnet: string): {
+  params?: GeoListParams;
+  ipLabel?: string;
+  error?: string;
+  pending?: boolean;
+} {
+  const net = parseIPOrSubnet(ipOrSubnet);
+  if (net?.mode === 'pending') return { pending: true };
+  if (net?.mode === 'invalid') return { error: net.message };
+  if (net?.mode === 'ip') return { params: { ip: net.ip }, ipLabel: net.label };
+  if (net?.mode === 'network') return { params: { q: net.q, limit: 200 }, ipLabel: net.label };
+
+  const q = textQ.trim();
+  if (q) return { params: { q, limit: 2000 } };
+  return {};
+}
+
 export default function GeoRangesPage() {
   const { toast } = useToast();
   const [params] = useSearchParams();
@@ -40,9 +98,13 @@ export default function GeoRangesPage() {
   });
   const [rows, setRows] = useState<GeoRange[]>([]);
   const [totalInDb, setTotalInDb] = useState(0);
+  const [shownCount, setShownCount] = useState(0);
+  const [filteredCount, setFilteredCount] = useState(0);
+  const [truncated, setTruncated] = useState(false);
   const [uploadMaxBytes, setUploadMaxBytes] = useState(0);
   const [uploadMaxRanges, setUploadMaxRanges] = useState(0);
   const [ipLookupActive, setIpLookupActive] = useState(false);
+  const [textSearchActive, setTextSearchActive] = useState(false);
   const [edit, setEdit] = useState<GeoRange | null>(null);
   const [form, setForm] = useState({
     original_network: '',
@@ -64,39 +126,63 @@ export default function GeoRangesPage() {
   const [manualLabel, setManualLabel] = useState('');
 
   const load = useCallback(async () => {
-    const ip = ipSearch.trim();
-    let lookup = false;
-    if (ip && isIPv4(ip)) {
-      lookup = true;
-    } else if (ip) {
-      setIpStatus({ mode: 'miss', text: 'Введите корректный IPv4' });
+    const resolved = resolveGeoSearch(q, ipSearch);
+    if (resolved.pending) return;
+    if (resolved.error) {
+      setIpStatus({ mode: 'miss', text: resolved.error });
       setIpLookupActive(false);
+      setTextSearchActive(false);
+      setRows([]);
+      setShownCount(0);
+      setFilteredCount(0);
+      setTruncated(false);
       return;
-    } else {
+    }
+    const lookup = Boolean(resolved.params?.ip);
+    const subnetViaQ = Boolean(resolved.params?.q && resolved.ipLabel);
+    const textQ = Boolean(resolved.params?.q) && !lookup && !subnetViaQ;
+    setIpLookupActive(lookup || subnetViaQ);
+    setTextSearchActive(textQ);
+    if (!lookup && !subnetViaQ) {
       setIpStatus({ mode: '', text: '' });
     }
-    setIpLookupActive(lookup);
     try {
-      const data = await fetchGeoRanges(
-        lookup ? { ip } : undefined,
-      );
-      setRows(data.ranges || []);
-      setTotalInDb(Number(data.count) || (data.ranges || []).length);
+      const data = (await fetchGeoRanges(resolved.params)) as GeoRangesResponse & {
+        shown?: number;
+        filtered?: number;
+        truncated?: boolean;
+      };
+      const list = data.ranges || [];
+      setRows(list);
+      setTotalInDb(Number(data.count) || list.length);
+      const shown = Number(data.shown);
+      const filtered = Number(data.filtered);
+      setShownCount(Number.isFinite(shown) && shown >= 0 ? shown : list.length);
+      setFilteredCount(Number.isFinite(filtered) && filtered >= 0 ? filtered : list.length);
+      setTruncated(Boolean(data.truncated));
       if (data.limits) {
         setUploadMaxBytes(Number(data.limits.upload_max_bytes) || 0);
         setUploadMaxRanges(Number(data.limits.upload_max_ranges) || 0);
       }
-      if (lookup) {
+      if (lookup && resolved.ipLabel) {
         setIpStatus(
           data.ip_hit
-            ? { mode: 'hit', text: `Найден диапазон для ${ip}` }
-            : { mode: 'miss', text: `Нет диапазона для ${ip}` },
+            ? { mode: 'hit', text: `Найден диапазон для ${resolved.ipLabel}` }
+            : { mode: 'miss', text: `Нет диапазона для ${resolved.ipLabel}` },
         );
+      } else if (resolved.params?.q && resolved.ipLabel) {
+        setIpStatus(
+          list.length
+            ? { mode: 'hit', text: `Найдено по подсети ${resolved.ipLabel}` }
+            : { mode: 'miss', text: `Нет диапазона для ${resolved.ipLabel}` },
+        );
+      } else {
+        setIpStatus({ mode: '', text: '' });
       }
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Ошибка', 'error');
     }
-  }, [ipSearch, toast]);
+  }, [ipSearch, q, toast]);
 
   const loadEnterprise = useCallback(async () => {
     try {
@@ -119,17 +205,23 @@ export default function GeoRangesPage() {
 
   useEffect(() => {
     if (tab !== 'enterprise') return;
-    const q = entSearch.trim();
-    const ip = entIP.trim();
     const t = window.setTimeout(() => {
       void (async () => {
-        if (!q && !ip) {
+        const resolved = resolveGeoSearch(entSearch, entIP);
+        if (resolved.pending) return;
+        if (resolved.error) {
+          setEntHits([]);
+          return;
+        }
+        if (!resolved.params) {
           setEntHits([]);
           return;
         }
         try {
           const data = await fetchGeoRanges(
-            ip && isIPv4(ip) ? { ip } : q ? { q, limit: 200 } : undefined,
+            resolved.params.ip
+              ? { ip: resolved.params.ip }
+              : { q: resolved.params.q, limit: resolved.params.limit ?? 200 },
           );
           setEntHits(data.ranges || []);
         } catch (e) {
@@ -139,27 +231,6 @@ export default function GeoRangesPage() {
     }, 300);
     return () => window.clearTimeout(t);
   }, [tab, entSearch, entIP, toast]);
-
-  // SoT: text search is client-side; IP lookup is server-side ?ip=.
-  const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    if (!needle) return rows;
-    return rows.filter(
-      (r) =>
-        String(r.network || '')
-          .toLowerCase()
-          .includes(needle) ||
-        String(r.country || '')
-          .toLowerCase()
-          .includes(needle) ||
-        String(r.region || '')
-          .toLowerCase()
-          .includes(needle) ||
-        String(r.city || '')
-          .toLowerCase()
-          .includes(needle),
-    );
-  }, [rows, q]);
 
   const markedKeys = useMemo(() => {
     const s = new Set<string>();
@@ -470,16 +541,18 @@ export default function GeoRangesPage() {
             </form>
             <div className="toolbar" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
               <input
-                placeholder="Найти в GeoIP: город, организация, страна…"
+                placeholder="По тексту: страна, регион, город…"
                 value={entSearch}
                 onChange={(e) => setEntSearch(e.target.value)}
                 style={{ minWidth: 260 }}
+                aria-label="Поиск по текстовым полям GeoIP"
               />
               <input
-                placeholder="Или IP…"
+                placeholder="IP или подсеть…"
                 value={entIP}
                 onChange={(e) => setEntIP(e.target.value)}
-                style={{ minWidth: 140 }}
+                style={{ minWidth: 160 }}
+                aria-label="Поиск по IP или подсети"
               />
             </div>
             {(entSearch.trim() || entIP.trim()) ? (
@@ -595,18 +668,25 @@ export default function GeoRangesPage() {
           </div>
           <div>
             <div className="hint">Показано</div>
-            <b>{fmtNumber(filtered.length)}</b>
+            <b>{fmtNumber(shownCount || rows.length)}</b>
           </div>
+          {textSearchActive && filteredCount > shownCount ? (
+            <div>
+              <div className="hint">Найдено</div>
+              <b>{fmtNumber(filteredCount)}</b>
+            </div>
+          ) : null}
         </div>
         <div className="toolbar" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
           <input
-            placeholder="Поиск по Network, стране, городу…"
+            placeholder="По тексту: страна, регион, город…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            style={{ minWidth: 220 }}
+            style={{ minWidth: 240 }}
+            aria-label="Поиск по текстовым полям"
           />
           <input
-            placeholder="Найти по IP…"
+            placeholder="IP или подсеть (CIDR / range)…"
             value={ipSearch}
             onChange={(e) => setIpSearch(e.target.value)}
             onKeyDown={(e) => {
@@ -615,10 +695,12 @@ export default function GeoRangesPage() {
                 void load();
               }
             }}
-            style={{ minWidth: 160 }}
+            style={{ minWidth: 200 }}
+            aria-label="Поиск по IP или подсети"
           />
-          {ipStatus.text ? (
-            <span className={`hint${ipStatus.mode === 'hit' ? '' : ''}`}>{ipStatus.text}</span>
+          {ipStatus.text ? <span className="hint">{ipStatus.text}</span> : null}
+          {truncated && textSearchActive ? (
+            <span className="hint">показаны первые {fmtNumber(shownCount)} из {fmtNumber(filteredCount)}</span>
           ) : null}
           <button type="button" className="btn" onClick={() => void load()}>
             Обновить
@@ -640,19 +722,19 @@ export default function GeoRangesPage() {
               </tr>
             </thead>
             <tbody>
-              {!filtered.length ? (
+              {!rows.length ? (
                 <tr>
                   <td colSpan={7} className="empty">
                     {ipLookupActive
-                      ? 'IP не входит ни в один диапазон базы GeoIP'
-                      : rows.length
-                        ? 'Нет диапазонов по текстовому фильтру'
+                      ? 'IP/подсеть не входит ни в один диапазон базы GeoIP'
+                      : textSearchActive
+                        ? 'Нет диапазонов по текстовому запросу'
                         : 'Нет диапазонов — загрузите CSV или добавьте со страницы IP без координат'}
                   </td>
                 </tr>
               ) : (
-                filtered.map((r) => (
-                  <tr key={r.network} className={ipLookupActive ? 'ip-hit-row' : undefined}>
+                rows.map((r) => (
+                  <tr key={`${r.network}-${r.start_ip}-${r.end_ip}`} className={ipLookupActive ? 'ip-hit-row' : undefined}>
                     <td className="mono">{r.network}</td>
                     <td>{r.country}</td>
                     <td>{r.region}</td>
