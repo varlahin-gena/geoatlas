@@ -5,6 +5,15 @@
 
 ## [Unreleased]
 
+## [2.1.3] — 2026-08-25
+
+### Changed
+- «Сети предприятия»: тот же серверный поиск GeoIP, что на «База GeoIP» (`?q=` / IP·CIDR·range), счётчик «Показано», статус и кнопка «Обновить».
+
+### Notes
+- OpenAPI API doc version: **1.15.0** (без изменений)
+- Продуктовая версия: **2.1.3**
+
 ## [2.1.2] — 2026-08-25
 
 ### Fixed
@@ -443,6 +452,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.1.3]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.3
 [2.1.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.2
 [2.1.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.1
 [2.1.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.0

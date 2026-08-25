@@ -121,9 +121,14 @@ export default function GeoRangesPage() {
   const [entSearch, setEntSearch] = useState('');
   const [entIP, setEntIP] = useState('');
   const [entHits, setEntHits] = useState<GeoRange[]>([]);
+  const [entShown, setEntShown] = useState(0);
+  const [entFiltered, setEntFiltered] = useState(0);
+  const [entTruncated, setEntTruncated] = useState(false);
+  const [entStatus, setEntStatus] = useState('');
   const [entBusy, setEntBusy] = useState(false);
   const [manualNet, setManualNet] = useState('');
   const [manualLabel, setManualLabel] = useState('');
+  const [entSearchTick, setEntSearchTick] = useState(0);
 
   const load = useCallback(async () => {
     const resolved = resolveGeoSearch(q, ipSearch);
@@ -211,26 +216,56 @@ export default function GeoRangesPage() {
         if (resolved.pending) return;
         if (resolved.error) {
           setEntHits([]);
+          setEntShown(0);
+          setEntFiltered(0);
+          setEntTruncated(false);
+          setEntStatus(resolved.error);
           return;
         }
         if (!resolved.params) {
           setEntHits([]);
+          setEntShown(0);
+          setEntFiltered(0);
+          setEntTruncated(false);
+          setEntStatus('');
           return;
         }
         try {
-          const data = await fetchGeoRanges(
-            resolved.params.ip
-              ? { ip: resolved.params.ip }
-              : { q: resolved.params.q, limit: resolved.params.limit ?? 200 },
-          );
-          setEntHits(data.ranges || []);
+          // Same API as «База GeoIP»: ?ip= or ?q= (country/region/city/network).
+          const data = (await fetchGeoRanges(resolved.params)) as GeoRangesResponse & {
+            shown?: number;
+            filtered?: number;
+            truncated?: boolean;
+          };
+          const list = data.ranges || [];
+          setEntHits(list);
+          const shown = Number(data.shown);
+          const filtered = Number(data.filtered);
+          setEntShown(Number.isFinite(shown) && shown >= 0 ? shown : list.length);
+          setEntFiltered(Number.isFinite(filtered) && filtered >= 0 ? filtered : list.length);
+          setEntTruncated(Boolean(data.truncated));
+          if (resolved.params.ip && resolved.ipLabel) {
+            setEntStatus(
+              data.ip_hit
+                ? `Найден диапазон для ${resolved.ipLabel}`
+                : `Нет диапазона для ${resolved.ipLabel}`,
+            );
+          } else if (resolved.ipLabel) {
+            setEntStatus(
+              list.length
+                ? `Найдено по подсети ${resolved.ipLabel}`
+                : `Нет диапазона для ${resolved.ipLabel}`,
+            );
+          } else {
+            setEntStatus('');
+          }
         } catch (e) {
           toast(e instanceof Error ? e.message : 'Ошибка поиска', 'error');
         }
       })();
     }, 300);
     return () => window.clearTimeout(t);
-  }, [tab, entSearch, entIP, toast]);
+  }, [tab, entSearch, entIP, entSearchTick, toast]);
 
   const markedKeys = useMemo(() => {
     const s = new Set<string>();
@@ -544,65 +579,100 @@ export default function GeoRangesPage() {
                 placeholder="По тексту: страна, регион, город…"
                 value={entSearch}
                 onChange={(e) => setEntSearch(e.target.value)}
-                style={{ minWidth: 260 }}
+                style={{ minWidth: 240 }}
                 aria-label="Поиск по текстовым полям GeoIP"
               />
               <input
-                placeholder="IP или подсеть…"
+                placeholder="IP или подсеть (CIDR / range)…"
                 value={entIP}
                 onChange={(e) => setEntIP(e.target.value)}
-                style={{ minWidth: 160 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    setEntSearchTick((n) => n + 1);
+                  }
+                }}
+                style={{ minWidth: 200 }}
                 aria-label="Поиск по IP или подсети"
               />
+              {entStatus ? <span className="hint">{entStatus}</span> : null}
+              {entTruncated && (entSearch.trim() || entIP.trim()) ? (
+                <span className="hint">
+                  показаны первые {fmtNumber(entShown)} из {fmtNumber(entFiltered)}
+                </span>
+              ) : null}
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setEntSearchTick((n) => n + 1)}
+              >
+                Обновить
+              </button>
             </div>
             {(entSearch.trim() || entIP.trim()) ? (
-              <div className="card table-wrap" style={{ marginBottom: 16 }}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th scope="col">Network</th>
-                      <th scope="col">Country</th>
-                      <th scope="col">Region</th>
-                      <th scope="col">City</th>
-                      <th scope="col">
-                        <span className="visually-hidden">Действия</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {!entHits.length ? (
+              <>
+                <div className="summary" style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
+                  <div>
+                    <div className="hint">Показано</div>
+                    <b>{fmtNumber(entShown || entHits.length)}</b>
+                  </div>
+                  {entFiltered > entShown ? (
+                    <div>
+                      <div className="hint">Найдено</div>
+                      <b>{fmtNumber(entFiltered)}</b>
+                    </div>
+                  ) : null}
+                </div>
+                <div className="card table-wrap" style={{ marginBottom: 16 }}>
+                  <table>
+                    <thead>
                       <tr>
-                        <td colSpan={5} className="empty">
-                          Нет диапазонов по запросу
-                        </td>
+                        <th scope="col">Network</th>
+                        <th scope="col">Country</th>
+                        <th scope="col">Region</th>
+                        <th scope="col">City</th>
+                        <th scope="col">
+                          <span className="visually-hidden">Действия</span>
+                        </th>
                       </tr>
-                    ) : (
-                      entHits.map((r) => (
-                        <tr key={`${r.network}-${r.start_ip}-${r.end_ip}`}>
-                          <td className="mono">{r.network}</td>
-                          <td>{r.country}</td>
-                          <td>{r.region}</td>
-                          <td>{r.city}</td>
-                          <td>
-                            {isMarked(r) ? (
-                              <span className="hint">уже отмечен</span>
-                            ) : (
-                              <button
-                                type="button"
-                                className="btn primary"
-                                disabled={entBusy}
-                                onClick={() => void markRange(r)}
-                              >
-                                Отметить
-                              </button>
-                            )}
+                    </thead>
+                    <tbody>
+                      {!entHits.length ? (
+                        <tr>
+                          <td colSpan={5} className="empty">
+                            {entIP.trim()
+                              ? 'IP/подсеть не входит ни в один диапазон базы GeoIP'
+                              : 'Нет диапазонов по текстовому запросу'}
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                      ) : (
+                        entHits.map((r) => (
+                          <tr key={`${r.network}-${r.start_ip}-${r.end_ip}`}>
+                            <td className="mono">{r.network}</td>
+                            <td>{r.country}</td>
+                            <td>{r.region}</td>
+                            <td>{r.city}</td>
+                            <td>
+                              {isMarked(r) ? (
+                                <span className="hint">уже отмечен</span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="btn primary"
+                                  disabled={entBusy}
+                                  onClick={() => void markRange(r)}
+                                >
+                                  Отметить
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             ) : null}
             <h2 style={{ fontSize: 16, margin: '8px 0' }}>Отмеченные сети</h2>
             <div className="card table-wrap">
