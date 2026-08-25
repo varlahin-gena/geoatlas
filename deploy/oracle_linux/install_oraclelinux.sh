@@ -36,7 +36,7 @@ ${src_line}
   6. Порт веб-интерфейса
   7. Профиль производительности
   8. Файрвол
-  9. Запуск стека
+  9. Запуск стека (docker load из images/, если есть)
 EOF
 }
 
@@ -437,6 +437,7 @@ prepare_project() {
              deploy/common/select_https.sh \
              deploy/common/firewall_helpers.sh \
              deploy/common/ui.sh \
+             deploy/common/load_images.sh \
              deploy/common/admin_auth.sh \
              deploy/common/uninstall.sh \
              deploy/oracle_linux/install_oraclelinux.sh \

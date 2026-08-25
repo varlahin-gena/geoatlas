@@ -212,10 +212,24 @@ main() {
         chmod +x "${PROJECT_DIR}/start.sh" "${PROJECT_DIR}/stop.sh" "${PROJECT_DIR}/update.sh" 2>/dev/null || true
     fi
 
+    # shellcheck source=deploy/common/load_images.sh
+    if [[ -f "${PROJECT_DIR}/deploy/common/load_images.sh" ]]; then
+        # shellcheck source=/dev/null
+        source "${PROJECT_DIR}/deploy/common/load_images.sh"
+    elif [[ -f "${SCRIPT_DIR}/deploy/common/load_images.sh" ]]; then
+        # shellcheck source=/dev/null
+        source "${SCRIPT_DIR}/deploy/common/load_images.sh"
+    fi
+
     if [[ "$DO_START" == "1" ]]; then
-        log "Запуск ./start.sh (пересборка образов)…"
+        log "Запуск ./start.sh…"
         "${PROJECT_DIR}/start.sh"
     else
+        if declare -F ga_load_release_images >/dev/null 2>&1 \
+            && declare -F ga_release_images_present >/dev/null 2>&1 \
+            && ga_release_images_present "$PROJECT_DIR"; then
+            ga_load_release_images "$PROJECT_DIR"
+        fi
         log "Старт пропущен (--no-start). Запустите ${PROJECT_DIR}/start.sh"
     fi
 

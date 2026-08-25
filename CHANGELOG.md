@@ -5,11 +5,24 @@
 
 ## [Unreleased]
 
+## [2.1.1] — 2026-08-25
+
+Патч: офлайн-пакет с готовыми Docker-образами, только пошаговый установщик, фикс сборки syslog-ng.
+
+### Added
+- Офлайн-пакет Docker-образов: `bash scripts/pack-release.sh --with-images` кладёт `images/` (`docker save`); на сервере `./start.sh` делает `docker load` и `compose up` без `--build` / Docker Hub.
+
+### Fixed
+- syslog-ng Dockerfile: перед `apt-get update` удаляется apt-source `ose-repo.syslog-ng.com` из базового образа (часто 403 Forbidden и ломает сборку).
+
 ### Changed
 - Установщик: убран режим «Сделай мне хорошо» (`GA_FULL_AUTO` / `--full-auto`); осталась только пошаговая установка. Хелперы syslog для UFW/firewalld — в `deploy/common/firewall_helpers.sh`.
+- CI release: `pack-release.sh --with-images` — в GitHub Release попадает полный установочный tar с образами.
 
-### Security
-- syslog-ng: образ `geoatlas-syslog-ng` поверх `balabit/syslog-ng:4.12.0` — `apt-get upgrade` (util-linux, libssh2, protobuf, python3.13, …) и патч Python venv: `pyasn1==0.6.4`, `aiohttp==3.14.3`, `idna==3.15`, `msgpack==1.2.1`, `setuptools==83.0.0`; pip удаляется после патча (Trivy FP setuptools 70.3 из `bom.cdx.json`). Конфиг `@version: 4.12`. Image scan также на `push` в `main`/`develop`.
+### Notes
+- OpenAPI API doc version: **1.15.0** (без изменений)
+- Продуктовая версия: **2.1.1**
+- Пакет с `images/`: после `./update.sh` / установки сеть к Docker Hub для стека не нужна. Без бандла образов — `DO_BUILD=1` как раньше.
 
 ## [2.1.0] — 2026-08-24
 
@@ -421,6 +434,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.1.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.1
 [2.1.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.0
 [2.0.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.0.2
 [2.0.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.0.1

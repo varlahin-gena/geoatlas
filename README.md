@@ -53,7 +53,8 @@
 - Опциональный **HTTPS** на nginx со своими PEM-сертификатами (редирект HTTP→HTTPS)
 - Загрузка и правка **GeoIP-базы** (CSV SIEM KUMA, `/geo-ranges`, IP без координат на `/geo-missing`)
 - **Пошаговая установка** (Ubuntu / Oracle Linux): модули, HTTPS, порт UI, профиль, файрвол
-- **Один установочный пакет** `geoatlas-X.Y.Z.tar.gz` для Ubuntu и Oracle Linux / RHEL; установка и обновление только через этот архив на сервере (`./update.sh`)
+- **Один установочный пакет** `geoatlas-X.Y.Z.tar.gz` для Ubuntu и Oracle Linux / RHEL; прод-сборка с `--with-images` (готовые Docker-образы внутри); установка и обновление через архив на сервере (`./update.sh`)
+
 - Toast-уведомления без автоскрытия (крестик), сохраняются при смене страниц до ручного закрытия
 - **Репутация IP** (модуль опционален при установке): offline-списки и URL-фиды (`/reputation`), каталог публичных источников, фильтр и подсветка дуг на карте; приватные IP не помечаются
 - Хранение и аналитика в **ClickHouse**; дневные geo-агрегаты для пресетов `1d+` (city/country)
@@ -260,7 +261,7 @@ http://<IP_сервера>/
 
 ### Установочный пакет
 
-Один архив **`geoatlas-X.Y.Z.tar.gz`** (плюс `.sha256`; SBOM `.cdx.json` / `.spdx.json` — для аудита, не для установки) с [GitHub Releases](https://github.com/varlahin-gena/geoatlas/releases) — исходники стека, **оба** установщика (`deploy/ubuntu/…`, `deploy/oracle_linux/…`) и `update.sh`. Это не `.deb`/`.rpm`: Docker и файрвол хоста ставит OS-скрипт из пакета.
+Один архив **`geoatlas-X.Y.Z.tar.gz`** (плюс `.sha256`; SBOM `.cdx.json` / `.spdx.json` — для аудита, не для установки) с [GitHub Releases](https://github.com/varlahin-gena/geoatlas/releases) — исходники стека, **оба** установщика (`deploy/ubuntu/…`, `deploy/oracle_linux/…`), `update.sh` и (для прод-пакета) каталог **`images/`** с готовыми Docker-образами. Это не `.deb`/`.rpm`: Docker и файрвол хоста ставит OS-скрипт из пакета.
 
 | Задача | Что запускать |
 |--------|----------------|
@@ -271,7 +272,7 @@ http://<IP_сервера>/
 **Общий первый шаг на сервере** (Ubuntu и Oracle Linux одинаково):
 
 ```bash
-VER=2.1.0   # или нужный релиз
+VER=2.1.1   # или нужный релиз
 cd /tmp
 curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz"
 curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz.sha256"
@@ -282,7 +283,18 @@ cd "geoatlas-${VER}"
 
 Дальше — установщик вашей ОС (см. ниже) или `./update.sh` для уже стоящей системы.
 
-Сборка архива для разработки (не для прод): `bash scripts/pack-release.sh` → `dist/geoatlas-<VERSION>.tar.gz`.
+**Сборка пакета:**
+
+```bash
+# Прод / сервер (нужен Docker на машине сборки): образы внутри tar, на сервере без docker build и без Docker Hub
+bash scripts/pack-release.sh --with-images
+# → dist/geoatlas-<VERSION>.tar.gz  (обычно 1–3+ GiB)
+
+# Только исходники (разработка; на сервере будет compose --build и pull)
+bash scripts/pack-release.sh
+```
+
+При наличии `images/manifest.txt` `./start.sh` делает `docker load` и поднимает стек с `DO_BUILD=0`. Без бандла — как раньше (`DO_BUILD=1`, `--build`). Явно: `DO_BUILD=1 ./start.sh` или `DO_BUILD=0 ./start.sh`.
 ### Ubuntu
 
 После шагов выше (пакет в `/tmp/geoatlas-${VER}`):
@@ -736,7 +748,7 @@ docker compose exec clickhouse sh -c 'clickhouse-client --password "$CLICKHOUSE_
 **Единственный путь обновления** — скачать пакет на сервер, проверить SHA-256, `./update.sh`:
 
 ```bash
-VER=2.1.0   # нужный релиз
+VER=2.1.1   # нужный релиз
 cd /tmp
 curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz"
 curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz.sha256"
@@ -1020,7 +1032,9 @@ geoatlas/
 │   ├── ci-docker-build.sh            # CI: docker build backend / frontend / stats
 │   ├── ci-govulncheck.sh             # CI: govulncheck по Go-модулям
 │   ├── ci-sbom.sh                    # релиз: CycloneDX + SPDX из geoatlas-*.tar.gz
-│   ├── pack-release.sh               # dist/geoatlas-X.Y.Z.tar.gz (+ sha256)
+│   ├── pack-release.sh               # dist/geoatlas-X.Y.Z.tar.gz (+ sha256); --with-images
+│   ├── export-images.sh              # docker build/pull + save → images/ для офлайн-пакета
+
 │   ├── test-apply-package.sh         # CI: pack + наложение пакета
 │   ├── test-compose-stop-env.sh      # CI: заглушки для compose down без секретов
 │   ├── shellcheck.sh                 # CI: start/stop/update, scripts/, deploy/

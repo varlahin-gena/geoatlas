@@ -53,6 +53,12 @@ done
 pkg_ver="$(tr -d '[:space:]' <"${root}/VERSION")"
 [[ "$pkg_ver" == "$ver" ]] || fail "VERSION ${pkg_ver} ≠ tarball ${ver}"
 
+# Образы docker save — бинарные слои; для source SBOM не нужны и раздувают диск/RAM.
+if [[ -d "${root}/images" ]]; then
+  find "${root}/images" -type f -name '*.tar' -delete 2>/dev/null || true
+  ok "skipped images/*.tar for SBOM"
+fi
+
 echo "::group::syft scan ${base}"
 "$SYFT" scan "dir:${root}" \
   --source-name "geoatlas" \

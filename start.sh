@@ -8,9 +8,22 @@ cd "$SCRIPT_DIR"
 source "${SCRIPT_DIR}/deploy/common/compose.sh"
 # shellcheck source=deploy/common/admin_auth.sh
 source "${SCRIPT_DIR}/deploy/common/admin_auth.sh"
+if [[ -f "${SCRIPT_DIR}/deploy/common/load_images.sh" ]]; then
+    # shellcheck source=deploy/common/load_images.sh
+    source "${SCRIPT_DIR}/deploy/common/load_images.sh"
+fi
 
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-120}"
-DO_BUILD="${DO_BUILD:-1}"          # 1 = пересобирать образы, 0 = только поднять
+# DO_BUILD: явный env побеждает. Если не задан — 0 при images/manifest.txt (офлайн-пакет), иначе 1 (dev).
+_GA_DO_BUILD_EXPLICIT=0
+case "${DO_BUILD+set}" in set) _GA_DO_BUILD_EXPLICIT=1 ;; esac
+if [[ "$_GA_DO_BUILD_EXPLICIT" != "1" ]]; then
+    if [[ -f "${SCRIPT_DIR}/images/manifest.txt" ]]; then
+        DO_BUILD=0
+    else
+        DO_BUILD=1
+    fi
+fi
 
 _ga_env_get() {
     local key="$1" v=""
@@ -367,7 +380,11 @@ main() {
         log "HTTPS: выкл. (положите PEM в ./certs — см. certs/README.md)"
     fi
 
-    log "Запуск стека Docker Compose..."
+    if declare -F ga_load_release_images >/dev/null 2>&1; then
+        ga_load_release_images "$SCRIPT_DIR"
+    fi
+
+    log "Запуск стека Docker Compose (DO_BUILD=${DO_BUILD})..."
     if [[ "$DO_BUILD" == "1" ]]; then
         ga_compose "$SCRIPT_DIR" up -d --build
     else

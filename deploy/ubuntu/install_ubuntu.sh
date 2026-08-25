@@ -36,7 +36,7 @@ ${src_line}
   5. Порт веб-интерфейса
   6. Профиль производительности
   7. Файрвол
-  8. Запуск стека
+  8. Запуск стека (docker load из images/, если есть)
 EOF
 }
 
@@ -432,6 +432,7 @@ prepare_project() {
              deploy/common/select_https.sh \
              deploy/common/firewall_helpers.sh \
              deploy/common/ui.sh \
+             deploy/common/load_images.sh \
              deploy/common/admin_auth.sh \
              deploy/common/uninstall.sh \
              deploy/ubuntu/install_ubuntu.sh \

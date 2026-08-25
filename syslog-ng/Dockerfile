@@ -2,6 +2,19 @@
 # Compose / image-scan / ci-docker-build must stay on the same base tag.
 FROM balabit/syslog-ng:4.12.0
 
+# Base image ships ose-repo.syslog-ng.com; it often returns 403 and fails
+# apt-get update. Debian upgrades do not need it — syslog-ng is already installed.
+RUN set -eux; \
+    for f in /etc/apt/sources.list.d/*; do \
+      [ -f "$f" ] || continue; \
+      if grep -qE 'ose-repo\.syslog-ng\.com|syslog-ng\.com/apt' "$f"; then \
+        rm -fv "$f"; \
+      fi; \
+    done; \
+    if [ -f /etc/apt/sources.list ]; then \
+      sed -i -E '\|ose-repo\.syslog-ng\.com|d; \|syslog-ng\.com/apt|d' /etc/apt/sources.list; \
+    fi
+
 # Pull Debian security updates (util-linux, libssh2, protobuf, python3.13, …).
 # hadolint ignore=DL3005,DL3008
 RUN set -eux; \

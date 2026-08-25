@@ -17,6 +17,7 @@ jobs:
     name: GitHub Release from CHANGELOG
     needs: release-contract
     runs-on: ubuntu-latest
+    timeout-minutes: 180
     permissions:
       contents: write
     steps:
@@ -43,8 +44,14 @@ jobs:
           else
             gh release create "$TAG" --title "$TAG" --notes-file "$notes"
           fi
-      - name: pack install tarball
-        run: bash scripts/pack-release.sh
+      - name: free disk space
+        run: |
+          set -euo pipefail
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          df -h
+
+      - name: pack install tarball (with Docker images)
+        run: bash scripts/pack-release.sh --with-images
 
       - name: download syft
         id: syft
