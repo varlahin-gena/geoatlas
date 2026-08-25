@@ -120,7 +120,7 @@
 
 **Буфер syslog-ng (включён по умолчанию):** в `syslog-ng.conf` у назначений UDP/TCP стоят `disk-buffer` (`reliable(no)`). Окно в RAM — `flow-control-window-size` (число сообщений, не байты: в 4.11 `mem-buf-size` с `reliable(no)` игнорируется), диск — `capacity-bytes`. Размеры **fifo / window / disk** задаёт профиль (`syslog-ng.d/zz_profile.conf`, пишет `start.sh` или `tune-resources.sh`). Без файла действуют безопасные дефолты под compose 1 GiB. Это сглаживает краткие пики/рестарты backend; после буфера доставка в backend всё равно at-most-once. Потери **до** backend видны на стадии Syslog-NG (`/system`, `pipeline.syslogng.dropped_total` / `queued`); drops очереди ingest — `/api/ingest/stats`.
 
-syslog-ng **4.11** (`balabit/syslog-ng:4.11.0`): healthcheck `syslog-ng-ctl stats`, внутренний stats-exporter `:9577` (не публикуется). Backend скрейпит live (`SYSLOG_STATS_URL`), stats-collector пишет историю в `system_metrics`.
+syslog-ng **4.12** (`geoatlas-syslog-ng` поверх `balabit/syslog-ng:4.12.0`, Debian upgrade + патч Python venv): healthcheck `syslog-ng-ctl stats`, внутренний stats-exporter `:9577` (не публикуется). Backend скрейпит live (`SYSLOG_STATS_URL`), stats-collector пишет историю в `system_metrics`.
 
 ### Product limits (appliance)
 
@@ -1069,6 +1069,7 @@ geoatlas/
 ├── .github/workflows/ci.yml          # тесты + docker build образов compose
 ├── .github/workflows/release-tag.yml # тег v*: Release + tar.gz + SBOM
 ├── start.sh / stop.sh / update.sh    # update.sh — наложение geoatlas-*.tar.gz
+├── syslog-ng/Dockerfile              # 4.12.0 + apt upgrade + Python venv patches
 ├── syslog-ng.conf
 └── syslog-ng.d/                      # 00-keep.conf + zz_profile.conf.example; zz_profile.conf генерируется
 ```

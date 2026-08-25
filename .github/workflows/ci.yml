@@ -114,6 +114,12 @@ jobs:
               - 'scripts/ci-docker-build.sh'
               - 'docker-compose.yml'
               - '.github/workflows/ci.yml'
+            docker_syslog:
+              - 'syslog-ng/Dockerfile'
+              - 'syslog-ng/**'
+              - 'scripts/ci-docker-build.sh'
+              - 'docker-compose.yml'
+              - '.github/workflows/ci.yml'
 
       - name: set job gates
         id: gates
@@ -130,6 +136,7 @@ jobs:
           DOCKER_BACKEND: ${{ steps.filter.outputs.docker_backend }}
           DOCKER_STATS: ${{ steps.filter.outputs.docker_stats }}
           DOCKER_FRONTEND: ${{ steps.filter.outputs.docker_frontend }}
+          DOCKER_SYSLOG: ${{ steps.filter.outputs.docker_syslog }}
         run: |
           set -euo pipefail
           emit() { printf '%s=%s\n' "$1" "$2" >> "$GITHUB_OUTPUT"; }
@@ -138,7 +145,7 @@ jobs:
               emit "$k" true
             done
             emit docker_any true
-            emit docker_images '["backend","stats-collector","frontend"]'
+            emit docker_images '["backend","stats-collector","frontend","syslog-ng"]'
             exit 0
           fi
           emit backend "${BACKEND:-false}"
@@ -153,6 +160,7 @@ jobs:
           [[ "${DOCKER_BACKEND:-false}" == "true" ]] && imgs+=("backend")
           [[ "${DOCKER_STATS:-false}" == "true" ]] && imgs+=("stats-collector")
           [[ "${DOCKER_FRONTEND:-false}" == "true" ]] && imgs+=("frontend")
+          [[ "${DOCKER_SYSLOG:-false}" == "true" ]] && imgs+=("syslog-ng")
           if ((${#imgs[@]} == 0)); then
             # Dummy matrix: GHA still parses fromJSON when the job is skipped.
             emit docker_any false

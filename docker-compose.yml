@@ -59,7 +59,10 @@ services:
         max-file: "3"
 
   syslog-ng:
-    image: balabit/syslog-ng:4.11.0
+    build:
+      context: ./syslog-ng
+      dockerfile: Dockerfile
+    image: geoatlas-syslog-ng:latest
     container_name: syslog-ng
     profiles: ["syslog"]
     ports:

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Сборка образов backend / frontend / stats-collector как в docker-compose.yml.
+# Сборка образов backend / frontend / stats-collector / syslog-ng как в docker-compose.yml.
 # Без `compose up` и без секретов: интерполяция ${VAR:?} для build не нужна.
 #
-#   bash scripts/ci-docker-build.sh              # все три
+#   bash scripts/ci-docker-build.sh              # все четыре
 #   bash scripts/ci-docker-build.sh frontend     # один образ
 #
 # В GitHub Actions: docker/setup-buildx-action + GA_DOCKER_CACHE=gha
@@ -22,6 +22,7 @@ docker info >/dev/null 2>&1 || fail "docker daemon is not running"
 [[ -f backend/Dockerfile ]] || fail "missing backend/Dockerfile"
 [[ -f stats-collector/Dockerfile ]] || fail "missing stats-collector/Dockerfile"
 [[ -f frontend/Dockerfile ]] || fail "missing frontend/Dockerfile"
+[[ -f syslog-ng/Dockerfile ]] || fail "missing syslog-ng/Dockerfile"
 
 grep -q 'dockerfile: backend/Dockerfile' docker-compose.yml \
   || fail "docker-compose.yml: backend dockerfile path drifted"
@@ -29,6 +30,10 @@ grep -q 'dockerfile: stats-collector/Dockerfile' docker-compose.yml \
   || fail "docker-compose.yml: stats-collector dockerfile path drifted"
 grep -q 'context: ./frontend' docker-compose.yml \
   || fail "docker-compose.yml: frontend context drifted"
+grep -q 'context: ./syslog-ng' docker-compose.yml \
+  || fail "docker-compose.yml: syslog-ng context drifted"
+grep -q 'image: geoatlas-syslog-ng:latest' docker-compose.yml \
+  || fail "docker-compose.yml: syslog-ng image tag drifted"
 ok "compose build contexts"
 
 use_gha_cache=0
@@ -177,8 +182,21 @@ build_frontend() {
   smoke_frontend "$tag"
 }
 
+build_syslog_ng() {
+  local tag="geoatlas-syslog-ng:ci"
+  build_image syslog-ng syslog-ng/Dockerfile syslog-ng "$tag"
+  # Smoke: patched Python packages from syslog-ng/Dockerfile.
+  docker run --rm --entrypoint /var/lib/syslog-ng/python-venv/bin/python "$tag" \
+    -c "import importlib.metadata as m; a=m.version; \
+assert a('pyasn1')=='0.6.4', a('pyasn1'); \
+assert a('aiohttp')=='3.14.3', a('aiohttp'); \
+assert a('idna')=='3.15', a('idna'); \
+assert a('setuptools')=='83.0.0', a('setuptools')"
+  ok "syslog-ng python-venv patches"
+}
+
 if [[ $# -eq 0 ]]; then
-  targets=(backend stats-collector frontend)
+  targets=(backend stats-collector frontend syslog-ng)
 else
   targets=("$@")
 fi
@@ -188,7 +206,8 @@ for t in "${targets[@]}"; do
     backend) build_backend ;;
     stats-collector) build_stats ;;
     frontend) build_frontend ;;
-    *) fail "unknown image '${t}' (backend|stats-collector|frontend)" ;;
+    syslog-ng) build_syslog_ng ;;
+    *) fail "unknown image '${t}' (backend|stats-collector|frontend|syslog-ng)" ;;
   esac
 done
 

@@ -5,6 +5,9 @@
 
 ## [Unreleased]
 
+### Security
+- syslog-ng: образ `geoatlas-syslog-ng` поверх `balabit/syslog-ng:4.12.0` — `apt-get upgrade` (util-linux, libssh2, protobuf, python3.13, …) и патч Python venv: `pyasn1==0.6.4`, `aiohttp==3.14.3`, `idna==3.15`, `setuptools==83.0.0` (закрывает HIGH/MEDIUM из Trivy по python-venv и Debian-пакетам). Конфиг `@version: 4.12`.
+
 ## [2.1.0] — 2026-08-24
 
 Минорный релиз: роль **dashboard** для видеостены и единый контракт ролей API ↔ UI.
