@@ -42,9 +42,9 @@ assert a('setuptools')=='83.0.0', a('setuptools')"; \
       "${venv}"/lib/python*/site-packages/pip \
       "${venv}"/lib/python*/site-packages/pip-*.dist-info; \
     # Guard: no pip SBOM / old setuptools metadata left for Trivy.
-    if find /var/lib/syslog-ng /usr /root -type f \( \
+    if ! find /var/lib/syslog-ng /usr /root -type f \( \
          -name 'bom.cdx.json' -o -path '*/pip/_vendor/vendor.txt' \
-       \) 2>/dev/null | grep -q .; then \
+       \) -exec false {} + 2>/dev/null; then \
       echo 'pip vendor SBOM still present' >&2; exit 1; \
     fi; \
     leftovers="$(find /var/lib/syslog-ng /usr /root -type d \
