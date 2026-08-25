@@ -5,6 +5,15 @@
 
 ## [Unreleased]
 
+## [2.1.5] — 2026-08-25
+
+### Added
+- «Сети предприятия»: фильтр отмеченных сетей по подписи, городу, стране и network.
+
+### Notes
+- OpenAPI API doc version: **1.15.0** (без изменений)
+- Продуктовая версия: **2.1.5**
+
 ## [2.1.4] — 2026-08-25
 
 ### Changed
@@ -461,6 +470,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.1.5]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.5
 [2.1.4]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.4
 [2.1.3]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.3
 [2.1.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.2

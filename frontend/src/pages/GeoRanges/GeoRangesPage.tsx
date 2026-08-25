@@ -129,6 +129,7 @@ export default function GeoRangesPage() {
   const [manualNet, setManualNet] = useState('');
   const [manualLabel, setManualLabel] = useState('');
   const [entSearchTick, setEntSearchTick] = useState(0);
+  const [markedFilter, setMarkedFilter] = useState('');
 
   const load = useCallback(async () => {
     const resolved = resolveGeoSearch(q, ipSearch);
@@ -275,6 +276,17 @@ export default function GeoRangesPage() {
     }
     return s;
   }, [enterprise]);
+
+  const filteredMarked = useMemo(() => {
+    const needle = markedFilter.trim().toLowerCase();
+    if (!needle) return enterprise;
+    return enterprise.filter((n) => {
+      const hay = [n.network, n.label, n.country, n.region, n.city]
+        .map((v) => String(v || '').toLowerCase())
+        .join(' ');
+      return hay.includes(needle);
+    });
+  }, [enterprise, markedFilter]);
 
   function isMarked(r: GeoRange): boolean {
     if (r.start_ip != null && r.end_ip != null && markedKeys.has(`${r.start_ip}-${r.end_ip}`)) return true;
@@ -654,6 +666,20 @@ export default function GeoRangesPage() {
               </div>
             ) : null}
             <h2 style={{ fontSize: 16, margin: '8px 0' }}>Отмеченные сети</h2>
+            <div className="toolbar" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+              <input
+                placeholder="Поиск по отмеченным: подпись, город, сеть…"
+                value={markedFilter}
+                onChange={(e) => setMarkedFilter(e.target.value)}
+                style={{ minWidth: 260 }}
+                aria-label="Поиск по отмеченным сетям"
+              />
+              {markedFilter.trim() ? (
+                <span className="hint">
+                  показано {fmtNumber(filteredMarked.length)} из {fmtNumber(enterprise.length)}
+                </span>
+              ) : null}
+            </div>
             <form
               className="toolbar"
               style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}
@@ -695,8 +721,14 @@ export default function GeoRangesPage() {
                         Пока ничего не отмечено — найдите диапазон выше или введите CIDR
                       </td>
                     </tr>
+                  ) : !filteredMarked.length ? (
+                    <tr>
+                      <td colSpan={5} className="empty">
+                        Нет отмеченных сетей по запросу
+                      </td>
+                    </tr>
                   ) : (
-                    enterprise.map((n) => (
+                    filteredMarked.map((n) => (
                       <tr key={`${n.start_ip}-${n.end_ip}`}>
                         <td className="mono">{n.network}</td>
                         <td>{n.label}</td>
