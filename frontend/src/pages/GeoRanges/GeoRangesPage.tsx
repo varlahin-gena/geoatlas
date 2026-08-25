@@ -552,35 +552,28 @@ export default function GeoRangesPage() {
                 <div className="hint">Отмечено</div>
                 <b>{enterprise.length}</b>
               </div>
+              <div>
+                <div className="hint">Показано</div>
+                <b>
+                  {entSearch.trim() || entIP.trim()
+                    ? fmtNumber(entShown || entHits.length)
+                    : '—'}
+                </b>
+              </div>
+              {entFiltered > entShown && (entSearch.trim() || entIP.trim()) ? (
+                <div>
+                  <div className="hint">Найдено</div>
+                  <b>{fmtNumber(entFiltered)}</b>
+                </div>
+              ) : null}
             </div>
-            <form
-              className="toolbar"
-              style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}
-              onSubmit={addManual}
-            >
-              <input
-                placeholder="CIDR вручную, например 10.20.0.0/16"
-                value={manualNet}
-                onChange={(e) => setManualNet(e.target.value)}
-                style={{ minWidth: 240 }}
-              />
-              <input
-                placeholder="Подпись (офис, ЦОД…)"
-                value={manualLabel}
-                onChange={(e) => setManualLabel(e.target.value)}
-                style={{ minWidth: 160 }}
-              />
-              <button type="submit" className="btn primary" disabled={entBusy}>
-                Отметить
-              </button>
-            </form>
             <div className="toolbar" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
               <input
                 placeholder="По тексту: страна, регион, город…"
                 value={entSearch}
                 onChange={(e) => setEntSearch(e.target.value)}
                 style={{ minWidth: 240 }}
-                aria-label="Поиск по текстовым полям GeoIP"
+                aria-label="Поиск по текстовым полям"
               />
               <input
                 placeholder="IP или подсеть (CIDR / range)…"
@@ -610,71 +603,78 @@ export default function GeoRangesPage() {
               </button>
             </div>
             {(entSearch.trim() || entIP.trim()) ? (
-              <>
-                <div className="summary" style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
-                  <div>
-                    <div className="hint">Показано</div>
-                    <b>{fmtNumber(entShown || entHits.length)}</b>
-                  </div>
-                  {entFiltered > entShown ? (
-                    <div>
-                      <div className="hint">Найдено</div>
-                      <b>{fmtNumber(entFiltered)}</b>
-                    </div>
-                  ) : null}
-                </div>
-                <div className="card table-wrap" style={{ marginBottom: 16 }}>
-                  <table>
-                    <thead>
+              <div className="card table-wrap" style={{ marginBottom: 16 }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th scope="col">Network</th>
+                      <th scope="col">Country</th>
+                      <th scope="col">Region</th>
+                      <th scope="col">City</th>
+                      <th scope="col">
+                        <span className="visually-hidden">Действия</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {!entHits.length ? (
                       <tr>
-                        <th scope="col">Network</th>
-                        <th scope="col">Country</th>
-                        <th scope="col">Region</th>
-                        <th scope="col">City</th>
-                        <th scope="col">
-                          <span className="visually-hidden">Действия</span>
-                        </th>
+                        <td colSpan={5} className="empty">
+                          {entIP.trim()
+                            ? 'IP/подсеть не входит ни в один диапазон базы GeoIP'
+                            : 'Нет диапазонов по текстовому запросу'}
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {!entHits.length ? (
-                        <tr>
-                          <td colSpan={5} className="empty">
-                            {entIP.trim()
-                              ? 'IP/подсеть не входит ни в один диапазон базы GeoIP'
-                              : 'Нет диапазонов по текстовому запросу'}
+                    ) : (
+                      entHits.map((r) => (
+                        <tr key={`${r.network}-${r.start_ip}-${r.end_ip}`}>
+                          <td className="mono">{r.network}</td>
+                          <td>{r.country}</td>
+                          <td>{r.region}</td>
+                          <td>{r.city}</td>
+                          <td>
+                            {isMarked(r) ? (
+                              <span className="hint">уже отмечен</span>
+                            ) : (
+                              <button
+                                type="button"
+                                className="btn primary"
+                                disabled={entBusy}
+                                onClick={() => void markRange(r)}
+                              >
+                                Отметить
+                              </button>
+                            )}
                           </td>
                         </tr>
-                      ) : (
-                        entHits.map((r) => (
-                          <tr key={`${r.network}-${r.start_ip}-${r.end_ip}`}>
-                            <td className="mono">{r.network}</td>
-                            <td>{r.country}</td>
-                            <td>{r.region}</td>
-                            <td>{r.city}</td>
-                            <td>
-                              {isMarked(r) ? (
-                                <span className="hint">уже отмечен</span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  className="btn primary"
-                                  disabled={entBusy}
-                                  onClick={() => void markRange(r)}
-                                >
-                                  Отметить
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             ) : null}
             <h2 style={{ fontSize: 16, margin: '8px 0' }}>Отмеченные сети</h2>
+            <form
+              className="toolbar"
+              style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}
+              onSubmit={addManual}
+            >
+              <input
+                placeholder="CIDR вручную, например 10.20.0.0/16"
+                value={manualNet}
+                onChange={(e) => setManualNet(e.target.value)}
+                style={{ minWidth: 240 }}
+              />
+              <input
+                placeholder="Подпись (офис, ЦОД…)"
+                value={manualLabel}
+                onChange={(e) => setManualLabel(e.target.value)}
+                style={{ minWidth: 160 }}
+              />
+              <button type="submit" className="btn primary" disabled={entBusy}>
+                Отметить
+              </button>
+            </form>
             <div className="card table-wrap">
               <table>
                 <thead>
@@ -692,7 +692,7 @@ export default function GeoRangesPage() {
                   {!enterprise.length ? (
                     <tr>
                       <td colSpan={5} className="empty">
-                        Пока ничего не отмечено — найдите диапазон в базе GeoIP или введите CIDR
+                        Пока ничего не отмечено — найдите диапазон выше или введите CIDR
                       </td>
                     </tr>
                   ) : (
