@@ -5,6 +5,15 @@
 
 ## [Unreleased]
 
+## [2.1.6] — 2026-08-25
+
+### Changed
+- «Отмеченные сети»: одно поле поиска; форма CIDR спрятана за «Добавить вручную».
+
+### Notes
+- OpenAPI API doc version: **1.15.0** (без изменений)
+- Продуктовая версия: **2.1.6**
+
 ## [2.1.5] — 2026-08-25
 
 ### Added
@@ -470,6 +479,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.1.6]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.6
 [2.1.5]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.5
 [2.1.4]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.4
 [2.1.3]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.3

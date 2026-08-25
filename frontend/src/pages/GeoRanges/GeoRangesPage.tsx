@@ -128,6 +128,7 @@ export default function GeoRangesPage() {
   const [entBusy, setEntBusy] = useState(false);
   const [manualNet, setManualNet] = useState('');
   const [manualLabel, setManualLabel] = useState('');
+  const [showManualAdd, setShowManualAdd] = useState(false);
   const [entSearchTick, setEntSearchTick] = useState(0);
   const [markedFilter, setMarkedFilter] = useState('');
 
@@ -343,6 +344,7 @@ export default function GeoRangesPage() {
       await addEnterpriseNet({ network, label: manualLabel.trim() || undefined });
       setManualNet('');
       setManualLabel('');
+      setShowManualAdd(false);
       toast(`Отмечено: ${network}`, 'success');
       await loadEnterprise();
     } catch (err) {
@@ -668,7 +670,7 @@ export default function GeoRangesPage() {
             <h2 style={{ fontSize: 16, margin: '8px 0' }}>Отмеченные сети</h2>
             <div className="toolbar" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
               <input
-                placeholder="Поиск по отмеченным: подпись, город, сеть…"
+                placeholder="Поиск: подпись, город, сеть…"
                 value={markedFilter}
                 onChange={(e) => setMarkedFilter(e.target.value)}
                 style={{ minWidth: 260 }}
@@ -679,28 +681,40 @@ export default function GeoRangesPage() {
                   показано {fmtNumber(filteredMarked.length)} из {fmtNumber(enterprise.length)}
                 </span>
               ) : null}
-            </div>
-            <form
-              className="toolbar"
-              style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}
-              onSubmit={addManual}
-            >
-              <input
-                placeholder="CIDR вручную, например 10.20.0.0/16"
-                value={manualNet}
-                onChange={(e) => setManualNet(e.target.value)}
-                style={{ minWidth: 240 }}
-              />
-              <input
-                placeholder="Подпись (офис, ЦОД…)"
-                value={manualLabel}
-                onChange={(e) => setManualLabel(e.target.value)}
-                style={{ minWidth: 160 }}
-              />
-              <button type="submit" className="btn primary" disabled={entBusy}>
-                Отметить
+              <button
+                type="button"
+                className="btn"
+                aria-expanded={showManualAdd}
+                onClick={() => setShowManualAdd((v) => !v)}
+              >
+                {showManualAdd ? 'Скрыть добавление' : 'Добавить вручную'}
               </button>
-            </form>
+            </div>
+            {showManualAdd ? (
+              <form
+                className="toolbar"
+                style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}
+                onSubmit={addManual}
+              >
+                <input
+                  placeholder="CIDR или IP, например 10.20.0.0/16"
+                  value={manualNet}
+                  onChange={(e) => setManualNet(e.target.value)}
+                  style={{ minWidth: 240 }}
+                  aria-label="CIDR или IP для отметки"
+                />
+                <input
+                  placeholder="Подпись (офис, ЦОД…)"
+                  value={manualLabel}
+                  onChange={(e) => setManualLabel(e.target.value)}
+                  style={{ minWidth: 160 }}
+                  aria-label="Подпись сети"
+                />
+                <button type="submit" className="btn primary" disabled={entBusy}>
+                  Отметить
+                </button>
+              </form>
+            ) : null}
             <div className="card table-wrap">
               <table>
                 <thead>
@@ -718,7 +732,7 @@ export default function GeoRangesPage() {
                   {!enterprise.length ? (
                     <tr>
                       <td colSpan={5} className="empty">
-                        Пока ничего не отмечено — найдите диапазон выше или введите CIDR
+                        Пока ничего не отмечено — найдите диапазон выше или добавьте CIDR вручную
                       </td>
                     </tr>
                   ) : !filteredMarked.length ? (
