@@ -185,14 +185,20 @@ build_frontend() {
 build_syslog_ng() {
   local tag="geoatlas-syslog-ng:ci"
   build_image syslog-ng syslog-ng/Dockerfile syslog-ng "$tag"
-  # Smoke: patched Python packages from syslog-ng/Dockerfile.
+  # Smoke: patched Python packages from syslog-ng/Dockerfile; pip must be gone
+  # (Trivy false-positive setuptools 70.3 via pip/_vendor/bom.cdx.json).
   docker run --rm --entrypoint /var/lib/syslog-ng/python-venv/bin/python "$tag" \
     -c "import importlib.metadata as m; a=m.version; \
 assert a('pyasn1')=='0.6.4', a('pyasn1'); \
 assert a('aiohttp')=='3.14.3', a('aiohttp'); \
 assert a('idna')=='3.15', a('idna'); \
+assert a('msgpack')=='1.2.1', a('msgpack'); \
 assert a('setuptools')=='83.0.0', a('setuptools')"
-  ok "syslog-ng python-venv patches"
+  if docker run --rm --entrypoint sh "$tag" -c \
+      'test -e /var/lib/syslog-ng/python-venv/lib/python3.13/site-packages/pip'; then
+    fail "syslog-ng image must not ship pip (Trivy setuptools FP)"
+  fi
+  ok "syslog-ng python-venv patches (no pip)"
 }
 
 if [[ $# -eq 0 ]]; then
