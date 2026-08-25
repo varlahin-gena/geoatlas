@@ -7,6 +7,7 @@
 
 ### Security
 - syslog-ng: образ `geoatlas-syslog-ng` поверх `balabit/syslog-ng:4.12.0` — `apt-get upgrade` (util-linux, libssh2, protobuf, python3.13, …) и патч Python venv: `pyasn1==0.6.4`, `aiohttp==3.14.3`, `idna==3.15`, `setuptools==83.0.0` (закрывает HIGH/MEDIUM из Trivy по python-venv и Debian-пакетам). Конфиг `@version: 4.12`.
+- syslog-ng: `get-pip --no-setuptools` + удаление leftover `setuptools-70.*` (CVE-2025-47273 / CVE-2026-59890); Image scan также на `push` в `main`/`develop`.
 
 ## [2.1.0] — 2026-08-24
 

@@ -4,6 +4,13 @@ on:
   schedule:
     - cron: "20 4 * * 1"
   workflow_dispatch:
+  push:
+    branches: [main, develop]
+    paths:
+      - "docker-compose.yml"
+      - "**/Dockerfile"
+      - "syslog-ng/**"
+      - ".github/workflows/image-scan.yml"
   pull_request:
     paths:
       - "docker-compose.yml"
