@@ -5,46 +5,15 @@
 
 ## [Unreleased]
 
-## [2.1.6] — 2026-08-25
-
-### Changed
-- «Отмеченные сети»: одно поле поиска; форма CIDR спрятана за «Добавить вручную».
-
-### Notes
-- OpenAPI API doc version: **1.15.0** (без изменений)
-- Продуктовая версия: **2.1.6**
-
-## [2.1.5] — 2026-08-25
-
-### Added
-- «Сети предприятия»: фильтр отмеченных сетей по подписи, городу, стране и network.
-
-### Notes
-- OpenAPI API doc version: **1.15.0** (без изменений)
-- Продуктовая версия: **2.1.5**
-
-## [2.1.4] — 2026-08-25
-
-### Changed
-- «Сети предприятия»: блок поиска сверху как на «База GeoIP» (Отмечено / Показано + те же поля); ручной CIDR перенесён к списку отмеченных сетей.
-
-### Notes
-- OpenAPI API doc version: **1.15.0** (без изменений)
-- Продуктовая версия: **2.1.4**
-
-## [2.1.3] — 2026-08-25
-
-### Changed
-- «Сети предприятия»: тот же серверный поиск GeoIP, что на «База GeoIP» (`?q=` / IP·CIDR·range), счётчик «Показано», статус и кнопка «Обновить».
-
-### Notes
-- OpenAPI API doc version: **1.15.0** (без изменений)
-- Продуктовая версия: **2.1.3**
-
 ## [2.1.2] — 2026-08-25
 
+Патч: серверный поиск GeoIP и упрощённый UX «Сети предприятия».
+
 ### Fixed
-- GeoIP base search: text was client-side on first ~2000 rows; now server `?q=` for country/region/city; IP field accepts IPv4/CIDR/range.
+- База GeoIP: текстовый поиск шёл только по уже загруженным ~2000 строкам; теперь серверный `?q=` по country/region/city/network; поле IP принимает IPv4, CIDR и range.
+
+### Changed
+- «Сети предприятия»: тот же поиск GeoIP, что на «База GeoIP» (текст / IP·CIDR·range), блок сверху как на базе; фильтр отмеченных сетей по подписи/городу/сети; форма ручного CIDR спрятана за «Добавить вручную».
 
 ### Notes
 - OpenAPI API doc version: **1.15.0** (без изменений)
@@ -479,10 +448,6 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
-[2.1.6]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.6
-[2.1.5]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.5
-[2.1.4]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.4
-[2.1.3]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.3
 [2.1.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.2
 [2.1.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.1
 [2.1.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.0
