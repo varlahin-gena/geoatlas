@@ -9,8 +9,7 @@
 # Env (CI / без TTY):
 #   HTTP_PORT=8080              — без вопросов
 #   GA_HTTP_PORT=8080           — алиас
-#   GA_FULL_AUTO=1              — порт 8080 (даже если HTTP_PORT ещё не выставлен)
-#   GA_AUTO_MODULES=1           — порт 80 по умолчанию (не full-auto)
+#   GA_AUTO_MODULES=1           — порт 80 по умолчанию
 #
 # После confirm_http_port: HTTP_PORT (1–65535), GA_HTTP_PORT_CONFIRMED=1
 # Если HTTPS уже включён — спрашиваем порт для HTTP (редирект / параллельный доступ).
@@ -109,13 +108,6 @@ confirm_http_port() {
         fi
         _ga_port_set_confirmed "$HTTP_PORT"
         _ga_port_log "Порт задан через GA_HTTP_PORT=${HTTP_PORT}."
-        return 0
-    fi
-
-    # «Сделай мне хорошо» — всегда 8080 (не путать с GA_AUTO_MODULES → 80).
-    if [[ "${GA_FULL_AUTO:-0}" == "1" ]]; then
-        _ga_port_set_confirmed 8080
-        _ga_port_log "GA_FULL_AUTO=1 — HTTP_PORT=8080."
         return 0
     fi
 

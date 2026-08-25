@@ -5,6 +5,9 @@
 
 ## [Unreleased]
 
+### Changed
+- Установщик: убран режим «Сделай мне хорошо» (`GA_FULL_AUTO` / `--full-auto`); осталась только пошаговая установка. Хелперы syslog для UFW/firewalld — в `deploy/common/firewall_helpers.sh`.
+
 ### Security
 - syslog-ng: образ `geoatlas-syslog-ng` поверх `balabit/syslog-ng:4.12.0` — `apt-get upgrade` (util-linux, libssh2, protobuf, python3.13, …) и патч Python venv: `pyasn1==0.6.4`, `aiohttp==3.14.3`, `idna==3.15`, `msgpack==1.2.1`, `setuptools==83.0.0`; pip удаляется после патча (Trivy FP setuptools 70.3 из `bom.cdx.json`). Конфиг `@version: 4.12`. Image scan также на `push` в `main`/`develop`.
 

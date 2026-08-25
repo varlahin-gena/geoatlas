@@ -17,7 +17,7 @@
 #   GA_SSL_KEY_SRC=/path/privkey.pem
 #   GA_CERTS_DIR=/path/to/dir     — копирует fullchain.pem+privkey.pem (или cert.pem+key.pem)
 #
-# Важно: шаг задаётся и в пошаговой установке, и при GA_FULL_AUTO=1
+# Важно: шаг задаётся в пошаговой установке
 # (если есть TTY и HTTPS_ENABLED / GA_HTTPS_ENABLED ещё не заданы).
 # После выбора HTTPS вызывается confirm_http_port (если ещё не подтверждён).
 
@@ -325,8 +325,8 @@ confirm_https() {
         return 0
     fi
 
-    # CI / pipe без /dev/tty — не спрашиваем. Иначе спрашиваем всегда
-    # (пошагово и «Сделай мне хорошо»), даже если после whiptail stdin уже не TTY.
+    # CI / pipe без /dev/tty — не спрашиваем. Иначе спрашиваем всегда,
+    # даже если после whiptail stdin уже не TTY.
     if ! _ga_https_can_ask; then
         if _ga_https_certs_present "$project_dir"; then
             HTTPS_ENABLED=auto
@@ -345,7 +345,7 @@ confirm_https() {
         return 0
     fi
 
-    # Явный шаг: пошаговая установка и «Сделай мне хорошо».
+    # Явный шаг пошаговой установки.
     _ga_https_ensure_ui || true
     local default_on="OFF" default_off="ON"
     if _ga_https_certs_present "$project_dir"; then

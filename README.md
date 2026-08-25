@@ -52,7 +52,7 @@
 - Веб-интерфейс — **React SPA** (Vite + TypeScript)
 - Опциональный **HTTPS** на nginx со своими PEM-сертификатами (редирект HTTP→HTTPS)
 - Загрузка и правка **GeoIP-базы** (CSV SIEM KUMA, `/geo-ranges`, IP без координат на `/geo-missing`)
-- Установка **«Сделай мне хорошо»** (`GA_FULL_AUTO` / `--full-auto`): релиз, все модули, порт 8080, автопрофиль, firewall allowlist (UI + :514)
+- **Пошаговая установка** (Ubuntu / Oracle Linux): модули, HTTPS, порт UI, профиль, файрвол
 - **Один установочный пакет** `geoatlas-X.Y.Z.tar.gz` для Ubuntu и Oracle Linux / RHEL; установка и обновление только через этот архив на сервере (`./update.sh`)
 - Toast-уведомления без автоскрытия (крестик), сохраняются при смене страниц до ручного закрытия
 - **Репутация IP** (модуль опционален при установке): offline-списки и URL-фиды (`/reputation`), каталог публичных источников, фильтр и подсветка дуг на карте; приватные IP не помечаются
@@ -219,7 +219,7 @@ HTTP_REDIRECT=1
 
 `HTTPS_ENABLED=auto` (дефолт) тоже включит TLS, если оба файла на месте.
 
-Установщик (Ubuntu / Oracle Linux) спрашивает HTTPS и в пошаговом режиме, и в «Сделай мне хорошо» (при TTY). Без вопросов / CI:
+Установщик (Ubuntu / Oracle Linux) спрашивает HTTPS в пошаговом режиме (при TTY). Без вопросов / CI:
 
 | Env | Назначение |
 |-----|------------|
@@ -246,7 +246,7 @@ http://<IP_сервера>/
 По умолчанию включена UI-авторизация. Первый вход — учётка **admin** (роль administrator). Пароля по умолчанию нет:
 
 - пошаговая установка спрашивает пароль (дважды, мин. 8 символов);
-- `--full-auto` / нет TTY / голый `./start.sh` — берут `AUTH_ADMIN_PASSWORD` из окружения или генерируют одноразовый и пишут его в `.admin_password_once` (права 600; удалите после входа).
+- нет TTY / голый `./start.sh` — берут `AUTH_ADMIN_PASSWORD` из окружения или генерируют одноразовый и пишут его в `.admin_password_once` (права 600; удалите после входа).
 
 Если пароль сгенерирован, при входе его нужно сменить (`must_reset_password`). Operator и dashboard в процессе установки не создаются — создайте в UI `/users` (dashboard — для видеостены: долгая сессия, только карта и аномалии).
 `./start.sh` при необходимости генерирует `API_AUTH_TOKEN`, `SESSION_SECRET`, пароль admin и `CLICKHOUSE_PASSWORD` в `.env` (ключи без значений — [`.env.example`](.env.example)).
@@ -283,7 +283,7 @@ cd "geoatlas-${VER}"
 Дальше — установщик вашей ОС (см. ниже) или `./update.sh` для уже стоящей системы.
 
 Сборка архива для разработки (не для прод): `bash scripts/pack-release.sh` → `dist/geoatlas-<VERSION>.tar.gz`.
-### Ubuntu (автоматическая)
+### Ubuntu
 
 После шагов выше (пакет в `/tmp/geoatlas-${VER}`):
 
@@ -294,16 +294,6 @@ sudo ./deploy/ubuntu/install_ubuntu.sh
 Скрипт устанавливает Docker, накладывает пакет в `/opt/geoatlas`, **интерактивно предлагает модули** и профиль производительности, настраивает UFW и запускает стек.
 
 Диалоги установки и удаления — **TUI** (`whiptail` → `dialog` → текст). Долгие шаги (apt/Docker) показывают **gauge**.
-
-**«Сделай мне хорошо» (полный авто):** без вопросов — все модули, порт **8080**, автопрофиль по ресурсам, **включает** host firewall с allowlist портов (UI и при syslog `:514/tcp+udp`) и запускает стек. `:514` без TLS/auth — ограничьте источником МСЭ или `GA_SYSLOG_ALLOW_FROM=CIDR`. Выключить firewall: `GA_DISABLE_HOST_FIREWALL=1`. HTTPS при TTY спрашивается первым среди сетевых шагов (или задайте `GA_HTTPS_ENABLED` / сертификаты через env).
-
-```bash
-sudo GA_FULL_AUTO=1 ./deploy/ubuntu/install_ubuntu.sh
-# или
-sudo ./deploy/ubuntu/install_ubuntu.sh --full-auto
-```
-
-После установки UI: `http://<host>:8080`. В интерактивном TUI тот же режим — первый пункт radiolist «Сделай мне хорошо».
 
 **Что делает скрипт:**
 
@@ -323,14 +313,12 @@ sudo ./deploy/ubuntu/install_ubuntu.sh --full-auto
 | Переменная | Назначение |
 |------------|------------|
 | `GA_UI=whiptail\|dialog\|text` | принудительный бэкенд диалогов |
-| `GA_FULL_AUTO=1` / `--full-auto` | «Сделай мне хорошо»: все модули, порт 8080, автопрофиль, firewall allowlist, старт стека |
-| `GA_DISABLE_HOST_FIREWALL=1` | full-auto: выключить UFW/firewalld (небезопасно на публичном IP) |
 | `GA_SYSLOG_ALLOW_FROM` | CIDR/IP: открыть `:514` только с этого источника (UFW/firewalld) |
-| `AUTH_ADMIN_PASSWORD` | пароль admin для full-auto / без TTY; иначе установщик спросит или сгенерирует |
+| `AUTH_ADMIN_PASSWORD` | пароль admin для без TTY; иначе установщик спросит или сгенерирует |
 | `GA_AUTO_MODULES=1` | без вопросов: модули по умолчанию, порт 80 |
 | `GA_INSTALL_PACKAGE` | путь к `.tar.gz` или распакованному каталогу (если install запускают не из корня пакета) |
 | `GA_INSTALL_PACKAGE_SHA256=<hex>` | проверить контрольную сумму пакета |
-| нет TTY (CI/pipe) | то же, что авто-режим; gauge пишет прогресс в лог |
+| нет TTY (CI/pipe) | значения по умолчанию; gauge пишет прогресс в лог |
 **Порт UI:** `HTTP_PORT=8080` (или `GA_HTTP_PORT`) — без вопроса; в compose: `${HTTP_PORT:-80}:80`. HTTPS спрашивается **до** HTTP-порта (или через env: `GA_HTTPS_ENABLED`, `GA_HTTPS_PORT`, `GA_SSL_CERT_SRC` / `GA_SSL_KEY_SRC`, `GA_CERTS_DIR`; см. [HTTPS](#https-свои-сертификаты)).
 
 **Выбор модулей (интерактивно или через env):**
@@ -347,7 +335,7 @@ sudo ./deploy/ubuntu/install_ubuntu.sh --full-auto
 
 ---
 
-### Oracle Linux / RHEL (автоматическая)
+### Oracle Linux / RHEL
 
 Поддерживаются Oracle Linux, RHEL, Rocky Linux, AlmaLinux, CentOS. **Тот же** `geoatlas-X.Y.Z.tar.gz`, что для Ubuntu.
 
@@ -356,8 +344,6 @@ sudo ./deploy/ubuntu/install_ubuntu.sh --full-auto
 ```bash
 sudo ./deploy/oracle_linux/install_oraclelinux.sh
 ```
-
-Полный авто (как на Ubuntu): `sudo GA_FULL_AUTO=1 ./deploy/oracle_linux/install_oraclelinux.sh` или `sudo ./deploy/oracle_linux/install_oraclelinux.sh --full-auto` → UI на порту **8080**, firewalld включён (порты UI + :514).
 
 **Что делает скрипт:**
 
@@ -892,7 +878,7 @@ curl -sS -w "\nHTTP %{http_code}\n" \
   -H "Content-Type: text/csv" \
   --data-binary @/opt/geoatlas/geoip.csv \
   "http://127.0.0.1/upload-geo"
-# если UI на 8080 (full-auto): http://127.0.0.1:8080/upload-geo
+# если UI на другом порту: http://127.0.0.1:8080/upload-geo
 
 docker compose exec clickhouse sh -c 'clickhouse-client --password "$CLICKHOUSE_PASSWORD" -q "SELECT count() FROM geo_ranges"'
 docker compose logs backend --since=10m 2>&1 | grep -iE 'geo index loaded|geo csv|upload|overlap|error'

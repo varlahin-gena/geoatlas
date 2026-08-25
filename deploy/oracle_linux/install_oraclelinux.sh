@@ -97,8 +97,8 @@ _source_ui() {
     return 0
 }
 
-_source_full_auto_preset() {
-    _ga_source_common full_auto_preset.sh
+_source_firewall_helpers() {
+    _ga_source_common firewall_helpers.sh
 }
 
 # Тёмная тема whiptail до появления ui.sh (curl-установка / welcome).
@@ -135,55 +135,20 @@ scale=white,black'
 }
 
 _welcome_dialog() {
-    # Уже выбран авто-режим (env / --full-auto / нет TTY) — без диалога.
-    if [[ "${GA_FULL_AUTO:-0}" == "1" ]] || [[ "${GA_AUTO_MODULES:-0}" == "1" ]] || [[ ! -t 0 ]]; then
+    # CI / без TTY / авто-модули — без приветствия.
+    if [[ "${GA_AUTO_MODULES:-0}" == "1" ]] || [[ ! -t 0 ]]; then
         return 0
     fi
     _ensure_dark_newt
     _source_ui || true
-    if ! declare -F ga_ui_radiolist >/dev/null 2>&1; then
-        if declare -F ga_ui_msgbox >/dev/null 2>&1; then
-            ga_ui_msgbox "Установка ГеоАтлас" \
+    if declare -F ga_ui_msgbox >/dev/null 2>&1; then
+        ga_ui_msgbox "Установка ГеоАтлас" \
 "Добро пожаловать в мастер установки.
 
 Каталог: ${PROJECT_DIR}
 
-Далее: Docker, SELinux, наложение пакета, модули и запуск." || true
-        fi
-        return 0
-    fi
-
-    # Короткий tag+item: длинные UTF-8 строки в radiolist ломают рамку newt/whiptail.
-    local mode
-    local _ui_w="${GA_UI_WIDTH:-72}" _ui_h="${GA_UI_HEIGHT:-18}" _ui_lh="${GA_UI_LIST_HEIGHT:-8}"
-    GA_UI_WIDTH=64
-    GA_UI_HEIGHT=14
-    GA_UI_LIST_HEIGHT=3
-    if ! mode="$(ga_ui_radiolist "Установка ГеоАтлас" \
-"Режим установки
-
-auto — пакет, модули, :8080, firewalld ports
-step — спросить каждый шаг
-
-${PROJECT_DIR}" \
-        auto "Сделай мне хорошо" ON \
-        step "Пошаговая" OFF \
-    )"; then
-        GA_UI_WIDTH="$_ui_w"
-        GA_UI_HEIGHT="$_ui_h"
-        GA_UI_LIST_HEIGHT="$_ui_lh"
-        log "Установка отменена пользователем."
-        exit 0
-    fi
-    GA_UI_WIDTH="$_ui_w"
-    GA_UI_HEIGHT="$_ui_h"
-    GA_UI_LIST_HEIGHT="$_ui_lh"
-
-    if [[ "$mode" == "auto" || "$mode" == "full_auto" ]]; then
-        export GA_FULL_AUTO=1
-        if declare -F ga_apply_full_auto_preset >/dev/null 2>&1; then
-            ga_apply_full_auto_preset
-        fi
+Далее по шагам: Docker, SELinux, пакет, модули,
+HTTPS, порт UI, профиль, файрвол и запуск." || true
     fi
 }
 
@@ -310,6 +275,7 @@ configure_firewall() {
             ;;
     esac
     if [[ "${GA_MODULE_SYSLOG:-1}" == "1" ]]; then
+        _source_firewall_helpers || true
         if declare -F ga_firewalld_allow_syslog >/dev/null 2>&1; then
             ga_firewalld_allow_syslog
         else
@@ -469,7 +435,7 @@ prepare_project() {
              deploy/common/apply_package.sh \
              deploy/common/select_http_port.sh \
              deploy/common/select_https.sh \
-             deploy/common/full_auto_preset.sh \
+             deploy/common/firewall_helpers.sh \
              deploy/common/ui.sh \
              deploy/common/admin_auth.sh \
              deploy/common/uninstall.sh \
@@ -553,19 +519,11 @@ main() {
     require_root
     detect_os
     _ensure_dark_newt
-    _source_full_auto_preset || true
-    if declare -F ga_parse_full_auto_argv >/dev/null 2>&1; then
-        ga_parse_full_auto_argv "$@"
-    fi
-    if declare -F ga_apply_full_auto_preset >/dev/null 2>&1; then
-        ga_apply_full_auto_preset
-    fi
     _source_ui || true
     print_banner
     _ga_run_gauge_fn "Конфликты" "Удаление podman/buildah…" remove_conflicting_packages
     _ga_run_gauge_fn "Пакеты" "Установка зависимостей (dnf)…" install_packages
     _source_ui || true
-    _source_full_auto_preset || true
     _welcome_dialog
     _ga_run_gauge_fn "Docker" "Установка Docker Engine и Compose…" install_docker
     _ga_run_gauge_fn "SELinux" "Настройка SELinux для Docker…" configure_selinux
@@ -581,30 +539,14 @@ main() {
         apply_install_source "$PROJECT_DIR"
     fi
     _source_ui || true
-    _source_full_auto_preset || true
-    if declare -F ga_apply_full_auto_preset >/dev/null 2>&1; then
-        ga_apply_full_auto_preset
-    fi
     prepare_project
-    if [[ "${GA_FULL_AUTO:-0}" == "1" ]]; then
-        if [[ "${GA_DISABLE_HOST_FIREWALL:-0}" == "1" ]] && declare -F ga_disable_host_firewall >/dev/null 2>&1; then
-            ga_disable_host_firewall "$PROJECT_DIR"
-        else
-            ENABLE_FIREWALL=1
-            configure_firewall
-        fi
+    ask_firewall
+    if [[ "${ENABLE_FIREWALL}" == "1" ]]; then
+        _ga_run_gauge_fn "Файрвол" "Настройка правил firewalld…" configure_firewall
     else
-        ask_firewall
-        if [[ "${ENABLE_FIREWALL}" == "1" ]]; then
-            _ga_run_gauge_fn "Файрвол" "Настройка правил firewalld…" configure_firewall
-        else
-            configure_firewall
-        fi
+        configure_firewall
     fi
     start_stack
-    if [[ "${GA_FULL_AUTO:-0}" == "1" ]] && declare -F ga_full_auto_finish >/dev/null 2>&1; then
-        ga_full_auto_finish "$PROJECT_DIR"
-    fi
 }
 
 main "$@"

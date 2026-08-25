@@ -477,8 +477,7 @@ write_env_file() {
             _ga_log "ОШИБКА: не найден deploy/common/admin_auth.sh"
             exit 1
         fi
-        if [[ "${GA_FULL_AUTO:-0}" != "1" ]] \
-            && [[ "${GA_UI_AVAILABLE:-0}" == "1" ]] \
+        if [[ "${GA_UI_AVAILABLE:-0}" == "1" ]] \
             && declare -F ga_ui_passwordbox >/dev/null 2>&1; then
             can_ask=1
         fi
