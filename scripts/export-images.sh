@@ -89,6 +89,7 @@ build_or_pull build geoatlas-syslog-ng:latest -f syslog-ng/Dockerfile syslog-ng
 # Third-party runtime images from docker-compose.yml.
 build_or_pull pull clickhouse/clickhouse-server:25.8.30.16
 build_or_pull pull alpine:3.23
+build_or_pull pull amir20/dozzle:v10.7.4
 
 : >"${OUT}/manifest.txt"
 save_one geoatlas-backend:latest
