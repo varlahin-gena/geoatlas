@@ -125,3 +125,39 @@ jobs:
         with:
           sarif_file: trivy-syslog-ng.sarif
           category: trivy-syslog-ng
+
+      # Close orphaned alerts from former categories (raw alpine/nginx tags).
+      # GitHub only auto-closes when the same category uploads again with fewer findings.
+      - name: Empty SARIF for retired trivy-alpine / trivy-nginx categories
+        run: |
+          cat > trivy-empty.sarif <<'EOF'
+          {
+            "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+            "version": "2.1.0",
+            "runs": [
+              {
+                "tool": {
+                  "driver": {
+                    "name": "Trivy",
+                    "informationUri": "https://github.com/aquasecurity/trivy",
+                    "version": "0.0.0",
+                    "rules": []
+                  }
+                },
+                "results": []
+              }
+            ]
+          }
+          EOF
+
+      - uses: github/codeql-action/upload-sarif@f3712979fa5f215279b101dd0a2e3bdfb4353324 # v3
+        if: always()
+        with:
+          sarif_file: trivy-empty.sarif
+          category: trivy-alpine
+
+      - uses: github/codeql-action/upload-sarif@f3712979fa5f215279b101dd0a2e3bdfb4353324 # v3
+        if: always()
+        with:
+          sarif_file: trivy-empty.sarif
+          category: trivy-nginx
