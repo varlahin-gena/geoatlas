@@ -98,6 +98,7 @@ save_one geoatlas-frontend:latest
 save_one geoatlas-syslog-ng:latest
 save_one clickhouse/clickhouse-server:25.8.30.16
 save_one alpine:3.23
+save_one amir20/dozzle:v10.7.4
 
 log "готово: ${OUT}/manifest.txt"
 wc -l <"${OUT}/manifest.txt" | awk '{print "[export-images] образов: " $1}'
