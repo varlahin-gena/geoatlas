@@ -12,6 +12,7 @@
 ### Security
 - Runtime-образы backend / stats-collector / frontend: `apk upgrade libssl3 libcrypto3` (OpenSSL 3.5.7 → 3.5.8+, Trivy CVE в alpine/nginx base).
 - Image scan: Trivy по собранным `geoatlas-*` образам; пустой SARIF для старых category `trivy-alpine`/`trivy-nginx`, чтобы закрыть orphaned alerts после смены целей скана.
+- ClickHouse: `geoatlas-clickhouse` на базе `25.8.33.6` + `apt` upgrade openssl/libssl3/perl-base (Trivy Ubuntu CVE); CI integration на `25.8.33.6`.
 
 ## [2.1.2] — 2026-08-25
 

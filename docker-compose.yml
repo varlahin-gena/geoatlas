@@ -17,7 +17,10 @@ services:
     restart: "no"
 
   clickhouse:
-    image: clickhouse/clickhouse-server:25.8.30.16
+    build:
+      context: ./clickhouse
+      dockerfile: Dockerfile
+    image: geoatlas-clickhouse:latest
     container_name: clickhouse
     expose:
       - "8123"

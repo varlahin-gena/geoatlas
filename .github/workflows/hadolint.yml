@@ -69,6 +69,15 @@ jobs:
           output-file: hadolint-syslog-ng.sarif
           failure-threshold: error
 
+      - name: Run hadolint clickhouse dockerfile
+        if: always()
+        uses: hadolint/hadolint-action@f988afea3da57ee48710a9795b6bb677cc901183 # v3.1.0
+        with:
+          dockerfile: clickhouse/Dockerfile
+          format: sarif
+          output-file: hadolint-clickhouse.sarif
+          failure-threshold: error
+
       - name: Upload backend analysis results
         if: always()
         uses: github/codeql-action/upload-sarif@f3712979fa5f215279b101dd0a2e3bdfb4353324 # v3
@@ -99,4 +108,12 @@ jobs:
         with:
           sarif_file: hadolint-syslog-ng.sarif
           category: hadolint-syslog-ng
+          wait-for-processing: true
+
+      - name: Upload clickhouse analysis results
+        if: always()
+        uses: github/codeql-action/upload-sarif@f3712979fa5f215279b101dd0a2e3bdfb4353324 # v3
+        with:
+          sarif_file: hadolint-clickhouse.sarif
+          category: hadolint-clickhouse
           wait-for-processing: true

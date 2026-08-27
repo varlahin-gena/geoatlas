@@ -85,9 +85,9 @@ build_or_pull build geoatlas-backend:latest -f backend/Dockerfile .
 build_or_pull build geoatlas-stats-collector:latest -f stats-collector/Dockerfile .
 build_or_pull build geoatlas-frontend:latest -f frontend/Dockerfile frontend
 build_or_pull build geoatlas-syslog-ng:latest -f syslog-ng/Dockerfile syslog-ng
+build_or_pull build geoatlas-clickhouse:latest -f clickhouse/Dockerfile clickhouse
 
 # Third-party runtime images from docker-compose.yml.
-build_or_pull pull clickhouse/clickhouse-server:25.8.30.16
 build_or_pull pull alpine:3.23
 build_or_pull pull amir20/dozzle:v10.7.4
 
@@ -96,7 +96,7 @@ save_one geoatlas-backend:latest
 save_one geoatlas-stats-collector:latest
 save_one geoatlas-frontend:latest
 save_one geoatlas-syslog-ng:latest
-save_one clickhouse/clickhouse-server:25.8.30.16
+save_one geoatlas-clickhouse:latest
 save_one alpine:3.23
 save_one amir20/dozzle:v10.7.4
 

@@ -72,10 +72,13 @@ jobs:
           output: trivy-stats.sarif
           exit-code: "0"
 
+      - name: Build geoatlas-clickhouse
+        run: docker build -t geoatlas-clickhouse:scan -f clickhouse/Dockerfile clickhouse
+
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: image
-          image-ref: clickhouse/clickhouse-server:25.8.30.16
+          image-ref: geoatlas-clickhouse:scan
           severity: CRITICAL
           ignore-unfixed: true
           format: sarif
