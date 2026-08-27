@@ -234,6 +234,8 @@
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header Cookie $http_cookie;
+        # Без gzip от upstream — иначе sub_filter не видит HTML.
+        proxy_set_header Accept-Encoding "";
 
         # SSE: без буфера; длинные таймауты для стрима логов.
         proxy_buffering off;
@@ -242,6 +244,13 @@
         proxy_read_timeout 3600s;
         proxy_send_timeout 3600s;
         gzip off;
+
+        # Кнопка «назад в ГеоАтлас» (Dozzle не умеет кастомный chrome).
+        # Инжект в </head>: у Dozzle <body> часто с class/атрибутами.
+        sub_filter_once on;
+        sub_filter_types text/html;
+        sub_filter '</head>'
+            '<style id="ga-dozzle-back-css">#ga-dozzle-back{position:fixed;z-index:2147483646;top:0;left:0;right:0;height:36px;display:flex;align-items:center;gap:8px;padding:0 14px;box-sizing:border-box;background:#14161a;border-bottom:1px solid #2c313a;font:500 13px/1.2 ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif}#ga-dozzle-back a{color:#e8eaed;text-decoration:none}#ga-dozzle-back a:hover{color:#fff;text-decoration:underline}html.ga-dozzle-back-pad body,body.ga-dozzle-back-pad{padding-top:36px!important}</style><script id="ga-dozzle-back-js">(function(){function m(){if(document.getElementById("ga-dozzle-back"))return;var n=document.createElement("nav");n.id="ga-dozzle-back";n.setAttribute("aria-label","Навигация ГеоАтлас");var a=document.createElement("a");a.href="/system";a.textContent="\u2190 \u0413\u0435\u043e\u0410\u0442\u043b\u0430\u0441";n.appendChild(a);document.documentElement.classList.add("ga-dozzle-back-pad");if(document.body){document.body.classList.add("ga-dozzle-back-pad");document.body.insertBefore(n,document.body.firstChild)}}if(document.body)m();else document.addEventListener("DOMContentLoaded",m)})();</script></head>';
     }
 
     # Streaming-upload: лимит ≈ MaxLogUploadSize (дефолт 1 GiB); 0 = без лимита nginx
