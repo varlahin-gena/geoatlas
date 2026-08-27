@@ -5,6 +5,10 @@
 
 ## [Unreleased]
 
+### Added
+- Опциональный профиль Compose `dozzle` ([amir20/dozzle](https://github.com/amir20/dozzle) v10.7.4): realtime-логи контейнеров на `/dozzle/` за nginx `auth_request` (admin); порт не публикуется; start/stop/restart включены, shell выключен.
+- Установщик: модуль Dozzle отдельным пунктом checklist (`GA_ENABLE_DOZZLE`; по умолчанию **вкл.**); ссылка «Логи контейнеров» в навигации для admin; сохранение флага при пересчёте профиля.
+
 ## [2.1.2] — 2026-08-25
 
 Патч: серверный поиск GeoIP и упрощённый UX «Сети предприятия».

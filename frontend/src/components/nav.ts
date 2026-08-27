@@ -8,6 +8,8 @@ export interface NavItem {
   adminOnly?: boolean;
   requiresReputation?: boolean;
   requiresUIAuth?: boolean;
+  /** Full-page navigation outside the React SPA (e.g. Dozzle). */
+  external?: boolean;
 }
 
 const NAV_GROUP_ORDER: NavGroupId[] = [
@@ -42,6 +44,14 @@ export const PAGE_NAV: NavItem[] = [
     group: 'observe',
     match: ['/system', '/system.html'],
     adminOnly: true,
+  },
+  {
+    href: '/dozzle/',
+    label: 'Логи контейнеров',
+    group: 'observe',
+    match: ['/dozzle', '/dozzle/'],
+    adminOnly: true,
+    external: true,
   },
   {
     href: '/anomalies',

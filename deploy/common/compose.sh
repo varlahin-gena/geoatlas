@@ -88,7 +88,7 @@ _ga_compose_adopt_existing_project() {
         return 0
     fi
     command -v docker >/dev/null 2>&1 || return 0
-    for n in clickhouse ga-volume-perms backend frontend syslog-ng stats-collector; do
+    for n in clickhouse ga-volume-perms backend frontend syslog-ng stats-collector dozzle; do
         proj="$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project" }}' "$n" 2>/dev/null || true)"
         case "$proj" in
             geoatlas)

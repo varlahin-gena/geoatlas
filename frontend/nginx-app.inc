@@ -211,6 +211,39 @@
         include /etc/nginx/includes/proxy-headers.inc;
     }
 
+    # Dozzle (профиль compose dozzle): realtime logs + container actions.
+    # Variable upstream + Docker DNS — frontend стартует и без контейнера dozzle.
+    location = /dozzle {
+        return 302 /dozzle/;
+    }
+
+    location ^~ /dozzle/ {
+        auth_request /auth-check-admin;
+        error_page 401 = @login_redirect;
+        error_page 403 = @forbidden_redirect;
+
+        resolver 127.0.0.11 valid=10s ipv6=off;
+        set $dozzle_upstream dozzle:8080;
+        proxy_pass http://$dozzle_upstream;
+
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Cookie $http_cookie;
+
+        # SSE: без буфера; длинные таймауты для стрима логов.
+        proxy_buffering off;
+        proxy_cache off;
+        chunked_transfer_encoding off;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+        gzip off;
+    }
+
     # Streaming-upload: лимит ≈ MaxLogUploadSize (дефолт 1 GiB); 0 = без лимита nginx
     location = /upload-logs {
         client_max_body_size 0;

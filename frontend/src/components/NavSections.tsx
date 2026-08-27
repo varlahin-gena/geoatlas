@@ -23,16 +23,32 @@ function NavLinkItem({
   badge?: string | null;
   nested?: boolean;
 }) {
-  return (
-    <Link
-      to={item.href}
-      className={`side-btn${active ? ' active' : ''}${nested ? ' nav-nested-link' : ''}`}
-      aria-current={active ? 'page' : undefined}
-      title={badge ? `${item.label} (${badge})` : item.label}
-    >
+  const className = `side-btn${active ? ' active' : ''}${nested ? ' nav-nested-link' : ''}`;
+  const title = badge ? `${item.label} (${badge})` : item.label;
+  const content = (
+    <>
       <NavIcon kind={NAV_ICONS[item.href] || 'map'} />
       <span className="label">{item.label}</span>
       {badge ? <span className="side-btn-badge">{badge}</span> : null}
+    </>
+  );
+
+  if (item.external) {
+    return (
+      <a href={item.href} className={className} title={title}>
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <Link
+      to={item.href}
+      className={className}
+      aria-current={active ? 'page' : undefined}
+      title={title}
+    >
+      {content}
     </Link>
   );
 }
@@ -141,7 +157,11 @@ export function NavSections({
   function toggleObserve() {
     if (collapsed) {
       const first = observe[0];
-      if (first) navigate(first.href);
+      if (first?.external) {
+        window.location.assign(first.href);
+      } else if (first) {
+        navigate(first.href);
+      }
       return;
     }
     setObserveOpen((v) => !v);

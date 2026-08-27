@@ -406,6 +406,7 @@ write_env_file() {
     local mod_syslog="${GA_MODULE_SYSLOG:-1}"
     local mod_stats="${GA_MODULE_STATS:-1}"
     local mod_reputation="${GA_MODULE_REPUTATION:-1}"
+    local mod_dozzle="${GA_MODULE_DOZZLE:-1}"
     local reputation_fetch_enabled="${REPUTATION_FETCH_ENABLED:-true}"
     local compose_profiles="${GA_COMPOSE_PROFILES:-${COMPOSE_PROFILES:-syslog,stats}}"
     local http_port="${HTTP_PORT:-80}"
@@ -435,6 +436,7 @@ write_env_file() {
             v="$(_ga_env_get "$env_file" GA_MODULE_SYSLOG)"; [[ -n "$v" ]] && mod_syslog="$v"
             v="$(_ga_env_get "$env_file" GA_MODULE_STATS)"; [[ -n "$v" ]] && mod_stats="$v"
             v="$(_ga_env_get "$env_file" GA_MODULE_REPUTATION)"; [[ -n "$v" ]] && mod_reputation="$v"
+            v="$(_ga_env_get "$env_file" GA_MODULE_DOZZLE)"; [[ -n "$v" ]] && mod_dozzle="$v"
             v="$(_ga_env_get "$env_file" AUTH_DISABLED)"; [[ -n "$v" ]] && auth_disabled="$v"
             v="$(_ga_env_get "$env_file" API_AUTH_DISABLED)"; [[ -n "$v" ]] && api_auth_disabled="$v"
             v="$(_ga_env_get "$env_file" REPUTATION_FETCH_ENABLED)"; [[ -n "$v" ]] && reputation_fetch_enabled="$v"
@@ -450,6 +452,7 @@ write_env_file() {
             [[ "${mod_auth}" == "1" ]] && auth_disabled="false" || auth_disabled="true"
             [[ "${mod_api_auth}" == "1" ]] && api_auth_disabled="false" || api_auth_disabled="true"
             [[ "${mod_reputation}" == "1" ]] && reputation_fetch_enabled="true" || reputation_fetch_enabled="false"
+            mod_dozzle="${GA_MODULE_DOZZLE:-1}"
             compose_profiles="${GA_COMPOSE_PROFILES:-}"
             [[ -n "${HTTP_PORT:-}" ]] && http_port="$HTTP_PORT"
             [[ -n "${HTTPS_ENABLED:-}" ]] && https_enabled="$HTTPS_ENABLED"
@@ -460,6 +463,7 @@ write_env_file() {
         [[ "${mod_auth}" == "1" ]] && auth_disabled="false" || auth_disabled="true"
         [[ "${mod_api_auth}" == "1" ]] && api_auth_disabled="false" || api_auth_disabled="true"
         [[ "${mod_reputation}" == "1" ]] && reputation_fetch_enabled="true" || reputation_fetch_enabled="false"
+        mod_dozzle="${GA_MODULE_DOZZLE:-1}"
         compose_profiles="${GA_COMPOSE_PROFILES:-}"
         [[ -n "${HTTP_PORT:-}" ]] && http_port="$HTTP_PORT"
         [[ -n "${HTTPS_ENABLED:-}" ]] && https_enabled="$HTTPS_ENABLED"
@@ -549,6 +553,7 @@ GA_MODULE_API_AUTH=${mod_api_auth}
 GA_MODULE_SYSLOG=${mod_syslog}
 GA_MODULE_STATS=${mod_stats}
 GA_MODULE_REPUTATION=${mod_reputation}
+GA_MODULE_DOZZLE=${mod_dozzle}
 AUTH_DISABLED=${auth_disabled}
 API_AUTH_DISABLED=${api_auth_disabled}
 REPUTATION_FETCH_ENABLED=${reputation_fetch_enabled}

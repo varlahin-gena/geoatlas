@@ -9,17 +9,18 @@
 #
 # Переменные окружения (CI / без TTY):
 #   GA_AUTO_MODULES=1              — принять все модули по умолчанию (вкл.)
-#   GA_MODULES=auth,syslog,stats,reputation — явный список (через запятую); пусто = только ядро
+#   GA_MODULES=auth,syslog,stats,reputation,dozzle — явный список (через запятую); пусто = только ядро
 #   GA_ENABLE_AUTH=0|1             — UI-авторизация (логин / роли)
 #   GA_ENABLE_API_AUTH=0|1         — Bearer-токен для мутирующих API
 #   GA_ENABLE_SYSLOG=0|1           — контейнер syslog-ng
 #   GA_ENABLE_STATS=0|1            — контейнер stats-collector
 #   GA_ENABLE_REPUTATION=0|1       — модуль репутации IP (API, UI, фиды)
+#   GA_ENABLE_DOZZLE=0|1           — Dozzle (логи контейнеров /dozzle/; docker.sock)
 #   GA_UI=whiptail|dialog|text     — бэкенд диалогов
 #
 # После confirm_modules доступны:
 #   GA_MODULE_AUTH, GA_MODULE_API_AUTH, GA_MODULE_SYSLOG, GA_MODULE_STATS,
-#   GA_MODULE_REPUTATION  (0|1)
+#   GA_MODULE_REPUTATION, GA_MODULE_DOZZLE  (0|1)
 #   GA_COMPOSE_PROFILES  — строка для COMPOSE_PROFILES в .env
 
 set -Eeuo pipefail
@@ -104,6 +105,7 @@ _ga_mod_parse_list() {
     GA_MODULE_SYSLOG=0
     GA_MODULE_STATS=0
     GA_MODULE_REPUTATION=0
+    GA_MODULE_DOZZLE=0
     IFS=',' read -ra parts <<<"$raw"
     for part in "${parts[@]}"; do
         part="${part,,}"
@@ -115,12 +117,14 @@ _ga_mod_parse_list() {
             syslog|syslog-ng|ingest) GA_MODULE_SYSLOG=1 ;;
             stats|stats-collector|monitoring|system) GA_MODULE_STATS=1 ;;
             reputation|rep|reputation-ip|reputation_ip) GA_MODULE_REPUTATION=1 ;;
+            dozzle|logs|container-logs|container_logs) GA_MODULE_DOZZLE=1 ;;
             all)
                 GA_MODULE_AUTH=1
                 GA_MODULE_API_AUTH=1
                 GA_MODULE_SYSLOG=1
                 GA_MODULE_STATS=1
                 GA_MODULE_REPUTATION=1
+                GA_MODULE_DOZZLE=1
                 ;;
             core|none) ;;
             *)
@@ -136,6 +140,7 @@ _ga_mod_set_defaults() {
     GA_MODULE_SYSLOG="${GA_MODULE_SYSLOG:-1}"
     GA_MODULE_STATS="${GA_MODULE_STATS:-1}"
     GA_MODULE_REPUTATION="${GA_MODULE_REPUTATION:-1}"
+    GA_MODULE_DOZZLE="${GA_MODULE_DOZZLE:-1}"
 }
 
 _ga_mod_from_env_flags() {
@@ -155,23 +160,28 @@ _ga_mod_from_env_flags() {
     if [[ -n "${GA_ENABLE_REPUTATION:-}" ]]; then
         _ga_mod_truthy "$GA_ENABLE_REPUTATION" && GA_MODULE_REPUTATION=1 || GA_MODULE_REPUTATION=0
     fi
+    if [[ -n "${GA_ENABLE_DOZZLE:-}" ]]; then
+        _ga_mod_truthy "$GA_ENABLE_DOZZLE" && GA_MODULE_DOZZLE=1 || GA_MODULE_DOZZLE=0
+    fi
 }
 
 _ga_mod_build_compose_profiles() {
     local profiles=()
     [[ "${GA_MODULE_SYSLOG:-0}" == "1" ]] && profiles+=("syslog")
     [[ "${GA_MODULE_STATS:-0}" == "1" ]] && profiles+=("stats")
+    [[ "${GA_MODULE_DOZZLE:-1}" == "1" ]] && profiles+=("dozzle")
     local IFS=','
     GA_COMPOSE_PROFILES="${profiles[*]-}"
 }
 
 print_modules_summary() {
-    local a s t p r
+    local a s t p r d
     [[ "${GA_MODULE_AUTH:-0}" == "1" ]] && a="вкл." || a="выкл. (AUTH_DISABLED)"
     [[ "${GA_MODULE_API_AUTH:-0}" == "1" ]] && t="вкл." || t="выкл. (API_AUTH_DISABLED)"
     [[ "${GA_MODULE_SYSLOG:-0}" == "1" ]] && s="вкл." || s="выкл."
     [[ "${GA_MODULE_STATS:-0}" == "1" ]] && p="вкл." || p="выкл."
     [[ "${GA_MODULE_REPUTATION:-0}" == "1" ]] && r="вкл." || r="выкл. (модуль отключён)"
+    [[ "${GA_MODULE_DOZZLE:-1}" == "1" ]] && d="вкл." || d="выкл."
     local profiles="${GA_COMPOSE_PROFILES:-}"
     [[ -n "$profiles" ]] || profiles="(нет — только ядро)"
     echo ""
@@ -184,6 +194,7 @@ print_modules_summary() {
     echo "  syslog-ng         : ${s}"
     echo "  stats-collector   : ${p}"
     echo "  Репутация IP      : ${r}"
+    echo "  Dozzle (логи)     : ${d}"
     echo "  Compose-профили   : ${profiles}"
     echo "══════════════════════════════════════════════════════════"
     echo ""
@@ -196,6 +207,7 @@ API Bearer-токен: ${t}
 syslog-ng: ${s}
 stats-collector: ${p}
 Репутация IP: ${r}
+Dozzle (логи): ${d}
 Compose-профили: ${profiles}" || true
     fi
 }
@@ -211,7 +223,7 @@ confirm_modules() {
 
     if [[ "${GA_AUTO_MODULES:-0}" == "1" ]]; then
         _ga_mod_build_compose_profiles
-        _ga_mod_log "GA_AUTO_MODULES=1 — модули: auth=${GA_MODULE_AUTH} api_auth=${GA_MODULE_API_AUTH} syslog=${GA_MODULE_SYSLOG} stats=${GA_MODULE_STATS} reputation=${GA_MODULE_REPUTATION}"
+        _ga_mod_log "GA_AUTO_MODULES=1 — модули: auth=${GA_MODULE_AUTH} api_auth=${GA_MODULE_API_AUTH} syslog=${GA_MODULE_SYSLOG} stats=${GA_MODULE_STATS} reputation=${GA_MODULE_REPUTATION} dozzle=${GA_MODULE_DOZZLE}"
         return 0
     fi
 
@@ -219,7 +231,7 @@ confirm_modules() {
     if [[ -n "${GA_MODULES+x}" ]] || \
        [[ -n "${GA_ENABLE_AUTH:-}" ]] || [[ -n "${GA_ENABLE_API_AUTH:-}" ]] || \
        [[ -n "${GA_ENABLE_SYSLOG:-}" ]] || [[ -n "${GA_ENABLE_STATS:-}" ]] || \
-       [[ -n "${GA_ENABLE_REPUTATION:-}" ]]; then
+       [[ -n "${GA_ENABLE_REPUTATION:-}" ]] || [[ -n "${GA_ENABLE_DOZZLE:-}" ]]; then
         _ga_mod_build_compose_profiles
         _ga_mod_log "Модули заданы через окружение (без интерактива)."
         print_modules_summary
@@ -235,12 +247,13 @@ confirm_modules() {
     _ga_mod_ensure_ui || true
 
     local selected=""
-    local auth_on=OFF api_on=OFF syslog_on=OFF stats_on=OFF reputation_on=OFF
+    local auth_on=OFF api_on=OFF syslog_on=OFF stats_on=OFF reputation_on=OFF dozzle_on=OFF
     [[ "${GA_MODULE_AUTH:-1}" == "1" ]] && auth_on=ON
     [[ "${GA_MODULE_API_AUTH:-1}" == "1" ]] && api_on=ON
     [[ "${GA_MODULE_SYSLOG:-1}" == "1" ]] && syslog_on=ON
     [[ "${GA_MODULE_STATS:-1}" == "1" ]] && stats_on=ON
     [[ "${GA_MODULE_REPUTATION:-1}" == "1" ]] && reputation_on=ON
+    [[ "${GA_MODULE_DOZZLE:-1}" == "1" ]] && dozzle_on=ON
 
     if declare -F ga_ui_checklist >/dev/null 2>&1; then
         if selected="$(ga_ui_checklist \
@@ -251,17 +264,20 @@ confirm_modules() {
             api_auth "Bearer-токен для мутирующих API" "$api_on" \
             syslog "syslog-ng (приём syslog на :514)" "$syslog_on" \
             stats "stats-collector (метрики / страница system)" "$stats_on" \
-            reputation "Репутация IP (фиды, /reputation.html, фильтр на карте)" "$reputation_on")"; then
+            reputation "Репутация IP (фиды, /reputation.html, фильтр на карте)" "$reputation_on" \
+            dozzle "Dozzle — логи контейнеров UI /dozzle/ (docker.sock)" "$dozzle_on")"; then
             GA_MODULE_AUTH=0
             GA_MODULE_API_AUTH=0
             GA_MODULE_SYSLOG=0
             GA_MODULE_STATS=0
             GA_MODULE_REPUTATION=0
+            GA_MODULE_DOZZLE=0
             _ga_mod_tag_selected "$selected" auth && GA_MODULE_AUTH=1
             _ga_mod_tag_selected "$selected" api_auth && GA_MODULE_API_AUTH=1
             _ga_mod_tag_selected "$selected" syslog && GA_MODULE_SYSLOG=1
             _ga_mod_tag_selected "$selected" stats && GA_MODULE_STATS=1
             _ga_mod_tag_selected "$selected" reputation && GA_MODULE_REPUTATION=1
+            _ga_mod_tag_selected "$selected" dozzle && GA_MODULE_DOZZLE=1
         else
             _ga_mod_log "Выбор модулей отменён — установка прервана."
             exit 0
@@ -308,6 +324,13 @@ confirm_modules() {
             GA_MODULE_REPUTATION=0
             echo "    → REPUTATION_FETCH_ENABLED=false: модуль репутации полностью отключён." >&2
         fi
+
+        if _ga_mod_yesno "  Включить Dozzle — логи контейнеров UI /dozzle/ (docker.sock)?" 1; then
+            GA_MODULE_DOZZLE=1
+            echo "    → Профиль dozzle: /dozzle/ для admin; start/stop/restart контейнеров." >&2
+        else
+            GA_MODULE_DOZZLE=0
+        fi
     fi
 
     if [[ "${GA_MODULE_AUTH:-1}" != "1" ]]; then
@@ -319,10 +342,13 @@ confirm_modules() {
     if [[ "${GA_MODULE_REPUTATION:-1}" != "1" ]]; then
         _ga_mod_log "Модуль репутации IP отключён (REPUTATION_FETCH_ENABLED=false)."
     fi
+    if [[ "${GA_MODULE_DOZZLE:-1}" != "1" ]]; then
+        _ga_mod_log "Dozzle отключён (профиль dozzle не в COMPOSE_PROFILES)."
+    fi
 
     _ga_mod_build_compose_profiles
     print_modules_summary
-    _ga_mod_log "Модули: auth=${GA_MODULE_AUTH} api_auth=${GA_MODULE_API_AUTH} syslog=${GA_MODULE_SYSLOG} stats=${GA_MODULE_STATS} reputation=${GA_MODULE_REPUTATION}"
+    _ga_mod_log "Модули: auth=${GA_MODULE_AUTH} api_auth=${GA_MODULE_API_AUTH} syslog=${GA_MODULE_SYSLOG} stats=${GA_MODULE_STATS} reputation=${GA_MODULE_REPUTATION} dozzle=${GA_MODULE_DOZZLE}"
 }
 
 # Обновляет/добавляет ключи модулей в .env (не затирает остальные строки).
@@ -365,6 +391,7 @@ GA_MODULE_API_AUTH=${GA_MODULE_API_AUTH:-1}
 GA_MODULE_SYSLOG=${GA_MODULE_SYSLOG:-1}
 GA_MODULE_STATS=${GA_MODULE_STATS:-1}
 GA_MODULE_REPUTATION=${GA_MODULE_REPUTATION:-1}
+GA_MODULE_DOZZLE=${GA_MODULE_DOZZLE:-1}
 AUTH_DISABLED=${auth_disabled}
 API_AUTH_DISABLED=${api_auth_disabled}
 REPUTATION_FETCH_ENABLED=${reputation_fetch_enabled}
@@ -382,7 +409,8 @@ EOF
     "api_auth": $([ "${GA_MODULE_API_AUTH:-1}" == "1" ] && echo true || echo false),
     "syslog": $([ "${GA_MODULE_SYSLOG:-1}" == "1" ] && echo true || echo false),
     "stats": $([ "${GA_MODULE_STATS:-1}" == "1" ] && echo true || echo false),
-    "reputation": $([ "${GA_MODULE_REPUTATION:-1}" == "1" ] && echo true || echo false)
+    "reputation": $([ "${GA_MODULE_REPUTATION:-1}" == "1" ] && echo true || echo false),
+    "dozzle": $([ "${GA_MODULE_DOZZLE:-1}" == "1" ] && echo true || echo false)
   },
   "compose_profiles": "${GA_COMPOSE_PROFILES:-}",
   "auth_disabled": $([ "$auth_disabled" = "true" ] && echo true || echo false),
@@ -400,6 +428,9 @@ EOF
     fi
     if [[ "$reputation_fetch_enabled" == "false" ]]; then
         _ga_mod_log "Модуль репутации IP отключён (REPUTATION_FETCH_ENABLED=false)."
+    fi
+    if [[ "${GA_MODULE_DOZZLE:-1}" != "1" ]]; then
+        _ga_mod_log "Dozzle отключён (профиль dozzle)."
     fi
 }
 

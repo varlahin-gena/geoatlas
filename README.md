@@ -78,7 +78,7 @@
 
 Система состоит из **пяти сервисов**, оркеструемых через Docker Compose.
 Ядро всегда поднимается: **clickhouse + backend + frontend**.
-`syslog-ng` и `stats-collector` включаются через compose-профили (`COMPOSE_PROFILES=syslog,stats` — по умолчанию в `start.sh`, если в `.env` ещё нет).
+`syslog-ng`, `stats-collector` и `dozzle` включаются через compose-профили (`COMPOSE_PROFILES=syslog,stats,dozzle` — по умолчанию при установке / в `.env.example`).
 
 ```
 МСЭ (UserGate, FortiGate, …) или SIEM
@@ -110,6 +110,7 @@
 | `clickhouse`      | `clickhouse`       | *(ядро)*    | Хранилище и аналитика (только внутренняя docker-сеть)   |
 | `syslog-ng`       | `syslog-ng`        | `syslog`    | Приём syslog от МСЭ, буферизация, передача в backend    |
 | `stats-collector` | `stats-collector`  | `stats`     | Сбор системных метрик контейнеров в ClickHouse          |
+| `dozzle`          | `dozzle`           | `dozzle`    | Realtime-логи контейнеров UI `/dozzle/` (admin; opt-in) |
 
 ### Поток данных
 
@@ -313,7 +314,7 @@ sudo ./deploy/ubuntu/install_ubuntu.sh
 2. Устанавливает `curl`, `ufw`, `whiptail` (опционально `dialog`)
 3. Устанавливает Docker Engine и compose plugin (если ещё нет)
 4. Накладывает пакет из текущего каталога в `/opt/geoatlas`
-5. Спрашивает, какие модули ставить (checklist: авторизация, API-токен, syslog-ng, stats-collector, репутация IP)
+5. Спрашивает, какие модули ставить (checklist: авторизация, API-токен, syslog-ng, stats-collector, репутация IP, Dozzle)
 6. Спрашивает **HTTPS** (свои PEM; можно оставить только HTTP)
 7. Спрашивает **порт(ы)**: при HTTPS — порт TLS, затем HTTP (редирект); при HTTP-only — порт UI (80 / 8080 или свой)
 8. Запускает детектор ресурсов и предлагает профиль
@@ -342,6 +343,7 @@ sudo ./deploy/ubuntu/install_ubuntu.sh
 | syslog-ng        | вкл.         | приём syslog на `:514` (Compose profile `syslog`)                               |
 | stats-collector  | вкл.         | метрики / `/system` (Compose profile `stats`)                                   |
 | Репутация IP     | вкл.         | модуль целиком; при отказе `REPUTATION_FETCH_ENABLED=false` (API/UI/фиды выкл.) |
+| Dozzle           | вкл.         | realtime-логи UI `/dozzle/` (profile `dozzle`; `docker.sock` + start/stop/restart) |
 
 Ядро (ClickHouse + Backend + Frontend) ставится всегда.
 
@@ -676,6 +678,21 @@ cd /opt/geoatlas
 
 ### Логи и диагностика
 
+**Dozzle (опционально):** realtime-просмотр логов контейнеров стека в браузере.
+
+```bash
+# В .env (после установки обычно уже есть):
+# COMPOSE_PROFILES=syslog,stats,dozzle
+# отключить: уберите dozzle из списка или GA_ENABLE_DOZZLE=0 при установке
+
+cd /opt/geoatlas
+./start.sh   # или: docker compose --profile dozzle up -d dozzle
+```
+
+Откройте `/dozzle/` под учётной записью **administrator** (nginx `auth_request`). Порт Dozzle наружу не публикуется. Контейнер монтирует `/var/run/docker.sock` **RW** для start/stop/restart; shell отключён. Флаг actions в Dozzle также открывает `remove` / `update` в его UI — используйте осторожно. Фильтр: только контейнеры проекта Compose (`com.docker.compose.project`).
+
+Без профиля `dozzle` ссылка «Логи контейнеров» в UI даёт 502 — это ожидаемо.
+
 ```bash
 cd /opt/geoatlas
 
@@ -687,6 +704,7 @@ docker compose logs -f backend
 docker compose logs -f syslog-ng
 docker compose logs -f clickhouse
 docker compose logs -f stats-collector
+docker compose logs -f dozzle
 
 # Статус healthcheck
 docker compose ps
@@ -942,11 +960,12 @@ Compact-снимок индекса пишется в `/app/data/geo_index.snap`
 | `/geo-ranges`          | База GeoIP            | Просмотр/правка диапазонов, выгрузка CSV                                                                                                             |
 | `/parser-test`         | Тест парсеров         | До 200 строк за запрос, пресеты по вендорам, статусы parsed/skipped/error                                                                            |
 | `/system`              | Системный мониторинг  | Обзор / Pipeline (Syslog-NG queued/drops + ingest EPS) / Безопасность / Графики / Резервное копирование; алёрты, ёмкость, профиль установки          |
+| `/dozzle/`             | Логи контейнеров      | Dozzle (профиль `dozzle`): realtime stdout стека, start/stop/restart; только administrator; вне React SPA                                            |
 | `/users`               | Учётные записи        | Список/создание УЗ: administrator, operator, dashboard (скрыто, если UI-auth выключен)                                                               |
 | `/api-tokens`          | API-токены            | Именованные Bearer со scope read/ops/admin; секрет показывается один раз                                                                             |
 | `/change-password`     | Смена пароля          | Смена своего пароля                                                                                                                                  |
 
-SPA (React Router): page-auth в UI; nginx `auth_request` для `/api/*`. Карта и смена пароля — любой залогиненный (**administrator**, **operator**, **dashboard**); system / parsers / geo / reputation / users / api-tokens — только **administrator**. Роль **dashboard** отличается от operator длительной cookie-сессией (видеостена). Legacy `*.html` редиректятся на clean paths.
+SPA (React Router): page-auth в UI; nginx `auth_request` для `/api/*` и `/dozzle/`. Карта и смена пароля — любой залогиненный (**administrator**, **operator**, **dashboard**); system / dozzle / parsers / geo / reputation / users / api-tokens — только **administrator**. Роль **dashboard** отличается от operator длительной cookie-сессией (видеостена). Legacy `*.html` редиректятся на clean paths.
 
 Unit-тесты карты (репутация / heatmap focus / coords helpers): `cd frontend && npm test` (vitest). Контрактные grep-проверки UI: `bash scripts/frontend-smoke.sh`.
 

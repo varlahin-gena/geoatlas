@@ -257,6 +257,40 @@ services:
         max-size: "20m"
         max-file: "3"
 
+  # Опциональный realtime log viewer (Dozzle). Порт не публикуется —
+  # доступ только через nginx /dozzle/ (admin auth_request).
+  # docker.sock RW нужен для start/stop/restart (DOZZLE_ENABLE_ACTIONS).
+  # Shell не включаем. Actions также открывают remove/update в UI Dozzle.
+  dozzle:
+    image: amir20/dozzle:v10.7.4
+    container_name: dozzle
+    profiles: ["dozzle"]
+    expose:
+      - "8080"
+    environment:
+      DOZZLE_BASE: /dozzle
+      DOZZLE_HOSTNAME: ${DOZZLE_HOSTNAME:-geoatlas}
+      DOZZLE_ENABLE_ACTIONS: "true"
+      DOZZLE_FILTER: "label=com.docker.compose.project=${COMPOSE_PROJECT_NAME:-geoatlas}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - dozzle-data:/data
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128m
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
   frontend:
     build:
       context: ./frontend
@@ -313,6 +347,7 @@ volumes:
   clickhouse-backups:
   syslog-ng-buffer:
   auth-users:
+  dozzle-data:
 
 networks:
   default:

@@ -348,7 +348,8 @@ source_module_helper() {
         GA_MODULE_SYSLOG=1
         GA_MODULE_STATS=1
         GA_MODULE_REPUTATION=1
-        GA_COMPOSE_PROFILES="syslog,stats"
+        GA_MODULE_DOZZLE=1
+        GA_COMPOSE_PROFILES="syslog,stats,dozzle"
         return 1
     fi
     # shellcheck source=deploy/common/select_modules.sh

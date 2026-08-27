@@ -37,6 +37,7 @@ describe('groupNav', () => {
     ]);
     expect(sections.find((s) => s.id === 'observe')?.items.map((i) => i.href)).toEqual([
       '/system',
+      '/dozzle/',
       '/anomalies',
       '/reputation',
     ]);
@@ -72,6 +73,7 @@ describe('splitNavItems', () => {
     expect(workspace.map((i) => i.href)).toEqual(['/']);
     expect(observe.map((i) => i.label)).toEqual([
       'Мониторинг системы',
+      'Логи контейнеров',
       'Аномалии',
       'Репутация IP',
     ]);
