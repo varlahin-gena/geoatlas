@@ -69,6 +69,7 @@
 - **Журнал ошибок парсинга**: поиск, выборочное и полное удаление, передача строк в «Тест парсеров»
 - Страница системного мониторинга (Обзор / Pipeline / Безопасность / Графики / **Резервное копирование**): метрики контейнеров, пайплайна (в т.ч. **UDP/TCP EPS**, drops, circuit breaker), **форма TTL**, неуспешные логины, хранилище, профиль установки, **индикатор ёмкости**, алёрты; ручной maintenance backfill агрегатов
 - Индикатор здоровья системы на главной странице (ссылка на `/system`); **версия установки** (из пакета / `install-meta.json`) в меню пользователя
+- **Логи контейнеров** (опционально, Dozzle): realtime stdout стека в UI `/dozzle/` для administrator; профиль Compose `dozzle`, по умолчанию вкл. при установке
 - Docker: fail-closed секреты в compose, hardened контейнеры (`cap_drop: ALL`); запуск через `./start.sh`
 - Контракт HTTP API: [`openapi.yaml`](openapi.yaml) (OpenAPI **1.15.0**)
 
@@ -273,7 +274,7 @@ http://<IP_сервера>/
 **Общий первый шаг на сервере** (Ubuntu и Oracle Linux одинаково):
 
 ```bash
-VER=2.1.1   # или нужный релиз
+VER=2.1.3   # или нужный релиз
 cd /tmp
 curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz"
 curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz.sha256"
@@ -766,7 +767,7 @@ docker compose exec clickhouse sh -c 'clickhouse-client --password "$CLICKHOUSE_
 **Единственный путь обновления** — скачать пакет на сервер, проверить SHA-256, `./update.sh`:
 
 ```bash
-VER=2.1.1   # нужный релиз
+VER=2.1.3   # нужный релиз
 cd /tmp
 curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz"
 curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz.sha256"

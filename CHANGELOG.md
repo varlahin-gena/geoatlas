@@ -5,14 +5,23 @@
 
 ## [Unreleased]
 
+## [2.1.3] — 2026-08-27
+
+Патч: опциональный realtime-просмотр логов контейнеров (Dozzle) и закрытие Trivy CVE в runtime-образах.
+
 ### Added
 - Опциональный профиль Compose `dozzle` ([amir20/dozzle](https://github.com/amir20/dozzle) v10.7.4): realtime-логи контейнеров на `/dozzle/` за nginx `auth_request` (admin); порт не публикуется; start/stop/restart включены, shell выключен.
 - Установщик: модуль Dozzle отдельным пунктом checklist (`GA_ENABLE_DOZZLE`; по умолчанию **вкл.**); ссылка «Логи контейнеров» в навигации для admin; сохранение флага при пересчёте профиля.
+- Офлайн-пакет (`pack-release.sh --with-images` / `export-images.sh`): образы Dozzle и `geoatlas-clickhouse` входят в `images/`.
 
 ### Security
 - Runtime-образы backend / stats-collector / frontend: `apk upgrade libssl3 libcrypto3` (OpenSSL 3.5.7 → 3.5.8+, Trivy CVE в alpine/nginx base).
 - Image scan: Trivy по собранным `geoatlas-*` образам; пустой SARIF для старых category `trivy-alpine`/`trivy-nginx`, чтобы закрыть orphaned alerts после смены целей скана.
 - ClickHouse: `geoatlas-clickhouse` на базе `25.8.33.6` + `apt` upgrade openssl/libssl3/perl-base (Trivy Ubuntu CVE); CI integration на `25.8.33.6`.
+
+### Notes
+- OpenAPI API doc version: **1.15.0** (без изменений)
+- Продуктовая версия: **2.1.3**
 
 ## [2.1.2] — 2026-08-25
 
@@ -457,6 +466,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.1.3]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.3
 [2.1.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.2
 [2.1.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.1
 [2.1.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.0
