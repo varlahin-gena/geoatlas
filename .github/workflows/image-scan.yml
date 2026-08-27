@@ -32,24 +32,44 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
+      # Scan built app images (apk-upgraded OpenSSL), not raw upstream alpine/nginx tags.
+      - name: Build geoatlas-frontend
+        run: docker build -t geoatlas-frontend:scan -f frontend/Dockerfile frontend
+
+      - name: Build geoatlas-backend
+        run: docker build -t geoatlas-backend:scan -f backend/Dockerfile .
+
+      - name: Build geoatlas-stats-collector
+        run: docker build -t geoatlas-stats-collector:scan -f stats-collector/Dockerfile .
+
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: image
-          image-ref: nginx:1.30.4-alpine
+          image-ref: geoatlas-frontend:scan
           severity: CRITICAL
           ignore-unfixed: true
           format: sarif
-          output: trivy-nginx.sarif
+          output: trivy-frontend.sarif
           exit-code: "0"
 
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: image
-          image-ref: alpine:3.23
+          image-ref: geoatlas-backend:scan
           severity: CRITICAL
           ignore-unfixed: true
           format: sarif
-          output: trivy-alpine.sarif
+          output: trivy-backend.sarif
+          exit-code: "0"
+
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: geoatlas-stats-collector:scan
+          severity: CRITICAL
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-stats.sarif
           exit-code: "0"
 
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -79,14 +99,20 @@ jobs:
       - uses: github/codeql-action/upload-sarif@f3712979fa5f215279b101dd0a2e3bdfb4353324 # v3
         if: always()
         with:
-          sarif_file: trivy-nginx.sarif
-          category: trivy-nginx
+          sarif_file: trivy-frontend.sarif
+          category: trivy-frontend
 
       - uses: github/codeql-action/upload-sarif@f3712979fa5f215279b101dd0a2e3bdfb4353324 # v3
         if: always()
         with:
-          sarif_file: trivy-alpine.sarif
-          category: trivy-alpine
+          sarif_file: trivy-backend.sarif
+          category: trivy-backend
+
+      - uses: github/codeql-action/upload-sarif@f3712979fa5f215279b101dd0a2e3bdfb4353324 # v3
+        if: always()
+        with:
+          sarif_file: trivy-stats.sarif
+          category: trivy-stats
 
       - uses: github/codeql-action/upload-sarif@f3712979fa5f215279b101dd0a2e3bdfb4353324 # v3
         if: always()

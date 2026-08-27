@@ -19,7 +19,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
 FROM alpine:3.23
 # uid/gid 101 = clickhouse/clickhouse-server — общий том clickhouse-backups
 # (иначе auth *.tgz и prune падают с permission denied).
+# libssl3/libcrypto3: apk upgrade закрывает Trivy OpenSSL CVE (3.5.7 → 3.5.8+).
 RUN apk add --no-cache ca-certificates=20260611-r0 tzdata=2026c-r0 && \
+    apk upgrade --no-cache libssl3 libcrypto3 && \
     addgroup -g 101 app && \
     adduser -D -u 101 -G app app && \
     mkdir -p /app/data && chown -R app:app /app

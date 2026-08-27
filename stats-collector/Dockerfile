@@ -13,7 +13,9 @@ COPY stats-collector/ .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/stats-collector .
 
 FROM alpine:3.23
+# libssl3/libcrypto3: apk upgrade закрывает Trivy OpenSSL CVE (3.5.7 → 3.5.8+).
 RUN apk add --no-cache ca-certificates=20260611-r0 tzdata=2026c-r0 && \
+    apk upgrade --no-cache libssl3 libcrypto3 && \
     addgroup -g 10001 app && \
     adduser -D -u 10001 -G app app
 USER app

@@ -9,6 +9,10 @@
 - Опциональный профиль Compose `dozzle` ([amir20/dozzle](https://github.com/amir20/dozzle) v10.7.4): realtime-логи контейнеров на `/dozzle/` за nginx `auth_request` (admin); порт не публикуется; start/stop/restart включены, shell выключен.
 - Установщик: модуль Dozzle отдельным пунктом checklist (`GA_ENABLE_DOZZLE`; по умолчанию **вкл.**); ссылка «Логи контейнеров» в навигации для admin; сохранение флага при пересчёте профиля.
 
+### Security
+- Runtime-образы backend / stats-collector / frontend: `apk upgrade libssl3 libcrypto3` (OpenSSL 3.5.7 → 3.5.8+, Trivy CVE в alpine/nginx base).
+- Image scan: Trivy по собранным `geoatlas-*` образам (не сырые `alpine`/`nginx` tags).
+
 ## [2.1.2] — 2026-08-25
 
 Патч: серверный поиск GeoIP и упрощённый UX «Сети предприятия».

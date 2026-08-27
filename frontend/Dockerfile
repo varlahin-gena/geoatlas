@@ -9,7 +9,9 @@ COPY src ./src
 RUN npm run build
 
 FROM nginx:1.30.4-alpine
-RUN mkdir -p /etc/nginx/includes
+# libssl3/libcrypto3: apk upgrade закрывает Trivy OpenSSL CVE (3.5.7 → 3.5.8+).
+RUN apk upgrade --no-cache libssl3 libcrypto3 && \
+    mkdir -p /etc/nginx/includes
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx-app.inc /etc/nginx/includes/app.inc
 COPY nginx-security-headers.inc /etc/nginx/includes/security-headers.inc
