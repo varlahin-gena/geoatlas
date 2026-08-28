@@ -5,6 +5,22 @@
 
 ## [Unreleased]
 
+## [2.2.0] — 2026-08-28
+
+Минор: SIEM-подобный конструктор запросов на карте.
+
+### Added
+- Конструктор запросов на карте: группы полей **Общее**, **Атакующий**, **Цель** (IP, порт, страна, город отдельно для src/dst).
+- Операторы сравнения в DSL поиска: `=` (равно), `!=` (не равно), `contains` / `:` (содержит).
+- Поле **`action`** в конструкторе и поиске — фильтрация по действию МСЭ (allow/deny/block и т.д.); алиас `rule:` сохранён для старых шаблонов.
+
+### Changed
+- Поиск по карте выполняется на стороне ClickHouse для новых полей (src_ip, dst_port, action и др.) во всех режимах группировки.
+
+### Notes
+- OpenAPI API doc version: **1.15.0** (без изменений)
+- Продуктовая версия: **2.2.0**
+
 ## [2.1.3] — 2026-08-27
 
 Патч: опциональный realtime-просмотр логов контейнеров (Dozzle) и закрытие Trivy CVE в runtime-образах.
@@ -466,6 +482,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.2.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.2.0
 [2.1.3]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.3
 [2.1.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.2
 [2.1.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.1
