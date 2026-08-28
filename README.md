@@ -15,13 +15,13 @@
 - [Быстрый старт](#быстрый-старт)
 - [Установка](#установка)
   - [Установочный пакет](#установочный-пакет)
-  - [Ubuntu (автоматическая)](#ubuntu-автоматическая)
-  - [Oracle Linux / RHEL (автоматическая)](#oracle-linux--rhel-автоматическая)
+  - [Ubuntu](#ubuntu)
+  - [Oracle Linux / RHEL](#oracle-linux--rhel)
   - [Ручная установка из пакета](#ручная-установка-из-пакета)
 - [Удаление](#удаление)
   - [Быстрый старт (автоопределение ОС)](#быстрый-старт-автоопределение-ос)
   - [Ubuntu / Debian](#ubuntu--debian)
-  - [Oracle Linux / RHEL](#oracle-linux--rhel)
+  - [Oracle Linux / RHEL](#oracle-linux--rhel-1)
   - [Остановка без удаления проекта](#остановка-без-удаления-проекта)
 - [Запуск и остановка](#запуск-и-остановка)
 - [Обслуживание](#обслуживание)
@@ -895,28 +895,89 @@ Network,Country,Region,City,Latitude,Longitude
 
 Большие базы (сотни МБ) через браузер часто упираются в ширину канала между рабочей станцией и сервером.
 **Не переключайте страницу/вкладку во время upload** — браузер оборвёт запрос (`Failed to fetch`).
-Надёжнее положить CSV на сам хост и залить через API локально (нужен `API_AUTH_TOKEN` из `.env` или именованный токен scope **ops**/**admin**):
+Надёжнее положить CSV на хост и залить через API **с самого сервера** (localhost → nginx → backend).
+
+Нужен Bearer с scope **ops** или **admin**: токен из контейнера `backend` (ниже) или именованный токен из UI `/api-tokens`. Токен берите через `docker exec backend` — так вы гарантированно совпадаете с тем, что реально проверяет API (не зависит от `source .env` / `COMPOSE_PROJECT_NAME`).
+
+**1. Скопировать CSV на сервер** (с рабочей станции):
+
+```bash
+scp geoip.csv root@сервер:/opt/geoatlas/geoip.csv
+```
+
+**2. На сервере — токен из живого backend:**
 
 ```bash
 cd /opt/geoatlas
-# скопировать файл на сервер, например:
-# scp geoip.csv root@сервер:/opt/geoatlas/geoip.csv
+# контейнер должен быть Up (healthy): docker ps --filter name=^backend$
+TOKEN="$(docker exec backend printenv API_AUTH_TOKEN)"
+echo -n "$TOKEN" | wc -c   # ожидаете > 0 (обычно 32+)
+```
 
-set -a; . ./.env; set +a
+**3. Проверить авторизацию** (ожидаете HTTP `200`):
 
+```bash
+# если UI не на 80-м порту — подставьте HTTP_PORT из .env (например :8080)
+curl -sS -o /tmp/auth_body -w "HTTP %{http_code}\n" \
+  -H "Authorization: Bearer $TOKEN" \
+  "http://127.0.0.1/api/auth/check-ops"
+cat /tmp/auth_body
+```
+
+При **401** токен пустой/неверный или UI на другом порту. Не продолжайте upload, пока `check-ops` не вернёт 200.
+
+**4. (Опционально) dry-run без записи** — отловит пересечения диапазонов и лимиты:
+
+```bash
 curl -sS -w "\nHTTP %{http_code}\n" \
-  -H "Authorization: Bearer $API_AUTH_TOKEN" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: text/csv" \
+  --data-binary @/opt/geoatlas/geoip.csv \
+  "http://127.0.0.1/upload-geo?dry_run=1"
+```
+
+**5. Залить CSV:**
+
+```bash
+curl -sS -w "\nHTTP %{http_code}\n" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: text/csv" \
   --data-binary @/opt/geoatlas/geoip.csv \
   "http://127.0.0.1/upload-geo"
-# если UI на другом порту: http://127.0.0.1:8080/upload-geo
-
-docker compose exec clickhouse sh -c 'clickhouse-client --password "$CLICKHOUSE_PASSWORD" -q "SELECT count() FROM geo_ranges"'
-docker compose logs backend --since=10m 2>&1 | grep -iE 'geo index loaded|geo csv|upload|overlap|error'
 ```
 
-Ожидаете: JSON с `"ok":true,"ranges":N`, `count() > 0` и в логах `geo index loaded`.
-На большой базе backend может на 1–3 минуты занять много CPU/RAM — это нормально (парсинг и in-memory индекс).
+Ожидаете JSON `{"ok":true,"ranges":N}` и HTTP `200`.
+
+**6. Проверить результат:**
+
+```bash
+docker exec clickhouse sh -c \
+  'clickhouse-client --password "$CLICKHOUSE_PASSWORD" -q "SELECT count() FROM geo_ranges"'
+docker logs backend --since=10m 2>&1 | grep -iE 'geo index loaded|geo csv|upload|overlap|error'
+```
+
+В логах — `geo index loaded`. На большой базе backend 1–3 минуты грузит CPU/RAM (парсинг и in-memory индекс) — это нормально.
+
+**Типичные ответы upload:**
+
+| HTTP | Причина | Что делать |
+|------|---------|------------|
+| **401** | нет/неверный Bearer | шаг 2–3; токен только из `docker exec backend` |
+| **400** `overlapping geo ranges` | в CSV пересекаются сети (границы включительные) | править CSV, снова `dry_run=1` |
+| **409** | опасный replace / мало RAM / занят heavy-job | см. ниже: очистить базу или не перезаливать |
+| **413** | файл или число ranges сверх лимита | уменьшить CSV / `GEOIP_UPLOAD_MAX_*` / профиль памяти |
+
+Если nginx снова отдаёт 401, а `docker exec backend` токен верный — заливка мимо nginx (прямо в процесс backend):
+
+```bash
+TOKEN="$(docker exec backend printenv API_AUTH_TOKEN)"
+docker cp /opt/geoatlas/geoip.csv backend:/tmp/geoip.csv
+docker exec backend wget -qO- \
+  --header="Authorization: Bearer $TOKEN" \
+  --header="Content-Type: text/csv" \
+  --post-file=/tmp/geoip.csv \
+  http://127.0.0.1:8080/upload-geo
+```
 
 ### Повторная загрузка большой GeoIP и HTTP 502 / OOM
 
