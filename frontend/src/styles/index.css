@@ -287,7 +287,7 @@ body.page-map {
 .topbar .search-builder-toggle .icon { width: 14px; height: 14px; }
 .topbar .search-builder-panel {
     display: none; position: absolute; top: calc(100% + 8px); left: 0; z-index: 140;
-    width: min(620px, calc(100vw - 340px));
+    width: min(720px, calc(100vw - 340px));
     background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
     box-shadow: var(--shadow); padding: 12px;
 }
@@ -402,12 +402,12 @@ body.page-map {
 }
 .topbar .search-builder-row {
     display: grid;
-    grid-template-columns: 72px 70px 130px minmax(0, 1fr) auto;
+    grid-template-columns: 72px 70px 160px 88px minmax(0, 1fr) auto;
     gap: 8px;
     align-items: center;
 }
 .topbar .search-builder-row-nested {
-    grid-template-columns: 70px 130px minmax(0, 1fr) auto;
+    grid-template-columns: 70px 160px 88px minmax(0, 1fr) auto;
 }
 .topbar .search-builder-group {
     border: 1px solid var(--border);

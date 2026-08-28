@@ -167,7 +167,7 @@ export function MapTopbar({
         </svg>
         <input
           type="text"
-          placeholder="Поиск: IP, страна, city:Москва, rule:block…"
+          placeholder="Поиск: IP, страна, action=allow, src_ip=10.0.0.1…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />

@@ -8,16 +8,56 @@ import {
 } from '@/api/searchTemplates';
 import { useAuth } from '@/auth/AuthContext';
 import { useToast } from '@/components/Toast';
-import type { SearchField } from '@/lib/search';
+import type { SearchField, SearchOp } from '@/lib/search';
+import { SEARCH_OP_DEFS } from '@/lib/search';
 import {
   createDefaultBuilderGroup,
   createDefaultBuilderRow,
   fieldLabel,
-  SEARCH_BUILDER_FIELDS,
+  opLabel,
+  SEARCH_BUILDER_FIELD_GROUPS,
   SEARCH_EXAMPLE_CHIPS,
   serializeSearchBuilderRows,
   type BuilderRow,
 } from '@/lib/searchBuilder';
+
+function FieldSelect({
+  value,
+  onChange,
+}: {
+  value: SearchField;
+  onChange: (field: SearchField) => void;
+}) {
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value as SearchField)}>
+      {SEARCH_BUILDER_FIELD_GROUPS.map((group) => (
+        <optgroup key={group.label} label={group.label}>
+          {group.fields.map((f) => (
+            <option key={f} value={f}>
+              {fieldLabel(f)}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+    </select>
+  );
+}
+
+function OpSelect({ value, onChange }: { value: SearchOp; onChange: (op: SearchOp) => void }) {
+  return (
+    <select
+      className="search-builder-op"
+      value={value}
+      onChange={(e) => onChange(e.target.value as SearchOp)}
+    >
+      {(Object.keys(SEARCH_OP_DEFS) as SearchOp[]).map((op) => (
+        <option key={op} value={op}>
+          {opLabel(op)}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 type Tab = 'builder' | 'mine' | 'all';
 
@@ -161,7 +201,7 @@ export function SearchBuilder({
             ))}
           </div>
           <div className="search-builder-hint">
-            Подсказка: country:Россия AND device:fw1, NOT rule:block, (A OR B)
+            Подсказка: src_ip=10.0.0.1, action=allow, action!=deny, device:fw1
           </div>
           <div className="search-builder-rows">
             {rows.map((row, idx) => (
@@ -192,16 +232,11 @@ export function SearchBuilder({
                 </label>
                 {row.kind === 'term' ? (
                   <>
-                    <select
+                    <FieldSelect
                       value={row.field}
-                      onChange={(e) => updateRow(idx, { field: e.target.value as SearchField })}
-                    >
-                      {SEARCH_BUILDER_FIELDS.map((f) => (
-                        <option key={f} value={f}>
-                          {fieldLabel(f)}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(field) => updateRow(idx, { field })}
+                    />
+                    <OpSelect value={row.op} onChange={(op) => updateRow(idx, { op })} />
                     <input
                       type="text"
                       className="search-builder-value"
@@ -242,23 +277,22 @@ export function SearchBuilder({
                             />
                             НЕ
                           </label>
-                          <select
+                          <FieldSelect
                             value={child.field}
-                            onChange={(e) => {
+                            onChange={(field) => {
                               const children = row.children.slice();
-                              children[cidx] = {
-                                ...child,
-                                field: e.target.value as SearchField,
-                              };
+                              children[cidx] = { ...child, field };
                               updateRow(idx, { children });
                             }}
-                          >
-                            {SEARCH_BUILDER_FIELDS.map((f) => (
-                              <option key={f} value={f}>
-                                {fieldLabel(f)}
-                              </option>
-                            ))}
-                          </select>
+                          />
+                          <OpSelect
+                            value={child.op}
+                            onChange={(op) => {
+                              const children = row.children.slice();
+                              children[cidx] = { ...child, op };
+                              updateRow(idx, { children });
+                            }}
+                          />
                           <input
                             type="text"
                             placeholder="Значение"
@@ -279,7 +313,7 @@ export function SearchBuilder({
                           updateRow(idx, {
                             children: [
                               ...row.children,
-                              { negate: false, field: 'all', value: '' },
+                              { negate: false, field: 'src_ip', op: 'eq', value: '' },
                             ],
                           })
                         }

@@ -9,16 +9,25 @@ import (
 type Field string
 
 const (
-	FieldAll     Field = "all"
-	FieldIP      Field = "ip"
-	FieldCountry Field = "country"
-	FieldCity    Field = "city"
-	FieldRule    Field = "rule"
-	FieldDevice  Field = "device"
-	FieldSrc     Field = "src"
-	FieldDst     Field = "dst"
-	FieldProto   Field = "proto"
-	FieldZone    Field = "zone"
+	FieldAll        Field = "all"
+	FieldIP         Field = "ip"
+	FieldPort       Field = "port"
+	FieldCountry    Field = "country"
+	FieldCity       Field = "city"
+	FieldAction     Field = "action"
+	FieldDevice     Field = "device"
+	FieldSrcIP      Field = "src_ip"
+	FieldDstIP      Field = "dst_ip"
+	FieldSrcPort    Field = "src_port"
+	FieldDstPort    Field = "dst_port"
+	FieldSrcCountry Field = "src_country"
+	FieldDstCountry Field = "dst_country"
+	FieldSrcCity    Field = "src_city"
+	FieldDstCity    Field = "dst_city"
+	FieldSrc        Field = "src"
+	FieldDst        Field = "dst"
+	FieldProto      Field = "proto"
+	FieldZone       Field = "zone"
 )
 
 type Kind int
@@ -30,9 +39,18 @@ const (
 	KindOr
 )
 
+type Op int
+
+const (
+	OpContains Op = iota
+	OpEq
+	OpNe
+)
+
 type Node struct {
 	Kind  Kind
 	Field Field
+	Op    Op
 	Value string
 	Left  *Node
 	Right *Node
@@ -48,10 +66,20 @@ type Compiled struct {
 var fieldAliases = map[string]Field{
 	"all": "all", "any": "all", "text": "all",
 	"ip": "ip", "addr": "ip", "address": "ip",
+	"port": "port",
 	"country": "country", "страна": "country",
 	"city": "city", "город": "city",
-	"rule": "rule", "policy": "rule", "правило": "rule",
-	"device": "device", "host": "device", "fw": "device", "устройство": "device",
+	"action": "action", "act": "action", "действие": "action",
+	"rule": "action", "policy": "action", "правило": "action",
+	"device": "device", "host": "device", "fw": "device", "устройство": "device", "мсэ": "device",
+	"src_ip": "src_ip", "attacker": "src_ip", "attacker_ip": "src_ip", "атакующий": "src_ip",
+	"dst_ip": "dst_ip", "target": "dst_ip", "target_ip": "dst_ip", "цель": "dst_ip",
+	"src_port": "src_port", "spt": "src_port", "attacker_port": "src_port",
+	"dst_port": "dst_port", "dpt": "dst_port", "target_port": "dst_port",
+	"src_country": "src_country", "attacker_country": "src_country",
+	"dst_country": "dst_country", "target_country": "dst_country",
+	"src_city": "src_city", "attacker_city": "src_city",
+	"dst_city": "dst_city", "target_city": "dst_city",
 	"src": "src", "source": "src", "from": "src",
 	"dst": "dst", "dest": "dst", "destination": "dst", "to": "dst",
 	"proto": "proto", "protocol": "proto",
@@ -64,6 +92,8 @@ const (
 	tokWord tokenType = iota
 	tokString
 	tokColon
+	tokEq
+	tokNe
 	tokLParen
 	tokRParen
 	tokAnd
@@ -82,12 +112,15 @@ func normalize(s string) string {
 
 func looksAdvanced(raw string) bool {
 	for _, r := range raw {
-		if r == '(' || r == ')' || r == '"' {
+		if r == '(' || r == ')' || r == '"' || r == '=' {
 			return true
 		}
 	}
 	upper := strings.ToUpper(raw)
-	if hasWord(upper, "AND") || hasWord(upper, "OR") || hasWord(upper, "NOT") {
+	if hasWord(upper, "AND") || hasWord(upper, "OR") || hasWord(upper, "NOT") || hasWord(upper, "CONTAINS") {
+		return true
+	}
+	if strings.Contains(raw, "!=") {
 		return true
 	}
 	return hasFieldColon(raw)
@@ -168,6 +201,19 @@ func tokenize(raw string) ([]token, error) {
 			tokens = append(tokens, token{typ: tokColon, value: ":"})
 			i += w
 			continue
+		case '=':
+			tokens = append(tokens, token{typ: tokEq, value: "="})
+			i += w
+			continue
+		case '!':
+			if i+w < len(raw) && raw[i+w] == '=' {
+				tokens = append(tokens, token{typ: tokNe, value: "!="})
+				i += w + 1
+				continue
+			}
+			tokens = append(tokens, token{typ: tokWord, value: "!"})
+			i += w
+			continue
 		case '"':
 			i += w
 			var b strings.Builder
@@ -197,7 +243,7 @@ func tokenize(raw string) ([]token, error) {
 		start := i
 		for i < len(raw) {
 			cr, cw := utf8.DecodeRuneInString(raw[i:])
-			if unicode.IsSpace(cr) || cr == '(' || cr == ')' || cr == ':' || cr == '"' {
+			if unicode.IsSpace(cr) || cr == '(' || cr == ')' || cr == ':' || cr == '"' || cr == '=' || cr == '!' {
 				break
 			}
 			i += cw
@@ -278,6 +324,46 @@ func (p *parser) parseValue() (string, error) {
 	return t.value, nil
 }
 
+func (p *parser) parseFieldTerm(field Field) (*Node, error) {
+	t := p.peek()
+	if t == nil {
+		return nil, errExpectedValue
+	}
+	switch t.typ {
+	case tokColon:
+		p.next()
+		val, err := p.parseValue()
+		if err != nil {
+			return nil, err
+		}
+		return &Node{Kind: KindTerm, Field: field, Op: OpContains, Value: val}, nil
+	case tokEq:
+		p.next()
+		val, err := p.parseValue()
+		if err != nil {
+			return nil, err
+		}
+		return &Node{Kind: KindTerm, Field: field, Op: OpEq, Value: val}, nil
+	case tokNe:
+		p.next()
+		val, err := p.parseValue()
+		if err != nil {
+			return nil, err
+		}
+		return &Node{Kind: KindTerm, Field: field, Op: OpNe, Value: val}, nil
+	case tokWord:
+		if strings.EqualFold(t.value, "contains") {
+			p.next()
+			val, err := p.parseValue()
+			if err != nil {
+				return nil, err
+			}
+			return &Node{Kind: KindTerm, Field: field, Op: OpContains, Value: val}, nil
+		}
+	}
+	return nil, errString("Ожидался оператор сравнения после поля: " + string(field))
+}
+
 func (p *parser) parsePrimary() (*Node, error) {
 	t := p.peek()
 	if t == nil {
@@ -299,19 +385,20 @@ func (p *parser) parsePrimary() (*Node, error) {
 		return nil, errExpectedCond
 	}
 	head := p.next()
-	if head.typ == tokWord && p.peek() != nil && p.peek().typ == tokColon {
-		p.next()
+	if head.typ == tokWord {
 		field, ok := fieldAliases[normalize(head.value)]
+		if ok && field != FieldAll && p.peek() != nil {
+			next := p.peek()
+			if next.typ == tokColon || next.typ == tokEq || next.typ == tokNe ||
+				(next.typ == tokWord && strings.EqualFold(next.value, "contains")) {
+				return p.parseFieldTerm(field)
+			}
+		}
 		if !ok {
 			return nil, errString("Неизвестное поле: " + head.value)
 		}
-		val, err := p.parseValue()
-		if err != nil {
-			return nil, err
-		}
-		return &Node{Kind: KindTerm, Field: field, Value: val}, nil
 	}
-	return &Node{Kind: KindTerm, Field: FieldAll, Value: head.value}, nil
+	return &Node{Kind: KindTerm, Field: FieldAll, Op: OpContains, Value: head.value}, nil
 }
 
 func (p *parser) parseUnary() (*Node, error) {

@@ -31,7 +31,7 @@ func TestLogsWhereBindsCountryAndQuery(t *testing.T) {
 }
 
 func TestLogsWhereAdvancedQueryBinds(t *testing.T) {
-	clause, args := MapScope{Query: "country:Germany AND rule:block"}.LogsWhere()
+	clause, args := MapScope{Query: "country:Germany AND action:block"}.LogsWhere()
 	if !strings.Contains(clause, "AND") || len(args) < 2 {
 		t.Fatalf("clause=%s args=%d", clause, len(args))
 	}
