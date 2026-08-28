@@ -21,10 +21,6 @@ export const SEARCH_BUILDER_FIELD_GROUPS: SearchBuilderFieldGroup[] = [
   },
 ];
 
-export const SEARCH_BUILDER_FIELDS: SearchField[] = SEARCH_BUILDER_FIELD_GROUPS.flatMap(
-  (group) => group.fields,
-);
-
 export const SEARCH_EXAMPLE_CHIPS = [
   { label: 'Action = allow', query: 'action=allow' },
   { label: 'Action != deny', query: 'action!=deny' },
