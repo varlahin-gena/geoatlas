@@ -80,7 +80,7 @@ jobs:
 
       - name: Upload backend analysis results
         if: always()
-        uses: github/codeql-action/upload-sarif@f3712979fa5f215279b101dd0a2e3bdfb4353324 # v3
+        uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
         with:
           sarif_file: hadolint-backend.sarif
           category: hadolint-backend
@@ -88,7 +88,7 @@ jobs:
 
       - name: Upload frontend analysis results
         if: always()
-        uses: github/codeql-action/upload-sarif@f3712979fa5f215279b101dd0a2e3bdfb4353324 # v3
+        uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
         with:
           sarif_file: hadolint-frontend.sarif
           category: hadolint-frontend
@@ -96,7 +96,7 @@ jobs:
 
       - name: Upload stats-collector analysis results
         if: always()
-        uses: github/codeql-action/upload-sarif@f3712979fa5f215279b101dd0a2e3bdfb4353324 # v3
+        uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
         with:
           sarif_file: hadolint-stats-collector.sarif
           category: hadolint-stats-collector
@@ -104,7 +104,7 @@ jobs:
 
       - name: Upload syslog-ng analysis results
         if: always()
-        uses: github/codeql-action/upload-sarif@f3712979fa5f215279b101dd0a2e3bdfb4353324 # v3
+        uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
         with:
           sarif_file: hadolint-syslog-ng.sarif
           category: hadolint-syslog-ng
@@ -112,7 +112,7 @@ jobs:
 
       - name: Upload clickhouse analysis results
         if: always()
-        uses: github/codeql-action/upload-sarif@f3712979fa5f215279b101dd0a2e3bdfb4353324 # v3
+        uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
         with:
           sarif_file: hadolint-clickhouse.sarif
           category: hadolint-clickhouse
