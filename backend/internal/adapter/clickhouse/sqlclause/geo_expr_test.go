@@ -90,7 +90,7 @@ func TestGeoGroupExprsPrefixedQualifiesCityCols(t *testing.T) {
 		t.Fatalf("bare src_country in country key: %s", sk)
 	}
 	sk, dk, sl, dl = GeoGroupExprs("continent")
-	if !strings.Contains(sk, "multiIf(") || sk != sl || dk != dl {
+	if !strings.Contains(sk, "transform(") || sk != sl || dk != dl {
 		t.Fatalf("continent exprs: %s %s %s %s", sk, dk, sl, dl)
 	}
 }

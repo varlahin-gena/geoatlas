@@ -1,6 +1,9 @@
 package model
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestContinentOfKnownCountries(t *testing.T) {
 	cases := map[string]string{
@@ -39,7 +42,16 @@ func TestContinentCenter(t *testing.T) {
 
 func TestContinentSQLExpr(t *testing.T) {
 	expr := ContinentSQLExpr("src_country")
-	if expr == "" || expr[:8] != "multiIf(" {
-		t.Fatalf("bad expr: %s", expr)
+	if expr == "" || !strings.HasPrefix(expr, "transform(src_country, [") {
+		t.Fatalf("bad expr prefix: %.80q", expr)
+	}
+	if strings.Count(expr, "src_country") != 1 {
+		t.Fatalf("country expr should appear once, got %d", strings.Count(expr, "src_country"))
+	}
+	if len(expr) > 32000 {
+		t.Fatalf("expr too long: %d bytes", len(expr))
+	}
+	if !strings.Contains(expr, "'Russia'") || !strings.Contains(expr, "'Европа'") {
+		t.Fatalf("missing sample mapping in: %.120q", expr)
 	}
 }

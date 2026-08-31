@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -219,36 +220,34 @@ func ContinentCenter(name string) (float64, float64, bool) {
 	return 0, 0, false
 }
 
-// ContinentSQLExpr маппит SQL-выражение страны в континент (multiIf).
+// ContinentSQLExpr маппит SQL-выражение страны в континент (transform).
+// Используем transform, а не multiIf с повтором countryExpr на каждую страну —
+// иначе запрос раздувается и CH падает на group_by=continent.
 func ContinentSQLExpr(countryExpr string) string {
-	type pair struct {
-		country   string
-		continent string
+	if len(countryContinent) == 0 {
+		return chStringLiteral(ContinentUnknown)
 	}
-	seen := make(map[string]struct{})
-	var pairs []pair
-	for country, continent := range countryContinent {
-		if _, ok := seen[country]; ok {
-			continue
-		}
-		seen[country] = struct{}{}
-		pairs = append(pairs, pair{country: country, continent: continent})
+	keys := make([]string, 0, len(countryContinent))
+	for k := range countryContinent {
+		keys = append(keys, k)
 	}
-	if len(pairs) == 0 {
-		return fmt.Sprintf("'%s'", ContinentUnknown)
+	sort.Strings(keys)
+
+	countries := make([]string, len(keys))
+	continents := make([]string, len(keys))
+	for i, k := range keys {
+		countries[i] = chStringLiteral(k)
+		continents[i] = chStringLiteral(countryContinent[k])
 	}
-	var b strings.Builder
-	b.WriteString("multiIf(")
-	for _, p := range pairs {
-		b.WriteString(countryExpr)
-		b.WriteString(" = '")
-		b.WriteString(strings.ReplaceAll(p.country, "'", "\\'"))
-		b.WriteString("', '")
-		b.WriteString(strings.ReplaceAll(p.continent, "'", "\\'"))
-		b.WriteString("', ")
-	}
-	b.WriteString("'")
-	b.WriteString(ContinentUnknown)
-	b.WriteString("')")
-	return b.String()
+	return fmt.Sprintf(
+		"transform(%s, [%s], [%s], %s)",
+		countryExpr,
+		strings.Join(countries, ", "),
+		strings.Join(continents, ", "),
+		chStringLiteral(ContinentUnknown),
+	)
+}
+
+func chStringLiteral(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "''") + "'"
 }
