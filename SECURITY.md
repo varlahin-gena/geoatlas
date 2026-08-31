@@ -35,7 +35,7 @@
 
 **Не скоуп** (не уязвимости ГеоАтласа, пока не просим «исправить как CVE»):
 
-- известные ограничения продукта: syslog на `:514` без TLS/auth (рекомендуется host firewall / `GA_SYSLOG_ALLOW_FROM`), IPv4-only, at-most-once ingest (drops при переполнении) — см. README;
+- известные ограничения продукта: syslog на `:514` без TLS/auth (рекомендуется host firewall / `GA_SYSLOG_ALLOW_FROM`), IPv4-only, at-most-once ingest (drops при переполнении) — см. [docs/architecture.md](docs/architecture.md);
 - опциональный модуль Dozzle (`COMPOSE_PROFILES` / `GA_ENABLE_DOZZLE`): доступ к Docker socket и container actions; в установщике включён по умолчанию, можно снять галочку; UI `/dozzle/` только для administrator;
 - CVE ClickHouse, syslog-ng, nginx, Docker, ядра хоста — кроме случая, когда в compose/Dockerfile сознательно закреплён уязвимый тег и его можно поднять;
 - отключённая защита (`AUTH_DISABLED`, `API_AUTH_DISABLED`, `GA_ALLOW_INSECURE`, `GA_ALLOW_MULTI_INSTANCE`);
@@ -44,4 +44,4 @@
 
 ## После исправления
 
-Патч выходит обычным GitHub Release (в Assets — `geoatlas-X.Y.Z.tar.gz`). Операторы накладывают его через `./update.sh` (см. README, «Обновление системы»). Кратко — в CHANGELOG (секция Security), подробности — в GitHub Security Advisory, когда исправление уже доступно.
+Патч выходит обычным GitHub Release (в Assets — `geoatlas-X.Y.Z.tar.gz`). Операторы накладывают его через `./update.sh` (см. [docs/operations.md](docs/operations.md#обновление-системы)). Кратко — в CHANGELOG (секция Security), подробности — в GitHub Security Advisory, когда исправление уже доступно.

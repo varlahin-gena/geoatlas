@@ -2956,7 +2956,7 @@ export interface paths {
          * Сводка системы (ingest, storage, alerts)
          * @description Только administrator или Bearer.
          *     В ответе `ingest_slo` — пороги capacity SLO; `alerts` строятся по этим порогам
-         *     (queue/drops/circuit/lag/profile EPS, syslog-ng buffer). См. README «Ingest SLO».
+         *     (queue/drops/circuit/lag/profile EPS, syslog-ng buffer). См. docs/architecture.md «Ingest SLO».
          *     `pipeline.syslogng` — live scrape stats-exporter (`dropped_total`, `queued`,
          *     `processed_total`, `udp_processed`, `tcp_processed`, `drops_per_sec`);
          *     `health.syslogng.up` — 1 если scrape успешен. Пустой `SYSLOG_STATS_URL` — scrape выключен.

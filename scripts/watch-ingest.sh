@@ -5,7 +5,7 @@
 #
 # Capacity SLO: drop/s должен быть 0. Любой устойчивый drop/s — инцидент ёмкости
 # (алерты ingest_dropping / ingest_dropping_critical на /system.html).
-# См. README «Мониторинг ingest».
+# См. docs/operations.md «Мониторинг ingest».
 
 set -euo pipefail
 

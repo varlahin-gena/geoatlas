@@ -8,7 +8,7 @@ import (
 )
 
 // authTier documents the middleware wrapping each route in NewServer.
-// Keep in sync with server.go and openapi.yaml / README «HTTP API».
+// Keep in sync with server.go and openapi.yaml / docs/ui.md «HTTP API».
 type authTier string
 
 const (
