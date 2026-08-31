@@ -15,7 +15,7 @@ import {
   hasCoords,
   statusRGB,
   topByCount,
-  useGreatCircleArcOnMap,
+  shouldUseGreatCircleArcOnMap,
   normalizeLonLat,
   resolveNodeLonLat,
   buildLineCoordFallback,
@@ -111,9 +111,9 @@ describe('mapLayers helpers', () => {
     expect(greatCircleOffScreenOnMercator(13.4, 52.5, 37.6, 55.75)).toBe(false);
   });
 
-  it('useGreatCircleArcOnMap keeps Pacific geodesic but flatens risky transatlantic', () => {
-    expect(useGreatCircleArcOnMap(49.1, 55.8, -171.8, -13.8)).toBe(true);
-    expect(useGreatCircleArcOnMap(15.2, 54.5, -105.2, 54.5)).toBe(false);
+  it('shouldUseGreatCircleArcOnMap keeps Pacific geodesic but flatens risky transatlantic', () => {
+    expect(shouldUseGreatCircleArcOnMap(49.1, 55.8, -171.8, -13.8)).toBe(true);
+    expect(shouldUseGreatCircleArcOnMap(15.2, 54.5, -105.2, 54.5)).toBe(false);
   });
 
   it('buildDisplayCoordMap spreads co-located nodes', () => {

@@ -94,7 +94,7 @@ export function greatCircleOffScreenOnMercator(
 }
 
 /** Whether ArcLayer should use greatCircle on the flat map (globe always uses geodesic). */
-export function useGreatCircleArcOnMap(
+export function shouldUseGreatCircleArcOnMap(
   sLon: number,
   sLat: number,
   tLon: number,
@@ -129,7 +129,7 @@ function partitionMapArcLines(
       lineFallback,
       displayCoords,
     );
-    if (useGreatCircleArcOnMap(sLon, sLat, tLon, tLat)) geodesic.push(line);
+    if (shouldUseGreatCircleArcOnMap(sLon, sLat, tLon, tLat)) geodesic.push(line);
     else flat.push(line);
   }
   return { geodesic, flat };
