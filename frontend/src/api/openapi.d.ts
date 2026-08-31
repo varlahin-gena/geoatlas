@@ -1263,7 +1263,7 @@ export interface paths {
                     /** @description RFC3339 или YYYY-MM-DD */
                     from?: string;
                     to?: string;
-                    group_by?: "ip" | "subnet" | "city" | "country";
+                    group_by?: "ip" | "subnet" | "city" | "country" | "continent";
                     filter?: "all" | "allowed" | "blocked";
                     /** @description Макс. сырых пар (по умолчанию 10000, макс. 50000). UI шлёт maxArcs. */
                     limit?: number;

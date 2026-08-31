@@ -253,6 +253,29 @@ export function countryAliases(country: string): Set<string> {
   return aliases;
 }
 
+/** Нормализованное имя страны для сравнения (RU label). */
+export function normalizeCountryName(
+  country: string | null | undefined,
+  pointCountry?: string | null,
+): string {
+  const raw = String(country || pointCountry || '').trim();
+  if (!raw || raw.toLowerCase() === 'unknown' || raw === 'Неизвестно' || raw === 'Reserved') {
+    return '';
+  }
+  return mapRuCountry(raw).toLowerCase();
+}
+
+/** true, если оба конца связи в одной известной стране. */
+export function lineIsIntraCountry(
+  line: { src: string; dst: string; src_country?: string; dst_country?: string },
+  points: Record<string, { country?: string }>,
+): boolean {
+  const src = normalizeCountryName(line.src_country, points[line.src]?.country);
+  const dst = normalizeCountryName(line.dst_country, points[line.dst]?.country);
+  if (!src || !dst) return false;
+  return src === dst;
+}
+
 export async function loadCountriesGeoJSON(): Promise<GeoFeatureCollection | null> {
   try {
     const res = await fetch('/data/countries.geojson');

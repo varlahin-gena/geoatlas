@@ -40,6 +40,7 @@ func (a *RetentionApplier) ApplyEdges(ctx context.Context, days int) error {
 		"traffic_edges_hourly",
 		"traffic_edges_city_daily",
 		"traffic_edges_country_daily",
+		"traffic_edges_continent_daily",
 	}
 	for _, table := range tables {
 		ok, err := a.tableExists(ctx, table)

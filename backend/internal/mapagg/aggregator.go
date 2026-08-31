@@ -119,6 +119,12 @@ func IPGroupMetaHinted(g GeoLookuper, ipStr, groupBy string, hint LogGeoHint) mo
 			}
 		}
 
+	case "continent":
+		m = continentGroupMeta(model.GroupMeta{
+			Country: lk.Country,
+			City:    lk.City, Region: lk.Region,
+		})
+
 	default:
 		m = model.GroupMeta{
 			Key: ipStr, Label: ipStr,
@@ -128,7 +134,26 @@ func IPGroupMetaHinted(g GeoLookuper, ipStr, groupBy string, hint LogGeoHint) mo
 		}
 	}
 
-	return applyLogGeoFallback(m, hint, ipStr)
+	m = applyLogGeoFallback(m, hint, ipStr)
+	if groupBy == "continent" {
+		return continentGroupMeta(m)
+	}
+	return m
+}
+
+func continentGroupMeta(m model.GroupMeta) model.GroupMeta {
+	country := strings.TrimSpace(m.Country)
+	if !model.UsableCountry(country) {
+		country = "Неизвестно"
+	}
+	label := model.ContinentOf(country)
+	m.Key = label
+	m.Label = label
+	if cLat, cLon, ok := model.ContinentCenter(label); ok {
+		m.Lat, m.Lon = cLat, cLon
+		m.Valid = label != model.ContinentUnknown
+	}
+	return m
 }
 
 // applyLogGeoFallback подставляет lat/lon/страну из логов, если live GeoIP
@@ -419,7 +444,7 @@ func (e EdgeAgg) ToLines() []model.Line {
 	return []model.Line{e.ToLine()}
 }
 
-// BuildMapFromGeoEdges собирает lines/points из уже свёрнутых CH-рёбер (city|country).
+// BuildMapFromGeoEdges собирает lines/points из уже свёрнутых CH-рёбер (city|country|continent).
 func BuildMapFromGeoEdges(rows []model.GeoEdgeAgg) (lines []model.Line, points map[string]model.Node, skippedNoGeo int) {
 	edgesMap := make(map[string]*EdgeAgg, len(rows))
 	for _, row := range rows {
@@ -496,7 +521,9 @@ func geoMetaFromEdge(key, label, city, country string, lat, lon float64) model.G
 	// Fallback «город → страна» должен сидеть в центре страны.
 	// Иначе среднее lat/lon безымянных IP разъезжается с точкой и дуги
 	// рисуются «в океан», пока маркер остаётся в CountryCenter.
-	if strings.HasPrefix(key, "city:country:") {
+	if cLat, cLon, ok := model.ContinentCenter(key); ok && key != model.ContinentUnknown {
+		lat, lon = cLat, cLon
+	} else if strings.HasPrefix(key, "city:country:") {
 		c := strings.TrimPrefix(key, "city:country:")
 		if cLat, cLon, ok := model.CountryCenter(c); ok {
 			lat, lon = cLat, cLon

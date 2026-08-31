@@ -19,7 +19,7 @@ const schemaComponentTrafficLogsIP = "traffic_logs_ip"
 const schemaComponentHourlyEdges = "hourly_edges_agg"
 
 const schemaVersionEdgesAgg uint32 = 4      // IP daily + coords
-const schemaVersionGeoEdges uint32 = 4      // PARTITION BY day
+const schemaVersionGeoEdges uint32 = 5      // + traffic_edges_continent_daily
 const schemaVersionTrafficLogsIP uint32 = 2 // ORDER BY hour bucket, drop raw, LC geo
 const schemaVersionHourlyEdges uint32 = 1
 

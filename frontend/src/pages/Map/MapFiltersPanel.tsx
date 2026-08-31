@@ -9,6 +9,8 @@ export type MapFiltersPanelProps = {
     setGroupBy: (v: string) => void;
     filter: 'all' | 'allowed' | 'blocked';
     setFilter: (v: 'all' | 'allowed' | 'blocked') => void;
+    hideIntraCountry: boolean;
+    setHideIntraCountry: (v: boolean) => void;
   };
   reputation: {
     reputationEnabled: boolean;
@@ -32,17 +34,19 @@ export function countActiveMapFilters(opts: {
   filter: string;
   repFilterCount: number;
   repColorArcs: boolean;
+  hideIntraCountry: boolean;
 }): number {
   let n = 0;
   if (opts.groupBy !== 'ip') n += 1;
   if (opts.filter !== 'all') n += 1;
   if (opts.repFilterCount > 0) n += 1;
   if (opts.repColorArcs) n += 1;
+  if (opts.groupBy === 'city' && opts.hideIntraCountry) n += 1;
   return n;
 }
 
 export function MapFiltersPanel({ open, grouping, reputation, onReset }: MapFiltersPanelProps) {
-  const { groupBy, setGroupBy, filter, setFilter } = grouping;
+  const { groupBy, setGroupBy, filter, setFilter, hideIntraCountry, setHideIntraCountry } = grouping;
   const {
     reputationEnabled,
     ipMode,
@@ -80,8 +84,22 @@ export function MapFiltersPanel({ open, grouping, reputation, onReset }: MapFilt
           <option value="subnet">/24</option>
           <option value="city">Город</option>
           <option value="country">Страна</option>
+          <option value="continent">Континент</option>
         </select>
       </div>
+
+      {groupBy === 'city' ? (
+        <div className="map-chrome-panel-section">
+          <label className="side-toggle">
+            <input
+              type="checkbox"
+              checked={hideIntraCountry}
+              onChange={(e) => setHideIntraCountry(e.target.checked)}
+            />
+            <span>Скрыть связи внутри страны</span>
+          </label>
+        </div>
+      ) : null}
 
       <div className="map-chrome-panel-section">
         <div className="map-chrome-panel-label">Статус</div>

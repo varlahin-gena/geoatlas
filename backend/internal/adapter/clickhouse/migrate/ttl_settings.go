@@ -33,6 +33,7 @@ func EnsureTTLOnlyDropParts(ctx context.Context, ch clickhouse.Conn) error {
 		"traffic_edges_hourly",
 		"traffic_edges_city_daily",
 		"traffic_edges_country_daily",
+		"traffic_edges_continent_daily",
 		"anomaly_events",
 	}
 	for _, table := range tables {

@@ -9,8 +9,9 @@ type Tables struct {
 	Logs         string
 	EdgesDaily   string
 	EdgesHourly  string
-	EdgesCity    string
-	EdgesCountry string
+	EdgesCity       string
+	EdgesCountry    string
+	EdgesContinent  string
 }
 
 func LiveTables() Tables {
@@ -18,8 +19,9 @@ func LiveTables() Tables {
 		Logs:         "traffic_logs",
 		EdgesDaily:   "traffic_edges_daily",
 		EdgesHourly:  "traffic_edges_hourly",
-		EdgesCity:    "traffic_edges_city_daily",
-		EdgesCountry: "traffic_edges_country_daily",
+		EdgesCity:      "traffic_edges_city_daily",
+		EdgesCountry:   "traffic_edges_country_daily",
+		EdgesContinent: "traffic_edges_continent_daily",
 	}
 }
 
@@ -29,8 +31,9 @@ func BackupTables() Tables {
 		Logs:         "ga_bak_traffic_logs",
 		EdgesDaily:   "ga_bak_traffic_edges_daily",
 		EdgesHourly:  "ga_bak_traffic_edges_hourly",
-		EdgesCity:    "ga_bak_traffic_edges_city_daily",
-		EdgesCountry: "ga_bak_traffic_edges_country_daily",
+		EdgesCity:      "ga_bak_traffic_edges_city_daily",
+		EdgesCountry:   "ga_bak_traffic_edges_country_daily",
+		EdgesContinent: "ga_bak_traffic_edges_continent_daily",
 	}
 }
 
@@ -44,6 +47,8 @@ func (t Tables) GeoEdges(groupBy string) string {
 		return t.EdgesCity
 	case "country":
 		return t.EdgesCountry
+	case "continent":
+		return t.EdgesContinent
 	default:
 		return ""
 	}
@@ -73,6 +78,7 @@ func MapShadowPairs() [][2]string {
 		{live.EdgesHourly, bak.EdgesHourly},
 		{live.EdgesCity, bak.EdgesCity},
 		{live.EdgesCountry, bak.EdgesCountry},
+		{live.EdgesContinent, bak.EdgesContinent},
 	}
 }
 

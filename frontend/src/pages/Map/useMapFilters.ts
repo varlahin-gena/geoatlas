@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { compileSearchQuery, evaluateSearchAst } from '@/lib/search';
 import { mapRuCountry } from './mapConstants';
-import { lineMatchesFocusedCountry } from './mapHeatmap';
+import { lineIsIntraCountry, lineMatchesFocusedCountry } from './mapHeatmap';
 import { hasCoords } from './mapLayers';
 import { lineMatchesReputation } from './mapReputation';
 import { classifyEmptyMap } from './geoWizard';
@@ -23,6 +23,8 @@ export function useMapFilters(opts: {
   search: string;
   minCount: number;
   focusedCountry: string | null;
+  groupBy: string;
+  hideIntraCountry: boolean;
 }) {
   const {
     lines,
@@ -39,6 +41,8 @@ export function useMapFilters(opts: {
     search,
     minCount,
     focusedCountry,
+    groupBy,
+    hideIntraCountry,
   } = opts;
 
   const compiled = useMemo(() => compileSearchQuery(search), [search]);
@@ -47,6 +51,7 @@ export function useMapFilters(opts: {
     return lines.filter((line) => {
       if (!hasCoords(line)) return false;
       if (line.src && line.src === line.dst) return false;
+      if (groupBy === 'city' && hideIntraCountry && lineIsIntraCountry(line, points)) return false;
       if ((line.count || 0) < minCount) return false;
       if (filter === 'allowed' && line.status !== 'allowed') return false;
       if (filter === 'blocked' && line.status !== 'blocked') return false;
@@ -112,6 +117,8 @@ export function useMapFilters(opts: {
     repCategories,
     repLists,
     repSide,
+    groupBy,
+    hideIntraCountry,
   ]);
 
   const stats = useMemo(() => {
@@ -153,6 +160,7 @@ export function useMapFilters(opts: {
     if (minCount > 1) filterHints.push(`порог ≥ ${minCount} соб.`);
     if (repActive) filterHints.push('репутация');
     if (focusedCountry) filterHints.push('фокус страны');
+    if (groupBy === 'city' && hideIntraCountry) filterHints.push('без связей внутри страны');
 
     const classified = classifyEmptyMap({
       loading,
@@ -184,6 +192,8 @@ export function useMapFilters(opts: {
     minCount,
     repActive,
     focusedCountry,
+    groupBy,
+    hideIntraCountry,
     compiled,
   ]);
 

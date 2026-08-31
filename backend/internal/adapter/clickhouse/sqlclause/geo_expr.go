@@ -1,6 +1,10 @@
 package sqlclause
 
-import "fmt"
+import (
+	"fmt"
+
+	"geoatlas/internal/model"
+)
 
 // GeoEnrichIPTable — ephemeral IP→geo lookup для rebuild geo-edges без ALTER UPDATE
 // на traffic_logs. Заполняется EnrichLogsMissingGeo, читается INSERT SELECT.
@@ -88,11 +92,11 @@ func MapLogsFromSQL(logsTable, wherePred string) string {
 	return fmt.Sprintf("FROM %s\n\t\tWHERE %s", logsTable, wherePred)
 }
 
-// GeoEdgesTable возвращает имя daily-агрегата по city|country.
+// GeoEdgesTable возвращает имя daily-агрегата по city|country|continent.
 // Неизвестный groupBy → "" (не интерполируем произвольные строки в SQL).
 func GeoEdgesTable(groupBy string) string {
 	switch groupBy {
-	case "city", "country":
+	case "city", "country", "continent":
 		return "traffic_edges_" + groupBy + "_daily"
 	default:
 		return ""
@@ -102,7 +106,7 @@ func GeoEdgesTable(groupBy string) string {
 // GeoEdgesMV возвращает имя materialized view для geo-агрегата.
 func GeoEdgesMV(groupBy string) string {
 	switch groupBy {
-	case "city", "country":
+	case "city", "country", "continent":
 		return "traffic_edges_" + groupBy + "_daily_mv"
 	default:
 		return ""
@@ -153,6 +157,10 @@ func countryKeyExpr(side, table string) string {
 	return fmt.Sprintf(`if(trimBoth(%[1]s) = '' OR %[1]s IN ('Неизвестно', 'Unknown', 'unknown', 'Reserved', 'reserved'), 'Неизвестно', %[1]s)`, country)
 }
 
+func continentKeyExpr(side, table string) string {
+	return model.ContinentSQLExpr(countryKeyExpr(side, table))
+}
+
 func ipKeyExpr(side, table string) string {
 	return fmt.Sprintf("toString(%s)", colRef(table, side+"_ip"))
 }
@@ -191,6 +199,10 @@ func geoGroupExprs(groupBy, table string) (srcKey, dstKey, srcLabel, dstLabel st
 		k := subnetKeyExpr("src", table)
 		d := subnetKeyExpr("dst", table)
 		return k, d, k, d
+	case "continent":
+		sk := continentKeyExpr("src", table)
+		dk := continentKeyExpr("dst", table)
+		return sk, dk, sk, dk
 	default:
 		return countryKeyExpr("src", table), countryKeyExpr("dst", table),
 			countryKeyExpr("src", table), countryKeyExpr("dst", table)

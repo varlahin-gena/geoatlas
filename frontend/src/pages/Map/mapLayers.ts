@@ -410,7 +410,7 @@ export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
   const outlineColor = cssRgb('--map-outline-rgb', opts.mapTilesFailed ? 255 : 140);
   const outlineSoft = cssRgb('--map-outline-rgb', 160);
   const useHeat = opts.showHeatmap;
-  const countriesPickable = useHeat || opts.groupBy === 'country';
+  const countriesPickable = useHeat || opts.groupBy === 'country' || opts.groupBy === 'continent';
   const heavyOk = opts.heavyCountryLayersAllowed;
 
   // На глобусе GeoJson-заливка стран даёт артефакты (иглы / ломаный wrap /

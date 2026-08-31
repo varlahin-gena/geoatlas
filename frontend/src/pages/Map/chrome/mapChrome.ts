@@ -51,6 +51,8 @@ export type MapChromeTopbarInput = {
   setGroupBy: (v: string) => void;
   filter: 'all' | 'allowed' | 'blocked';
   setFilter: (v: 'all' | 'allowed' | 'blocked') => void;
+  hideIntraCountry: boolean;
+  setHideIntraCountry: (v: boolean) => void;
   reputationEnabled: boolean;
   ipMode: boolean;
   repFilterCount: number;
@@ -109,6 +111,8 @@ export function buildMapTopbarProps(input: MapChromeTopbarInput): MapTopbarProps
       setGroupBy: input.setGroupBy,
       filter: input.filter,
       setFilter: input.setFilter,
+      hideIntraCountry: input.hideIntraCountry,
+      setHideIntraCountry: input.setHideIntraCountry,
     },
     reputation: {
       reputationEnabled: input.reputationEnabled,

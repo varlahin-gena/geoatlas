@@ -32,6 +32,9 @@ func EnsureGeoEdgesAggSchema(ctx context.Context, ch clickhouse.Conn) error {
 		if err := ensureGeoEdgesTable(ctx, ch, "country"); err != nil {
 			return err
 		}
+		if err := ensureGeoEdgesTable(ctx, ch, "continent"); err != nil {
+			return err
+		}
 		if err := setSchemaVersion(ctx, ch, schemaComponentGeoEdges, schemaVersionGeoEdges); err != nil {
 			return fmt.Errorf("set geo_edges schema version: %w", err)
 		}
@@ -45,15 +48,13 @@ func EnsureGeoEdgesAggSchema(ctx context.Context, ch clickhouse.Conn) error {
 	return nil
 }
 
-// BackfillGeoEdgesAgg дозаполняет city/country daily-агрегаты и включает PreferGeoEdgesAgg.
+// BackfillGeoEdgesAgg дозаполняет city/country/continent daily-агрегаты и включает PreferGeoEdgesAgg.
 func BackfillGeoEdgesAgg(ctx context.Context, ch clickhouse.Conn) error {
-	if err := backfillGeoEdgesAgg(ctx, ch, "city"); err != nil {
-		aggstate.SetGeoEdgesAggReady(false)
-		return err
-	}
-	if err := backfillGeoEdgesAgg(ctx, ch, "country"); err != nil {
-		aggstate.SetGeoEdgesAggReady(false)
-		return err
+	for _, groupBy := range []string{"city", "country", "continent"} {
+		if err := backfillGeoEdgesAgg(ctx, ch, groupBy); err != nil {
+			aggstate.SetGeoEdgesAggReady(false)
+			return err
+		}
 	}
 	aggstate.SetGeoEdgesAggReady(true)
 	slog.Info("geo edges agg: ready")
@@ -72,7 +73,12 @@ func RefreshGeoEdgesAggReady(ctx context.Context, ch clickhouse.Conn) error {
 		aggstate.SetGeoEdgesAggReady(false)
 		return err
 	}
-	ready := okCity && okCountry
+	okContinent, err := geoEdgesAggReady(ctx, ch, "continent")
+	if err != nil {
+		aggstate.SetGeoEdgesAggReady(false)
+		return err
+	}
+	ready := okCity && okCountry && okContinent
 	aggstate.SetGeoEdgesAggReady(ready)
 	if ready {
 		slog.Info("geo edges agg: already up to date")
@@ -384,7 +390,7 @@ func RebuildGeoEdgesLookback(ctx context.Context, ch clickhouse.Conn, lookbackDa
 		slog.Info("geo edges agg: rebuild skipped, no closed days")
 		return nil
 	}
-	for _, groupBy := range []string{"city", "country"} {
+	for _, groupBy := range []string{"city", "country", "continent"} {
 		if err := rebuildGeoEdgesDays(ctx, ch, groupBy, days); err != nil {
 			return err
 		}

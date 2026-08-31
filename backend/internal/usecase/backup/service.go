@@ -769,6 +769,7 @@ func (s *Service) resolveTables(ctx context.Context, includeEdges bool) ([]strin
 			"traffic_edges_hourly",
 			"traffic_edges_city_daily",
 			"traffic_edges_country_daily",
+			"traffic_edges_continent_daily",
 		)
 	}
 	var out []string

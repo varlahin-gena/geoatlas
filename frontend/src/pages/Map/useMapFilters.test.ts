@@ -85,6 +85,8 @@ describe('useMapFilters', () => {
         search: '',
         minCount: 5,
         focusedCountry: 'Germany',
+        groupBy: 'city',
+        hideIntraCountry: false,
       }),
     );
 
@@ -117,9 +119,57 @@ describe('useMapFilters', () => {
         search: '',
         minCount: 1,
         focusedCountry: null,
+        groupBy: 'city',
+        hideIntraCountry: false,
       }),
     );
     expect(result.current.visibleLines).toHaveLength(0);
     expect(result.current.emptyOverlay).not.toBeNull();
+  });
+
+  it('hides intra-country lines when enabled in city grouping', () => {
+    const lines: MapLine[] = [
+      line({
+        src: 'Moscow, Russia',
+        dst: 'Saint Petersburg, Russia',
+        src_country: 'Russia',
+        dst_country: 'Russian Federation',
+        count: 100,
+      }),
+      line({
+        src: 'Moscow, Russia',
+        dst: 'Berlin, Germany',
+        src_country: 'Russia',
+        dst_country: 'Germany',
+        count: 50,
+      }),
+    ];
+    const points: Record<string, MapPoint> = {
+      'Moscow, Russia': { lat: 55.75, lon: 37.62, country: 'Russia', count: 1 },
+      'Saint Petersburg, Russia': { lat: 59.93, lon: 30.33, country: 'Russia', count: 1 },
+      'Berlin, Germany': { lat: 52.52, lon: 13.4, country: 'Germany', count: 1 },
+    };
+
+    const { result } = renderHook(() =>
+      useMapFilters({
+        lines,
+        points,
+        loading: false,
+        fetchError: null,
+        repActive: false,
+        repCategories: new Set(),
+        repLists: new Set(),
+        repSide: 'any',
+        filter: 'all',
+        search: '',
+        minCount: 1,
+        focusedCountry: null,
+        groupBy: 'city',
+        hideIntraCountry: true,
+      }),
+    );
+
+    expect(result.current.visibleLines).toHaveLength(1);
+    expect(result.current.visibleLines[0].dst).toBe('Berlin, Germany');
   });
 });

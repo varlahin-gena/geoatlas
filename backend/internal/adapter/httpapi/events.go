@@ -132,7 +132,7 @@ func parseOptionalLimit(v string) int {
 func normalizeGroupBy(v string) string {
 	v = strings.ToLower(strings.TrimSpace(v))
 	switch v {
-	case "ip", "subnet", "country", "city":
+	case "ip", "subnet", "country", "city", "continent":
 		return v
 	default:
 		return "city"

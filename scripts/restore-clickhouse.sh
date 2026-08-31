@@ -74,6 +74,7 @@ CANDIDATES=(
   traffic_edges_daily
   traffic_edges_city_daily
   traffic_edges_country_daily
+  traffic_edges_continent_daily
 )
 
 SETTINGS=""

@@ -502,7 +502,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [ip, subnet, city, country]
+            enum: [ip, subnet, city, country, continent]
             default: city
         - name: filter
           in: query

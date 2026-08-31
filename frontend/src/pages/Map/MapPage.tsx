@@ -156,6 +156,8 @@ export default function MapPage() {
     setMinCount,
     maxArcs,
     setMaxArcs,
+    hideIntraCountry,
+    setHideIntraCountry,
     focusedCountry,
     setFocusedCountry,
     clearFocusedCountry,
@@ -236,6 +238,8 @@ export default function MapPage() {
     search: view.search,
     minCount: view.minCount,
     focusedCountry,
+    groupBy,
+    hideIntraCountry,
   });
 
   const geoWizard = useGeoWizard({
@@ -390,6 +394,8 @@ export default function MapPage() {
         setGroupBy,
         filter,
         setFilter,
+        hideIntraCountry,
+        setHideIntraCountry,
         reputationEnabled,
         ipMode,
         repFilterCount,

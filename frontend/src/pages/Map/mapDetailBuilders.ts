@@ -28,6 +28,8 @@ function lineEndpointKeyLabel(groupBy: string): string {
       return 'Подсеть';
     case 'country':
       return 'Страна';
+    case 'continent':
+      return 'Континент';
     default:
       return 'Ключ';
   }
@@ -50,7 +52,7 @@ function lineEndpointRows(
   coarse: boolean,
 ) {
   const showLabel = side.label && side.label !== side.key;
-  const showCountry = groupBy !== 'country';
+  const showCountry = groupBy !== 'country' && groupBy !== 'continent';
   const rows = [{ key: lineEndpointKeyLabel(groupBy), value: side.key }];
   if (showLabel) rows.push({ key: 'Метка', value: side.label || '' });
   rows.push(
@@ -72,7 +74,7 @@ export function buildLineDetail(
   actions: DetailAction[],
   points?: Record<string, MapPoint>,
 ): DetailState {
-  const coarse = groupBy === 'subnet' || groupBy === 'city' || groupBy === 'country';
+  const coarse = groupBy === 'subnet' || groupBy === 'city' || groupBy === 'country' || groupBy === 'continent';
   const srcPoint = points?.[line.src];
   const dstPoint = points?.[line.dst];
   return {

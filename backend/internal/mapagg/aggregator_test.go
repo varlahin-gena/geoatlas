@@ -131,6 +131,25 @@ func TestIPGroupMetaCityHintPromotesUnknownKey(t *testing.T) {
 	}
 }
 
+func TestIPGroupMetaHintedContinentUsesCenter(t *testing.T) {
+	m := IPGroupMetaHinted(stubGeo{}, "1.2.3.4", "continent", LogGeoHint{
+		Country: "Germany",
+	})
+	if !m.Valid {
+		t.Fatal("expected Valid")
+	}
+	if m.Key != model.ContinentEurope {
+		t.Fatalf("key = %q, want %q", m.Key, model.ContinentEurope)
+	}
+	cLat, cLon, ok := model.ContinentCenter(model.ContinentEurope)
+	if !ok {
+		t.Fatal("Europe center missing")
+	}
+	if m.Lat != cLat || m.Lon != cLon {
+		t.Fatalf("coords = (%v,%v), want (%v,%v)", m.Lat, m.Lon, cLat, cLon)
+	}
+}
+
 func TestBuildMapFromGeoEdges(t *testing.T) {
 	rows := []model.GeoEdgeAgg{{
 		SrcKey: "Berlin, Germany", DstKey: "United States",

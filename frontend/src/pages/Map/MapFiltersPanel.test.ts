@@ -9,6 +9,7 @@ describe('countActiveMapFilters', () => {
         filter: 'all',
         repFilterCount: 0,
         repColorArcs: false,
+        hideIntraCountry: false,
       }),
     ).toBe(0);
   });
@@ -20,6 +21,7 @@ describe('countActiveMapFilters', () => {
         filter: 'blocked',
         repFilterCount: 2,
         repColorArcs: true,
+        hideIntraCountry: false,
       }),
     ).toBe(4);
   });

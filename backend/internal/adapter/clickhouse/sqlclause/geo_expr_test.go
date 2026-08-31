@@ -89,6 +89,10 @@ func TestGeoGroupExprsPrefixedQualifiesCityCols(t *testing.T) {
 	if strings.Contains(sk, "trimBoth(src_country)") {
 		t.Fatalf("bare src_country in country key: %s", sk)
 	}
+	sk, dk, sl, dl = GeoGroupExprs("continent")
+	if !strings.Contains(sk, "multiIf(") || sk != sl || dk != dl {
+		t.Fatalf("continent exprs: %s %s %s %s", sk, dk, sl, dl)
+	}
 }
 
 func TestGeoEdgesTableAllowlist(t *testing.T) {
@@ -97,6 +101,12 @@ func TestGeoEdgesTableAllowlist(t *testing.T) {
 	}
 	if got := GeoEdgesTable("country"); got != "traffic_edges_country_daily" {
 		t.Fatalf("country=%q", got)
+	}
+	if got := GeoEdgesTable("continent"); got != "traffic_edges_continent_daily" {
+		t.Fatalf("continent=%q", got)
+	}
+	if got := GeoEdgesMV("continent"); got != "traffic_edges_continent_daily_mv" {
+		t.Fatalf("continent mv=%q", got)
 	}
 	for _, bad := range []string{"", "ip", "subnet", "city; DROP TABLE", "country`x"} {
 		if got := GeoEdgesTable(bad); got != "" {

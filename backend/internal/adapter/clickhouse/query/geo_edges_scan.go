@@ -38,7 +38,7 @@ func ScanGeoEdgesForTimeRange(
 	timeout time.Duration,
 ) ([]model.GeoEdgeAgg, bool, error) {
 	switch groupBy {
-	case "city", "country", "ip", "subnet":
+	case "city", "country", "continent", "ip", "subnet":
 	default:
 		return nil, false, nil
 	}
@@ -49,7 +49,7 @@ func ScanGeoEdgesForTimeRange(
 	case "ip", "subnet":
 		tr = promoteHoursToDays(tr, tables.IsBackup() || agg.PreferDailyEdgesAgg())
 		tr = promoteMinutesToHours(tr, tables.IsBackup() || agg.PreferHourlyEdgesAgg())
-	case "city", "country":
+	case "city", "country", "continent":
 		tr = promoteHoursToDays(tr, tables.IsBackup() || agg.PreferGeoEdgesAgg())
 		tr = promoteMinutesToHours(tr, tables.IsBackup() || agg.PreferHourlyEdgesAgg())
 	}
@@ -73,7 +73,7 @@ func ScanGeoEdgesForTimeRange(
 			}
 			return rows, true, nil
 		}
-		// city|country: pre-agg если готов — даже пустой ответ (нет данных за период).
+		// city|country|continent: pre-agg если готов — даже пустой ответ (нет данных за период).
 		tryEdges := tables.IsBackup() || agg.PreferGeoEdgesAgg()
 		if tryEdges {
 			table := tables.GeoEdges(groupBy)

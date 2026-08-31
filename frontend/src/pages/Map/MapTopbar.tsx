@@ -18,6 +18,8 @@ export type MapTopbarProps = {
     setGroupBy: (v: string) => void;
     filter: 'all' | 'allowed' | 'blocked';
     setFilter: (v: 'all' | 'allowed' | 'blocked') => void;
+    hideIntraCountry: boolean;
+    setHideIntraCountry: (v: boolean) => void;
   };
   reputation: {
     reputationEnabled: boolean;
@@ -85,7 +87,7 @@ export function MapTopbar({
   layers,
 }: MapTopbarProps) {
   const { search, setSearch, builderOpen, setBuilderOpen } = searchCtl;
-  const { groupBy, setGroupBy, filter, setFilter } = grouping;
+  const { groupBy, setGroupBy, filter, setFilter, hideIntraCountry, setHideIntraCountry } = grouping;
   const {
     reputationEnabled,
     ipMode,
@@ -111,6 +113,7 @@ export function MapTopbar({
     filter,
     repFilterCount,
     repColorArcs,
+    hideIntraCountry,
   });
 
   function openPanel(next: ChromePanel) {
@@ -152,6 +155,7 @@ export function MapTopbar({
   function resetFilters() {
     setGroupBy('ip');
     setFilter('all');
+    setHideIntraCountry(false);
     setRepCategories(new Set());
     setRepLists(new Set());
     setRepSide('any');

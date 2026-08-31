@@ -62,6 +62,7 @@ if [[ "$BACKUP_INCLUDE_EDGES" == "1" || "$BACKUP_INCLUDE_EDGES" == "true" ]]; th
     traffic_edges_daily
     traffic_edges_city_daily
     traffic_edges_country_daily
+    traffic_edges_continent_daily
   )
 fi
 

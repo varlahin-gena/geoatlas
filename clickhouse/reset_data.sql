@@ -4,6 +4,7 @@ TRUNCATE TABLE IF EXISTS traffic_edges_daily;
 TRUNCATE TABLE IF EXISTS traffic_edges_hourly;
 TRUNCATE TABLE IF EXISTS traffic_edges_city_daily;
 TRUNCATE TABLE IF EXISTS traffic_edges_country_daily;
+TRUNCATE TABLE IF EXISTS traffic_edges_continent_daily;
 TRUNCATE TABLE IF EXISTS geo_ranges;
 TRUNCATE TABLE IF EXISTS enterprise_nets;
 TRUNCATE TABLE IF EXISTS parse_errors;

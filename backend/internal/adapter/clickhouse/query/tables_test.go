@@ -6,8 +6,8 @@ func TestMapShadowPairsMatchLiveAndBackupTables(t *testing.T) {
 	live := LiveTables()
 	bak := BackupTables()
 	pairs := MapShadowPairs()
-	if len(pairs) != 5 {
-		t.Fatalf("pairs=%d want 5", len(pairs))
+	if len(pairs) != 6 {
+		t.Fatalf("pairs=%d want 6", len(pairs))
 	}
 	want := [][2]string{
 		{live.Logs, bak.Logs},
@@ -15,6 +15,7 @@ func TestMapShadowPairsMatchLiveAndBackupTables(t *testing.T) {
 		{live.EdgesHourly, bak.EdgesHourly},
 		{live.EdgesCity, bak.EdgesCity},
 		{live.EdgesCountry, bak.EdgesCountry},
+		{live.EdgesContinent, bak.EdgesContinent},
 	}
 	for i, p := range pairs {
 		if p != want[i] {
@@ -22,7 +23,7 @@ func TestMapShadowPairsMatchLiveAndBackupTables(t *testing.T) {
 		}
 	}
 	names := MapShadowNames()
-	if len(names) != 5 || names[0] != bak.Logs {
+	if len(names) != 6 || names[0] != bak.Logs {
 		t.Fatalf("names=%v", names)
 	}
 }

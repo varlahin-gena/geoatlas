@@ -16,7 +16,7 @@ import (
 type GetMapInput struct {
 	TimeRange     model.TimeRange
 	Limit         int
-	GroupBy       string // ip|subnet|city|country
+	GroupBy       string // ip|subnet|city|country|continent
 	Filter        string // all|allowed|blocked
 	Country       string
 	Query         string
@@ -298,7 +298,7 @@ func trimLinesByCount(lines []model.Line, limit int) []model.Line {
 
 func normalizeGroupBy(v string) string {
 	switch v {
-	case "ip", "subnet", "country", "city":
+	case "ip", "subnet", "country", "city", "continent":
 		return v
 	default:
 		return "city"

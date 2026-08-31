@@ -8,7 +8,7 @@ import (
 )
 
 func TestGeoEdgesAggSelectBodyNoAliasShadowing(t *testing.T) {
-	for _, groupBy := range []string{"city", "country"} {
+	for _, groupBy := range []string{"city", "country", "continent"} {
 		srcKey, dstKey, srcLabel, dstLabel := sqlclause.GeoGroupExprsPrefixed("traffic_logs", groupBy)
 		body := geoEdgesAggSelectBody(srcKey, dstKey, srcLabel, dstLabel, sqlclause.GeoCoordOK)
 		for _, bad := range []string{
