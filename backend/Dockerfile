@@ -1,6 +1,6 @@
 # ---------- build stage ----------
 # context: репозиторий (.) — нужен pkg/chconn и pkg/syslogngstats
-FROM golang:1.25.13-alpine AS build
+FROM golang:1.25.14-alpine AS build
 
 WORKDIR /src
 
