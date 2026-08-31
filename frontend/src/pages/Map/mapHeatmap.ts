@@ -254,7 +254,7 @@ export function countryAliases(country: string): Set<string> {
 }
 
 /** Нормализованное имя страны для сравнения (RU label). */
-export function normalizeCountryName(
+function normalizeCountryName(
   country: string | null | undefined,
   pointCountry?: string | null,
 ): string {
