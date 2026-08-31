@@ -11,9 +11,11 @@ vi.mock('@deck.gl/layers', () => ({
 
 import {
   arcCrossesAntimeridian,
+  greatCircleOffScreenOnMercator,
   hasCoords,
   statusRGB,
   topByCount,
+  useGreatCircleArcOnMap,
   normalizeLonLat,
   resolveNodeLonLat,
   buildLineCoordFallback,
@@ -101,6 +103,17 @@ describe('mapLayers helpers', () => {
     expect(arcCrossesAntimeridian(37.6, 13.4)).toBe(false);
     // Sydney → Los Angeles — short path east across Pacific
     expect(arcCrossesAntimeridian(151.2, -118.2)).toBe(true);
+  });
+
+  it('greatCircleOffScreenOnMercator flags polar-routing transatlantic arcs', () => {
+    expect(greatCircleOffScreenOnMercator(15.2, 54.5, -105.2, 54.5)).toBe(true);
+    expect(greatCircleOffScreenOnMercator(37.6, 55.75, -98.5, 39.8)).toBe(true);
+    expect(greatCircleOffScreenOnMercator(13.4, 52.5, 37.6, 55.75)).toBe(false);
+  });
+
+  it('useGreatCircleArcOnMap keeps Pacific geodesic but flatens risky transatlantic', () => {
+    expect(useGreatCircleArcOnMap(49.1, 55.8, -171.8, -13.8)).toBe(true);
+    expect(useGreatCircleArcOnMap(15.2, 54.5, -105.2, 54.5)).toBe(false);
   });
 
   it('buildDisplayCoordMap spreads co-located nodes', () => {

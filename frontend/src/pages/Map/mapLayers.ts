@@ -76,6 +76,65 @@ export function arcCrossesAntimeridian(sLon: number, tLon: number): boolean {
   return Math.abs(tLon - sLon) > 180;
 }
 
+/**
+ * Geodesic arcs between similar mid/high latitudes route over the pole; on 2D Mercator
+ * the control point shoots off-screen (e.g. Europe ↔ North America).
+ */
+export function greatCircleOffScreenOnMercator(
+  sLon: number,
+  sLat: number,
+  tLon: number,
+  tLat: number,
+): boolean {
+  const absLat = Math.max(Math.abs(sLat), Math.abs(tLat));
+  let dLon = Math.abs(tLon - sLon);
+  if (dLon > 180) dLon = 360 - dLon;
+  const dLat = Math.abs(tLat - sLat);
+  return absLat >= 35 && dLon >= 70 && dLat < 35;
+}
+
+/** Whether ArcLayer should use greatCircle on the flat map (globe always uses geodesic). */
+export function useGreatCircleArcOnMap(
+  sLon: number,
+  sLat: number,
+  tLon: number,
+  tLat: number,
+): boolean {
+  if (arcCrossesAntimeridian(sLon, tLon)) return true;
+  return !greatCircleOffScreenOnMercator(sLon, sLat, tLon, tLat);
+}
+
+function partitionMapArcLines(
+  lines: MapLine[],
+  allPoints: Record<string, MapPoint>,
+  lineFallback: Map<string, { lon: number; lat: number }>,
+  displayCoords: Map<string, [number, number]>,
+): { geodesic: MapLine[]; flat: MapLine[] } {
+  const geodesic: MapLine[] = [];
+  const flat: MapLine[] = [];
+  for (const line of lines) {
+    const [sLon, sLat] = displayLonLat(
+      line.src,
+      line.src_lon,
+      line.src_lat,
+      allPoints,
+      lineFallback,
+      displayCoords,
+    );
+    const [tLon, tLat] = displayLonLat(
+      line.dst,
+      line.dst_lon,
+      line.dst_lat,
+      allPoints,
+      lineFallback,
+      displayCoords,
+    );
+    if (useGreatCircleArcOnMap(sLon, sLat, tLon, tLat)) geodesic.push(line);
+    else flat.push(line);
+  }
+  return { geodesic, flat };
+}
+
 /** Weighted lon/lat from visible line endpoints — matches arc anchor coords. */
 export function buildLineCoordFallback(
   lines: MapLine[],
@@ -525,66 +584,82 @@ export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
   }
 
   const nodeOpacity = 150;
-  layers.push(
-    new ArcLayer({
-      id: 'arcs',
-      data: lines,
-      pickable: true,
-      // Geodesic arcs avoid bezier + tilt artifacts at the date line (e.g. Kazan → Apia).
-      greatCircle: true,
-      wrapLongitude: !isGlobe,
-      getSourcePosition: (d: MapLine) =>
-        displayLonLat(d.src, d.src_lon, d.src_lat, opts.points, lineFallback, displayCoords),
-      getTargetPosition: (d: MapLine) =>
-        displayLonLat(d.dst, d.dst_lon, d.dst_lat, opts.points, lineFallback, displayCoords),
-      getSourceColor: (d: MapLine) => [
-        ...arcRGB(d.status, d, opts.monoArcColor, opts.repColorArcs),
-        d._flowAlpha || 210,
-      ],
-      getTargetColor: (d: MapLine) => [
-        ...arcRGB(d.status, d, opts.monoArcColor, opts.repColorArcs),
-        d._flowAlpha || 210,
-      ],
-      getWidth: (d: MapLine) => {
-        const base = Math.max(1.2, Math.min(7, 1.2 + Math.log2((d.count || 1) + 1) * 0.9));
-        if (opts.highlightEdgeKeys?.includes(edgeKey(d.src, d.dst))) return base + 2.5;
-        return base;
-      },
-      widthUnits: 'pixels',
-      getHeight: (d: MapLine) => arcHeightWithSpread(d, opts.points, lineFallback, isGlobe),
-      getTilt: (d: MapLine) => {
-        if (isGlobe) return 0;
-        const [sLon] = displayLonLat(
-          d.src,
-          d.src_lon,
-          d.src_lat,
-          opts.points,
-          lineFallback,
-          displayCoords,
-        );
-        const [tLon] = displayLonLat(
-          d.dst,
-          d.dst_lon,
-          d.dst_lat,
-          opts.points,
-          lineFallback,
-          displayCoords,
-        );
-        if (arcCrossesAntimeridian(sLon, tLon)) return 0;
-        return arcTilt(d) * 0.5;
-      },
-      autoHighlight: true,
-      highlightColor: [255, 255, 255, 140],
-      parameters: isGlobe ? GLOBE_LAYER_PARAMETERS : { depthTest: false },
-      updateTriggers: {
-        getWidth: [opts.highlightEdgeKeys],
-        getSourceColor: [opts.monoArcColor, opts.repColorArcs],
-      },
-      onClick: (info: { object?: MapLine }) => {
-        if (info.object) opts.onLineClick(info.object);
-      },
-    }),
-  );
+
+  const pushArcLayer = (id: string, arcLines: MapLine[], greatCircle: boolean) => {
+    if (!arcLines.length) return;
+    layers.push(
+      new ArcLayer({
+        id,
+        data: arcLines,
+        pickable: true,
+        greatCircle,
+        wrapLongitude: !isGlobe,
+        getSourcePosition: (d: MapLine) =>
+          displayLonLat(d.src, d.src_lon, d.src_lat, opts.points, lineFallback, displayCoords),
+        getTargetPosition: (d: MapLine) =>
+          displayLonLat(d.dst, d.dst_lon, d.dst_lat, opts.points, lineFallback, displayCoords),
+        getSourceColor: (d: MapLine) => [
+          ...arcRGB(d.status, d, opts.monoArcColor, opts.repColorArcs),
+          d._flowAlpha || 210,
+        ],
+        getTargetColor: (d: MapLine) => [
+          ...arcRGB(d.status, d, opts.monoArcColor, opts.repColorArcs),
+          d._flowAlpha || 210,
+        ],
+        getWidth: (d: MapLine) => {
+          const base = Math.max(1.2, Math.min(7, 1.2 + Math.log2((d.count || 1) + 1) * 0.9));
+          if (opts.highlightEdgeKeys?.includes(edgeKey(d.src, d.dst))) return base + 2.5;
+          return base;
+        },
+        widthUnits: 'pixels',
+        getHeight: (d: MapLine) => arcHeightWithSpread(d, opts.points, lineFallback, isGlobe),
+        getTilt: (d: MapLine) => {
+          if (isGlobe) return 0;
+          const [sLon] = displayLonLat(
+            d.src,
+            d.src_lon,
+            d.src_lat,
+            opts.points,
+            lineFallback,
+            displayCoords,
+          );
+          const [tLon] = displayLonLat(
+            d.dst,
+            d.dst_lon,
+            d.dst_lat,
+            opts.points,
+            lineFallback,
+            displayCoords,
+          );
+          if (arcCrossesAntimeridian(sLon, tLon)) return 0;
+          return arcTilt(d) * 0.5;
+        },
+        autoHighlight: true,
+        highlightColor: [255, 255, 255, 140],
+        parameters: isGlobe ? GLOBE_LAYER_PARAMETERS : { depthTest: false },
+        updateTriggers: {
+          getWidth: [opts.highlightEdgeKeys],
+          getSourceColor: [opts.monoArcColor, opts.repColorArcs],
+        },
+        onClick: (info: { object?: MapLine }) => {
+          if (info.object) opts.onLineClick(info.object);
+        },
+      }),
+    );
+  };
+
+  if (isGlobe) {
+    pushArcLayer('arcs', lines, true);
+  } else {
+    const { geodesic, flat } = partitionMapArcLines(
+      lines,
+      opts.points,
+      lineFallback,
+      displayCoords,
+    );
+    pushArcLayer('arcs-geodesic', geodesic, true);
+    pushArcLayer('arcs-flat', flat, false);
+  }
 
   layers.push(
     new ScatterplotLayer({
