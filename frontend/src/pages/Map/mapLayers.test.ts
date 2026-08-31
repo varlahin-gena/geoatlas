@@ -9,7 +9,17 @@ vi.mock('@deck.gl/layers', () => ({
   TextLayer: class TextLayer {},
 }));
 
-import { hasCoords, statusRGB, topByCount, normalizeLonLat, resolveNodeLonLat, buildLineCoordFallback, buildDisplayCoordMap, buildDeckLayers } from './mapLayers';
+import {
+  arcCrossesAntimeridian,
+  hasCoords,
+  statusRGB,
+  topByCount,
+  normalizeLonLat,
+  resolveNodeLonLat,
+  buildLineCoordFallback,
+  buildDisplayCoordMap,
+  buildDeckLayers,
+} from './mapLayers';
 import type { MapLine } from './mapTypes';
 
 describe('mapLayers helpers', () => {
@@ -82,6 +92,15 @@ describe('mapLayers helpers', () => {
     expect(resolveNodeLonLat('10.93.0.49', undefined, undefined, points, fallback)).toEqual([
       92.8672, 56.0184,
     ]);
+  });
+
+  it('arcCrossesAntimeridian detects Pacific routes crossing ±180°', () => {
+    // Kazan → Apia (short path east through Asia / Pacific)
+    expect(arcCrossesAntimeridian(49.1, -171.8)).toBe(true);
+    // Moscow → Berlin — stays in Europe
+    expect(arcCrossesAntimeridian(37.6, 13.4)).toBe(false);
+    // Sydney → Los Angeles — short path east across Pacific
+    expect(arcCrossesAntimeridian(151.2, -118.2)).toBe(true);
   });
 
   it('buildDisplayCoordMap spreads co-located nodes', () => {

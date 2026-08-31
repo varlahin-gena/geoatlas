@@ -71,6 +71,11 @@ function coordDistanceDeg(lon1: number, lat1: number, lon2: number, lat2: number
   return Math.hypot(dLon, Math.abs(lat1 - lat2));
 }
 
+/** True when the shorter great-circle path crosses the antimeridian (±180°). */
+export function arcCrossesAntimeridian(sLon: number, tLon: number): boolean {
+  return Math.abs(tLon - sLon) > 180;
+}
+
 /** Weighted lon/lat from visible line endpoints — matches arc anchor coords. */
 export function buildLineCoordFallback(
   lines: MapLine[],
@@ -525,7 +530,8 @@ export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
       id: 'arcs',
       data: lines,
       pickable: true,
-      greatCircle: isGlobe,
+      // Geodesic arcs avoid bezier + tilt artifacts at the date line (e.g. Kazan → Apia).
+      greatCircle: true,
       wrapLongitude: !isGlobe,
       getSourcePosition: (d: MapLine) =>
         displayLonLat(d.src, d.src_lon, d.src_lat, opts.points, lineFallback, displayCoords),
@@ -546,7 +552,27 @@ export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
       },
       widthUnits: 'pixels',
       getHeight: (d: MapLine) => arcHeightWithSpread(d, opts.points, lineFallback, isGlobe),
-      getTilt: isGlobe ? 0 : (d: MapLine) => arcTilt(d) * 0.5,
+      getTilt: (d: MapLine) => {
+        if (isGlobe) return 0;
+        const [sLon] = displayLonLat(
+          d.src,
+          d.src_lon,
+          d.src_lat,
+          opts.points,
+          lineFallback,
+          displayCoords,
+        );
+        const [tLon] = displayLonLat(
+          d.dst,
+          d.dst_lon,
+          d.dst_lat,
+          opts.points,
+          lineFallback,
+          displayCoords,
+        );
+        if (arcCrossesAntimeridian(sLon, tLon)) return 0;
+        return arcTilt(d) * 0.5;
+      },
       autoHighlight: true,
       highlightColor: [255, 255, 255, 140],
       parameters: isGlobe ? GLOBE_LAYER_PARAMETERS : { depthTest: false },
