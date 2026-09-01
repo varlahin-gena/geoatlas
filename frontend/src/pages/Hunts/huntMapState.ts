@@ -23,7 +23,7 @@ export function mapViewToHuntState(view: {
   };
 }
 
-export function huntStateToMapView(state: HuntMapState): Partial<MapViewState> {
+function huntStateToMapView(state: HuntMapState): Partial<MapViewState> {
   return {
     period: state.period || '1d',
     periodFrom: state.period_from || '',

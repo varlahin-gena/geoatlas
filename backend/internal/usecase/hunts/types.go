@@ -97,10 +97,7 @@ func ValidateMapState(st MapState) error {
 	default:
 		return ErrInvalidMapState
 	}
-	filter := strings.ToLower(strings.TrimSpace(st.Filter))
-	if filter == "" {
-		filter = "all"
-	}
+	filter := normalizeFilter(st.Filter)
 	switch filter {
 	case "all", "allowed", "blocked":
 	default:

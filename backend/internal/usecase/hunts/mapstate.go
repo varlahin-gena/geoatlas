@@ -106,7 +106,8 @@ func normalizeFilter(v string) string {
 	}
 }
 
-func mapLimit(st MapState) int {
+// MapLimit returns the map edge limit from hunt state (default 5000).
+func MapLimit(st MapState) int {
 	if st.Limit > 0 {
 		return st.Limit
 	}

@@ -20,10 +20,7 @@ func (r MapRunner) RunMap(ctx context.Context, st hunts.MapState, timeout time.D
 	}
 	now := time.Now().UTC()
 	cost := mapsearch.AssessMapQueryCost(hunts.CostInputForState(st, now))
-	limit := st.Limit
-	if limit <= 0 {
-		limit = 5000
-	}
+	limit := hunts.MapLimit(st)
 	if applied, capped := mapsearch.EffectiveMapLimit(limit, cost); capped && applied > 0 {
 		limit = applied
 	}
