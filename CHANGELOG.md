@@ -5,12 +5,20 @@
 
 ## [Unreleased]
 
+## [2.3.0] — 2026-09-01
+
+Минор: новые аномалии (объём / beaconing / lateral) и workspace разбора.
+
 ### Added
 - Anomaly Engine: детекторы **`byte_surge`** (всплеск объёма), **`beaconing`** (периодическая связь), **`lateral_fanout`** (веер по enterprise-net); на `/anomalies` — панель «Связи» через `GET /api/events`.
 - Investigation workspace: **`/investigate?alert=<fingerprint>`** — разбор алерта (peers, ack/assign, CSV, шаблон поиска, ссылки на карту/workspace); вход с `/anomalies` → «Разбор».
 
 ### Security
 - Image scan (Trivy CRITICAL, `ignore-unfixed`): job падает при находках (`exit-code: 1`), SARIF по-прежнему загружается в GitHub Security.
+
+### Notes
+- OpenAPI API doc version: **1.15.0** (без изменений)
+- Продуктовая версия: **2.3.0**
 
 ## [2.2.0] — 2026-08-28
 
@@ -489,6 +497,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.3.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.3.0
 [2.2.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.2.0
 [2.1.3]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.3
 [2.1.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.2
