@@ -4,7 +4,7 @@
 Принимает syslog с файрволов или из SIEM, парсит события, обогащает их геоданными
 (IP → страна/координаты) и строит карту сетевых связей в веб-интерфейсе.
 
-**Актуальный релиз:** [v2.3.0](https://github.com/varlahin-gena/geoatlas/releases/tag/v2.3.0) (`VERSION` = 2.3.0) · ОС: Ubuntu 20.04+, Oracle Linux 8+ / RHEL-совместимые · пакет: `geoatlas-X.Y.Z.tar.gz` в [Releases](https://github.com/varlahin-gena/geoatlas/releases).
+**Актуальный релиз:** [v2.4.0](https://github.com/varlahin-gena/geoatlas/releases/tag/v2.4.0) (`VERSION` = 2.4.0) · ОС: Ubuntu 20.04+, Oracle Linux 8+ / RHEL-совместимые · пакет: `geoatlas-X.Y.Z.tar.gz` в [Releases](https://github.com/varlahin-gena/geoatlas/releases).
 
 Appliance: **IPv4-only**, один хост / один процесс backend, доставка syslog **at-most-once** (при переполнении очереди возможны drops). Подробнее — [архитектура](docs/architecture.md).
 
@@ -55,7 +55,7 @@ Appliance: **IPv4-only**, один хост / один процесс backend, �
 | [Конфигурация](docs/configuration.md) | `.env`, секреты, модули |
 | [Обслуживание](docs/operations.md) | Запуск, профили, retention, бэкапы, логи, обновление |
 | [GeoIP](docs/geoip.md) | CSV, загрузка с сервера, 502/OOM |
-| [UI и HTTP API](docs/ui.md) | Страницы SPA, роли, OpenAPI **1.15.0** |
+| [UI и HTTP API](docs/ui.md) | Страницы SPA, роли, OpenAPI **1.16.0** |
 | [Репутация](docs/reputation.md) | Фиды и offline-списки |
 | [Аномалии](docs/anomalies.md) | Типы (в т.ч. byte_surge / beaconing / lateral), ack/assign, разбор |
 | [Разработка](docs/development.md) | Локальный стек из git |
@@ -64,7 +64,7 @@ Appliance: **IPv4-only**, один хост / один процесс backend, �
 | [SECURITY.md](SECURITY.md) | Сообщение об уязвимостях |
 | [CHANGELOG.md](CHANGELOG.md) | История релизов |
 
-Контракт REST: [`openapi.yaml`](openapi.yaml) (документ OpenAPI **1.15.0**).
+Контракт REST: [`openapi.yaml`](openapi.yaml) (документ OpenAPI **1.16.0**).
 
 ## Лицензия
 
@@ -98,6 +98,6 @@ Appliance: **IPv4-only**, один хост / один процесс backend, �
 | `deploy/` | установщики Ubuntu / Oracle Linux |
 | `docs/` | документация оператора и разработчика |
 | `scripts/` | CI, pack-release, бэкапы |
-| `openapi.yaml` | контракт HTTP API (OpenAPI **1.15.0**) |
+| `openapi.yaml` | контракт HTTP API (OpenAPI **1.16.0**) |
 
 Полное дерево: [docs/repo-layout.md](docs/repo-layout.md).

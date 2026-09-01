@@ -5,6 +5,21 @@
 
 ## [Unreleased]
 
+## [2.4.0] — 2026-09-01
+
+Минор: настройки движка аномалий, корреляция эпизодов, saved hunts и защита тяжёлых map-запросов.
+
+### Added
+- **Anomaly Engine** (`/anomalies/engine`): `GET/PUT /api/anomalies/settings`, hot-reload из `/app/data/anomaly_settings.json`.
+- **Эпизоды корреляции**: `episode_id` на алертах, `GET /api/anomalies/episodes`; панель эпизодов на `/anomalies`, связанные алерты в `/investigate`.
+- **Saved hunts**: CRUD `/api/me/hunts`, ручной/плановый запуск, синтетический алерт `hunt_threshold`; UI `/hunts`, сохранение с карты и из разбора.
+- **Map query cost**: оценка tier light/medium/heavy на backend и frontend, cap лимита дуг, баннер на карте.
+- **System alerts**: `edges_agg_running_long` / `edges_agg_running_stuck` в мониторинге.
+
+### Notes
+- OpenAPI API doc version: **1.16.0**
+- Продуктовая версия: **2.4.0**
+
 ## [2.3.0] — 2026-09-01
 
 Минор: новые аномалии (объём / beaconing / lateral) и workspace разбора.
@@ -497,6 +512,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.4.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.4.0
 [2.3.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.3.0
 [2.2.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.2.0
 [2.1.3]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.1.3
