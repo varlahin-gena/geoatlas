@@ -127,6 +127,8 @@ type Config struct {
 	AnomalySuppressHours                 int
 	AnomalyNewCountryMinShare            float64
 	AnomalyNewCountryRepeatCooldownHours int
+	AnomalySettingsFile                  string
+	HuntsFile                            string
 
 	LogLevel  string // debug|info|warn|error
 	LogFormat string // text|json
@@ -225,6 +227,8 @@ func FromEnv() Config {
 		AnomalySuppressHours:                 parser.int("ANOMALY_SUPPRESS_HOURS", 24),
 		AnomalyNewCountryMinShare:            parser.float("ANOMALY_NEW_COUNTRY_MIN_SHARE", 0.05),
 		AnomalyNewCountryRepeatCooldownHours: parser.int("ANOMALY_NEW_COUNTRY_REPEAT_COOLDOWN_HOURS", 24),
+		AnomalySettingsFile:                  envOr("ANOMALY_SETTINGS_FILE", "/app/data/anomaly_settings.json"),
+		HuntsFile:                            envOr("HUNTS_FILE", "/app/data/saved_hunts.json"),
 		LogLevel:                             strings.ToLower(envOr("LOG_LEVEL", "info")),
 		LogFormat:                            strings.ToLower(envOr("LOG_FORMAT", "text")),
 	}

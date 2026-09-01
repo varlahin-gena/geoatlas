@@ -24,6 +24,7 @@ import { useMapDeckLayers } from './viz/useMapDeckLayers';
 import { useMapEvents } from './useMapEvents';
 import { useMapFilters } from './useMapFilters';
 import { useMapViewQuery } from './mapQuery';
+import { mapQueryWarning } from './mapQueryCost';
 import { useMapLibreController } from './useMapLibreController';
 import { useMapReputation } from './useMapReputation';
 import { useMapUploads } from './useMapUploads';
@@ -188,6 +189,9 @@ export default function MapPage() {
     loading,
     fetchError,
     eventStats,
+    queryCost,
+    requestedLimit,
+    effectiveLimit,
     repFacets,
     autoRefresh,
     setAutoRefresh,
@@ -340,10 +344,30 @@ export default function MapPage() {
     void loadCountriesGeoJSON().then(setCountriesGeoJSON);
   }, []);
 
-  const truncHint =
-    arcCountInfo.total > arcCountInfo.shown
-      ? `Показано ${fmtNumber(arcCountInfo.shown)} из ${fmtNumber(arcCountInfo.total)} связей — увеличьте лимит дуг или сузьте период`
-      : '';
+  const truncHint = useMemo(() => {
+    const queryWarn = mapQueryWarning({
+      cost: queryCost,
+      requestedLimit: eventStats.limitRequested || requestedLimit,
+      effectiveLimit: eventStats.limitApplied || effectiveLimit,
+      limitCapped: eventStats.limitCapped,
+      source: eventStats.source,
+    });
+    if (queryWarn) return queryWarn;
+    if (arcCountInfo.total > arcCountInfo.shown) {
+      return `Показано ${fmtNumber(arcCountInfo.shown)} из ${fmtNumber(arcCountInfo.total)} связей — увеличьте лимит дуг или сузьте период`;
+    }
+    return '';
+  }, [
+    queryCost,
+    eventStats.limitRequested,
+    eventStats.limitApplied,
+    eventStats.limitCapped,
+    eventStats.source,
+    requestedLimit,
+    effectiveLimit,
+    arcCountInfo.total,
+    arcCountInfo.shown,
+  ]);
 
   const showGeoEmptyBanner =
     isAdmin && !geoWizard.visible && geoWizard.geo != null && geoWizard.geo.count === 0;
@@ -439,6 +463,7 @@ export default function MapPage() {
         autoRotate: viz.autoRotate,
         setAutoRotate: viz.setAutoRotate,
         setInfoDockTab: viz.setInfoDockTab,
+        focusedCountry,
       }}
     >
       <MapChromeShell

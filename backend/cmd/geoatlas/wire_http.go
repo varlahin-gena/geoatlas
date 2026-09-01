@@ -4,7 +4,11 @@ import (
 	"path/filepath"
 	"time"
 
+	"geoatlas/internal/adapter/huntadapter"
+	"geoatlas/internal/adapter/huntjob"
+	"geoatlas/internal/adapter/huntsfile"
 	"geoatlas/internal/adapter/anomalyjob"
+	"geoatlas/internal/adapter/anomalysettingsfile"
 	"geoatlas/internal/adapter/backupfs"
 	"geoatlas/internal/adapter/backupjob"
 	"geoatlas/internal/adapter/backupschedulefile"
@@ -24,6 +28,7 @@ import (
 	"geoatlas/internal/installprofile"
 	"geoatlas/internal/parser"
 	usecaseanomaly "geoatlas/internal/usecase/anomaly"
+	usecasehunts "geoatlas/internal/usecase/hunts"
 	usecaseaudit "geoatlas/internal/usecase/auditlog"
 	usecaseauth "geoatlas/internal/usecase/auth"
 	usecasebackup "geoatlas/internal/usecase/backup"
@@ -88,6 +93,7 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 	a.backupJobs = backupjob.NewFromService(backupUC, time.Minute)
 
 	var anomalyUC *usecaseanomaly.Service
+	var anomalySettingsUC *usecaseanomaly.SettingsService
 	if cfg.AnomalyEnabled {
 		apiRepo := anomalystore.New(a.pools.API)
 		bgRepo := anomalystore.New(a.pools.Background)
@@ -111,9 +117,37 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 		anomalyUC.SetEnterpriseNets(geoUC)
 		a.anomalyJobs = anomalyjob.New(anomalyUC, cfg.AnomalyScanInterval, time.Minute)
 		a.anomalyJobs.SetLimiter(a.heavy)
+		seed := usecaseanomaly.DefaultSettingsFromConfig(cfg)
+		anomalySettingsUC = usecaseanomaly.NewSettingsService(
+			anomalysettingsfile.New(cfg.AnomalySettingsFile),
+			anomalyUC,
+			seed,
+			a.anomalyJobs.SetInterval,
+		)
+		if st, err := anomalySettingsUC.LoadAndApply(); err == nil {
+			a.anomalyJobs.SetInterval(time.Duration(st.ScanIntervalMin) * time.Minute)
+		}
 	}
 
 	searchTemplatesUC := searchtemplates.New(searchtemplatesfile.New(cfg.SearchTemplatesFile))
+
+	var huntsUC *usecasehunts.Service
+	var huntReporter usecasehunts.AnomalyReporter
+	if anomalyUC != nil {
+		huntReporter = huntadapter.HuntAnomalyReporter{Anomaly: anomalyUC}
+	}
+	timeout := cfg.QueryTimeout
+	if timeout <= 0 {
+		timeout = 2 * time.Minute
+	}
+	huntsUC = usecasehunts.New(
+		huntsfile.New(cfg.HuntsFile),
+		huntadapter.MapRunner{Events: eventsUC},
+		huntReporter,
+		huntadapter.HeavyGate{Try: a.heavy.TryAcquire, Rel: a.heavy.Release},
+		timeout,
+	)
+	a.huntJobs = huntjob.New(huntsUC, time.Minute)
 
 	return httpapi.NewServer(httpapi.Params{
 		Cfg:               cfg,
@@ -133,6 +167,8 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 		APITokens:         auth.apiTokens,
 		SearchTemplatesUC: searchTemplatesUC,
 		AnomalyUC:         anomalyUC,
+		AnomalySettingsUC: anomalySettingsUC,
+		HuntsUC:           huntsUC,
 		Logs:              logsUC,
 	}, httpapi.WithMetrics(a.prom))
 }

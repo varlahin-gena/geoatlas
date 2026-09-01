@@ -96,6 +96,7 @@ export type MapChromeTopbarInput = {
   autoRotate: boolean;
   setAutoRotate: (v: boolean) => void;
   setInfoDockTab: (tab: 'legend' | 'stats') => void;
+  focusedCountry: string | null;
 };
 
 export function buildMapTopbarProps(input: MapChromeTopbarInput): MapTopbarProps {
@@ -105,6 +106,15 @@ export function buildMapTopbarProps(input: MapChromeTopbarInput): MapTopbarProps
       setSearch: input.setSearch,
       builderOpen: input.builderOpen,
       setBuilderOpen: input.setBuilderOpen,
+      huntSave: {
+        period: input.period,
+        periodFrom: input.periodFrom,
+        periodTo: input.periodTo,
+        groupBy: input.groupBy,
+        filter: input.filter,
+        focusedCountry: input.focusedCountry,
+        maxArcs: input.maxArcs,
+      },
     },
     grouping: {
       groupBy: input.groupBy,

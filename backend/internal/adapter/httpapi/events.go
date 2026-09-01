@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"geoatlas/internal/mapsearch"
 	"geoatlas/internal/model"
 	usecaseevents "geoatlas/internal/usecase/events"
 )
@@ -215,15 +216,28 @@ func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	groupBy := normalizeGroupBy(q.Get("group_by"))
+	country := q.Get("country")
+	queryText := q.Get("q")
+	repCats := parseCSVParam(q.Get("rep_cat"), 32)
+	repLists := parseCSVParam(q.Get("rep_list"), 32)
+	repActive := groupBy == "ip" && (len(repCats) > 0 || len(repLists) > 0)
+	requestedLimit := parseOptionalLimit(q.Get("limit"))
+	queryCost := mapsearch.AssessMapQueryCost(mapsearch.MapQueryCostInput{
+		GroupBy: groupBy, Mode: tr.Mode, Amount: tr.Amount, From: tr.From, To: tr.To,
+		Country: country, Query: queryText, RepActive: repActive,
+	})
+	limit, limitCapped := mapsearch.EffectiveMapLimit(requestedLimit, queryCost)
+
 	result, err := h.eventsUC.GetMap(r.Context(), usecaseevents.GetMapInput{
 		TimeRange:     model.TimeRange{Mode: tr.Mode, Amount: tr.Amount, From: tr.From, To: tr.To},
-		Limit:         parseOptionalLimit(q.Get("limit")),
-		GroupBy:       normalizeGroupBy(q.Get("group_by")),
+		Limit:         limit,
+		GroupBy:       groupBy,
 		Filter:        normalizeFilter(q.Get("filter")),
-		Country:       q.Get("country"),
-		Query:         q.Get("q"),
-		RepCategories: parseCSVParam(q.Get("rep_cat"), 32),
-		RepLists:      parseCSVParam(q.Get("rep_list"), 32),
+		Country:       country,
+		Query:         queryText,
+		RepCategories: repCats,
+		RepLists:      repLists,
 		RepSide:       normalizeRepSide(q.Get("rep_side")),
 		DataSource:    dataSource,
 		Timeout:       h.cfg.QueryTimeout,
@@ -245,11 +259,15 @@ func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 		"points":            result.Points,
 		"reputation_facets": result.ReputationFacets,
 		"stats": map[string]any{
-			"raw_pairs":      result.RawPairs,
-			"edges":          len(result.Lines),
-			"nodes":          len(result.Points),
-			"skipped_no_geo": result.SkippedNoGeo,
-			"source":         result.Source,
+			"raw_pairs":       result.RawPairs,
+			"edges":           len(result.Lines),
+			"nodes":           len(result.Points),
+			"skipped_no_geo":  result.SkippedNoGeo,
+			"source":          result.Source,
+			"limit_requested": requestedLimit,
+			"limit_applied":   limit,
+			"limit_capped":    limitCapped,
+			"query_cost":      string(queryCost.Tier),
 		},
 	}
 	switch result.Period {

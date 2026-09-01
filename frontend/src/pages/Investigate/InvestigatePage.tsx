@@ -28,12 +28,14 @@ import {
   sinceIsoHoursAgo,
 } from '@/pages/Anomalies/anomalyDisplay';
 import { rememberMapAlert } from '@/pages/Map/AnomalyActiveBanner';
+import { mapViewToHuntState } from '@/pages/Hunts/huntMapState';
+import { promptSaveHuntFromMap } from '@/pages/Hunts/saveHuntFromMap';
 import './investigate.css';
 
 async function findAnomalyByFingerprint(
   fingerprint: string,
   signal?: AbortSignal,
-): Promise<AnomalyEvent | null> {
+): Promise<{ item: AnomalyEvent | null; related: AnomalyEvent[] }> {
   const data = await fetchAnomalies(
     {
       since: sinceIsoHoursAgo(168),
@@ -43,7 +45,12 @@ async function findAnomalyByFingerprint(
     { signal, cache: 'no-store' },
   );
   const items = data.items || [];
-  return items.find((row) => row.fingerprint === fingerprint) || null;
+  const item = items.find((row) => row.fingerprint === fingerprint) || null;
+  const related =
+    item?.episode_id != null && item.episode_id !== ''
+      ? items.filter((row) => row.episode_id === item.episode_id && row.fingerprint !== item.fingerprint)
+      : [];
+  return { item, related };
 }
 
 export default function InvestigatePage() {
@@ -53,6 +60,7 @@ export default function InvestigatePage() {
   const alertFp = (params.get('alert') || '').trim();
 
   const [item, setItem] = useState<AnomalyEvent | null>(null);
+  const [related, setRelated] = useState<AnomalyEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [missing, setMissing] = useState(false);
   const [directory, setDirectory] = useState<UserDirectoryEntry[]>([]);
@@ -67,8 +75,9 @@ export default function InvestigatePage() {
     try {
       const found = await findAnomalyByFingerprint(fp, signal);
       if (signal?.aborted) return;
-      setItem(found);
-      setMissing(!found);
+      setItem(found.item);
+      setRelated(found.related);
+      setMissing(!found.item);
       setPeerLines([]);
     } catch (e) {
       if (signal?.aborted) return;
@@ -356,12 +365,48 @@ export default function InvestigatePage() {
               >
                 Сохранить как шаблон поиска
               </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  const m = item.map;
+                  void promptSaveHuntFromMap(
+                    mapViewToHuntState({
+                      period: m?.period || '1d',
+                      periodFrom: '',
+                      periodTo: '',
+                      groupBy: m?.group || 'city',
+                      filter: (m?.filter as 'all' | 'allowed' | 'blocked') || 'all',
+                      search: m?.q || anomalyEventsQuery(item) || '',
+                      focusedCountry: m?.country || null,
+                    }),
+                    toast,
+                  );
+                }}
+              >
+                Сохранить как hunt
+              </button>
               {!acked ? (
                 <button type="button" className="btn" disabled={acking} onClick={() => void hideAlert()}>
                   Закрыть алерт
                 </button>
               ) : null}
             </div>
+
+            {related.length ? (
+              <section className="investigate-related">
+                <h3 className="card-title">Связанные алерты эпизода</h3>
+                <ul>
+                  {related.map((r) => (
+                    <li key={r.fingerprint}>
+                      <Link to={investigateHref(r.fingerprint)}>{eventCodeLabel(r)}</Link>
+                      {' · '}
+                      {severityLabel(r.severity)}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
 
             <AnomalyPeersPanel
               item={item}

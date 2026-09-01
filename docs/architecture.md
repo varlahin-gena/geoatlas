@@ -43,6 +43,7 @@
 3. **backend** снимает маркеры транспорта, парсит строки, обогащает GeoIP, пишет в ClickHouse; при старте `EnsureBaseSchema` / `Ensure*` создаёт базовые таблицы и агрегаты (`traffic_edges_*`, geo), применяет TTL из `retention.json` и при необходимости делает backfill. **Delivery contract — at-most-once / best-effort:** полная очередь ingest **не блокирует** TCP — лишние строки дропаются (`dropped_total`); при outage ClickHouse insert circuit ставит dequeue на паузу (очередь растёт → admission drops), а потери из processor-буфера учитываются отдельно (`buffer_drops_total`). Перед backend **syslog-ng уже буферизует** (см. ниже). Алерты и live-метрики drops — на `/system`.
 4. **frontend** отдаёт статику и проксирует API-запросы на backend.
 5. **stats-collector** каждые 30 секунд собирает метрики CPU/RAM контейнеров и состояние пайплайна (включая разбивку UDP/TCP).
+6. **Anomaly engine** (фоновый job в backend): каждые `ANOMALY_SCAN_INTERVAL` сканирует `traffic_logs` в ClickHouse, пишет срабатывания в JSON-store (`/app/data`), отдаёт через `GET /api/anomalies`. Требуются сети предприятия. Типы и пороги — [anomalies.md](anomalies.md).
 
 ## Product limits (appliance)
 

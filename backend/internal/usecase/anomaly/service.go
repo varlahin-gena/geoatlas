@@ -67,6 +67,7 @@ func (c Config) newCountryRepeatCooldown() time.Duration {
 
 // Service — application use case аномалий.
 type Service struct {
+	cfgMu    sync.RWMutex
 	cfg      Config
 	store    EventStore
 	scan     TrafficScanner
@@ -93,8 +94,38 @@ func (s *Service) SetEnterpriseNets(src EnterpriseNetSource) {
 	}
 }
 
+func (s *Service) Available() bool {
+	return s != nil && s.store != nil && s.scan != nil
+}
+
 func (s *Service) Enabled() bool {
-	return s != nil && s.cfg.Enabled && s.store != nil && s.scan != nil
+	if !s.Available() {
+		return false
+	}
+	return s.cfgSnapshot().Enabled
+}
+
+func (s *Service) cfgSnapshot() Config {
+	if s == nil {
+		return Config{}
+	}
+	s.cfgMu.RLock()
+	defer s.cfgMu.RUnlock()
+	return s.cfg
+}
+
+// ApplySettings обновляет in-memory конфиг без рестарта.
+func (s *Service) ApplySettings(st Settings) {
+	if s == nil {
+		return
+	}
+	s.cfgMu.Lock()
+	s.cfg.Enabled = st.Enabled
+	s.cfg.IncludePrivate = st.IncludePrivate
+	s.cfg.LearningDays = st.LearningDays
+	s.cfg.SuppressHours = st.SuppressHours
+	s.cfg.NewCountryMinShare = st.NewCountryMinShare
+	s.cfgMu.Unlock()
 }
 
 func (s *Service) Status() ScanStatus {
@@ -104,7 +135,7 @@ func (s *Service) Status() ScanStatus {
 	s.statusMu.Lock()
 	defer s.statusMu.Unlock()
 	out := s.status
-	out.Enabled = s.cfg.Enabled
+	out.Enabled = s.cfgSnapshot().Enabled
 	return out
 }
 
@@ -115,9 +146,10 @@ func (s *Service) setStatus(mut func(*ScanStatus)) {
 }
 
 func (s *Service) List(ctx context.Context, q ListQuery) (ListResult, error) {
-	if !s.Enabled() {
-		return ListResult{Items: []Event{}, Summary: Summary{Enabled: false}}, nil
+	if !s.Available() {
+		return ListResult{Items: []Event{}, Summary: Summary{Enabled: false, ModuleLoaded: false}}, nil
 	}
+	cfg := s.cfgSnapshot()
 	now := time.Now().UTC()
 	if q.Since.IsZero() {
 		q.Since = now.Add(-summarySince)
@@ -143,30 +175,56 @@ func (s *Service) List(ctx context.Context, q ListQuery) (ListResult, error) {
 		return ListResult{}, err
 	}
 	sum.Learning = s.isLearning(ctx, now)
-	sum.Enabled = true
+	sum.Enabled = cfg.Enabled
+	sum.ModuleLoaded = true
 	sum.UpdatedAt = now
 	sum.EnterpriseNets = len(s.loadEnterpriseNets(ctx))
 	return ListResult{Items: items, Summary: sum}, nil
 }
 
 func (s *Service) Summary(ctx context.Context) (Summary, error) {
-	if !s.Enabled() {
-		return Summary{Enabled: false, UpdatedAt: time.Now().UTC()}, nil
+	if !s.Available() {
+		return Summary{Enabled: false, ModuleLoaded: false, UpdatedAt: time.Now().UTC()}, nil
 	}
+	cfg := s.cfgSnapshot()
 	now := time.Now().UTC()
 	sum, err := s.store.CountSummary(ctx, now.Add(-summarySince))
 	if err != nil {
 		return Summary{}, err
 	}
 	sum.Learning = s.isLearning(ctx, now)
-	sum.Enabled = true
+	sum.Enabled = cfg.Enabled
+	sum.ModuleLoaded = true
 	sum.UpdatedAt = now
 	sum.EnterpriseNets = len(s.loadEnterpriseNets(ctx))
 	return sum, nil
 }
 
+func (s *Service) Episodes(ctx context.Context, q ListQuery) ([]EpisodeSummary, error) {
+	if !s.Available() {
+		return []EpisodeSummary{}, nil
+	}
+	res, err := s.List(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	return buildEpisodeSummaries(res.Items), nil
+}
+
+// InsertSynthetic вставляет события вне цикла Scan (например hunt_threshold).
+func (s *Service) InsertSynthetic(ctx context.Context, events []Event, now time.Time) error {
+	if !s.Available() || len(events) == 0 {
+		return nil
+	}
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	assignEpisodeIDs(events, now)
+	return s.store.Insert(ctx, events)
+}
+
 func (s *Service) Ack(ctx context.Context, fingerprint, by string) error {
-	if !s.Enabled() {
+	if !s.Available() {
 		return fmt.Errorf("anomaly module disabled")
 	}
 	fp := strings.TrimSpace(fingerprint)
@@ -177,7 +235,7 @@ func (s *Service) Ack(ctx context.Context, fingerprint, by string) error {
 	if by == "" {
 		by = "unknown"
 	}
-	if err := s.store.Ack(ctx, fp, by, s.cfg.suppressPeriod()); err != nil {
+	if err := s.store.Ack(ctx, fp, by, s.cfgSnapshot().suppressPeriod()); err != nil {
 		return err
 	}
 	// Закрытие без явного назначения — УЗ закрывшего становится исполнителем.
@@ -186,7 +244,7 @@ func (s *Service) Ack(ctx context.Context, fingerprint, by string) error {
 }
 
 func (s *Service) Assign(ctx context.Context, fingerprint, assignedTo, by string) error {
-	if !s.Enabled() {
+	if !s.Available() {
 		return fmt.Errorf("anomaly module disabled")
 	}
 	fp := strings.TrimSpace(fingerprint)
@@ -230,9 +288,10 @@ func (s *Service) Scan(ctx context.Context, now time.Time) ScanResult {
 
 	learning := s.isLearning(tctx, now)
 	res.Learning = learning
-	th := ThresholdsForProfile(s.cfg.InstallProfile)
-	if s.cfg.NewCountryMinShare > 0 {
-		th.NewCountryMinShare = s.cfg.NewCountryMinShare
+	cfg := s.cfgSnapshot()
+	th := ThresholdsForProfile(cfg.InstallProfile)
+	if cfg.NewCountryMinShare > 0 {
+		th.NewCountryMinShare = cfg.NewCountryMinShare
 	}
 	ent := s.loadEnterpriseNets(tctx)
 	if len(ent) == 0 {
@@ -300,6 +359,7 @@ func (s *Service) Scan(ctx context.Context, now time.Time) ScanResult {
 
 	kept := s.dedupAndCap(tctx, candidates, now)
 	if len(kept) > 0 {
+		assignEpisodeIDs(kept, now)
 		if err := s.store.Insert(tctx, kept); err != nil {
 			res.Error = "insert: " + err.Error()
 			slog.Warn("anomaly insert failed", "err", err)
@@ -394,7 +454,7 @@ func (s *Service) isLearning(ctx context.Context, now time.Time) bool {
 	if err != nil || oldest.IsZero() {
 		return true
 	}
-	return now.Sub(oldest) < s.cfg.learningPeriod()
+	return now.Sub(oldest) < s.cfgSnapshot().learningPeriod()
 }
 
 func (s *Service) dedupAndCap(ctx context.Context, in []Event, now time.Time) []Event {
@@ -471,7 +531,7 @@ func (s *Service) detectPortScan(ctx context.Context, now time.Time, th Threshol
 	if len(nets) == 0 {
 		return nil, nil
 	}
-	hits, err := s.scan.PortScan(ctx, portScanWindow, th.PortScanPorts, th.PortScanEvents, s.cfg.IncludePrivate, nets)
+	hits, err := s.scan.PortScan(ctx, portScanWindow, th.PortScanPorts, th.PortScanEvents, s.cfgSnapshot().IncludePrivate, nets)
 	if err != nil {
 		return nil, err
 	}
@@ -507,7 +567,7 @@ func (s *Service) detectHorizontalScan(ctx context.Context, now time.Time, th Th
 	if len(nets) == 0 {
 		return nil, nil
 	}
-	hits, err := s.scan.HorizontalScan(ctx, horizontalScanWindow, th.HorizontalHosts, th.HorizontalEvents, s.cfg.IncludePrivate, nets)
+	hits, err := s.scan.HorizontalScan(ctx, horizontalScanWindow, th.HorizontalHosts, th.HorizontalEvents, s.cfgSnapshot().IncludePrivate, nets)
 	if err != nil {
 		return nil, err
 	}
@@ -634,7 +694,7 @@ func (s *Service) detectNewCountry(ctx context.Context, now time.Time, th Thresh
 		}
 		candidateKeys = append(candidateKeys, suppressionKeyForCodeCountry(CodeNewCountryDst, cc))
 	}
-	recent, err := s.store.RecentSuppressionKeys(ctx, CodeNewCountryDst, candidateKeys, now.Add(-s.cfg.newCountryRepeatCooldown()))
+	recent, err := s.store.RecentSuppressionKeys(ctx, CodeNewCountryDst, candidateKeys, now.Add(-s.cfgSnapshot().newCountryRepeatCooldown()))
 	if err != nil {
 		return nil, err
 	}

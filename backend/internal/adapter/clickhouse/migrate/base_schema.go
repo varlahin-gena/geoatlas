@@ -108,6 +108,7 @@ func coldBootstrapStatements() []bootstrapStmt {
 		{title: "audit_events: журнал admin/security действий", sql: auditEventsDDL},
 		{title: "anomaly_events: журнал аномалий карты", sql: anomalyEventsDDL},
 		{title: "anomaly_events suppression_key: ключ подавления повтора", sql: `ALTER TABLE anomaly_events ADD COLUMN IF NOT EXISTS suppression_key String DEFAULT ''`},
+		{title: "anomaly_events episode_id: группировка корреляции", sql: `ALTER TABLE anomaly_events ADD COLUMN IF NOT EXISTS episode_id String DEFAULT ''`},
 		{title: "anomaly_acks: подтверждения аномалий", sql: anomalyAcksDDL},
 		{title: "anomaly_suppressions: подавление повторов аномалий", sql: anomalySuppressionsDDL},
 		{title: "anomaly_assignments: назначение аномалий на УЗ", sql: anomalyAssignmentsDDL},

@@ -45,7 +45,17 @@ SPA (React Router); nginx `auth_request` для `/api/*` и `/dozzle/`.
 ## Репутация и аномалии
 
 - [Репутация IP](reputation.md) — фиды, SSRF-ограничения, как выключить.
-- [Аномалии](anomalies.md) — типы, интервал скана, ack/assign.
+- [Аномалии](anomalies.md) — типы, интервал скана, ack/assign, workspace `/investigate`.
+
+### Разбор алерта (`/investigate`)
+
+Страница открывается с параметром `?alert=<fingerprint>` (кнопка «Разбор» на `/anomalies`).
+
+1. Загружается алерт из `GET /api/anomalies` (окно 7 суток, включая ack).
+2. Панель peers — те же агрегированные связи, что в «Связи» на списке аномалий (`GET /api/events`).
+3. Действия: закрыть (ack), назначить исполнителя, скопировать ссылки на разбор и карту, сохранить query как шаблон поиска, скачать CSV peers.
+
+Отдельного backend API для «кейсов» нет: fingerprint в URL — идентификатор расследования.
 
 ## HTTP API
 

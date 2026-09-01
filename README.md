@@ -26,7 +26,9 @@ Appliance: **IPv4-only**, один хост / один процесс backend, �
 - **Резервное копирование ClickHouse**
 - **Настраиваемый TTL (retention)**
 - **Построение связей** на 2D карте и 3D глобусе
-- **Аномалии на карте**
+- **Движок аномалий**: port/horizontal scan, всплеск блокировок, **всплеск объёма** (`byte_surge`), **beaconing**, **lateral movement** (`lateral_fanout`), новая страна, репутационный peer; панель «Связи» на `/anomalies`
+- **Разбор алерта** (`/investigate?alert=<fingerprint>`): workspace с peers, ack/assign, CSV, шаблон поиска, deep-link на карту
+- **Аномалии на карте** (баннер со ссылкой на список)
 - **Конструктор поиска** на карте (гибридный query builder) и **личные шаблоны** запросов; у администратора — просмотр всех шаблонов
 - **Группировка узлов**: по IP / по подсети `/24` / **по городу (по умолчанию)** / по стране
 - **Тест парсеров** в браузере: статусы parsed / skipped / error, гео-обогащение, пресеты по вендорам
@@ -55,7 +57,7 @@ Appliance: **IPv4-only**, один хост / один процесс backend, �
 | [GeoIP](docs/geoip.md) | CSV, загрузка с сервера, 502/OOM |
 | [UI и HTTP API](docs/ui.md) | Страницы SPA, роли, OpenAPI **1.15.0** |
 | [Репутация](docs/reputation.md) | Фиды и offline-списки |
-| [Аномалии](docs/anomalies.md) | Типы, ack/assign |
+| [Аномалии](docs/anomalies.md) | Типы (в т.ч. byte_surge / beaconing / lateral), ack/assign, разбор |
 | [Разработка](docs/development.md) | Локальный стек из git |
 | [Структура репо](docs/repo-layout.md) | Дерево каталогов |
 | [RELEASING.md](RELEASING.md) | Версии продукта / OpenAPI / схемы CH |

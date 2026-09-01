@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { SystemHealthPill, UserMenu } from '@/components/Shell';
+import { useToast } from '@/components/Toast';
+import { mapViewToHuntState } from '@/pages/Hunts/huntMapState';
+import { promptSaveHuntFromMap } from '@/pages/Hunts/saveHuntFromMap';
 import { SearchBuilder } from './SearchBuilder';
 import { countActiveMapFilters, MapFiltersPanel } from './MapFiltersPanel';
 import { MapLayersPanel } from './MapLayersPanel';
@@ -12,6 +15,15 @@ export type MapTopbarProps = {
     setSearch: (v: string) => void;
     builderOpen: boolean;
     setBuilderOpen: Dispatch<SetStateAction<boolean>>;
+    huntSave?: {
+      period: string;
+      periodFrom: string;
+      periodTo: string;
+      groupBy: string;
+      filter: 'all' | 'allowed' | 'blocked';
+      focusedCountry: string | null;
+      maxArcs: number;
+    };
   };
   grouping: {
     groupBy: string;
@@ -86,7 +98,8 @@ export function MapTopbar({
   period: periodCtl,
   layers,
 }: MapTopbarProps) {
-  const { search, setSearch, builderOpen, setBuilderOpen } = searchCtl;
+  const { toast } = useToast();
+  const { search, setSearch, builderOpen, setBuilderOpen, huntSave } = searchCtl;
   const { groupBy, setGroupBy, filter, setFilter, hideIntraCountry, setHideIntraCountry } = grouping;
   const {
     reputationEnabled,
@@ -196,6 +209,21 @@ export function MapTopbar({
           search={search}
           onApply={setSearch}
         />
+        {huntSave ? (
+          <button
+            type="button"
+            className="btn sm map-save-hunt-btn"
+            title="Сохранить saved hunt"
+            onClick={() =>
+              void promptSaveHuntFromMap(
+                mapViewToHuntState({ ...huntSave, search }),
+                toast,
+              )
+            }
+          >
+            Hunt
+          </button>
+        ) : null}
       </div>
 
       <div className="period-control">

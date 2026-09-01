@@ -11,6 +11,7 @@ const (
 	CodeByteSurge      = "byte_surge"
 	CodeBeaconing      = "beaconing"
 	CodeLateralFanout  = "lateral_fanout"
+	CodeHuntThreshold  = "hunt_threshold"
 
 	SeverityInfo = "info"
 	SeverityWarn = "warn"
@@ -53,6 +54,7 @@ type Event struct {
 	Device         string         `json:"device,omitempty"`
 	EventCount     uint64         `json:"event_count"`
 	Fingerprint    string         `json:"fingerprint"`
+	EpisodeID      string         `json:"episode_id,omitempty"`
 	ExpiresAt      time.Time      `json:"expires_at"`
 	Acknowledged   bool           `json:"acknowledged"`
 	AssignedTo     string         `json:"assigned_to,omitempty"`
@@ -79,6 +81,8 @@ func CodeHumanLabel(code string) string {
 		return "Периодическая связь"
 	case CodeLateralFanout:
 		return "Веер по сети предприятия"
+	case CodeHuntThreshold:
+		return "Порог saved hunt"
 	default:
 		return code
 	}
@@ -99,9 +103,10 @@ type Summary struct {
 	Warn      int       `json:"warn"`
 	Total     int       `json:"total"`
 	Acked     int       `json:"acked"`
-	Learning  bool      `json:"learning"`
-	Enabled   bool      `json:"enabled"`
-	UpdatedAt time.Time `json:"updated_at"`
+	Learning     bool      `json:"learning"`
+	Enabled      bool      `json:"enabled"`
+	ModuleLoaded bool      `json:"module_loaded"`
+	UpdatedAt    time.Time `json:"updated_at"`
 	EnterpriseNets int  `json:"enterprise_nets"`
 }
 

@@ -318,6 +318,91 @@ paths:
           description: OK
         "403":
           description: Не администратор
+  /api/me/hunts:
+    get:
+      tags: [events]
+      summary: Saved hunts текущего пользователя
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: hunts list
+    post:
+      tags: [events]
+      summary: Создать saved hunt
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SavedHuntInput"
+      responses:
+        "200":
+          description: created
+  /api/me/hunts/{id}:
+    put:
+      tags: [events]
+      summary: Обновить saved hunt
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SavedHuntInput"
+      responses:
+        "200":
+          description: updated
+    delete:
+      tags: [events]
+      summary: Удалить saved hunt
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: deleted
+  /api/me/hunts/{id}/run:
+    post:
+      tags: [events]
+      summary: Запустить saved hunt вручную
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: run result
+  /api/hunts:
+    get:
+      tags: [events]
+      summary: Все saved hunts (administrator)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: all hunts with authors
   /api/tokens:
     get:
       tags: [auth]
@@ -714,6 +799,81 @@ paths:
                 $ref: "#/components/schemas/AnomalyAssignResponse"
         "400":
           description: Невалидный запрос
+        "503":
+          description: Модуль выключен
+
+  /api/anomalies/episodes:
+    get:
+      tags: [anomalies]
+      summary: Эпизоды корреляции аномалий
+      description: |
+        Группировка алертов по anchor IP и часовому окну.
+        Те же query-параметры, что у GET /api/anomalies (since, include_acked).
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: since
+          in: query
+          schema: { type: string, format: date-time }
+        - name: include_acked
+          in: query
+          schema: { type: string, enum: ["0", "1", "true", "false"] }
+      responses:
+        "200":
+          description: episodes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  episodes:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AnomalyEpisode"
+
+  /api/anomalies/settings:
+    get:
+      tags: [anomalies]
+      summary: Настройки движка аномалий
+      description: |
+        Только administrator или Bearer.
+        Редактируемые параметры из `/app/data/anomaly_settings.json` и read-only пороги install profile.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: settings + thresholds + status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnomalySettingsResponse"
+        "503":
+          description: Модуль выключен (ANOMALY_ENABLED=false)
+    put:
+      tags: [anomalies]
+      summary: Обновить настройки движка аномалий
+      description: administrator; hot-reload без рестарта backend.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnomalyEngineSettings"
+      responses:
+        "200":
+          description: updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnomalySettingsResponse"
+        "400":
+          description: Невалидные значения
         "503":
           description: Модуль выключен
 
@@ -2113,8 +2273,113 @@ components:
         acked: { type: integer }
         learning: { type: boolean }
         enabled: { type: boolean }
+        module_loaded: { type: boolean }
         updated_at: { type: string, format: date-time }
         enterprise_nets: { type: integer }
+
+    AnomalyEpisode:
+      type: object
+      properties:
+        episode_id: { type: string }
+        anchor_ip: { type: string }
+        started_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        alert_count: { type: integer }
+        high_count: { type: integer }
+        warn_count: { type: integer }
+        max_severity: { type: string, enum: [warn, high, info] }
+        codes:
+          type: array
+          items: { type: string }
+        fingerprints:
+          type: array
+          items: { type: string }
+
+    HuntMapState:
+      type: object
+      properties:
+        period: { type: string }
+        period_from: { type: string }
+        period_to: { type: string }
+        group_by: { type: string }
+        filter: { type: string }
+        query: { type: string }
+        country: { type: string }
+        limit: { type: integer }
+        data_source: { type: string }
+
+    HuntSchedule:
+      type: object
+      properties:
+        enabled: { type: boolean }
+        interval_min: { type: integer, minimum: 15, maximum: 1440 }
+        edge_threshold: { type: integer, minimum: 0 }
+        edge_ratio: { type: number, minimum: 1 }
+
+    SavedHuntInput:
+      type: object
+      required: [name, map]
+      properties:
+        name: { type: string }
+        notes: { type: string }
+        map:
+          $ref: "#/components/schemas/HuntMapState"
+        schedule:
+          $ref: "#/components/schemas/HuntSchedule"
+
+    AnomalyEngineSettings:
+      type: object
+      required:
+        - enabled
+        - scan_interval_min
+        - learning_days
+        - suppress_hours
+        - include_private
+        - new_country_min_share
+      properties:
+        enabled: { type: boolean }
+        scan_interval_min: { type: integer, minimum: 1, maximum: 1440 }
+        learning_days: { type: integer, minimum: 1, maximum: 30 }
+        suppress_hours: { type: integer, minimum: 1, maximum: 168 }
+        include_private: { type: boolean }
+        new_country_min_share: { type: number, minimum: 0.01, maximum: 1 }
+        updated_at: { type: string, format: date-time }
+
+    AnomalyThresholds:
+      type: object
+      additionalProperties: true
+      properties:
+        port_scan_ports: { type: integer }
+        port_scan_events: { type: integer }
+        horizontal_hosts: { type: integer }
+        horizontal_events: { type: integer }
+        surge_ratio: { type: number }
+        surge_abs_min: { type: integer, format: int64 }
+        surge_floor: { type: integer, format: int64 }
+        new_country_min: { type: integer, format: int64 }
+        new_country_baseline: { type: integer, format: int64 }
+        new_country_min_share: { type: number }
+        rep_min_events: { type: integer, format: int64 }
+        byte_surge_ratio: { type: number }
+        byte_surge_abs_min: { type: integer, format: int64 }
+        byte_surge_floor: { type: integer, format: int64 }
+        beacon_min_hours: { type: integer }
+        beacon_max_avg_bytes: { type: integer, format: int64 }
+        beacon_min_regularity: { type: number }
+        lateral_hosts: { type: integer }
+        lateral_events: { type: integer }
+
+    AnomalySettingsResponse:
+      type: object
+      properties:
+        ok: { type: boolean }
+        settings:
+          $ref: "#/components/schemas/AnomalyEngineSettings"
+        install_profile: { type: string }
+        thresholds:
+          $ref: "#/components/schemas/AnomalyThresholds"
+        status:
+          $ref: "#/components/schemas/AnomalyScanStatus"
 
     AnomalyList:
       type: object

@@ -8,6 +8,7 @@ import (
 
 	"geoatlas/internal/adapter/anomalyjob"
 	"geoatlas/internal/adapter/backupjob"
+	"geoatlas/internal/adapter/huntjob"
 	chadapter "geoatlas/internal/adapter/clickhouse"
 	"geoatlas/internal/adapter/datalock"
 	"geoatlas/internal/adapter/geojob"
@@ -28,6 +29,7 @@ type app struct {
 	repJobs     *reputationjob.Scheduler
 	backupJobs  *backupjob.Scheduler
 	anomalyJobs *anomalyjob.Scheduler
+	huntJobs    *huntjob.Scheduler
 	heavy       *heavytask.Limiter
 	skipGate    *heavytask.DeferredGate
 	dataLock    *datalock.Lock
@@ -105,6 +107,9 @@ func buildApp(ctx context.Context, cfg config.Config) (*app, error) {
 	}
 	if a.anomalyJobs != nil {
 		a.anomalyJobs.Start(bgCtx)
+	}
+	if a.huntJobs != nil {
+		a.huntJobs.Start(bgCtx)
 	}
 	return a, nil
 }

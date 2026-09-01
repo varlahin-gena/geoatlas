@@ -5,6 +5,11 @@ import type { ToastKind } from '@/components/Toast';
 import { usePolling } from '@/lib/usePolling';
 import { buildPeriodQuery } from './mapConstants';
 import { mapFetchLimit, mapServerScope, type MapActionFilter } from './mapQuery';
+import {
+  assessMapQueryCost,
+  effectiveMapLimit,
+  type MapQueryCostTier,
+} from './mapQueryCost';
 import type { MapLine, MapPoint } from './mapTypes';
 
 export type MapDataSource = 'live' | 'backup';
@@ -44,7 +49,15 @@ export function useMapEvents(
   const [lines, setLines] = useState<MapLine[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [eventStats, setEventStats] = useState({ rawPairs: 0, skippedNoGeo: 0 });
+  const [eventStats, setEventStats] = useState({
+    rawPairs: 0,
+    skippedNoGeo: 0,
+    source: '',
+    limitRequested: 0,
+    limitApplied: 0,
+    limitCapped: false,
+    queryCost: 'light' as MapQueryCostTier,
+  });
   const [repFacets, setRepFacets] = useState<Record<string, string[]>>({});
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [dataSource, setDataSource] = useState<MapDataSource>('live');
@@ -55,6 +68,26 @@ export function useMapEvents(
     () => buildPeriodQuery(period, periodFrom, periodTo),
     [period, periodFrom, periodTo],
   );
+
+  const queryCost = useMemo(
+    () =>
+      assessMapQueryCost({
+        period,
+        periodFrom,
+        periodTo,
+        groupBy,
+        search,
+        focusedCountry,
+        repActive,
+      }),
+    [period, periodFrom, periodTo, groupBy, search, focusedCountry, repActive],
+  );
+
+  const requestedLimit = useMemo(() => mapFetchLimit(maxArcs), [maxArcs]);
+  const effectiveLimit = useMemo(() => {
+    const { applied } = effectiveMapLimit(requestedLimit, queryCost);
+    return applied;
+  }, [requestedLimit, queryCost]);
 
   const selectDataSource = useCallback((next: MapDataSource) => {
     setDataSource(next);
@@ -70,11 +103,10 @@ export function useMapEvents(
 
     setLoading(true);
     try {
-      const limit = mapFetchLimit(maxArcs);
       const { country, q } = mapServerScope(search, focusedCountry);
       const data = await fetchMapEvents({
         groupBy,
-        limit,
+        limit: effectiveLimit,
         filter,
         country,
         q,
@@ -88,9 +120,15 @@ export function useMapEvents(
       if (controller.signal.aborted) return;
       setPoints(data.points || {});
       setLines(data.lines || []);
+      const stats = data.stats || {};
       setEventStats({
-        rawPairs: Number(data.stats?.raw_pairs) || 0,
-        skippedNoGeo: Number(data.stats?.skipped_no_geo) || 0,
+        rawPairs: Number(stats.raw_pairs) || 0,
+        skippedNoGeo: Number(stats.skipped_no_geo) || 0,
+        source: String(stats.source || ''),
+        limitRequested: Number(stats.limit_requested) || requestedLimit,
+        limitApplied: Number(stats.limit_applied) || effectiveLimit,
+        limitCapped: Boolean(stats.limit_capped),
+        queryCost: (stats.query_cost as MapQueryCostTier) || queryCost.tier,
       });
       setRepFacets(data.reputation_facets || {});
       const attached = (data.backup_attached || '').trim();
@@ -125,6 +163,9 @@ export function useMapEvents(
     repCategories,
     repLists,
     repSide,
+    queryCost,
+    requestedLimit,
+    effectiveLimit,
   ]);
 
   useEffect(() => {
@@ -149,6 +190,9 @@ export function useMapEvents(
     loading,
     fetchError,
     eventStats,
+    queryCost,
+    requestedLimit,
+    effectiveLimit,
     repFacets,
     autoRefresh,
     setAutoRefresh,

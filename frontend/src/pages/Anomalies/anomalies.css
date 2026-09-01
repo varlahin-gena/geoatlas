@@ -21,6 +21,54 @@
   line-height: 1.2;
 }
 
+.anomaly-engine-form .form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.anomaly-engine-form .form-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 160px;
+  font-size: 13px;
+}
+
+.anomaly-engine-form .form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.anomaly-engine-dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.anomaly-engine-dl div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.anomaly-engine-dl dt {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.anomaly-engine-dl dd {
+  margin: 0;
+  font-size: 14px;
+}
+
+.anomaly-engine-status {
+  margin-bottom: 16px;
+}
+
 .anomaly-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -136,4 +184,21 @@
 .anomaly-peers-table {
   max-height: 280px;
   overflow: auto;
+}
+
+.anomaly-episodes-panel {
+  margin-bottom: 16px;
+}
+
+.anomaly-episode-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: baseline;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.anomaly-episode-row:last-child {
+  border-bottom: none;
 }

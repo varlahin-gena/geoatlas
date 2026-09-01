@@ -1,0 +1,92 @@
+.hunts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.hunt-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.hunt-card-head h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.hunt-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
+.hunt-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.hunt-meta dt {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.hunt-meta dd {
+  margin: 0;
+  font-size: 13px;
+  word-break: break-word;
+}
+
+.hunt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.hunt-edit-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.hunt-edit-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.hunt-check {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px !important;
+}
+
+.hunt-edit-form {
+  margin-top: 20px;
+}
+
+.anomaly-episodes-panel {
+  margin-bottom: 16px;
+}
+
+.anomaly-episode-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: baseline;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.anomaly-episode-row:last-child {
+  border-bottom: none;
+}

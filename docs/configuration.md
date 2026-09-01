@@ -97,6 +97,8 @@ Onboarding МСЭ: [syslog.md](syslog.md). Лимиты ёмкости: [арх�
 | `ANOMALY_LEARNING_DAYS` | `3` | Окно обучения |
 | `ANOMALY_SUPPRESS_HOURS` | `24` | Подавление после срабатывания |
 
+Пороги детекторов (`byte_surge`, `beaconing`, `lateral_fanout`, port scan и др.) **не** задаются через env: они привязаны к [профилю производительности](operations.md#профили-производительности) (`install-profile.json`). См. таблицу в [anomalies.md](anomalies.md#пороги-новых-детекторов-по-профилю).
+
 Подробнее: [reputation.md](reputation.md), [anomalies.md](anomalies.md).
 
 ## Прочее

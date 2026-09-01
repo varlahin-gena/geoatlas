@@ -22,6 +22,7 @@ type Scheduler struct {
 	cancel context.CancelFunc
 	done   chan struct{}
 	busy   sync.Mutex
+	ticker *time.Ticker
 }
 
 // SetLimiter — общий слот тяжёлых задач; при занятости тик пропускается.
@@ -47,11 +48,26 @@ func New(svc *usecaseanomaly.Service, interval, startDelay time.Duration) *Sched
 	}
 }
 
+func (s *Scheduler) SetInterval(d time.Duration) {
+	if s == nil {
+		return
+	}
+	if d < time.Minute {
+		d = time.Minute
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.interval = d
+	if s.ticker != nil {
+		s.ticker.Reset(d)
+	}
+}
+
 func (s *Scheduler) Start(parent context.Context) {
 	if s == nil {
 		return
 	}
-	if s.svc == nil || !s.svc.Enabled() {
+	if s.svc == nil || !s.svc.Available() {
 		select {
 		case <-s.done:
 		default:
@@ -75,7 +91,10 @@ func (s *Scheduler) Start(parent context.Context) {
 			}
 		}
 		s.tick(ctx)
-		ticker := time.NewTicker(s.interval)
+		s.mu.Lock()
+		s.ticker = time.NewTicker(s.interval)
+		ticker := s.ticker
+		s.mu.Unlock()
 		defer ticker.Stop()
 		for {
 			select {

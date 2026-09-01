@@ -19,6 +19,8 @@ const GeoMissingPage = lazy(() => import('@/pages/GeoMissing/GeoMissingPage'));
 const GeoRangesPage = lazy(() => import('@/pages/GeoRanges/GeoRangesPage'));
 const ReputationPage = lazy(() => import('@/pages/Reputation/ReputationPage'));
 const AnomaliesPage = lazy(() => import('@/pages/Anomalies/AnomaliesPage'));
+const AnomalyEnginePage = lazy(() => import('@/pages/Anomalies/AnomalyEnginePage'));
+const HuntsPage = lazy(() => import('@/pages/Hunts/HuntsPage'));
 const InvestigatePage = lazy(() => import('@/pages/Investigate/InvestigatePage'));
 
 function Lazy({ children, label }: { children: React.ReactNode; label?: string }) {
@@ -141,6 +143,26 @@ export default function App() {
                   <RequireAuth>
                     <Lazy label="анomalies">
                       <AnomaliesPage />
+                    </Lazy>
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/anomalies/engine"
+                element={
+                  <RequireAuth admin>
+                    <Lazy label="движок аномалий">
+                      <AnomalyEnginePage />
+                    </Lazy>
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/hunts"
+                element={
+                  <RequireAuth>
+                    <Lazy label="saved hunts">
+                      <HuntsPage />
                     </Lazy>
                   </RequireAuth>
                 }

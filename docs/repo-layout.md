@@ -13,6 +13,7 @@ geoatlas/
 │       │   │   ├── ingeststore/      # INSERT traffic_logs / parse_errors
 │       │   │   ├── perrorstore/      # list/delete parse_errors
 │       │   │   ├── trafficstore/     # map/events scans
+│       │   │   ├── anomalystore/     # anomaly detection SQL (port scan, byte_surge, …)
 │       │   │   ├── geostore/         # GeoIP ranges + ReloadableGeoIndex
 │       │   │   ├── repstore/         # reputation ranges + index
 │       │   │   ├── sysstore/         # system metrics
@@ -27,7 +28,7 @@ geoatlas/
 │       │   ├── bootstrapadapter/     # Ensure*/Backfill* для usecase/bootstrap
 │       │   ├── retentionfile/        # JSON-store TTL (`retention.json`)
 │       │   └── systemlive/           # live ingest / syslog-ng stats / profile adapters
-│       ├── usecase/                  # application use cases + ports (bootstrap, retention, …)
+│       ├── usecase/                  # application use cases + ports (bootstrap, retention, anomaly, …)
 │       ├── auth/                     # users / sessions / roles
 │       ├── config/                   # конфигурация из env
 │       ├── geoip/                    # импорт CSV и in-memory индекс
@@ -75,7 +76,7 @@ geoatlas/
 │   ├── Dockerfile                    # multi-stage: npm ci + vite build → nginx
 │   ├── index.html                    # Vite entry (#root)
 │   ├── public/                       # favicon, logo, countries.geojson
-│   ├── src/                          # React pages (Map, System, admin…)
+│   ├── src/                          # React pages (Map, Anomalies, Investigate, System, admin…)
 │   ├── nginx.conf
 │   ├── nginx-app.inc                 # SPA try_files @spa + auth_request API
 │   ├── docker-entrypoint.sh          # config.js + HTTP/HTTPS default.conf

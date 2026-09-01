@@ -19,6 +19,7 @@ export const ANOMALY_CODE_OPTIONS = [
   { value: 'lateral_fanout', label: 'Веер по сети предприятия' },
   { value: 'new_country_dst', label: 'Новая страна назначения' },
   { value: 'rep_new_peer', label: 'Репутационная связь' },
+  { value: 'hunt_threshold', label: 'Порог saved hunt' },
 ] as const;
 
 export const ANOMALY_SINCE_OPTIONS = [
@@ -61,6 +62,8 @@ function codeLabel(code?: string): string {
       return 'Новая страна назначения';
     case 'rep_new_peer':
       return 'Репутационная связь';
+    case 'hunt_threshold':
+      return 'Порог saved hunt';
     default:
       return code || '';
   }

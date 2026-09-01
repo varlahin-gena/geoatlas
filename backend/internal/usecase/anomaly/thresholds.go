@@ -4,28 +4,28 @@ import "strings"
 
 // Thresholds — пороги детекторов для install profile.
 type Thresholds struct {
-	PortScanPorts      int
-	PortScanEvents     int
-	HorizontalHosts    int
-	HorizontalEvents   int
-	SurgeRatio         float64
-	SurgeAbsMin        uint64
-	SurgeFloor         uint64
-	NewCountryMin      uint64
-	NewCountryBaseline uint64
-	NewCountryMinShare float64
-	RepMinEvents       uint64
+	PortScanPorts      int     `json:"port_scan_ports"`
+	PortScanEvents     int     `json:"port_scan_events"`
+	HorizontalHosts    int     `json:"horizontal_hosts"`
+	HorizontalEvents   int     `json:"horizontal_events"`
+	SurgeRatio         float64 `json:"surge_ratio"`
+	SurgeAbsMin        uint64  `json:"surge_abs_min"`
+	SurgeFloor         uint64  `json:"surge_floor"`
+	NewCountryMin      uint64  `json:"new_country_min"`
+	NewCountryBaseline uint64  `json:"new_country_baseline"`
+	NewCountryMinShare float64 `json:"new_country_min_share"`
+	RepMinEvents       uint64  `json:"rep_min_events"`
 
-	ByteSurgeRatio  float64
-	ByteSurgeAbsMin uint64
-	ByteSurgeFloor  uint64
+	ByteSurgeRatio  float64 `json:"byte_surge_ratio"`
+	ByteSurgeAbsMin uint64  `json:"byte_surge_abs_min"`
+	ByteSurgeFloor  uint64  `json:"byte_surge_floor"`
 
-	BeaconMinHours      int
-	BeaconMaxAvgBytes   uint64
-	BeaconMinRegularity float64
+	BeaconMinHours      int     `json:"beacon_min_hours"`
+	BeaconMaxAvgBytes   uint64  `json:"beacon_max_avg_bytes"`
+	BeaconMinRegularity float64 `json:"beacon_min_regularity"`
 
-	LateralHosts  int
-	LateralEvents int
+	LateralHosts  int `json:"lateral_hosts"`
+	LateralEvents int `json:"lateral_events"`
 }
 
 func ThresholdsForProfile(name string) Thresholds {

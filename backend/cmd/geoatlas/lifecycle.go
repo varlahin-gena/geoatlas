@@ -68,6 +68,12 @@ func (a *app) run(ctx context.Context) error {
 	}
 	anomCancel()
 
+	huntCtx, huntCancel := context.WithTimeout(base, 5*time.Second)
+	if a.huntJobs != nil {
+		a.huntJobs.Shutdown(huntCtx)
+	}
+	huntCancel()
+
 	ingestWait := a.ingestSvc.ShutdownWaitTimeout()
 	snap := a.ingestSvc.Stats()
 	slog.Info("waiting for ingest drain",

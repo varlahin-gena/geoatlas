@@ -54,6 +54,7 @@ func NewServer(p Params, opts ...ServerOption) *Server {
 	tokensH := &APITokensHandler{authDeps}
 	tplH := &SearchTemplatesHandler{deps.templates}
 	anomH := &AnomalyHandler{deps.anomaly}
+	huntsH := NewHuntsHandler(deps.hunts)
 
 	cfg := p.Cfg
 	envTokens := cfg.APIAuthTokens()
@@ -135,6 +136,26 @@ func NewServer(p Params, opts ...ServerOption) *Server {
 		withTimeout(chain(http.HandlerFunc(tplH.ListAll), adminMW), healthTimeout),
 	)
 
+	// --- Saved hunts (полное состояние карты + расписание) ---
+	rr.Handle("GET", "/api/me/hunts",
+		withTimeout(chain(http.HandlerFunc(huntsH.ListMine), loginMW), healthTimeout),
+	)
+	rr.Handle("POST", "/api/me/hunts",
+		chain(http.HandlerFunc(huntsH.CreateMine), loginMW, csrf, maxBytesMW(64<<10)),
+	)
+	rr.Handle("PUT", "/api/me/hunts/{id}",
+		chain(http.HandlerFunc(huntsH.UpdateMine), loginMW, csrf, maxBytesMW(64<<10)),
+	)
+	rr.Handle("DELETE", "/api/me/hunts/{id}",
+		chain(http.HandlerFunc(huntsH.DeleteMine), loginMW, csrf),
+	)
+	rr.Handle("POST", "/api/me/hunts/{id}/run",
+		withTimeout(chain(http.HandlerFunc(huntsH.RunMine), loginMW, csrf), readTimeout),
+	)
+	rr.Handle("GET", "/api/hunts",
+		withTimeout(chain(http.HandlerFunc(huntsH.ListAll), adminMW), healthTimeout),
+	)
+
 	// --- API-токены (administrator) ---
 	rr.Handle("GET", "/api/tokens",
 		withTimeout(chain(http.HandlerFunc(tokensH.List), adminMW), healthTimeout),
@@ -175,11 +196,20 @@ func NewServer(p Params, opts ...ServerOption) *Server {
 	rr.Handle("GET", "/api/anomalies",
 		withTimeout(chain(http.HandlerFunc(anomH.List), loginMW), readTimeout),
 	)
+	rr.Handle("GET", "/api/anomalies/episodes",
+		withTimeout(chain(http.HandlerFunc(anomH.Episodes), loginMW), readTimeout),
+	)
 	rr.Handle("POST", "/api/anomalies/{fingerprint}/ack",
 		chain(http.HandlerFunc(anomH.Ack), loginMW, csrf, maxBytesMW(maxJSONBodySize)),
 	)
 	rr.Handle("POST", "/api/anomalies/{fingerprint}/assign",
 		chain(http.HandlerFunc(anomH.Assign), loginMW, csrf, maxBytesMW(maxJSONBodySize)),
+	)
+	rr.Handle("GET", "/api/anomalies/settings",
+		withTimeout(chain(http.HandlerFunc(anomH.GetSettings), adminMW), healthTimeout),
+	)
+	rr.Handle("PUT", "/api/anomalies/settings",
+		chain(http.HandlerFunc(anomH.PutSettings), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
 	)
 	rr.Handle("GET", "/api/system/status",
 		withTimeout(chain(http.HandlerFunc(system.GetSystemStatus), loginMW), readTimeout),

@@ -4,6 +4,7 @@ import {
   ackAnomaly,
   assignAnomaly,
   fetchAnomalies,
+  fetchAnomalyEpisodes,
   type AnomalyEvent,
   type AnomalySummary,
 } from '@/api/anomalies';
@@ -28,6 +29,63 @@ import {
 import { AnomalyPeersPanel } from './AnomalyPeersPanel';
 import { rememberMapAlert } from '@/pages/Map/AnomalyActiveBanner';
 import './anomalies.css';
+
+function EpisodesPanel({
+  sinceHours,
+  includeAcked,
+}: {
+  sinceHours: string;
+  includeAcked: boolean;
+}) {
+  const [episodes, setEpisodes] = useState<import('@/api/anomalies').AnomalyEpisode[]>([]);
+  const [open, setOpen] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void fetchAnomalyEpisodes({
+      since: sinceIsoHoursAgo(Number(sinceHours) || 24),
+      include_acked: includeAcked ? '1' : undefined,
+    })
+      .then((data) => {
+        if (!cancelled) setEpisodes(data.episodes || []);
+      })
+      .catch((e) => {
+        if (!cancelled) toast(e instanceof Error ? e.message : 'Episodes failed', 'error');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, sinceHours, includeAcked, toast]);
+
+  if (!open) {
+    return (
+      <button type="button" className="btn sm" onClick={() => setOpen(true)}>
+        Показать эпизоды корреляции
+      </button>
+    );
+  }
+
+  return (
+    <section className="card card-compact anomaly-episodes-panel">
+      <h3 className="card-title">Эпизоды (корреляция по IP / час)</h3>
+      <button type="button" className="btn sm" onClick={() => setOpen(false)}>
+        Скрыть
+      </button>
+      {!episodes.length ? <p className="hint">Нет эпизодов за период.</p> : null}
+      {episodes.map((ep) => (
+        <div key={ep.episode_id} className="anomaly-episode-row">
+          <strong>{ep.anchor_ip || ep.episode_id.slice(0, 8)}</strong>
+          <span className={`sev-${ep.max_severity}`}>{severityLabel(ep.max_severity)}</span>
+          <span>{fmtNumber(ep.alert_count ?? 0)} алертов</span>
+          <span className="hint">{(ep.codes || []).join(', ')}</span>
+          <span className="hint">{relTime(ep.updated_at)}</span>
+        </div>
+      ))}
+    </section>
+  );
+}
 
 export default function AnomaliesPage() {
   const { toast } = useToast();
@@ -188,7 +246,8 @@ export default function AnomaliesPage() {
     }
   }
 
-  const disabled = summary?.enabled === false;
+  const moduleOff = summary?.module_loaded === false;
+  const scanPaused = !moduleOff && summary?.enabled === false;
 
   return (
     <AdminLayout title="Аномалии">
@@ -201,14 +260,22 @@ export default function AnomaliesPage() {
           ещё не выбран. «На карте» открывает контекст события с фильтрами.
         </p>
 
-        {disabled ? (
+        {moduleOff ? (
           <p className="hint warn-banner">Модуль аномалий отключён на сервере (ANOMALY_ENABLED).</p>
+        ) : null}
+        {scanPaused ? (
+          <p className="hint warn-banner">
+            Сканирование приостановлено в{' '}
+            <Link to="/anomalies/engine">настройках движка</Link> — журнал показывает ранее найденные алерты.
+          </p>
         ) : null}
         {summary?.learning ? (
           <p className="hint warn-banner">
             Базовая линия в режиме обучения — часть простых алертов может не появляться первые дни.
           </p>
         ) : null}
+
+        <EpisodesPanel sinceHours={sinceHours} includeAcked={includeAcked} />
 
         <div className="anomaly-summary-row">
           <div className="anomaly-summary-card">

@@ -18,7 +18,7 @@ func (r *Repository) Insert(ctx context.Context, events []usecaseanomaly.Event) 
 		INSERT INTO anomaly_events (
 			detected_at, window_start, window_end, code, severity, score, title, detail,
 			src_ip, dst_ip, src_country, dst_country, src_city, dst_city, device,
-			event_count, fingerprint, suppression_key, expires_at
+			event_count, fingerprint, suppression_key, episode_id, expires_at
 		)
 	`)
 	if err != nil {
@@ -43,7 +43,7 @@ func (r *Repository) Insert(ctx context.Context, events []usecaseanomaly.Event) 
 		if err := batch.Append(
 			e.DetectedAt, e.WindowStart, e.WindowEnd, e.Code, e.Severity, e.Score, e.Title, detail,
 			src, dst, e.SrcCountry, e.DstCountry, e.SrcCity, e.DstCity, e.Device,
-			e.EventCount, e.Fingerprint, string(e.SuppressionKey), e.ExpiresAt,
+			e.EventCount, e.Fingerprint, string(e.SuppressionKey), e.EpisodeID, e.ExpiresAt,
 		); err != nil {
 			return err
 		}
@@ -68,7 +68,7 @@ func (r *Repository) List(ctx context.Context, q usecaseanomaly.ListQuery) ([]us
 			e.detected_at, e.window_start, e.window_end, e.code, e.severity, e.score,
 			e.title, e.detail, toString(e.src_ip), toString(e.dst_ip),
 			e.src_country, e.dst_country, e.src_city, e.dst_city, e.device,
-			e.event_count, e.fingerprint, e.expires_at,
+			e.event_count, e.fingerprint, e.episode_id, e.expires_at,
 			if(a.fingerprint = '', 0, 1) AS acked,
 			ifNull(a.ack_by, '') AS ack_by,
 			ifNull(asg.assigned_to, '') AS assigned_to
@@ -116,7 +116,7 @@ func (r *Repository) List(ctx context.Context, q usecaseanomaly.ListQuery) ([]us
 			&e.DetectedAt, &e.WindowStart, &e.WindowEnd, &e.Code, &e.Severity, &e.Score,
 			&e.Title, &detail, &e.SrcIP, &e.DstIP,
 			&e.SrcCountry, &e.DstCountry, &e.SrcCity, &e.DstCity, &e.Device,
-			&e.EventCount, &e.Fingerprint, &e.ExpiresAt, &acked, &e.AckBy, &e.AssignedTo,
+			&e.EventCount, &e.Fingerprint, &e.EpisodeID, &e.ExpiresAt, &acked, &e.AckBy, &e.AssignedTo,
 		); err != nil {
 			return nil, err
 		}

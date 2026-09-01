@@ -18,8 +18,9 @@ import (
 	"geoatlas/internal/usecase/parsetest"
 	usecasereputation "geoatlas/internal/usecase/reputation"
 	usecaseretention "geoatlas/internal/usecase/retention"
-	usecasetls "geoatlas/internal/usecase/tls"
 	"geoatlas/internal/usecase/searchtemplates"
+	usecasetls "geoatlas/internal/usecase/tls"
+	usecasehunts "geoatlas/internal/usecase/hunts"
 	usecasesystem "geoatlas/internal/usecase/system"
 )
 
@@ -91,8 +92,10 @@ type SearchTemplatesDeps struct {
 
 // AnomalyDeps — зависимости AnomalyHandler.
 type AnomalyDeps struct {
-	cfg       config.Config
-	anomalyUC *usecaseanomaly.Service
+	cfg             config.Config
+	anomalyUC       *usecaseanomaly.Service
+	anomalySettings *usecaseanomaly.SettingsService
+	logs            *usecaseaudit.Service
 }
 
 // Params — вход NewDeps / NewServer.
@@ -114,6 +117,8 @@ type Params struct {
 	APITokens         APITokenStore
 	SearchTemplatesUC *searchtemplates.Service
 	AnomalyUC         *usecaseanomaly.Service
+	AnomalySettingsUC *usecaseanomaly.SettingsService
+	HuntsUC           *usecasehunts.Service
 	Logs              *usecaseaudit.Service
 }
 
@@ -131,6 +136,7 @@ type Deps struct {
 	reputation *ReputationDeps
 	templates  *SearchTemplatesDeps
 	anomaly    *AnomalyDeps
+	hunts      *usecasehunts.Service
 	prom       MetricsRecorder
 }
 
@@ -182,7 +188,13 @@ func NewDeps(p Params) *Deps {
 			searchTemplates: p.SearchTemplatesUC,
 			sessions:        p.Sessions,
 		},
-		anomaly: &AnomalyDeps{cfg: p.Cfg, anomalyUC: p.AnomalyUC},
+		anomaly: &AnomalyDeps{
+			cfg:             p.Cfg,
+			anomalyUC:       p.AnomalyUC,
+			anomalySettings: p.AnomalySettingsUC,
+			logs:            p.Logs,
+		},
+		hunts: p.HuntsUC,
 	}
 }
 

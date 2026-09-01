@@ -10,6 +10,7 @@ const LINKS = [
     external: true,
   },
   { to: '/anomalies', label: 'Аномалии', adminOnly: false },
+  { to: '/anomalies/engine', label: 'Движок аномалий', adminOnly: true },
   { to: '/reputation', label: 'Репутация IP', adminOnly: true, requiresReputation: true },
 ] as const;
 

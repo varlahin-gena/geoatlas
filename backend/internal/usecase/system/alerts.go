@@ -1,6 +1,14 @@
 package system
 
-import "strconv"
+import (
+	"strconv"
+	"time"
+)
+
+const (
+	edgesAggRunningWarnAfter  = 2 * time.Hour
+	edgesAggRunningErrorAfter = 6 * time.Hour
+)
 
 func ingestBufferPressure(buffered, depth, capacity, lag, dropsPerSec, bufferDropsPerSec, circuitOpen float64, slo IngestSLO) string {
 	queueRatio := 0.0
@@ -160,7 +168,12 @@ func computeAlertsWithSLO(stats SystemStatsResponse, slo IngestSLO) []Alert {
 			alerts = append(alerts, Alert{Level: "warn", Code: "capacity_high", Target: "pipeline", Message: "Ingest rate is near install profile capacity limit"})
 		}
 	}
-	switch edges := stats.EdgesAgg; edges.State {
+	alerts = append(alerts, edgesAggAlerts(stats.EdgesAgg, time.Now().UTC())...)
+	return alerts
+}
+
+func edgesAggAlerts(edges EdgesAggView, now time.Time) []Alert {
+	switch edges.State {
 	case "running":
 		message, code, level := "Edges agg in progress — map reads traffic_logs until ready", "edges_agg_running", "warn"
 		switch edges.Phase {
@@ -174,11 +187,31 @@ func computeAlertsWithSLO(stats SystemStatsResponse, slo IngestSLO) []Alert {
 				message = "Edges agg backfill in progress — map uses traffic_logs"
 			}
 		}
-		alerts = append(alerts, Alert{Level: level, Code: code, Target: "edges_agg", Message: message})
+		if !edges.StartedAt.IsZero() {
+			elapsed := now.Sub(edges.StartedAt)
+			if elapsed >= edgesAggRunningErrorAfter {
+				level = "error"
+				code = "edges_agg_running_stuck"
+				message = "Edges agg running " + formatDurationHours(elapsed) + " — map still on traffic_logs; check ClickHouse load and backend logs"
+			} else if elapsed >= edgesAggRunningWarnAfter {
+				code = "edges_agg_running_long"
+				message = "Edges agg running " + formatDurationHours(elapsed) + " — map queries stay on traffic_logs until ready"
+			}
+		}
+		return []Alert{{Level: level, Code: code, Target: "edges_agg", Message: message}}
 	case "error":
-		alerts = append(alerts, Alert{Level: "error", Code: "edges_agg_error", Target: "edges_agg", Message: "Edges agg failed: " + edges.Message})
+		return []Alert{{Level: "error", Code: "edges_agg_error", Target: "edges_agg", Message: "Edges agg failed: " + edges.Message}}
+	default:
+		return nil
 	}
-	return alerts
+}
+
+func formatDurationHours(d time.Duration) string {
+	h := int(d.Hours())
+	if h < 1 {
+		h = 1
+	}
+	return strconv.Itoa(h) + "h"
 }
 
 func syslogNGAlerts(stats SystemStatsResponse, slo IngestSLO) []Alert {

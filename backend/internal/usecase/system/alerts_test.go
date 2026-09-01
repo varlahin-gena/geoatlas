@@ -51,6 +51,27 @@ func TestComputeAlertsEdgesAggRebuilding(t *testing.T) {
 	}
 }
 
+func TestComputeAlertsEdgesAggRunningLong(t *testing.T) {
+	now := time.Now().UTC()
+	base := SystemStatsResponse{
+		Pipeline: map[string]map[string]float64{}, Health: map[string]map[string]any{},
+		Containers: map[string]map[string]float64{}, Storage: map[string]map[string]float64{},
+		EdgesAgg: EdgesAggView{
+			State: "running", Phase: "backfill", DaysDone: 1, DaysTotal: 10,
+			StartedAt: now.Add(-3 * time.Hour), MapSource: "traffic_logs",
+		},
+	}
+	alerts := edgesAggAlerts(base.EdgesAgg, now)
+	if !hasAlertCode(alerts, "edges_agg_running_long") {
+		t.Fatalf("expected edges_agg_running_long, got %#v", alerts)
+	}
+	base.EdgesAgg.StartedAt = now.Add(-7 * time.Hour)
+	alerts = edgesAggAlerts(base.EdgesAgg, now)
+	if !hasAlertCode(alerts, "edges_agg_running_stuck") {
+		t.Fatalf("expected edges_agg_running_stuck, got %#v", alerts)
+	}
+}
+
 func TestMergeLiveIngestStatsDropsPerSec(t *testing.T) {
 	rates := &RateSampler{
 		prevDrop: 100,

@@ -57,7 +57,21 @@ export const PAGE_NAV: NavItem[] = [
     href: '/anomalies',
     label: 'Аномалии',
     group: 'observe',
-    match: ['/anomalies', '/anomalies.html', '/investigate', '/investigate.html'],
+    match: ['/anomalies', '/anomalies.html', '/anomalies/engine', '/investigate', '/investigate.html'],
+    adminOnly: false,
+  },
+  {
+    href: '/anomalies/engine',
+    label: 'Движок аномалий',
+    group: 'observe',
+    match: ['/anomalies/engine'],
+    adminOnly: true,
+  },
+  {
+    href: '/hunts',
+    label: 'Saved hunts',
+    group: 'observe',
+    match: ['/hunts'],
     adminOnly: false,
   },
   {
