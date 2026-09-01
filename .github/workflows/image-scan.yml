@@ -50,7 +50,7 @@ jobs:
           ignore-unfixed: true
           format: sarif
           output: trivy-frontend.sarif
-          exit-code: "0"
+          exit-code: "1"
 
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -60,7 +60,7 @@ jobs:
           ignore-unfixed: true
           format: sarif
           output: trivy-backend.sarif
-          exit-code: "0"
+          exit-code: "1"
 
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -70,7 +70,7 @@ jobs:
           ignore-unfixed: true
           format: sarif
           output: trivy-stats.sarif
-          exit-code: "0"
+          exit-code: "1"
 
       - name: Build geoatlas-clickhouse
         run: docker build -t geoatlas-clickhouse:scan -f clickhouse/Dockerfile clickhouse
@@ -83,7 +83,7 @@ jobs:
           ignore-unfixed: true
           format: sarif
           output: trivy-clickhouse.sarif
-          exit-code: "0"
+          exit-code: "1"
 
       # Public ingest :514 — build hardened image (4.12.0 + apt/python patches).
       - name: Build geoatlas-syslog-ng
@@ -97,7 +97,7 @@ jobs:
           ignore-unfixed: true
           format: sarif
           output: trivy-syslog-ng.sarif
-          exit-code: "0"
+          exit-code: "1"
 
       - uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
         if: always()

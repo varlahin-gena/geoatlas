@@ -86,6 +86,9 @@ type fakeScan struct {
 	baseline     map[string]struct{}
 	edges        []EdgeRow
 	knownPairs   map[string]struct{}
+	byteSurge    []ByteSurgeHit
+	beaconing    []BeaconingHit
+	lateral      []LateralFanoutHit
 }
 
 func (f *fakeScan) OldestLogTime(context.Context) (time.Time, error) { return f.oldest, nil }
@@ -129,6 +132,15 @@ func (f *fakeScan) KnownPairs(context.Context, [][2]string, time.Duration) (map[
 		return map[string]struct{}{}, nil
 	}
 	return f.knownPairs, nil
+}
+func (f *fakeScan) ByteSurge(context.Context, time.Duration, uint64, uint64, []IPRange) ([]ByteSurgeHit, error) {
+	return f.byteSurge, nil
+}
+func (f *fakeScan) Beaconing(context.Context, time.Duration, int, uint64, []IPRange) ([]BeaconingHit, error) {
+	return f.beaconing, nil
+}
+func (f *fakeScan) LateralFanout(context.Context, time.Duration, int, int, []IPRange) ([]LateralFanoutHit, error) {
+	return f.lateral, nil
 }
 
 type fakeRep struct {
@@ -522,5 +534,97 @@ func TestThresholdsMedium(t *testing.T) {
 	th := ThresholdsForProfile("medium")
 	if th.PortScanPorts != 50 {
 		t.Fatalf("%+v", th)
+	}
+	if th.ByteSurgeAbsMin == 0 || th.BeaconMinHours == 0 || th.LateralHosts == 0 {
+		t.Fatalf("new thresholds missing: %+v", th)
+	}
+}
+
+func TestByteSurgeEmits(t *testing.T) {
+	now := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	store := &fakeStore{exist: map[string]struct{}{}}
+	scan := &fakeScan{
+		oldest: now.Add(-30 * 24 * time.Hour),
+		byteSurge: []ByteSurgeHit{{
+			SrcIP: "10.1.2.3", BytesNow: 600_000_000, BytesPrev: 10_000_000,
+		}},
+	}
+	res := withEnterprise(newSvc(store, scan, nil)).Scan(context.Background(), now)
+	found := false
+	for _, e := range store.inserted {
+		if e.Code == CodeByteSurge {
+			found = true
+			if e.Map.Period != "2h" || e.Map.Query != "src:10.1.2.3" {
+				t.Fatalf("map %+v", e.Map)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("byte_surge missing inserted=%d err=%s", res.Inserted, res.Error)
+	}
+}
+
+func TestLateralFanoutEmits(t *testing.T) {
+	now := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	store := &fakeStore{exist: map[string]struct{}{}}
+	scan := &fakeScan{
+		oldest:  now.Add(-30 * 24 * time.Hour),
+		lateral: []LateralFanoutHit{{SrcIP: "10.0.0.5", Hosts: 40, Events: 100}},
+	}
+	res := withEnterprise(newSvc(store, scan, nil)).Scan(context.Background(), now)
+	found := false
+	for _, e := range store.inserted {
+		if e.Code == CodeLateralFanout && e.Severity == SeverityHigh {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("lateral_fanout missing inserted=%d err=%s", res.Inserted, res.Error)
+	}
+}
+
+func TestBeaconingEmits(t *testing.T) {
+	now := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	hours := make([]int64, 0, 12)
+	base := now.Add(-24 * time.Hour).Unix()
+	for i := 0; i < 12; i++ {
+		hours = append(hours, base+int64(i)*3600)
+	}
+	store := &fakeStore{exist: map[string]struct{}{}}
+	scan := &fakeScan{
+		oldest: now.Add(-30 * 24 * time.Hour),
+		beaconing: []BeaconingHit{{
+			SrcIP: "10.0.0.8", DstIP: "203.0.113.9",
+			ActiveHours: 12, TotalBytes: 1_200_000, Events: 40, HourUnix: hours,
+		}},
+	}
+	res := withEnterprise(newSvc(store, scan, nil)).Scan(context.Background(), now)
+	found := false
+	for _, e := range store.inserted {
+		if e.Code == CodeBeaconing {
+			found = true
+			if e.Map.Period != "1d" {
+				t.Fatalf("period %s", e.Map.Period)
+			}
+			want := fingerprintDay(CodeBeaconing, "10.0.0.8", "203.0.113.9", "", now)
+			if e.Fingerprint != want {
+				t.Fatalf("fp day bucket: %s vs %s", e.Fingerprint, want)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("beaconing missing inserted=%d err=%s", res.Inserted, res.Error)
+	}
+}
+
+func TestHourRegularity(t *testing.T) {
+	base := int64(1_700_000_000)
+	seq := []int64{base, base + 3600, base + 7200, base + 10800}
+	if g := hourRegularity(seq); g < 0.99 {
+		t.Fatalf("regular=%v", g)
+	}
+	sparse := []int64{base, base + 3600, base + 10*3600}
+	if g := hourRegularity(sparse); g >= 0.99 {
+		t.Fatalf("sparse should be lower: %v", g)
 	}
 }

@@ -4,17 +4,22 @@
 
 Доступ к списку / ack / assign — любой залогиненный (**administrator**, **operator**, **dashboard**). Статус движка (`GET /api/anomalies/status`) — Bearer ≥ **ops** или administrator.
 
+Сканер работает только при наличии **сетей предприятия** (иначе `no_enterprise_nets`).
+
 ## Типы
 
-| Код | Смысл |
-|-----|--------|
-| `port_scan` | Сканирование портов |
-| `horizontal_scan` | Сканирование подсети |
-| `blocked_surge` | Всплеск блокировок |
-| `new_country_dst` | Новая страна назначения |
-| `rep_new_peer` | Новая связь с репутационным адресом |
+| Код | Смысл | Severity |
+|-----|--------|----------|
+| `port_scan` | Сканирование портов | high |
+| `horizontal_scan` | Сканирование подсети | high |
+| `blocked_surge` | Всплеск блокировок | warn / high |
+| `byte_surge` | Всплеск объёма байт (src, 1ч vs 1ч) | warn / high |
+| `beaconing` | Периодическая low-volume связь за 24ч | warn / high |
+| `lateral_fanout` | Веер на внутренние хосты enterprise-net | high |
+| `new_country_dst` | Новая страна назначения | warn |
+| `rep_new_peer` | Новая связь с репутационным адресом | high |
 
-Тяжесть: `info` / `warn` / `high`. На карте — полоска/баннер со ссылкой на `/anomalies`.
+На карте — полоска/баннер со ссылкой на `/anomalies`. На странице аномалий кнопка **«Связи»** подгружает рёбра из `GET /api/events` по `src`/map.q (агрегированные peers, не сырой PCAP).
 
 ## Включение и интервал
 
@@ -22,7 +27,7 @@
 |------------|--------------|------------|
 | `ANOMALY_ENABLED` | `true` | Выключатель движка |
 | `ANOMALY_SCAN_INTERVAL` | `5m` | Период фонового скана |
-| `ANOMALY_INCLUDE_PRIVATE` | `false` | Учитывать private IP |
+| `ANOMALY_INCLUDE_PRIVATE` | `false` | Учитывать private IP (port/horizontal) |
 | `ANOMALY_LEARNING_DAYS` | `3` | Окно обучения |
 | `ANOMALY_SUPPRESS_HOURS` | `24` | Не повторять то же срабатывание сразу |
 

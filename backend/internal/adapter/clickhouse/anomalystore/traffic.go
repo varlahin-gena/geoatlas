@@ -298,6 +298,159 @@ func (r *Repository) KnownPairs(ctx context.Context, pairs [][2]string, lookback
 	return out, rows.Err()
 }
 
+func (r *Repository) ByteSurge(ctx context.Context, window time.Duration, floor, absMin uint64, nets []usecaseanomaly.IPRange) ([]usecaseanomaly.ByteSurgeHit, error) {
+	if window < time.Minute {
+		window = time.Hour
+	}
+	sec := int(window.Seconds())
+	src, srcArgs := colInNetsSQL("src_ip", nets)
+	q := fmt.Sprintf(`
+		SELECT
+			toString(src_ip) AS src_ip,
+			sumIf(bytes_sent, hour >= now() - INTERVAL %d SECOND AND hour < now())
+			  + sumIf(bytes_recv, hour >= now() - INTERVAL %d SECOND AND hour < now()) AS bytes_now,
+			sumIf(bytes_sent, hour >= now() - INTERVAL %d SECOND AND hour < now() - INTERVAL %d SECOND)
+			  + sumIf(bytes_recv, hour >= now() - INTERVAL %d SECOND AND hour < now() - INTERVAL %d SECOND) AS bytes_prev
+		FROM traffic_edges_hourly
+		WHERE hour >= now() - INTERVAL %d SECOND
+		  %s
+		GROUP BY src_ip
+		HAVING bytes_now >= ? AND bytes_prev >= ?
+		ORDER BY bytes_now DESC
+		LIMIT 10
+		%s
+	`, sec, sec, 2*sec, sec, 2*sec, sec, 2*sec, src, query.AggSettings())
+	args := append(srcArgs, absMin, floor)
+	rows, err := r.ch.Query(ctx, q, args...)
+	if err != nil {
+		q2 := fmt.Sprintf(`
+			SELECT
+				toString(src_ip) AS src_ip,
+				sumIf(bytes_sent + bytes_recv, timestamp >= now() - INTERVAL %d SECOND AND timestamp < now()) AS bytes_now,
+				sumIf(bytes_sent + bytes_recv, timestamp >= now() - INTERVAL %d SECOND AND timestamp < now() - INTERVAL %d SECOND) AS bytes_prev
+			FROM traffic_logs
+			WHERE timestamp >= now() - INTERVAL %d SECOND
+			  %s
+			GROUP BY src_ip
+			HAVING bytes_now >= ? AND bytes_prev >= ?
+			ORDER BY bytes_now DESC
+			LIMIT 10
+			%s
+		`, sec, 2*sec, sec, 2*sec, src, query.AggSettings())
+		rows, err = r.ch.Query(ctx, q2, args...)
+		if err != nil {
+			return nil, err
+		}
+	}
+	defer rows.Close()
+	var out []usecaseanomaly.ByteSurgeHit
+	for rows.Next() {
+		var h usecaseanomaly.ByteSurgeHit
+		if err := rows.Scan(&h.SrcIP, &h.BytesNow, &h.BytesPrev); err != nil {
+			return nil, err
+		}
+		out = append(out, h)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) Beaconing(ctx context.Context, lookback time.Duration, minHours int, maxAvgBytes uint64, nets []usecaseanomaly.IPRange) ([]usecaseanomaly.BeaconingHit, error) {
+	if lookback < time.Hour {
+		lookback = 24 * time.Hour
+	}
+	if minHours < 2 {
+		minHours = 2
+	}
+	touch, touchArgs := touchNetsSQL(nets)
+	q := fmt.Sprintf(`
+		SELECT
+			toString(src_ip) AS src_ip,
+			toString(dst_ip) AS dst_ip,
+			uniqExact(hour) AS active_hours,
+			sum(bytes_sent) + sum(bytes_recv) AS total_bytes,
+			sum(cnt) AS events,
+			arraySort(groupUniqArray(toUnixTimestamp(toStartOfHour(hour)))) AS hour_ts
+		FROM traffic_edges_hourly
+		WHERE hour >= now() - INTERVAL %d SECOND
+		  %s
+		GROUP BY src_ip, dst_ip
+		HAVING active_hours >= ?
+		  AND (total_bytes / active_hours) <= ?
+		ORDER BY active_hours DESC, total_bytes ASC
+		LIMIT 30
+		%s
+	`, int(lookback.Seconds()), touch, query.AggSettings())
+	args := append(touchArgs, minHours, maxAvgBytes)
+	rows, err := r.ch.Query(ctx, q, args...)
+	if err != nil {
+		q2 := fmt.Sprintf(`
+			SELECT
+				toString(src_ip) AS src_ip,
+				toString(dst_ip) AS dst_ip,
+				uniqExact(toStartOfHour(timestamp)) AS active_hours,
+				sum(bytes_sent) + sum(bytes_recv) AS total_bytes,
+				count() AS events,
+				arraySort(groupUniqArray(toUnixTimestamp(toStartOfHour(timestamp)))) AS hour_ts
+			FROM traffic_logs
+			WHERE timestamp >= now() - INTERVAL %d SECOND
+			  %s
+			GROUP BY src_ip, dst_ip
+			HAVING active_hours >= ?
+			  AND (total_bytes / active_hours) <= ?
+			ORDER BY active_hours DESC, total_bytes ASC
+			LIMIT 30
+			%s
+		`, int(lookback.Seconds()), touch, query.AggSettings())
+		rows, err = r.ch.Query(ctx, q2, args...)
+		if err != nil {
+			return nil, err
+		}
+	}
+	defer rows.Close()
+	var out []usecaseanomaly.BeaconingHit
+	for rows.Next() {
+		var h usecaseanomaly.BeaconingHit
+		if err := rows.Scan(&h.SrcIP, &h.DstIP, &h.ActiveHours, &h.TotalBytes, &h.Events, &h.HourUnix); err != nil {
+			return nil, err
+		}
+		out = append(out, h)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) LateralFanout(ctx context.Context, window time.Duration, hostsTh, eventsTh int, nets []usecaseanomaly.IPRange) ([]usecaseanomaly.LateralFanoutHit, error) {
+	src, srcArgs := colInNetsSQL("src_ip", nets)
+	dst, dstArgs := colInNetsSQL("dst_ip", nets)
+	q := fmt.Sprintf(`
+		SELECT toString(src_ip) AS src_ip, uniqExact(dst_ip) AS hosts, count() AS events
+		FROM traffic_logs
+		WHERE timestamp >= now() - INTERVAL %d SECOND
+		  AND timestamp < now()
+		  %s
+		  %s
+		GROUP BY src_ip
+		HAVING hosts >= ? AND events >= ?
+		ORDER BY hosts DESC
+		LIMIT 10
+		%s
+	`, int(window.Seconds()), src, dst, query.AggSettings())
+	args := append(append(srcArgs, dstArgs...), hostsTh, eventsTh)
+	rows, err := r.ch.Query(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []usecaseanomaly.LateralFanoutHit
+	for rows.Next() {
+		var h usecaseanomaly.LateralFanoutHit
+		if err := rows.Scan(&h.SrcIP, &h.Hosts, &h.Events); err != nil {
+			return nil, err
+		}
+		out = append(out, h)
+	}
+	return out, rows.Err()
+}
+
 func scanCountrySet(rows interface {
 	Next() bool
 	Scan(dest ...any) error

@@ -14,6 +14,9 @@ export const ANOMALY_CODE_OPTIONS = [
   { value: 'port_scan', label: 'Сканирование портов' },
   { value: 'horizontal_scan', label: 'Сканирование подсети' },
   { value: 'blocked_surge', label: 'Всплеск блокировок' },
+  { value: 'byte_surge', label: 'Всплеск объёма' },
+  { value: 'beaconing', label: 'Периодическая связь' },
+  { value: 'lateral_fanout', label: 'Веер по сети предприятия' },
   { value: 'new_country_dst', label: 'Новая страна назначения' },
   { value: 'rep_new_peer', label: 'Репутационная связь' },
 ] as const;
@@ -48,6 +51,12 @@ function codeLabel(code?: string): string {
       return 'Сканирование подсети';
     case 'blocked_surge':
       return 'Всплеск блокировок';
+    case 'byte_surge':
+      return 'Всплеск объёма';
+    case 'beaconing':
+      return 'Периодическая связь';
+    case 'lateral_fanout':
+      return 'Веер по сети предприятия';
     case 'new_country_dst':
       return 'Новая страна назначения';
     case 'rep_new_peer':
@@ -103,4 +112,30 @@ export function matchesAnomalySearch(item: AnomalyEvent, query: string): boolean
     .join(' ')
     .toLowerCase();
   return hay.includes(q);
+}
+
+/** Hours for GET /api/events from anomaly map.period or window. */
+export function anomalyEventsHours(item: AnomalyEvent): number {
+  const p = (item.map?.period || '').trim().toLowerCase();
+  if (p.endsWith('d')) {
+    const n = Number(p.slice(0, -1));
+    if (Number.isFinite(n) && n > 0) return Math.min(24 * n, 168);
+  }
+  if (p.endsWith('h')) {
+    const n = Number(p.slice(0, -1));
+    if (Number.isFinite(n) && n > 0) return Math.min(n, 168);
+  }
+  if (p.endsWith('m')) {
+    const n = Number(p.slice(0, -1));
+    if (Number.isFinite(n) && n > 0) return Math.max(1, Math.ceil(n / 60));
+  }
+  return 1;
+}
+
+export function anomalyEventsQuery(item: AnomalyEvent): string {
+  const q = (item.map?.q || '').trim();
+  if (q) return q;
+  if (item.src_ip) return `src:${item.src_ip}`;
+  if (item.dst_ip) return `dst:${item.dst_ip}`;
+  return '';
 }

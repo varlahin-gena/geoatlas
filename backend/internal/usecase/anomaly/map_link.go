@@ -9,18 +9,30 @@ import (
 // MapLinkFor rebuilds the map view from persisted anomaly fields.
 func MapLinkFor(e Event) MapLink {
 	switch e.Code {
-	case CodePortScan, CodeHorizontalScan:
+	case CodePortScan, CodeHorizontalScan, CodeLateralFanout:
 		if src := strings.TrimSpace(e.SrcIP); src != "" {
-			return MapLink{Period: "15m", Group: "ip", Filter: "all", Query: "src:" + src}
+			period := "15m"
+			if e.Code == CodeLateralFanout {
+				period = "1h"
+			}
+			return MapLink{Period: period, Group: "ip", Filter: "all", Query: "src:" + src}
 		}
-	case CodeRepNewDst:
+	case CodeByteSurge:
+		if src := strings.TrimSpace(e.SrcIP); src != "" {
+			return MapLink{Period: "2h", Group: "ip", Filter: "all", Query: "src:" + src}
+		}
+	case CodeBeaconing, CodeRepNewDst:
 		src := strings.TrimSpace(e.SrcIP)
 		dst := strings.TrimSpace(e.DstIP)
 		q := ""
 		if src != "" && dst != "" {
 			q = "src:" + src + " dst:" + dst
 		}
-		return MapLink{Period: "1h", Group: "ip", Filter: "all", Query: q}
+		period := "1h"
+		if e.Code == CodeBeaconing {
+			period = "1d"
+		}
+		return MapLink{Period: period, Group: "ip", Filter: "all", Query: q}
 	case CodeNewCountryDst:
 		if country := strings.TrimSpace(e.DstCountry); country != "" {
 			return MapLink{Period: "1h", Group: "country", Filter: "all", Query: "dst:" + country, Country: country}

@@ -600,8 +600,8 @@ paths:
       summary: Журнал аномалий карты
       description: |
         Детерминированные детекторы (port_scan, horizontal_scan, blocked_surge,
-        new_country_dst, rep_new_peer). Сессия или Bearer≥read. По умолчанию — незакрытые
-        за 24 часа.
+        byte_surge, beaconing, lateral_fanout, new_country_dst, rep_new_peer).
+        Сессия или Bearer≥read. По умолчанию — незакрытые за 24 часа.
       security:
         - cookieAuth: []
         - bearerAuth: []

@@ -63,3 +63,24 @@ func TestMapLinkForFallsBackToCityScope(t *testing.T) {
 		t.Fatalf("query = %q", got.Query)
 	}
 }
+
+func TestMapLinkForByteSurge(t *testing.T) {
+	got := MapLinkFor(Event{Code: CodeByteSurge, SrcIP: "10.1.1.1"})
+	if got.Period != "2h" || got.Query != "src:10.1.1.1" {
+		t.Fatalf("%+v", got)
+	}
+}
+
+func TestMapLinkForBeaconing(t *testing.T) {
+	got := MapLinkFor(Event{Code: CodeBeaconing, SrcIP: "10.0.0.1", DstIP: "1.2.3.4"})
+	if got.Period != "1d" || got.Query != "src:10.0.0.1 dst:1.2.3.4" {
+		t.Fatalf("%+v", got)
+	}
+}
+
+func TestMapLinkForLateralFanout(t *testing.T) {
+	got := MapLinkFor(Event{Code: CodeLateralFanout, SrcIP: "10.0.0.2"})
+	if got.Period != "1h" || got.Query != "src:10.0.0.2" {
+		t.Fatalf("%+v", got)
+	}
+}

@@ -8,6 +8,9 @@ const (
 	CodeBlockedSurge   = "blocked_surge"
 	CodeRepNewDst      = "rep_new_peer"
 	CodeNewCountryDst  = "new_country_dst"
+	CodeByteSurge      = "byte_surge"
+	CodeBeaconing      = "beaconing"
+	CodeLateralFanout  = "lateral_fanout"
 
 	SeverityInfo = "info"
 	SeverityWarn = "warn"
@@ -70,6 +73,12 @@ func CodeHumanLabel(code string) string {
 		return "Новая страна назначения"
 	case CodeRepNewDst:
 		return "Репутационная связь"
+	case CodeByteSurge:
+		return "Всплеск объёма"
+	case CodeBeaconing:
+		return "Периодическая связь"
+	case CodeLateralFanout:
+		return "Веер по сети предприятия"
 	default:
 		return code
 	}
@@ -151,6 +160,30 @@ type EdgeRow struct {
 	Count      uint64
 	SrcCountry string
 	DstCountry string
+}
+
+// ByteSurgeHit — кандидат byte_surge (src за текущее vs предыдущее окно).
+type ByteSurgeHit struct {
+	SrcIP     string
+	BytesNow  uint64
+	BytesPrev uint64
+}
+
+// BeaconingHit — кандидат beaconing по hourly edges.
+type BeaconingHit struct {
+	SrcIP       string
+	DstIP       string
+	ActiveHours uint64
+	TotalBytes  uint64
+	Events      uint64
+	HourUnix    []int64
+}
+
+// LateralFanoutHit — кандидат lateral_fanout (east-west).
+type LateralFanoutHit struct {
+	SrcIP  string
+	Hosts  uint64
+	Events uint64
 }
 
 // IPRange — IPv4-диапазон сети предприятия.

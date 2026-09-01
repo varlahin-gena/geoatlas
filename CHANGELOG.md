@@ -5,6 +5,12 @@
 
 ## [Unreleased]
 
+### Added
+- Anomaly Engine: детекторы **`byte_surge`** (всплеск объёма), **`beaconing`** (периодическая связь), **`lateral_fanout`** (веер по enterprise-net); на `/anomalies` — панель «Связи» через `GET /api/events`.
+
+### Security
+- Image scan (Trivy CRITICAL, `ignore-unfixed`): job падает при находках (`exit-code: 1`), SARIF по-прежнему загружается в GitHub Security.
+
 ## [2.2.0] — 2026-08-28
 
 Минор: SIEM-подобный конструктор запросов на карте.

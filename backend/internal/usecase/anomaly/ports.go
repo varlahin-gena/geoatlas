@@ -36,6 +36,9 @@ type TrafficScanner interface {
 	BaselineCountries(ctx context.Context, days int, minN uint64, nets []IPRange) (map[string]struct{}, error)
 	RecentEdges(ctx context.Context, window time.Duration, limit int, nets []IPRange) ([]EdgeRow, error)
 	KnownPairs(ctx context.Context, pairs [][2]string, lookback time.Duration) (map[string]struct{}, error)
+	ByteSurge(ctx context.Context, window time.Duration, floor, absMin uint64, nets []IPRange) ([]ByteSurgeHit, error)
+	Beaconing(ctx context.Context, lookback time.Duration, minHours int, maxAvgBytes uint64, nets []IPRange) ([]BeaconingHit, error)
+	LateralFanout(ctx context.Context, window time.Duration, hostsTh, eventsTh int, nets []IPRange) ([]LateralFanoutHit, error)
 }
 
 // ReputationLookuper — in-memory reputation (optional).

@@ -9,6 +9,16 @@ import (
 
 func fingerprint(code, srcIP, dstIP, extra string, hour time.Time) string {
 	hour = hour.UTC().Truncate(time.Hour)
+	return fingerprintAt(code, srcIP, dstIP, extra, hour)
+}
+
+// fingerprintDay — day-bucketed id (beaconing), чтобы не спамить каждый тик.
+func fingerprintDay(code, srcIP, dstIP, extra string, t time.Time) string {
+	day := t.UTC().Truncate(24 * time.Hour)
+	return fingerprintAt(code, srcIP, dstIP, extra, day)
+}
+
+func fingerprintAt(code, srcIP, dstIP, extra string, bucket time.Time) string {
 	var b strings.Builder
 	b.WriteString(code)
 	b.WriteByte('|')
@@ -18,7 +28,7 @@ func fingerprint(code, srcIP, dstIP, extra string, hour time.Time) string {
 	b.WriteByte('|')
 	b.WriteString(strings.TrimSpace(extra))
 	b.WriteByte('|')
-	b.WriteString(hour.Format(time.RFC3339))
+	b.WriteString(bucket.UTC().Format(time.RFC3339))
 	sum := sha256.Sum256([]byte(b.String()))
 	return hex.EncodeToString(sum[:8])
 }

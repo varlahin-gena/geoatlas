@@ -105,3 +105,28 @@
 
 .sev-high { color: var(--red); }
 .sev-warn { color: var(--orange); }
+
+.anomaly-peers-row td {
+  padding: 0 12px 14px;
+  background: color-mix(in srgb, var(--panel-2) 80%, transparent);
+  border-bottom: 1px solid var(--border);
+}
+
+.anomaly-peers-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+}
+
+.anomaly-peers-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.anomaly-peers-table {
+  max-height: 280px;
+  overflow: auto;
+}

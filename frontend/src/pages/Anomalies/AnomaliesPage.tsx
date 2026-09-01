@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, Fragment } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ackAnomaly,
@@ -24,6 +24,7 @@ import {
   severityLabel,
   sinceIsoHoursAgo,
 } from './anomalyDisplay';
+import { AnomalyPeersPanel } from './AnomalyPeersPanel';
 import { rememberMapAlert } from '@/pages/Map/AnomalyActiveBanner';
 import './anomalies.css';
 
@@ -42,6 +43,7 @@ export default function AnomaliesPage() {
   const [search, setSearch] = useState('');
   const [acking, setAcking] = useState<string | null>(null);
   const [assigning, setAssigning] = useState<string | null>(null);
+  const [expandedFp, setExpandedFp] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -308,8 +310,15 @@ export default function AnomaliesPage() {
                 filtered.map((item) => {
                   const fp = item.fingerprint || item.title;
                   const acked = Boolean(item.acknowledged);
+                  const expanded = expandedFp === item.fingerprint;
+                  const canPeers = Boolean(item.src_ip || item.map?.q);
                   return (
-                    <tr key={fp} className={acked ? 'is-acked' : undefined}>
+                    <Fragment key={fp}>
+                      <tr
+                        className={[acked ? 'is-acked' : '', expanded ? 'is-expanded' : '']
+                          .filter(Boolean)
+                          .join(' ') || undefined}
+                      >
                       <td>
                         <span className={`anomaly-sev-badge sev-${item.severity || 'warn'}`}>
                           {severityLabel(item.severity)}
@@ -362,6 +371,20 @@ export default function AnomaliesPage() {
                           : 'Открыт'}
                       </td>
                       <td className="actions">
+                        {canPeers ? (
+                          <button
+                            type="button"
+                            className="btn sm"
+                            aria-expanded={expanded}
+                            onClick={() =>
+                              setExpandedFp((cur) =>
+                                cur === item.fingerprint ? null : item.fingerprint || null,
+                              )
+                            }
+                          >
+                            {expanded ? 'Скрыть связи' : 'Связи'}
+                          </button>
+                        ) : null}
                         <Link
                           to={anomalyMapHref(item)}
                           className="btn sm"
@@ -381,6 +404,14 @@ export default function AnomaliesPage() {
                         ) : null}
                       </td>
                     </tr>
+                    {expanded && canPeers ? (
+                      <tr className="anomaly-peers-row">
+                        <td colSpan={10}>
+                          <AnomalyPeersPanel item={item} />
+                        </td>
+                      </tr>
+                    ) : null}
+                    </Fragment>
                   );
                 })
               )}
