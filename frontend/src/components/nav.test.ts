@@ -39,6 +39,8 @@ describe('groupNav', () => {
       '/system',
       '/dozzle/',
       '/anomalies',
+      '/anomalies/engine',
+      '/hunts',
       '/reputation',
     ]);
     expect(sections.find((s) => s.id === 'data')?.items.map((i) => i.href)).toEqual([
@@ -75,6 +77,8 @@ describe('splitNavItems', () => {
       'Мониторинг системы',
       'Логи контейнеров',
       'Аномалии',
+      'Движок аномалий',
+      'Saved hunts',
       'Репутация IP',
     ]);
     expect(settings.map((s) => s.id)).toEqual(['data', 'access']);
