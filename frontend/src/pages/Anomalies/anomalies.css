@@ -126,6 +126,13 @@
   align-items: baseline;
 }
 
+.anomaly-peers-toolbar {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .anomaly-peers-table {
   max-height: 280px;
   overflow: auto;

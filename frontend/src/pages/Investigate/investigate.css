@@ -1,0 +1,67 @@
+.investigate-back {
+  margin: 0 0 12px;
+}
+
+.investigate-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+
+.investigate-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.investigate-code {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.investigate-title {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.investigate-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.investigate-meta dt {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.investigate-meta dd {
+  margin: 2px 0 0;
+}
+
+.investigate-meta .mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.investigate-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.anomaly-peers-toolbar {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}

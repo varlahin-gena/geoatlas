@@ -139,3 +139,79 @@ export function anomalyEventsQuery(item: AnomalyEvent): string {
   if (item.dst_ip) return `dst:${item.dst_ip}`;
   return '';
 }
+
+export function investigateHref(fingerprint: string): string {
+  const fp = fingerprint.trim();
+  if (!fp) return '/investigate';
+  return `/investigate?alert=${encodeURIComponent(fp)}`;
+}
+
+export function absoluteAppHref(pathWithQuery: string): string {
+  if (typeof window === 'undefined' || !window.location?.origin) {
+    return pathWithQuery;
+  }
+  const path = pathWithQuery.startsWith('/') ? pathWithQuery : `/${pathWithQuery}`;
+  return `${window.location.origin}${path}`;
+}
+
+const PEERS_CSV_HEADERS = ['src', 'dst', 'dst_port', 'action', 'count', 'bytes_sent', 'bytes_recv'] as const;
+
+function csvEscape(value: string | number | undefined | null): string {
+  const s = value === undefined || value === null ? '' : String(value);
+  if (/[",\n\r]/.test(s)) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+/** Serialize aggregated map peers for client-side CSV download. */
+export function peersLinesToCsv(
+  lines: Array<{
+    src?: string;
+    dst?: string;
+    dst_port?: number;
+    last_action?: string;
+    status?: string;
+    count?: number;
+    bytes_sent?: number;
+    bytes_recv?: number;
+  }>,
+): string {
+  const rows = [PEERS_CSV_HEADERS.join(',')];
+  for (const line of lines) {
+    rows.push(
+      [
+        csvEscape(line.src),
+        csvEscape(line.dst),
+        csvEscape(line.dst_port),
+        csvEscape(line.last_action || line.status || ''),
+        csvEscape(line.count ?? 0),
+        csvEscape(line.bytes_sent ?? 0),
+        csvEscape(line.bytes_recv ?? 0),
+      ].join(','),
+    );
+  }
+  return rows.join('\n') + '\n';
+}
+
+export function downloadTextFile(filename: string, contents: string, mime = 'text/csv;charset=utf-8'): void {
+  const blob = new Blob([contents], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+export function investigationTemplateName(item: AnomalyEvent, now = new Date()): string {
+  const code = (item.code || 'alert').trim() || 'alert';
+  const src = (item.src_ip || item.dst_ip || 'any').trim();
+  const y = now.getUTCFullYear();
+  const m = String(now.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(now.getUTCDate()).padStart(2, '0');
+  return `IR ${code} ${src} ${y}-${m}-${d}`;
+}

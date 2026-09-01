@@ -57,7 +57,7 @@ export const PAGE_NAV: NavItem[] = [
     href: '/anomalies',
     label: 'Аномалии',
     group: 'observe',
-    match: ['/anomalies', '/anomalies.html'],
+    match: ['/anomalies', '/anomalies.html', '/investigate', '/investigate.html'],
     adminOnly: false,
   },
   {

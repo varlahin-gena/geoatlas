@@ -6,7 +6,8 @@
 |------------------------|-----------------------|---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `/login`               | Вход                  | public              | Логин; смена пароля при `must_reset_password`                                                                                                        |
 | `/`                    | Карта / глобус        | login               | 2D/3D, группировка, фильтры status/репутации, конструктор поиска и шаблоны, порог событий, mono-дуги, экспорт PNG, загрузка логов/GeoIP (admin)      |
-| `/anomalies`           | Аномалии              | login               | Список срабатываний, ack / assign; баннер на карте                                                                                                   |
+| `/anomalies`           | Аномалии              | login               | Список срабатываний, ack / assign; кнопка «Разбор»; баннер на карте                                                                                  |
+| `/investigate`         | Разбор алерта         | login               | Workspace по `?alert=<fingerprint>`: шапка, peers, ack/assign, CSV, шаблон поиска, ссылка на карту                                                   |
 | `/reputation`          | Репутация IP          | administrator       | Списки и URL-фиды, каталог, refresh; модуль можно отключить                                                                                          |
 | `/parse-errors`        | Журнал ошибок парсинга| administrator       | Поиск, удаление, отправка в тест парсеров                                                                                                            |
 | `/geo-missing`         | IP без GeoIP          | administrator       | Адреса без координат; добавление в GeoIP; выгрузка CSV                                                                                               |
@@ -26,7 +27,7 @@ SPA (React Router); nginx `auth_request` для `/api/*` и `/dozzle/`.
 | Роль | Cookie-сессия | UI | API (кратко) |
 |------|---------------|-----|--------------|
 | **administrator** | обычный TTL (`SESSION_TTL_HOURS`, по умолчанию 12 ч) | все страницы + `/dozzle/` | полные права (admin middleware) |
-| **operator** | обычный TTL | карта, аномалии, смена пароля | login-tier: events, anomalies ack/assign, search templates; **без** uploads / system / geo / reputation / users / tokens |
+| **operator** | обычный TTL | карта, аномалии, разбор, смена пароля | login-tier: events, anomalies ack/assign, search templates; **без** uploads / system / geo / reputation / users / tokens |
 | **dashboard** | **длительная** (~видеостена) | как operator | как operator по login-tier |
 
 Загрузки логов/GeoIP, ingest-stats, system и прочие **ops**-маршруты: сессия **administrator** или Bearer ≥ **ops**. Одна cookie operator **не** открывает ops API.

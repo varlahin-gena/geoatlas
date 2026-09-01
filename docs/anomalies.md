@@ -19,7 +19,12 @@
 | `new_country_dst` | Новая страна назначения | warn |
 | `rep_new_peer` | Новая связь с репутационным адресом | high |
 
-На карте — полоска/баннер со ссылкой на `/anomalies`. На странице аномалий кнопка **«Связи»** подгружает рёбра из `GET /api/events` по `src`/map.q (агрегированные peers, не сырой PCAP).
+На карте — полоска/баннер со ссылкой на `/anomalies`. На странице аномалий:
+
+- **«Связи»** — рёбра из `GET /api/events` по `src`/map.q (агрегированные peers, не сырой PCAP);
+- **«Разбор»** — workspace [`/investigate?alert=<fingerprint>`](ui.md): шапка алерта, peers, ack/assign, клиентский CSV peers, сохранение query как search template, deep-link на карту (без встраивания MapLibre).
+
+Fingerprint + URL = «кейс»; отдельного case store нет.
 
 ## Включение и интервал
 

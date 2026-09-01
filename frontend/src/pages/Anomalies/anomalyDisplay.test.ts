@@ -4,7 +4,10 @@ import {
   anomalyEventsHours,
   anomalyEventsQuery,
   anomalyMapHref,
+  investigateHref,
+  investigationTemplateName,
   matchesAnomalySearch,
+  peersLinesToCsv,
 } from './anomalyDisplay';
 
 describe('anomalyDisplay', () => {
@@ -37,5 +40,33 @@ describe('anomalyDisplay', () => {
     expect(
       anomalyEventsQuery({ fingerprint: 'x', src_ip: '10.0.0.1' } as AnomalyEvent),
     ).toBe('src:10.0.0.1');
+  });
+
+  it('builds investigate href', () => {
+    expect(investigateHref('fp/1')).toBe('/investigate?alert=fp%2F1');
+    expect(investigateHref('')).toBe('/investigate');
+  });
+
+  it('serializes peers CSV', () => {
+    const csv = peersLinesToCsv([
+      {
+        src: '10.0.0.1',
+        dst: '1.2.3.4',
+        dst_port: 443,
+        last_action: 'allow',
+        count: 12,
+        bytes_sent: 100,
+        bytes_recv: 200,
+      },
+      { src: 'a,b', dst: 'c', count: 1 },
+    ]);
+    expect(csv.startsWith('src,dst,dst_port,action,count,bytes_sent,bytes_recv\n')).toBe(true);
+    expect(csv).toContain('10.0.0.1,1.2.3.4,443,allow,12,100,200');
+    expect(csv).toContain('"a,b",c,,');
+  });
+
+  it('builds investigation template name', () => {
+    const name = investigationTemplateName(item, new Date(Date.UTC(2026, 8, 1)));
+    expect(name).toBe('IR port_scan 203.0.113.5 2026-09-01');
   });
 });

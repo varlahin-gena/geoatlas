@@ -19,6 +19,7 @@ import {
   ANOMALY_SINCE_OPTIONS,
   anomalyMapHref,
   eventCodeLabel,
+  investigateHref,
   matchesAnomalySearch,
   relTime,
   severityLabel,
@@ -371,6 +372,11 @@ export default function AnomaliesPage() {
                           : 'Открыт'}
                       </td>
                       <td className="actions">
+                        {item.fingerprint ? (
+                          <Link to={investigateHref(item.fingerprint)} className="btn sm">
+                            Разбор
+                          </Link>
+                        ) : null}
                         {canPeers ? (
                           <button
                             type="button"

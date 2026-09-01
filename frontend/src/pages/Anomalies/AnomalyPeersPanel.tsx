@@ -1,20 +1,31 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AnomalyEvent } from '@/api/anomalies';
 import { fetchMapEvents } from '@/api/events';
 import type { MapLine } from '@/api/eventsTypes';
 import { fmtNumber } from '@/lib/format';
 import { anomalyEventsHours, anomalyEventsQuery } from './anomalyDisplay';
 
-export function AnomalyPeersPanel({ item }: { item: AnomalyEvent }) {
+export function AnomalyPeersPanel({
+  item,
+  toolbar,
+  onLinesLoaded,
+}: {
+  item: AnomalyEvent;
+  toolbar?: ReactNode;
+  onLinesLoaded?: (lines: MapLine[]) => void;
+}) {
   const q = anomalyEventsQuery(item);
   const hours = anomalyEventsHours(item);
   const [lines, setLines] = useState<MapLine[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const onLinesRef = useRef(onLinesLoaded);
+  onLinesRef.current = onLinesLoaded;
 
   useEffect(() => {
     if (!q) {
       setLines([]);
+      onLinesRef.current?.([]);
       setError('');
       return;
     }
@@ -34,11 +45,14 @@ export function AnomalyPeersPanel({ item }: { item: AnomalyEvent }) {
         const rows = [...(data.lines || [])].sort(
           (a, b) => (b.count || 0) - (a.count || 0),
         );
-        setLines(rows.slice(0, 100));
+        const sliced = rows.slice(0, 100);
+        setLines(sliced);
+        onLinesRef.current?.(sliced);
       })
       .catch((e: unknown) => {
         if (ac.signal.aborted) return;
         setLines([]);
+        onLinesRef.current?.([]);
         setError(e instanceof Error ? e.message : 'Не удалось загрузить связи');
       })
       .finally(() => {
@@ -56,6 +70,7 @@ export function AnomalyPeersPanel({ item }: { item: AnomalyEvent }) {
         <span className="hint">
           /api/events · {hours}ч · q={q}
         </span>
+        {toolbar ? <div className="anomaly-peers-toolbar">{toolbar}</div> : null}
       </div>
       {loading ? <p className="hint">Загрузка связей…</p> : null}
       {error ? <p className="hint warn-banner">{error}</p> : null}

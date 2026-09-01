@@ -7,6 +7,7 @@
 
 ### Added
 - Anomaly Engine: детекторы **`byte_surge`** (всплеск объёма), **`beaconing`** (периодическая связь), **`lateral_fanout`** (веер по enterprise-net); на `/anomalies` — панель «Связи» через `GET /api/events`.
+- Investigation workspace: **`/investigate?alert=<fingerprint>`** — разбор алерта (peers, ack/assign, CSV, шаблон поиска, ссылки на карту/workspace); вход с `/anomalies` → «Разбор».
 
 ### Security
 - Image scan (Trivy CRITICAL, `ignore-unfixed`): job падает при находках (`exit-code: 1`), SARIF по-прежнему загружается в GitHub Security.

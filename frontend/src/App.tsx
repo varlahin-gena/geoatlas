@@ -19,6 +19,7 @@ const GeoMissingPage = lazy(() => import('@/pages/GeoMissing/GeoMissingPage'));
 const GeoRangesPage = lazy(() => import('@/pages/GeoRanges/GeoRangesPage'));
 const ReputationPage = lazy(() => import('@/pages/Reputation/ReputationPage'));
 const AnomaliesPage = lazy(() => import('@/pages/Anomalies/AnomaliesPage'));
+const InvestigatePage = lazy(() => import('@/pages/Investigate/InvestigatePage'));
 
 function Lazy({ children, label }: { children: React.ReactNode; label?: string }) {
   return (
@@ -145,6 +146,16 @@ export default function App() {
                 }
               />
               <Route
+                path="/investigate"
+                element={
+                  <RequireAuth>
+                    <Lazy label="разбор">
+                      <InvestigatePage />
+                    </Lazy>
+                  </RequireAuth>
+                }
+              />
+              <Route
                 path="/reputation"
                 element={
                   <RequireAuth admin>
@@ -166,6 +177,7 @@ export default function App() {
               <Route path="/geo-ranges.html" element={<Navigate to="/geo-ranges" replace />} />
               <Route path="/reputation.html" element={<Navigate to="/reputation" replace />} />
               <Route path="/anomalies.html" element={<Navigate to="/anomalies" replace />} />
+              <Route path="/investigate.html" element={<Navigate to="/investigate" replace />} />
               <Route path="/change-password.html" element={<Navigate to="/change-password" replace />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

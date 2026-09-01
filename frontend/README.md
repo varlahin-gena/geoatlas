@@ -21,6 +21,7 @@ Runtime `/config.js` is injected by the nginx entrypoint in Docker (`window.GA_C
 | `/login` | public |
 | `/` | login (administrator / operator / dashboard) |
 | `/anomalies` | login |
+| `/investigate` | login (`?alert=` fingerprint) |
 | `/change-password` | login (allow must-reset) |
 | `/system`, `/users`, `/api-tokens`, `/parse-errors`, `/parser-test`, `/geo-missing`, `/geo-ranges`, `/reputation`, `/tls` | administrator |
 
