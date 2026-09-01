@@ -75,8 +75,8 @@ function EpisodesPanel({
       </button>
       {!episodes.length ? <p className="hint">Нет эпизодов за период.</p> : null}
       {episodes.map((ep) => (
-        <div key={ep.episode_id} className="anomaly-episode-row">
-          <strong>{ep.anchor_ip || ep.episode_id.slice(0, 8)}</strong>
+        <div key={ep.episode_id || ep.anchor_ip} className="anomaly-episode-row">
+          <strong>{ep.anchor_ip || ep.episode_id?.slice(0, 8) || '—'}</strong>
           <span className={`sev-${ep.max_severity}`}>{severityLabel(ep.max_severity)}</span>
           <span>{fmtNumber(ep.alert_count ?? 0)} алертов</span>
           <span className="hint">{(ep.codes || []).join(', ')}</span>

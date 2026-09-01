@@ -59,18 +59,7 @@ export type AnomalyEngineSettingsView = {
   status?: AnomalyScanStatus;
 };
 
-export type AnomalyEpisode = {
-  episode_id: string;
-  anchor_ip?: string;
-  started_at?: string;
-  updated_at?: string;
-  alert_count?: number;
-  high_count?: number;
-  warn_count?: number;
-  max_severity?: string;
-  codes?: string[];
-  fingerprints?: string[];
-};
+export type AnomalyEpisode = components['schemas']['AnomalyEpisode'];
 
 export function fetchAnomalySummary(init?: RequestInit): Promise<AnomalySummary> {
   return apiGet('/api/anomalies/summary', { cache: 'no-store', ...init });

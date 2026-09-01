@@ -1,4 +1,4 @@
-import { apiFetch, apiGet, apiPath, apiPut } from './client';
+import { apiFetch, apiGet, apiPath } from './client';
 
 export type HuntMapState = {
   period: string;
@@ -50,7 +50,10 @@ export function createHunt(body: Partial<SavedHunt>): Promise<{ ok?: boolean; hu
 }
 
 export function updateHunt(id: string, body: Partial<SavedHunt>): Promise<{ ok?: boolean; hunt?: SavedHunt }> {
-  return apiPut(apiPath('/api/me/hunts/{id}', { id }), body);
+  return apiFetch(apiPath('/api/me/hunts/{id}', { id }), {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
 }
 
 export function deleteHunt(id: string): Promise<{ ok?: boolean }> {

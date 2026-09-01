@@ -398,8 +398,12 @@ export default function InvestigatePage() {
                 <h3 className="card-title">Связанные алерты эпизода</h3>
                 <ul>
                   {related.map((r) => (
-                    <li key={r.fingerprint}>
-                      <Link to={investigateHref(r.fingerprint)}>{eventCodeLabel(r)}</Link>
+                    <li key={r.fingerprint || r.code}>
+                      {r.fingerprint ? (
+                        <Link to={investigateHref(r.fingerprint)}>{eventCodeLabel(r)}</Link>
+                      ) : (
+                        eventCodeLabel(r)
+                      )}
                       {' · '}
                       {severityLabel(r.severity)}
                     </li>

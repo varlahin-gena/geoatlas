@@ -838,6 +838,192 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/hunts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Saved hunts текущего пользователя */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description hunts list */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /** Создать saved hunt */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SavedHuntInput"];
+                };
+            };
+            responses: {
+                /** @description created */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/hunts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Обновить saved hunt */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SavedHuntInput"];
+                };
+            };
+            responses: {
+                /** @description updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        /** Удалить saved hunt */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description deleted */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/hunts/{id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Запустить saved hunt вручную */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description run result */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hunts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Все saved hunts (administrator) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description all hunts with authors */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tokens": {
         parameters: {
             query?: never;
@@ -1600,6 +1786,140 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/anomalies/episodes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Эпизоды корреляции аномалий
+         * @description Группировка алертов по anchor IP и часовому окну.
+         *     Те же query-параметры, что у GET /api/anomalies (since, include_acked).
+         */
+        get: {
+            parameters: {
+                query?: {
+                    since?: string;
+                    include_acked?: "0" | "1" | "true" | "false";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description episodes */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            ok?: boolean;
+                            episodes?: components["schemas"]["AnomalyEpisode"][];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/anomalies/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Настройки движка аномалий
+         * @description Только administrator или Bearer.
+         *     Редактируемые параметры из `/app/data/anomaly_settings.json` и read-only пороги install profile.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description settings + thresholds + status */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AnomalySettingsResponse"];
+                    };
+                };
+                /** @description Модуль выключен (ANOMALY_ENABLED=false) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /**
+         * Обновить настройки движка аномалий
+         * @description administrator; hot-reload без рестарта backend.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AnomalyEngineSettings"];
+                };
+            };
+            responses: {
+                /** @description updated settings */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AnomalySettingsResponse"];
+                    };
+                };
+                /** @description Невалидные значения */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Модуль выключен */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4043,6 +4363,11 @@ export interface components {
                 edges?: number;
                 nodes?: number;
                 skipped_no_geo?: number;
+                limit_requested?: number;
+                limit_applied?: number;
+                limit_capped?: boolean;
+                /** @enum {string} */
+                query_cost?: "light" | "medium" | "heavy";
                 /**
                  * @description ip | geo_city | geo_country
                  * @example geo_city
@@ -4090,6 +4415,7 @@ export interface components {
             acknowledged?: boolean;
             assigned_to?: string;
             ack_by?: string;
+            episode_id?: string;
             map?: components["schemas"]["AnomalyMapLink"];
         };
         AnomalySummary: {
@@ -4099,9 +4425,96 @@ export interface components {
             acked?: number;
             learning?: boolean;
             enabled?: boolean;
+            module_loaded?: boolean;
             /** Format: date-time */
             updated_at?: string;
             enterprise_nets?: number;
+        };
+        AnomalyEpisode: {
+            episode_id?: string;
+            anchor_ip?: string;
+            /** Format: date-time */
+            started_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+            alert_count?: number;
+            high_count?: number;
+            warn_count?: number;
+            /** @enum {string} */
+            max_severity?: "warn" | "high" | "info";
+            codes?: string[];
+            fingerprints?: string[];
+        };
+        HuntMapState: {
+            period?: string;
+            period_from?: string;
+            period_to?: string;
+            group_by?: string;
+            filter?: string;
+            query?: string;
+            country?: string;
+            limit?: number;
+            data_source?: string;
+        };
+        HuntSchedule: {
+            enabled?: boolean;
+            interval_min?: number;
+            edge_threshold?: number;
+            edge_ratio?: number;
+        };
+        SavedHuntInput: {
+            name: string;
+            notes?: string;
+            map: components["schemas"]["HuntMapState"];
+            schedule?: components["schemas"]["HuntSchedule"];
+        };
+        AnomalyEngineSettings: {
+            enabled: boolean;
+            scan_interval_min: number;
+            learning_days: number;
+            suppress_hours: number;
+            include_private: boolean;
+            new_country_min_share: number;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        AnomalyThresholds: {
+            port_scan_ports?: number;
+            port_scan_events?: number;
+            horizontal_hosts?: number;
+            horizontal_events?: number;
+            surge_ratio?: number;
+            /** Format: int64 */
+            surge_abs_min?: number;
+            /** Format: int64 */
+            surge_floor?: number;
+            /** Format: int64 */
+            new_country_min?: number;
+            /** Format: int64 */
+            new_country_baseline?: number;
+            new_country_min_share?: number;
+            /** Format: int64 */
+            rep_min_events?: number;
+            byte_surge_ratio?: number;
+            /** Format: int64 */
+            byte_surge_abs_min?: number;
+            /** Format: int64 */
+            byte_surge_floor?: number;
+            beacon_min_hours?: number;
+            /** Format: int64 */
+            beacon_max_avg_bytes?: number;
+            beacon_min_regularity?: number;
+            lateral_hosts?: number;
+            lateral_events?: number;
+        } & {
+            [key: string]: unknown;
+        };
+        AnomalySettingsResponse: {
+            ok?: boolean;
+            settings?: components["schemas"]["AnomalyEngineSettings"];
+            install_profile?: string;
+            thresholds?: components["schemas"]["AnomalyThresholds"];
+            status?: components["schemas"]["AnomalyScanStatus"];
         };
         AnomalyList: {
             items?: components["schemas"]["AnomalyEvent"][];
