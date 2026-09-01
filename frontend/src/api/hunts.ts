@@ -12,7 +12,7 @@ export type HuntMapState = {
   data_source?: string;
 };
 
-export type HuntSchedule = {
+type HuntSchedule = {
   enabled: boolean;
   interval_min: number;
   edge_threshold: number;
@@ -59,20 +59,4 @@ export function deleteHunt(id: string): Promise<{ ok?: boolean }> {
 
 export function runHunt(id: string): Promise<{ ok?: boolean; hunt?: SavedHunt; run?: HuntRun }> {
   return apiFetch(apiPath('/api/me/hunts/{id}/run', { id }), { method: 'POST', body: '{}' });
-}
-
-export function huntMapHref(hunt: SavedHunt): string {
-  const sp = new URLSearchParams();
-  const m = hunt.map;
-  if (m.period && m.period !== '1d') sp.set('period', m.period);
-  if (m.period === 'custom') {
-    if (m.period_from) sp.set('from', m.period_from);
-    if (m.period_to) sp.set('to', m.period_to);
-  }
-  if (m.group_by && m.group_by !== 'city') sp.set('group', m.group_by);
-  if (m.filter && m.filter !== 'all') sp.set('filter', m.filter);
-  if (m.query) sp.set('q', m.query);
-  if (m.country) sp.set('country', m.country);
-  const qs = sp.toString();
-  return qs ? `/?${qs}` : '/';
 }

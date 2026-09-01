@@ -1,5 +1,5 @@
-import type { MapViewState } from '@/pages/Map/mapQuery';
-import type { HuntMapState } from '@/api/hunts';
+import type { SavedHunt, HuntMapState } from '@/api/hunts';
+import { MAP_VIEW_DEFAULTS, serializeMapViewSearch, type MapViewState } from '@/pages/Map/mapQuery';
 
 export function mapViewToHuntState(view: {
   period: string;
@@ -33,4 +33,10 @@ export function huntStateToMapView(state: HuntMapState): Partial<MapViewState> {
     search: state.query || '',
     focusedCountry: state.country || null,
   };
+}
+
+export function huntMapHref(hunt: SavedHunt): string {
+  const view = { ...MAP_VIEW_DEFAULTS, ...huntStateToMapView(hunt.map) };
+  const qs = serializeMapViewSearch(view).toString();
+  return qs ? `/?${qs}` : '/';
 }

@@ -224,6 +224,11 @@ SETTINGS index_granularity = 8192, ttl_only_drop_parts = 1;
 ALTER TABLE anomaly_events ADD COLUMN IF NOT EXISTS suppression_key String DEFAULT '';
 
 -- ============================================================
+-- anomaly_events episode_id: группировка корреляции
+-- ============================================================
+ALTER TABLE anomaly_events ADD COLUMN IF NOT EXISTS episode_id String DEFAULT '';
+
+-- ============================================================
 -- anomaly_acks: подтверждения аномалий
 -- ============================================================
 CREATE TABLE IF NOT EXISTS anomaly_acks

@@ -2,12 +2,12 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import {
   deleteHunt,
-  huntMapHref,
   listMyHunts,
   runHunt,
   updateHunt,
   type SavedHunt,
 } from '@/api/hunts';
+import { huntMapHref } from '@/pages/Hunts/huntMapState';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useToast } from '@/components/Toast';
 import { fmtDate, fmtNumber } from '@/lib/format';

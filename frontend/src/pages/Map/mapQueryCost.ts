@@ -112,7 +112,7 @@ export function mapQueryWarning(opts: {
   source?: string;
 }): string | null {
   const parts: string[] = [];
-  const liveSource = (opts.source || '').includes('live') || (opts.source || '').includes('traffic_logs');
+  const liveSource = isLiveTrafficLogsSource(opts.source);
 
   if (opts.cost.tier === 'heavy') {
     parts.push('Тяжёлый запрос к ClickHouse');
@@ -138,7 +138,7 @@ export function mapQueryWarning(opts: {
   return parts.length ? parts.join('. ') + '.' : null;
 }
 
-export function isLiveTrafficLogsSource(source: string | undefined): boolean {
+function isLiveTrafficLogsSource(source: string | undefined): boolean {
   const s = (source || '').toLowerCase();
   return s.includes('ip_live') || s.includes('traffic_logs');
 }
