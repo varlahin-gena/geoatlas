@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -144,10 +143,7 @@ func (h *ReputationHandler) AddFeed(w http.ResponseWriter, r *http.Request) {
 		Category string `json:"category"`
 		Format   string `json:"format"`
 	}
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		writeBadRequest(w, "invalid json")
+	if !decodeJSONBody(w, r, &req, defaultJSONBodyLimit) {
 		return
 	}
 	err := h.reputationUC.AddFeed(r.Context(), usecasereputation.Feed{

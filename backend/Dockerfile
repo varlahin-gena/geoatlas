@@ -29,4 +29,8 @@ USER app
 WORKDIR /app
 COPY --from=build /out/geoatlas /app/geoatlas
 EXPOSE 8080 1514
+LABEL org.opencontainers.image.title="geoatlas-backend" \
+      org.opencontainers.image.source="https://github.com/varlahin-gena/geoatlas"
+HEALTHCHECK --interval=10s --timeout=5s --start-period=20s --retries=12 \
+    CMD wget -q -O /dev/null http://127.0.0.1:8080/live || exit 1
 ENTRYPOINT ["/app/geoatlas"]

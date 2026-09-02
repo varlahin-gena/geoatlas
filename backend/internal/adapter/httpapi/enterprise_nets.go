@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -71,8 +70,7 @@ func (h *GeoHandler) AddEnterpriseNet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req addEnterpriseNetRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeBadRequest(w, "invalid json")
+	if !decodeJSONBody(w, r, &req, defaultJSONBodyLimit) {
 		return
 	}
 	n, err := h.geoUC.AddEnterpriseNet(r.Context(), usecasegeo.AddEnterpriseNetInput{

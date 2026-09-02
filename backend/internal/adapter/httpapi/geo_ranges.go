@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -126,8 +125,7 @@ func (h *GeoHandler) AppendGeoRange(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	var req appendGeoRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeBadRequest(w, "invalid json")
+	if !decodeJSONBody(w, r, &req, defaultJSONBodyLimit) {
 		return
 	}
 
@@ -152,8 +150,7 @@ func (h *GeoHandler) UpdateGeoRange(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	var req updateGeoRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeBadRequest(w, "invalid json")
+	if !decodeJSONBody(w, r, &req, defaultJSONBodyLimit) {
 		return
 	}
 

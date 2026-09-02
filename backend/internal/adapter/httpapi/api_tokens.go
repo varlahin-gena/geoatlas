@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -29,10 +28,7 @@ func (h *APITokensHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Name  string `json:"name"`
 		Scope string `json:"scope"`
 	}
-	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&body); err != nil {
-		writeBadRequest(w, "invalid json")
+	if !decodeJSONBody(w, r, &body, defaultJSONBodyLimit) {
 		return
 	}
 	pub, plain, err := h.apiTokens.Create(body.Name, body.Scope)

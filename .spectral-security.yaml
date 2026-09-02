@@ -1,0 +1,27 @@
+extends:
+  - spectral:oas
+
+rules:
+  mutation-schemas-closed:
+    description: Mutation component schemas must set additionalProperties false.
+    severity: error
+    given: $.components.schemas[AuthLoginRequest,RetentionSettings,AnomalyEngineSettings,SavedHuntInput,ApiTokenCreateRequest,GeoRangeAppendRequest,ParseErrorsDeleteRequest,BackupScheduleUpdateRequest,TlsCertUploadRequest].additionalProperties
+    then:
+      function: equal
+      functionOptions:
+        value: false
+
+  auth-login-string-bounds:
+    description: Login credentials must declare maxLength on string fields.
+    severity: warn
+    given: $.components.schemas.AuthLoginRequest.properties[username,password]
+    then:
+      field: maxLength
+      function: truthy
+
+  validation-error-schema:
+    description: Shared ValidationError response schema should exist.
+    severity: warn
+    given: $.components.schemas.ValidationError
+    then:
+      function: truthy

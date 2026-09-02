@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -104,10 +103,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req loginRequest
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		writeBadRequest(w, "invalid json")
+	if !decodeJSONBody(w, r, &req, defaultJSONBodyLimit) {
 		return
 	}
 	req.Username = strings.TrimSpace(req.Username)
@@ -245,10 +241,7 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req changePasswordRequest
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		writeBadRequest(w, "invalid json")
+	if !decodeJSONBody(w, r, &req, defaultJSONBodyLimit) {
 		return
 	}
 	if h.authUC == nil {
@@ -338,10 +331,7 @@ func (h *AuthHandler) DismissGeoWizard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req geoWizardDismissRequest
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		writeBadRequest(w, "invalid json")
+	if !decodeJSONBody(w, r, &req, defaultJSONBodyLimit) {
 		return
 	}
 	if req.Dismissed == nil {
@@ -520,10 +510,7 @@ func (h *UsersHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req createUserRequest
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		writeBadRequest(w, "invalid json")
+	if !decodeJSONBody(w, r, &req, defaultJSONBodyLimit) {
 		return
 	}
 	if req.MustResetPassword == nil {
@@ -572,10 +559,7 @@ func (h *UsersHandler) SetRole(w http.ResponseWriter, r *http.Request) {
 	}
 	username := r.PathValue("username")
 	var req setRoleRequest
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		writeBadRequest(w, "invalid json")
+	if !decodeJSONBody(w, r, &req, defaultJSONBodyLimit) {
 		return
 	}
 	pub, err := h.authUC.SetRole(username, req.Role)
@@ -614,10 +598,7 @@ func (h *UsersHandler) SetFullName(w http.ResponseWriter, r *http.Request) {
 	}
 	username := r.PathValue("username")
 	var req setFullNameRequest
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		writeBadRequest(w, "invalid json")
+	if !decodeJSONBody(w, r, &req, defaultJSONBodyLimit) {
 		return
 	}
 	pub, err := h.authUC.SetFullName(username, req.FullName)
@@ -655,10 +636,7 @@ func (h *UsersHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 	username := r.PathValue("username")
 	var req resetPasswordRequest
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		writeBadRequest(w, "invalid json")
+	if !decodeJSONBody(w, r, &req, defaultJSONBodyLimit) {
 		return
 	}
 	if req.MustResetPassword == nil {

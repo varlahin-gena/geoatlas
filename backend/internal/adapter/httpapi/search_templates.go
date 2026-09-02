@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -47,10 +46,7 @@ func (h *SearchTemplatesHandler) CreateMine(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	var req searchTemplateRequest
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		writeBadRequest(w, "invalid json")
+	if !decodeJSONBody(w, r, &req, defaultJSONBodyLimit) {
 		return
 	}
 	t, err := h.searchTemplates.Create(username, req.Name, req.Query)
@@ -77,10 +73,7 @@ func (h *SearchTemplatesHandler) UpdateMine(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	var req searchTemplateRequest
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		writeBadRequest(w, "invalid json")
+	if !decodeJSONBody(w, r, &req, defaultJSONBodyLimit) {
 		return
 	}
 	t, err := h.searchTemplates.Update(username, id, req.Name, req.Query)

@@ -1,0 +1,53 @@
+name: API schema security
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "openapi.yaml"
+      - "scripts/schema_security_check.py"
+      - ".spectral-security.yaml"
+      - "backend/internal/adapter/httpapi/decode_json.go"
+      - "backend/internal/adapter/httpapi/openapi_security_test.go"
+      - ".github/workflows/api-schema-security.yml"
+  pull_request:
+    paths:
+      - "openapi.yaml"
+      - "scripts/schema_security_check.py"
+      - ".spectral-security.yaml"
+      - "backend/internal/adapter/httpapi/decode_json.go"
+      - "backend/internal/adapter/httpapi/openapi_security_test.go"
+      - ".github/workflows/api-schema-security.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  openapi-security:
+    name: openapi schema security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Install PyYAML
+        run: pip install pyyaml
+
+      - name: Run schema security script
+        run: python3 scripts/schema_security_check.py
+
+      - name: Spectral security lint
+        run: npx --yes @stoplight/spectral-cli@6.15.0 lint openapi.yaml --ruleset .spectral-security.yaml
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: "1.25.x"
+          check-latest: true
+          cache-dependency-path: backend/go.sum
+
+      - name: Go openapi security tests
+        working-directory: backend
+        run: go test -count=1 ./internal/adapter/httpapi/ -run 'TestOpenAPIMutation|TestOpenAPIAuthUser|TestOpenAPIRetention'

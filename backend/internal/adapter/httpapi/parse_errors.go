@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -48,8 +47,7 @@ func (h *ParseHandler) DeleteParseErrors(w http.ResponseWriter, r *http.Request)
 		IDs []string `json:"ids"`
 		All bool     `json:"all"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeBadRequest(w, "invalid json")
+	if !decodeJSONBody(w, r, &req, defaultJSONBodyLimit) {
 		return
 	}
 

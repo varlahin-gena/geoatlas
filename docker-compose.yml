@@ -50,6 +50,9 @@ services:
       retries: 30
       start_period: 30s
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 1000
     deploy:
       resources:
         limits:
@@ -87,6 +90,20 @@ services:
       retries: 6
       start_period: 10s
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - CHOWN
+      - SETUID
+      - SETGID
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=64m
+      - /var/run:noexec,nosuid,size=16m
+    pids_limit: 200
     deploy:
       resources:
         limits:
@@ -200,6 +217,11 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=64m
+    init: true
+    pids_limit: 500
     deploy:
       resources:
         limits:
@@ -248,7 +270,9 @@ services:
       - ALL
     read_only: true
     tmpfs:
-      - /tmp
+      - /tmp:noexec,nosuid,size=32m
+    init: true
+    pids_limit: 100
     deploy:
       resources:
         limits:
@@ -283,6 +307,7 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    pids_limit: 100
     deploy:
       resources:
         limits:
@@ -330,10 +355,13 @@ services:
       - CHOWN
       - SETUID
       - SETGID
+    read_only: true
     tmpfs:
-      - /tmp
-      - /var/cache/nginx
-      - /var/run
+      - /tmp:noexec,nosuid,size=32m
+      - /var/cache/nginx:noexec,nosuid,size=64m
+      - /var/run:noexec,nosuid,size=16m
+      - /etc/nginx/conf.d:noexec,nosuid,size=1m
+    pids_limit: 100
     deploy:
       resources:
         limits:

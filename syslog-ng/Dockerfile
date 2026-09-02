@@ -64,3 +64,5 @@ assert a('setuptools')=='83.0.0', a('setuptools')"; \
       \( -name 'setuptools-*.dist-info' -o -name 'setuptools-*.egg-info' \) \
       ! -name 'setuptools-83.0.0.dist-info' 2>/dev/null || true)"; \
     [ -z "$leftovers" ] || { printf 'leftover setuptools:\n%s\n' "$leftovers" >&2; exit 1; }
+LABEL org.opencontainers.image.title="geoatlas-syslog-ng" \
+      org.opencontainers.image.source="https://github.com/varlahin-gena/geoatlas"

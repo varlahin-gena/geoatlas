@@ -15,3 +15,5 @@ RUN set -eux; \
       libp11-kit0 \
       p11-kit-modules; \
     rm -rf /var/lib/apt/lists/*
+LABEL org.opencontainers.image.title="geoatlas-clickhouse" \
+      org.opencontainers.image.source="https://github.com/varlahin-gena/geoatlas"

@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
@@ -50,10 +49,7 @@ func (h *HuntsHandler) CreateMine(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req usecasehunts.Hunt
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		writeBadRequest(w, "invalid json")
+	if !decodeJSONBody(w, r, &req, defaultJSONBodyLimit) {
 		return
 	}
 	out, err := h.hunts.Create(user, req)
@@ -76,10 +72,7 @@ func (h *HuntsHandler) UpdateMine(w http.ResponseWriter, r *http.Request) {
 	}
 	id := strings.TrimSpace(r.PathValue("id"))
 	var req usecasehunts.Hunt
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		writeBadRequest(w, "invalid json")
+	if !decodeJSONBody(w, r, &req, defaultJSONBodyLimit) {
 		return
 	}
 	out, err := h.hunts.Update(user, id, req)

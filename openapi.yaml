@@ -54,11 +54,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [username, password]
-              properties:
-                username: { type: string }
-                password: { type: string }
+              $ref: "#/components/schemas/AuthLoginRequest"
       responses:
         "200":
           description: OK
@@ -126,10 +122,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [dismissed]
-              properties:
-                dismissed: { type: boolean }
+              $ref: "#/components/schemas/GeoWizardDismissRequest"
       responses:
         "200":
           description: OK (обновлённый пользователь)
@@ -422,11 +415,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [name, scope]
-              properties:
-                name: { type: string }
-                scope: { type: string, enum: [read, ops, admin] }
+              $ref: "#/components/schemas/ApiTokenCreateRequest"
       responses:
         "201":
           description: Created (token metadata + secret)
@@ -786,10 +775,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [assigned_to]
-              properties:
-                assigned_to: { type: string }
+              $ref: "#/components/schemas/AnomalyAssignRequest"
       responses:
         "200":
           description: OK
@@ -976,18 +962,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [network, country, region, city, lat, lon]
-              properties:
-                network:
-                  type: string
-                  description: "IP, CIDR (a.b.c.d/n) или диапазон (a.b.c.d-e.f.g.h)"
-                  example: "203.0.113.10"
-                country: { type: string, example: "Россия" }
-                region: { type: string, example: "OOO_Company" }
-                city: { type: string, example: "Москва" }
-                lat: { type: number, minimum: -90, maximum: 90, example: 55.76167 }
-                lon: { type: number, minimum: -180, maximum: 180, example: 37.60667 }
+              $ref: "#/components/schemas/GeoRangeAppendRequest"
       responses:
         "200":
           description: range appended; index applied; backfill scheduled
@@ -1015,19 +990,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [original_network, network, country, region, city, lat, lon]
-              properties:
-                original_network:
-                  type: string
-                  description: Текущий Network редактируемой записи
-                  example: "203.0.113.10"
-                network: { type: string, example: "203.0.113.0/24" }
-                country: { type: string }
-                region: { type: string }
-                city: { type: string }
-                lat: { type: number }
-                lon: { type: number }
+              $ref: "#/components/schemas/GeoRangeUpdateRequest"
       responses:
         "200":
           description: range updated
@@ -1128,14 +1091,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [network]
-              properties:
-                network: { type: string, example: "10.20.0.0/16" }
-                label: { type: string }
-                country: { type: string }
-                region: { type: string }
-                city: { type: string }
+              $ref: "#/components/schemas/EnterpriseNetCreateRequest"
       responses:
         "200":
           description: net added
@@ -1410,15 +1366,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [name, url]
-              properties:
-                name: { type: string }
-                url: { type: string }
-                category: { type: string }
-                format:
-                  type: string
-                  enum: [netset, plain, spamhaus_json, csv_ip]
+              $ref: "#/components/schemas/ReputationFeedCreateRequest"
       responses:
         "200":
           description: added
@@ -1756,11 +1704,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [cert_pem, key_pem]
-              properties:
-                cert_pem: { type: string }
-                key_pem: { type: string }
+              $ref: "#/components/schemas/TlsCertUploadRequest"
       responses:
         "200":
           description: Сертификаты сохранены
@@ -1945,15 +1889,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                enabled: { type: boolean }
-                hour: { type: integer, minimum: 0, maximum: 23 }
-                minute: { type: integer, minimum: 0, maximum: 59 }
-                timezone: { type: string, example: Europe/Moscow }
-                keep: { type: integer, minimum: 1, maximum: 90 }
-                include_edges: { type: boolean }
-                include_auth: { type: boolean }
+              $ref: "#/components/schemas/BackupScheduleUpdateRequest"
       responses:
         "200":
           description: Сохранено
@@ -2067,13 +2003,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                ids:
-                  type: array
-                  items: { type: string }
-                all:
-                  type: boolean
+              $ref: "#/components/schemas/ParseErrorsDeleteRequest"
       responses:
         "200":
           description: deleted
@@ -2122,9 +2052,135 @@ components:
       description: Сессия после POST /api/auth/login
 
   schemas:
+    ValidationError:
+      type: object
+      required: [error]
+      additionalProperties: false
+      properties:
+        error:
+          type: string
+          maxLength: 500
+
+    AuthLoginRequest:
+      type: object
+      required: [username, password]
+      additionalProperties: false
+      properties:
+        username: { type: string, minLength: 1, maxLength: 128 }
+        password: { type: string, minLength: 1, maxLength: 256 }
+
+    GeoWizardDismissRequest:
+      type: object
+      required: [dismissed]
+      additionalProperties: false
+      properties:
+        dismissed: { type: boolean }
+
+    ApiTokenCreateRequest:
+      type: object
+      required: [name, scope]
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 128 }
+        scope: { type: string, enum: [read, ops, admin] }
+
+    AnomalyAssignRequest:
+      type: object
+      required: [assigned_to]
+      additionalProperties: false
+      properties:
+        assigned_to: { type: string, maxLength: 128 }
+
+    GeoRangeAppendRequest:
+      type: object
+      required: [network, country, region, city, lat, lon]
+      additionalProperties: false
+      properties:
+        network:
+          type: string
+          maxLength: 128
+          description: "IP, CIDR (a.b.c.d/n) или диапазон (a.b.c.d-e.f.g.h)"
+          example: "203.0.113.10"
+        country: { type: string, maxLength: 128, example: "Россия" }
+        region: { type: string, maxLength: 256, example: "OOO_Company" }
+        city: { type: string, maxLength: 128, example: "Москва" }
+        lat: { type: number, minimum: -90, maximum: 90, example: 55.76167 }
+        lon: { type: number, minimum: -180, maximum: 180, example: 37.60667 }
+
+    GeoRangeUpdateRequest:
+      type: object
+      required: [original_network, network, country, region, city, lat, lon]
+      additionalProperties: false
+      properties:
+        original_network:
+          type: string
+          maxLength: 128
+          description: Текущий Network редактируемой записи
+          example: "203.0.113.10"
+        network: { type: string, maxLength: 128, example: "203.0.113.0/24" }
+        country: { type: string, maxLength: 128 }
+        region: { type: string, maxLength: 256 }
+        city: { type: string, maxLength: 128 }
+        lat: { type: number, minimum: -90, maximum: 90 }
+        lon: { type: number, minimum: -180, maximum: 180 }
+
+    EnterpriseNetCreateRequest:
+      type: object
+      required: [network]
+      additionalProperties: false
+      properties:
+        network: { type: string, maxLength: 128, example: "10.20.0.0/16" }
+        label: { type: string, maxLength: 256 }
+        country: { type: string, maxLength: 128 }
+        region: { type: string, maxLength: 256 }
+        city: { type: string, maxLength: 128 }
+
+    ReputationFeedCreateRequest:
+      type: object
+      required: [name, url]
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 128 }
+        url: { type: string, maxLength: 2048, format: uri }
+        category: { type: string, maxLength: 64 }
+        format:
+          type: string
+          enum: [netset, plain, spamhaus_json, csv_ip]
+
+    TlsCertUploadRequest:
+      type: object
+      required: [cert_pem, key_pem]
+      additionalProperties: false
+      properties:
+        cert_pem: { type: string, maxLength: 65536 }
+        key_pem: { type: string, maxLength: 65536 }
+
+    BackupScheduleUpdateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        enabled: { type: boolean }
+        hour: { type: integer, minimum: 0, maximum: 23 }
+        minute: { type: integer, minimum: 0, maximum: 59 }
+        timezone: { type: string, maxLength: 64, example: Europe/Moscow }
+        keep: { type: integer, minimum: 1, maximum: 90 }
+        include_edges: { type: boolean }
+        include_auth: { type: boolean }
+
+    ParseErrorsDeleteRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        ids:
+          type: array
+          items: { type: string, maxLength: 128 }
+          maxItems: 5000
+        all: { type: boolean }
+
     RetentionSettings:
       type: object
       required: [traffic_logs_days, edges_days, parse_errors_days, system_metrics_days]
+      additionalProperties: false
       properties:
         traffic_logs_days:
           type: integer
@@ -2304,6 +2360,7 @@ components:
 
     HuntMapState:
       type: object
+      additionalProperties: false
       properties:
         period: { type: string }
         period_from: { type: string }
@@ -2317,6 +2374,7 @@ components:
 
     HuntSchedule:
       type: object
+      additionalProperties: false
       properties:
         enabled: { type: boolean }
         interval_min: { type: integer, minimum: 15, maximum: 1440 }
@@ -2326,6 +2384,7 @@ components:
     SavedHuntInput:
       type: object
       required: [name, map]
+      additionalProperties: false
       properties:
         name: { type: string }
         notes: { type: string }
@@ -2343,6 +2402,7 @@ components:
         - suppress_hours
         - include_private
         - new_country_min_share
+      additionalProperties: false
       properties:
         enabled: { type: boolean }
         scan_interval_min: { type: integer, minimum: 1, maximum: 1440 }
@@ -2413,6 +2473,7 @@ components:
     AuthUser:
       type: object
       required: [username, role, reputationEnabled]
+      additionalProperties: false
       properties:
         username: { type: string }
         full_name: { type: string }

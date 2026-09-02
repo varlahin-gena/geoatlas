@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -104,10 +103,7 @@ func (h *AnomalyHandler) Assign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req assignAnomalyRequest
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		writeBadRequest(w, "invalid json")
+	if !decodeJSONBody(w, r, &req, smallJSONBodyLimit) {
 		return
 	}
 	by := h.actorName(r)
@@ -170,10 +166,7 @@ func (h *AnomalyHandler) PutSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req usecaseanomaly.Settings
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		writeBadRequest(w, "invalid json")
+	if !decodeJSONBody(w, r, &req, defaultJSONBodyLimit) {
 		return
 	}
 	timeout := h.cfg.QueryTimeout

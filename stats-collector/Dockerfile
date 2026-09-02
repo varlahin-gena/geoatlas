@@ -21,4 +21,6 @@ RUN apk add --no-cache ca-certificates=20260611-r0 tzdata=2026c-r0 && \
 USER app
 WORKDIR /app
 COPY --from=build /out/stats-collector /app/stats-collector
+LABEL org.opencontainers.image.title="geoatlas-stats-collector" \
+      org.opencontainers.image.source="https://github.com/varlahin-gena/geoatlas"
 ENTRYPOINT ["/app/stats-collector"]

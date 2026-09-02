@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
@@ -144,10 +143,7 @@ func (h *SystemHandler) PutRetention(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req usecaseretention.Settings
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		writeBadRequest(w, "invalid json")
+	if !decodeJSONBody(w, r, &req, defaultJSONBodyLimit) {
 		return
 	}
 	timeout := h.cfg.QueryTimeout
@@ -288,8 +284,7 @@ func (h *SystemHandler) PutBackupSchedule(w http.ResponseWriter, r *http.Request
 		IncludeEdges *bool  `json:"include_edges"`
 		IncludeAuth  *bool  `json:"include_auth"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeBadRequest(w, "invalid JSON")
+	if !decodeJSONBody(w, r, &body, defaultJSONBodyLimit) {
 		return
 	}
 	cur, err := h.backupUC.GetSchedule()
@@ -422,10 +417,7 @@ func (h *SystemHandler) PutTLS(w http.ResponseWriter, r *http.Request) {
 		CertPEM string `json:"cert_pem"`
 		KeyPEM  string `json:"key_pem"`
 	}
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		writeBadRequest(w, "invalid json")
+	if !decodeJSONBody(w, r, &req, largeJSONBodyLimit) {
 		return
 	}
 	err := h.tlsUC.Update(usecasetls.UpdateInput{CertPEM: req.CertPEM, KeyPEM: req.KeyPEM})

@@ -21,4 +21,8 @@ COPY docker-entrypoint.sh /docker-entrypoint-nm.sh
 RUN chmod +x /docker-entrypoint-nm.sh \
   && rm -f /etc/nginx/conf.d/default.conf
 EXPOSE 80 443
+LABEL org.opencontainers.image.title="geoatlas-frontend" \
+      org.opencontainers.image.source="https://github.com/varlahin-gena/geoatlas"
+HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=12 \
+    CMD wget -q -O /dev/null http://127.0.0.1/health || exit 1
 ENTRYPOINT ["/bin/sh", "/docker-entrypoint-nm.sh"]
