@@ -23,10 +23,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": {
-                        username: string;
-                        password: string;
-                    };
+                    "application/json": components["schemas"]["AuthLoginRequest"];
                 };
             };
             responses: {
@@ -243,9 +240,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": {
-                        dismissed: boolean;
-                    };
+                    "application/json": components["schemas"]["GeoWizardDismissRequest"];
                 };
             };
             responses: {
@@ -1063,11 +1058,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": {
-                        name: string;
-                        /** @enum {string} */
-                        scope: "read" | "ops" | "admin";
-                    };
+                    "application/json": components["schemas"]["ApiTokenCreateRequest"];
                 };
             };
             responses: {
@@ -1755,9 +1746,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": {
-                        assigned_to: string;
-                    };
+                    "application/json": components["schemas"]["AnomalyAssignRequest"];
                 };
             };
             responses: {
@@ -2063,20 +2052,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": {
-                        /**
-                         * @description Текущий Network редактируемой записи
-                         * @example 203.0.113.10
-                         */
-                        original_network: string;
-                        /** @example 203.0.113.0/24 */
-                        network: string;
-                        country: string;
-                        region: string;
-                        city: string;
-                        lat: number;
-                        lon: number;
-                    };
+                    "application/json": components["schemas"]["GeoRangeUpdateRequest"];
                 };
             };
             responses: {
@@ -2137,23 +2113,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": {
-                        /**
-                         * @description IP, CIDR (a.b.c.d/n) или диапазон (a.b.c.d-e.f.g.h)
-                         * @example 203.0.113.10
-                         */
-                        network: string;
-                        /** @example Россия */
-                        country: string;
-                        /** @example OOO_Company */
-                        region: string;
-                        /** @example Москва */
-                        city: string;
-                        /** @example 55.76167 */
-                        lat: number;
-                        /** @example 37.60667 */
-                        lon: number;
-                    };
+                    "application/json": components["schemas"]["GeoRangeAppendRequest"];
                 };
             };
             responses: {
@@ -2368,14 +2328,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": {
-                        /** @example 10.20.0.0/16 */
-                        network: string;
-                        label?: string;
-                        country?: string;
-                        region?: string;
-                        city?: string;
-                    };
+                    "application/json": components["schemas"]["EnterpriseNetCreateRequest"];
                 };
             };
             responses: {
@@ -2929,13 +2882,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": {
-                        name: string;
-                        url: string;
-                        category?: string;
-                        /** @enum {string} */
-                        format?: "netset" | "plain" | "spamhaus_json" | "csv_ip";
-                    };
+                    "application/json": components["schemas"]["ReputationFeedCreateRequest"];
                 };
             };
             responses: {
@@ -3628,10 +3575,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": {
-                        cert_pem: string;
-                        key_pem: string;
-                    };
+                    "application/json": components["schemas"]["TlsCertUploadRequest"];
                 };
             };
             responses: {
@@ -3993,16 +3937,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": {
-                        enabled?: boolean;
-                        hour?: number;
-                        minute?: number;
-                        /** @example Europe/Moscow */
-                        timezone?: string;
-                        keep?: number;
-                        include_edges?: boolean;
-                        include_auth?: boolean;
-                    };
+                    "application/json": components["schemas"]["BackupScheduleUpdateRequest"];
                 };
             };
             responses: {
@@ -4188,10 +4123,7 @@ export interface paths {
             };
             requestBody?: {
                 content: {
-                    "application/json": {
-                        ids?: string[];
-                        all?: boolean;
-                    };
+                    "application/json": components["schemas"]["ParseErrorsDeleteRequest"];
                 };
             };
             responses: {
@@ -4299,6 +4231,89 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ValidationError: {
+            error: string;
+        };
+        AuthLoginRequest: {
+            username: string;
+            password: string;
+        };
+        GeoWizardDismissRequest: {
+            dismissed: boolean;
+        };
+        ApiTokenCreateRequest: {
+            name: string;
+            /** @enum {string} */
+            scope: "read" | "ops" | "admin";
+        };
+        AnomalyAssignRequest: {
+            assigned_to: string;
+        };
+        GeoRangeAppendRequest: {
+            /**
+             * @description IP, CIDR (a.b.c.d/n) или диапазон (a.b.c.d-e.f.g.h)
+             * @example 203.0.113.10
+             */
+            network: string;
+            /** @example Россия */
+            country: string;
+            /** @example OOO_Company */
+            region: string;
+            /** @example Москва */
+            city: string;
+            /** @example 55.76167 */
+            lat: number;
+            /** @example 37.60667 */
+            lon: number;
+        };
+        GeoRangeUpdateRequest: {
+            /**
+             * @description Текущий Network редактируемой записи
+             * @example 203.0.113.10
+             */
+            original_network: string;
+            /** @example 203.0.113.0/24 */
+            network: string;
+            country: string;
+            region: string;
+            city: string;
+            lat: number;
+            lon: number;
+        };
+        EnterpriseNetCreateRequest: {
+            /** @example 10.20.0.0/16 */
+            network: string;
+            label?: string;
+            country?: string;
+            region?: string;
+            city?: string;
+        };
+        ReputationFeedCreateRequest: {
+            name: string;
+            /** Format: uri */
+            url: string;
+            category?: string;
+            /** @enum {string} */
+            format?: "netset" | "plain" | "spamhaus_json" | "csv_ip";
+        };
+        TlsCertUploadRequest: {
+            cert_pem: string;
+            key_pem: string;
+        };
+        BackupScheduleUpdateRequest: {
+            enabled?: boolean;
+            hour?: number;
+            minute?: number;
+            /** @example Europe/Moscow */
+            timezone?: string;
+            keep?: number;
+            include_edges?: boolean;
+            include_auth?: boolean;
+        };
+        ParseErrorsDeleteRequest: {
+            ids?: string[];
+            all?: boolean;
+        };
         RetentionSettings: {
             /** @description TTL для traffic_logs (дни) */
             traffic_logs_days: number;

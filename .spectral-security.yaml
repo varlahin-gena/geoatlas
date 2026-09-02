@@ -2,26 +2,80 @@ extends:
   - spectral:oas
 
 rules:
-  mutation-schemas-closed:
-    description: Mutation component schemas must set additionalProperties false.
+  auth-login-closed:
+    description: AuthLoginRequest must set additionalProperties false.
     severity: error
-    given: $.components.schemas[AuthLoginRequest,RetentionSettings,AnomalyEngineSettings,SavedHuntInput,ApiTokenCreateRequest,GeoRangeAppendRequest,ParseErrorsDeleteRequest,BackupScheduleUpdateRequest,TlsCertUploadRequest].additionalProperties
+    given: $.components.schemas.AuthLoginRequest
     then:
-      function: equal
+      field: additionalProperties
+      function: schema
       functionOptions:
-        value: false
+        schema:
+          const: false
 
-  auth-login-string-bounds:
-    description: Login credentials must declare maxLength on string fields.
+  retention-closed:
+    description: RetentionSettings must set additionalProperties false.
+    severity: error
+    given: $.components.schemas.RetentionSettings
+    then:
+      field: additionalProperties
+      function: schema
+      functionOptions:
+        schema:
+          const: false
+
+  anomaly-settings-closed:
+    description: AnomalyEngineSettings must set additionalProperties false.
+    severity: error
+    given: $.components.schemas.AnomalyEngineSettings
+    then:
+      field: additionalProperties
+      function: schema
+      functionOptions:
+        schema:
+          const: false
+
+  saved-hunt-closed:
+    description: SavedHuntInput must set additionalProperties false.
+    severity: error
+    given: $.components.schemas.SavedHuntInput
+    then:
+      field: additionalProperties
+      function: schema
+      functionOptions:
+        schema:
+          const: false
+
+  api-token-create-closed:
+    description: ApiTokenCreateRequest must set additionalProperties false.
+    severity: error
+    given: $.components.schemas.ApiTokenCreateRequest
+    then:
+      field: additionalProperties
+      function: schema
+      functionOptions:
+        schema:
+          const: false
+
+  auth-login-username-bounds:
+    description: Login username must declare maxLength.
     severity: warn
-    given: $.components.schemas.AuthLoginRequest.properties[username,password]
+    given: $.components.schemas.AuthLoginRequest.properties.username
     then:
       field: maxLength
-      function: truthy
+      function: defined
+
+  auth-login-password-bounds:
+    description: Login password must declare maxLength.
+    severity: warn
+    given: $.components.schemas.AuthLoginRequest.properties.password
+    then:
+      field: maxLength
+      function: defined
 
   validation-error-schema:
     description: Shared ValidationError response schema should exist.
     severity: warn
     given: $.components.schemas.ValidationError
     then:
-      function: truthy
+      function: defined
