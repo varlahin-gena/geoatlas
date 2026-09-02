@@ -76,6 +76,9 @@ type Config struct {
 	IngestAllowFrom string
 	// TrustedProxies — CSV hostnames/CIDRs для X-Real-IP (login throttle); дефолт frontend.
 	TrustedProxies     string
+	// APIRateLimitRPS — SpikeArrest (GA_API_RATE_LIMIT_RPS); 0 = выкл, дефолт 30 rps.
+	APIRateLimitRPS   float64
+	APIRateLimitBurst int // GA_API_RATE_BURST
 	QueryTimeout       time.Duration
 	CHMaxMemoryUsage   int64
 	CHExternalGroupBy  int64
@@ -193,6 +196,8 @@ func FromEnv() Config {
 		IngestSharedSecret:   envOr("INGEST_SHARED_SECRET", ""),
 		IngestAllowFrom:      envOr("INGEST_ALLOW_FROM", "syslog-ng"),
 		TrustedProxies:       envOr("GA_TRUSTED_PROXIES", "frontend"),
+		APIRateLimitRPS:      parser.float("GA_API_RATE_LIMIT_RPS", 30),
+		APIRateLimitBurst:    parser.int("GA_API_RATE_BURST", 60),
 		QueryTimeout:         parser.durationSeconds("QUERY_TIMEOUT_SEC", 3*time.Minute),
 		CHMaxMemoryUsage:     parser.int64("CH_MAX_MEMORY_USAGE", 2<<30),
 		CHExternalGroupBy:    parser.int64("CH_EXTERNAL_GROUP_BY_BYTES", 256<<20),

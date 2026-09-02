@@ -36,6 +36,21 @@ func TestDecodeJSONBodyRejectsTrailingJSON(t *testing.T) {
 	}
 }
 
+func TestDecodeJSONBodyRejectsDeepNesting(t *testing.T) {
+	var body struct {
+		Nested map[string]any `json:"nested"`
+	}
+	payload := `{"nested":{"a":{"b":{"c":{"d":{"e":{"f":1}}}}}}}`
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(payload))
+	rec := httptest.NewRecorder()
+	if decodeJSONBody(rec, req, &body, defaultJSONBodyLimit) {
+		t.Fatal("expected deep json rejection")
+	}
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rec.Code)
+	}
+}
+
 func TestDecodeJSONBodyAcceptsValidPayload(t *testing.T) {
 	var body struct {
 		Username string `json:"username"`

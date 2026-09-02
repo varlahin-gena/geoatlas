@@ -1,10 +1,13 @@
 package httpapi
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
+
+	"geoatlas/internal/adapter/httpapi/threatprot"
 )
 
 const (
@@ -20,14 +23,23 @@ func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst any, maxBytes in
 	if maxBytes <= 0 {
 		maxBytes = defaultJSONBodyLimit
 	}
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBytes))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(dst); err != nil {
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBytes))
+	if err != nil {
 		var maxErr *http.MaxBytesError
 		if errors.As(err, &maxErr) {
 			writeDomainError(w, "json body too large", maxErr)
 			return false
 		}
+		writeBadRequest(w, "invalid json")
+		return false
+	}
+	if err := threatprot.ValidateJSONStructure(body, threatprot.MaxJSONContainerDepth, threatprot.MaxJSONStringLength); err != nil {
+		writeBadRequest(w, "invalid json")
+		return false
+	}
+	dec := json.NewDecoder(bytes.NewReader(body))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(dst); err != nil {
 		writeBadRequest(w, "invalid json")
 		return false
 	}

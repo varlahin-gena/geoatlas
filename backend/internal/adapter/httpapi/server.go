@@ -360,6 +360,7 @@ func NewServer(p Params, opts ...ServerOption) *Server {
 	if deps.prom != nil {
 		h = metricsMW(deps.prom)(h)
 	}
+	h = apiThreatMW(cfg)(h)
 	h = recoverMW(h)
 	h = requestIDMW(h) // outermost
 
