@@ -1,5 +1,5 @@
 # context: репозиторий (.) — нужен pkg/chconn и pkg/syslogngstats
-FROM golang:1.25.14-alpine AS build
+FROM golang:1.26.8-alpine AS build
 WORKDIR /src
 
 COPY pkg/chconn ./pkg/chconn

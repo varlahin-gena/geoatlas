@@ -7,7 +7,7 @@ on:
 
 # Isolate modules: a Dependabot bump that raises one go.mod language version
 # must not fail chconn/stats via go.work. GOTOOLCHAIN=local keeps CI on setup-go
-# 1.25.x; check-latest: true picks the current patch (1.25.13+ stdlib advisories).
+# 1.26.x; check-latest: true picks the current patch (stdlib advisories).
 env:
   GOWORK: "off"
   GOTOOLCHAIN: local
@@ -210,7 +210,7 @@ jobs:
 
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
-          go-version: "1.25.x"
+          go-version: "1.26.x"
           check-latest: true
           cache-dependency-path: |
             backend/go.sum
@@ -316,7 +316,7 @@ jobs:
 
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
-          go-version: "1.25.x"
+          go-version: "1.26.x"
           check-latest: true
           cache-dependency-path: |
             pkg/chconn/go.sum
@@ -338,7 +338,7 @@ jobs:
 
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
-          go-version: "1.25.x"
+          go-version: "1.26.x"
           check-latest: true
           cache-dependency-path: pkg/syslogngstats/go.mod
 
@@ -376,7 +376,7 @@ jobs:
 
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
-          go-version: "1.25.x"
+          go-version: "1.26.x"
           check-latest: true
           cache-dependency-path: |
             backend/go.sum
@@ -448,7 +448,7 @@ jobs:
 
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
-          go-version: "1.25.x"
+          go-version: "1.26.x"
           check-latest: true
           cache-dependency-path: |
             stats-collector/go.sum
@@ -482,7 +482,7 @@ jobs:
 
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
-          go-version: "1.25.x"
+          go-version: "1.26.x"
           check-latest: true
           cache-dependency-path: |
             backend/go.sum
