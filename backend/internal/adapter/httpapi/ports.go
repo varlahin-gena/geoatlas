@@ -18,7 +18,8 @@ type Ingester interface {
 
 type APITokenStore interface {
 	List() []auth.APITokenPublic
-	Create(string, string) (auth.APITokenPublic, string, error)
+	Create(name, scope string, expiresAt time.Time) (auth.APITokenPublic, string, error)
+	Rotate(id string) (auth.APITokenPublic, string, error)
 	Revoke(string) error
 	Verify(string) (string, bool)
 }

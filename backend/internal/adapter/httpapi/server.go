@@ -163,6 +163,9 @@ func NewServer(p Params, opts ...ServerOption) *Server {
 	rr.Handle("POST", "/api/tokens",
 		chain(http.HandlerFunc(tokensH.Create), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
 	)
+	rr.Handle("POST", "/api/tokens/{id}/rotate",
+		chain(http.HandlerFunc(tokensH.Rotate), adminMW, csrf, maxBytesMW(maxJSONBodySize)),
+	)
 	rr.Handle("DELETE", "/api/tokens/{id}",
 		chain(http.HandlerFunc(tokensH.Revoke), adminMW, csrf),
 	)
@@ -361,6 +364,8 @@ func NewServer(p Params, opts ...ServerOption) *Server {
 		h = metricsMW(deps.prom)(h)
 	}
 	h = apiThreatMW(cfg)(h)
+	proxyGateOn := cfg.RequireProxy && !uiAuthOff && !apiAuthOff
+	h = proxyGateMW(ba, proxyGateOn)(h)
 	h = recoverMW(h)
 	h = requestIDMW(h) // outermost
 

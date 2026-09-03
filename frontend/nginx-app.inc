@@ -24,7 +24,8 @@
         application/geo+json
         image/svg+xml;
 
-    include /etc/nginx/includes/security-headers.inc;
+    # Security headers: only in locations that need them (not server{} —
+    # inheritance would attach SPA CSP to /api/* proxy responses).
 
     location ~ /\. {
         deny all;
@@ -76,6 +77,7 @@
         access_log off;
         default_type application/json;
         add_header Cache-Control "no-store" always;
+        include /etc/nginx/includes/security-headers-edge.inc;
         return 200 '{"ok":true,"status":"live"}';
     }
 

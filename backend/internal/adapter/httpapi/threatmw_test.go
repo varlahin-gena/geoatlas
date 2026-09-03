@@ -8,7 +8,7 @@ import (
 	"geoatlas/internal/config"
 )
 
-func TestAPITreatMWRejectsPathTraversal(t *testing.T) {
+func TestAPIThreatMWRejectsPathTraversal(t *testing.T) {
 	cfg := config.Config{APIRateLimitRPS: 0}
 	h := apiThreatMW(cfg)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
@@ -21,8 +21,9 @@ func TestAPITreatMWRejectsPathTraversal(t *testing.T) {
 	}
 }
 
-func TestAPITreatMWRateLimit(t *testing.T) {
-	cfg := config.Config{APIRateLimitRPS: 1, APIRateLimitBurst: 1}
+func TestAPIThreatMWRateLimit(t *testing.T) {
+	// RPS ≪ 1 so the bucket does not refill between immediate requests.
+	cfg := config.Config{APIRateLimitRPS: 0.001, APIRateLimitBurst: 1}
 	h := apiThreatMW(cfg)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
@@ -34,13 +35,18 @@ func TestAPITreatMWRateLimit(t *testing.T) {
 		if i == 0 && rec.Code != http.StatusNoContent {
 			t.Fatalf("first status = %d", rec.Code)
 		}
-		if i == 1 && rec.Code != http.StatusTooManyRequests {
-			t.Fatalf("second status = %d, want 429", rec.Code)
+		if i == 1 {
+			if rec.Code != http.StatusTooManyRequests {
+				t.Fatalf("second status = %d, want 429", rec.Code)
+			}
+			if rec.Header().Get("Retry-After") == "" {
+				t.Fatal("expected Retry-After on 429")
+			}
 		}
 	}
 }
 
-func TestAPITreatMWSetsSecurityHeaders(t *testing.T) {
+func TestAPIThreatMWSetsSecurityHeaders(t *testing.T) {
 	cfg := config.Config{APIRateLimitRPS: 0}
 	h := apiThreatMW(cfg)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

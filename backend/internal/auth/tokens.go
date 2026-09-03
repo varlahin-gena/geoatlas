@@ -20,10 +20,11 @@ import (
 )
 
 var (
-	ErrTokenNotFound  = errors.New("api token not found")
+	ErrTokenNotFound    = errors.New("api token not found")
 	ErrInvalidTokenName = errors.New("invalid api token name")
-	ErrInvalidScope   = errors.New("invalid api token scope")
-	ErrTokenLimit     = errors.New("api token limit reached")
+	ErrInvalidScope     = errors.New("invalid api token scope")
+	ErrTokenLimit       = errors.New("api token limit reached")
+	ErrInvalidExpiry    = errors.New("invalid api token expiry")
 )
 
 const (
@@ -31,8 +32,9 @@ const (
 	ScopeOps   = "ops"
 	ScopeAdmin = "admin"
 
-	maxAPITokens = 64
-	tokenBytes   = 32
+	maxAPITokens   = 64
+	tokenBytes     = 32
+	maxTokenTTL    = 365 * 24 * time.Hour
 )
 
 var tokenNameRe = regexp.MustCompile(`^[a-zA-Z0-9._\- ]{2,64}$`)
@@ -61,6 +63,7 @@ type APIToken struct {
 	TokenHash string `json:"token_hash"`
 	Scope     string `json:"scope"`
 	CreatedAt string `json:"created_at,omitempty"`
+	ExpiresAt string `json:"expires_at,omitempty"` // RFC3339; пусто = без срока
 }
 
 // APITokenPublic — без хеша (для списка).
@@ -69,10 +72,43 @@ type APITokenPublic struct {
 	Name      string `json:"name"`
 	Scope     string `json:"scope"`
 	CreatedAt string `json:"created_at,omitempty"`
+	ExpiresAt string `json:"expires_at,omitempty"`
 }
 
 func (t APIToken) Public() APITokenPublic {
-	return APITokenPublic{ID: t.ID, Name: t.Name, Scope: t.Scope, CreatedAt: t.CreatedAt}
+	return APITokenPublic{
+		ID:        t.ID,
+		Name:      t.Name,
+		Scope:     t.Scope,
+		CreatedAt: t.CreatedAt,
+		ExpiresAt: t.ExpiresAt,
+	}
+}
+
+func (t APIToken) expired(now time.Time) bool {
+	exp := strings.TrimSpace(t.ExpiresAt)
+	if exp == "" {
+		return false
+	}
+	ts, err := time.Parse(time.RFC3339, exp)
+	if err != nil {
+		return true
+	}
+	return !ts.After(now)
+}
+
+func normalizeExpiry(expiresAt time.Time, now time.Time) (string, error) {
+	if expiresAt.IsZero() {
+		return "", nil
+	}
+	exp := expiresAt.UTC()
+	if !exp.After(now) {
+		return "", fmt.Errorf("%w: must be in the future", ErrInvalidExpiry)
+	}
+	if exp.Sub(now) > maxTokenTTL {
+		return "", fmt.Errorf("%w: max TTL is %s", ErrInvalidExpiry, maxTokenTTL)
+	}
+	return exp.Format(time.RFC3339), nil
 }
 
 type tokensFile struct {
@@ -177,7 +213,8 @@ func (s *TokenStore) List() []APITokenPublic {
 }
 
 // Create генерирует секрет, сохраняет хеш, возвращает plaintext один раз.
-func (s *TokenStore) Create(name, scope string) (pub APITokenPublic, plaintext string, err error) {
+// expiresAt zero = без срока; иначе RFC3339 в будущем (макс. 365 дней).
+func (s *TokenStore) Create(name, scope string, expiresAt time.Time) (pub APITokenPublic, plaintext string, err error) {
 	if s == nil {
 		return APITokenPublic{}, "", fmt.Errorf("token store not configured")
 	}
@@ -188,6 +225,11 @@ func (s *TokenStore) Create(name, scope string) (pub APITokenPublic, plaintext s
 	}
 	if !ValidScope(scope) {
 		return APITokenPublic{}, "", fmt.Errorf("%w: %q", ErrInvalidScope, scope)
+	}
+	now := time.Now().UTC()
+	expStr, err := normalizeExpiry(expiresAt, now)
+	if err != nil {
+		return APITokenPublic{}, "", err
 	}
 
 	plain, err := generateAPIToken()
@@ -204,7 +246,8 @@ func (s *TokenStore) Create(name, scope string) (pub APITokenPublic, plaintext s
 		Name:      name,
 		TokenHash: hashAPIToken(plain),
 		Scope:     scope,
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+		CreatedAt: now.Format(time.RFC3339),
+		ExpiresAt: expStr,
 	}
 
 	s.mu.Lock()
@@ -236,7 +279,34 @@ func (s *TokenStore) Revoke(id string) error {
 	return s.persistUnlocked()
 }
 
-// Verify возвращает scope при совпадении plaintext с хешем в store.
+// Rotate заменяет секрет токена (тот же id/name/scope/expires_at); plaintext один раз.
+func (s *TokenStore) Rotate(id string) (pub APITokenPublic, plaintext string, err error) {
+	if s == nil {
+		return APITokenPublic{}, "", fmt.Errorf("token store not configured")
+	}
+	id = strings.TrimSpace(id)
+	plain, err := generateAPIToken()
+	if err != nil {
+		return APITokenPublic{}, "", err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t, ok := s.byID[id]
+	if !ok {
+		return APITokenPublic{}, "", ErrTokenNotFound
+	}
+	if t.expired(time.Now().UTC()) {
+		return APITokenPublic{}, "", ErrTokenNotFound
+	}
+	t.TokenHash = hashAPIToken(plain)
+	if err := s.persistUnlocked(); err != nil {
+		return APITokenPublic{}, "", err
+	}
+	return t.Public(), plain, nil
+}
+
+// Verify возвращает scope при совпадении plaintext с хешем в store (истекшие — false).
 func (s *TokenStore) Verify(plaintext string) (scope string, ok bool) {
 	if s == nil {
 		return "", false
@@ -247,6 +317,7 @@ func (s *TokenStore) Verify(plaintext string) (scope string, ok bool) {
 	}
 	want := hashAPIToken(plaintext)
 	wantb := []byte(want)
+	now := time.Now().UTC()
 
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -256,6 +327,9 @@ func (s *TokenStore) Verify(plaintext string) (scope string, ok bool) {
 			continue
 		}
 		if subtle.ConstantTimeCompare(hb, wantb) == 1 {
+			if t.expired(now) {
+				return "", false
+			}
 			return t.Scope, true
 		}
 	}

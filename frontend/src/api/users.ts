@@ -1,4 +1,4 @@
-import { apiDelete, apiFetch, apiGet, apiPath, apiPost } from './client';
+import { apiFetch, apiGet, apiPath, apiPost } from './client';
 import type { components } from './openapi';
 import type { UserRole } from './types';
 
@@ -40,13 +40,16 @@ export function updateUserRole(username: string, role: UserRole | string): Promi
   });
 }
 
-export function deleteUser(username: string): Promise<unknown> {
-  return apiDelete(apiPath('/api/users/{username}', { username }));
+export function deleteUser(username: string, currentPassword: string): Promise<unknown> {
+  return apiFetch(apiPath('/api/users/{username}', { username }), {
+    method: 'DELETE',
+    body: JSON.stringify({ current_password: currentPassword }),
+  });
 }
 
 export function resetUserPassword(
   username: string,
-  body: { password: string; must_reset_password?: boolean },
+  body: { password: string; must_reset_password?: boolean; current_password: string },
 ): Promise<unknown> {
   return apiFetch(apiPath('/api/users/{username}/reset-password', { username }), {
     method: 'POST',

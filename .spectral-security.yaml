@@ -2,10 +2,66 @@ extends:
   - spectral:oas
 
 rules:
+  # Mass-assignment guards on closed request schemas
   auth-login-closed:
     description: AuthLoginRequest must set additionalProperties false.
     severity: error
     given: $.components.schemas.AuthLoginRequest
+    then:
+      field: additionalProperties
+      function: schema
+      functionOptions:
+        schema:
+          const: false
+
+  auth-change-password-closed:
+    description: AuthChangePasswordRequest must set additionalProperties false.
+    severity: error
+    given: $.components.schemas.AuthChangePasswordRequest
+    then:
+      field: additionalProperties
+      function: schema
+      functionOptions:
+        schema:
+          const: false
+
+  auth-create-user-closed:
+    description: AuthCreateUserRequest must set additionalProperties false.
+    severity: error
+    given: $.components.schemas.AuthCreateUserRequest
+    then:
+      field: additionalProperties
+      function: schema
+      functionOptions:
+        schema:
+          const: false
+
+  auth-set-role-closed:
+    description: AuthSetRoleRequest must set additionalProperties false.
+    severity: error
+    given: $.components.schemas.AuthSetRoleRequest
+    then:
+      field: additionalProperties
+      function: schema
+      functionOptions:
+        schema:
+          const: false
+
+  auth-set-fullname-closed:
+    description: AuthSetFullNameRequest must set additionalProperties false.
+    severity: error
+    given: $.components.schemas.AuthSetFullNameRequest
+    then:
+      field: additionalProperties
+      function: schema
+      functionOptions:
+        schema:
+          const: false
+
+  auth-reset-password-closed:
+    description: AuthResetPasswordRequest must set additionalProperties false.
+    severity: error
+    given: $.components.schemas.AuthResetPasswordRequest
     then:
       field: additionalProperties
       function: schema
@@ -35,6 +91,17 @@ rules:
         schema:
           const: false
 
+  anomaly-thresholds-closed:
+    description: AnomalyThresholds must set additionalProperties false.
+    severity: error
+    given: $.components.schemas.AnomalyThresholds
+    then:
+      field: additionalProperties
+      function: schema
+      functionOptions:
+        schema:
+          const: false
+
   saved-hunt-closed:
     description: SavedHuntInput must set additionalProperties false.
     severity: error
@@ -57,9 +124,10 @@ rules:
         schema:
           const: false
 
+  # String bounds (DoS / oversized payload)
   auth-login-username-bounds:
     description: Login username must declare maxLength.
-    severity: warn
+    severity: error
     given: $.components.schemas.AuthLoginRequest.properties.username
     then:
       field: maxLength
@@ -67,15 +135,30 @@ rules:
 
   auth-login-password-bounds:
     description: Login password must declare maxLength.
-    severity: warn
+    severity: error
     given: $.components.schemas.AuthLoginRequest.properties.password
+    then:
+      field: maxLength
+      function: defined
+
+  saved-hunt-name-bounds:
+    description: SavedHuntInput.name must declare maxLength.
+    severity: error
+    given: $.components.schemas.SavedHuntInput.properties.name
     then:
       field: maxLength
       function: defined
 
   validation-error-schema:
     description: Shared ValidationError response schema should exist.
-    severity: warn
+    severity: error
     given: $.components.schemas.ValidationError
+    then:
+      function: defined
+
+  validation-error-response:
+    description: Shared ValidationError component response should exist.
+    severity: error
+    given: $.components.responses.ValidationError
     then:
       function: defined

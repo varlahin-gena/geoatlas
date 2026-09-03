@@ -17,7 +17,8 @@ import (
 type openAPIDoc struct {
 	Paths      map[string]map[string]any `yaml:"paths"`
 	Components struct {
-		Schemas map[string]any `yaml:"schemas"`
+		Schemas   map[string]any `yaml:"schemas"`
+		Responses map[string]any `yaml:"responses"`
 	} `yaml:"components"`
 }
 

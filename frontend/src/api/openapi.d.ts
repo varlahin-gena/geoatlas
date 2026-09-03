@@ -36,6 +36,7 @@ export interface paths {
                         "application/json": components["schemas"]["AuthUser"];
                     };
                 };
+                400: components["responses"]["ValidationError"];
                 /** @description Неверные учётные данные */
                 401: {
                     headers: {
@@ -96,7 +97,8 @@ export interface paths {
         put?: never;
         /**
          * Revoke всех сессий текущего пользователя (bump session_version) + clear cookie
-         * @description Инвалидирует все cookie с прежним `session_version`. Требует валидную сессию и CSRF.
+         * @description Инвалидирует все cookie с прежним `session_version`. Требует валидную сессию, CSRF
+         *     и повторный ввод пароля (`current_password`) для cookie-сессии.
          */
         post: {
             parameters: {
@@ -105,7 +107,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ReauthRequest"];
+                };
+            };
             responses: {
                 /** @description OK */
                 200: {
@@ -193,7 +199,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AuthChangePasswordRequest"];
+                };
+            };
             responses: {
                 /** @description OK */
                 200: {
@@ -202,6 +212,7 @@ export interface paths {
                     };
                     content?: never;
                 };
+                400: components["responses"]["ValidationError"];
                 /** @description Неверный текущий пароль / нет сессии */
                 401: {
                     headers: {
@@ -253,13 +264,7 @@ export interface paths {
                         "application/json": components["schemas"]["AuthUser"];
                     };
                 };
-                /** @description Неверный JSON */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
+                400: components["responses"]["ValidationError"];
                 /** @description Нет сессии */
                 401: {
                     headers: {
@@ -449,7 +454,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AuthCreateUserRequest"];
+                };
+            };
             responses: {
                 /** @description Created */
                 201: {
@@ -460,6 +469,7 @@ export interface paths {
                         "application/json": components["schemas"]["AuthUserPublic"];
                     };
                 };
+                400: components["responses"]["ValidationError"];
             };
         };
         delete?: never;
@@ -531,7 +541,11 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AuthSetRoleRequest"];
+                };
+            };
             responses: {
                 /** @description OK */
                 200: {
@@ -540,6 +554,7 @@ export interface paths {
                     };
                     content?: never;
                 };
+                400: components["responses"]["ValidationError"];
             };
         };
         delete?: never;
@@ -567,7 +582,11 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AuthSetFullNameRequest"];
+                };
+            };
             responses: {
                 /** @description OK */
                 200: {
@@ -576,6 +595,7 @@ export interface paths {
                     };
                     content?: never;
                 };
+                400: components["responses"]["ValidationError"];
             };
         };
         delete?: never;
@@ -603,7 +623,11 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AuthResetPasswordRequest"];
+                };
+            };
             responses: {
                 /** @description OK */
                 200: {
@@ -612,6 +636,7 @@ export interface paths {
                     };
                     content?: never;
                 };
+                400: components["responses"]["ValidationError"];
             };
         };
         delete?: never;
@@ -640,7 +665,11 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ReauthRequest"];
+                };
+            };
             responses: {
                 /** @description OK */
                 200: {
@@ -1099,7 +1128,11 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ReauthRequest"];
+                };
+            };
             responses: {
                 /** @description OK */
                 200: {
@@ -1110,6 +1143,59 @@ export interface paths {
                 };
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tokens/{id}/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ротация секрета токена
+         * @description Генерирует новый secret (возвращается один раз). id, name, scope и expires_at сохраняются.
+         *     Старый secret сразу перестаёт работать. Истёкший токен ротировать нельзя (404).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ReauthRequest"];
+                };
+            };
+            responses: {
+                /** @description OK (token metadata + новый secret) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiTokenCreateResponse"];
+                    };
+                };
+                /** @description Not found or expired */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -4238,6 +4324,35 @@ export interface components {
             username: string;
             password: string;
         };
+        AuthChangePasswordRequest: {
+            old_password: string;
+            new_password: string;
+        };
+        AuthCreateUserRequest: {
+            username: string;
+            full_name?: string;
+            password: string;
+            /** @enum {string} */
+            role: "administrator" | "operator" | "dashboard";
+            must_reset_password: boolean;
+        };
+        AuthSetRoleRequest: {
+            /** @enum {string} */
+            role: "administrator" | "operator" | "dashboard";
+        };
+        AuthSetFullNameRequest: {
+            full_name: string;
+        };
+        AuthResetPasswordRequest: {
+            password: string;
+            must_reset_password: boolean;
+            /** @description Пароль текущего администратора (re-auth для cookie-сессии) */
+            current_password?: string;
+        };
+        ReauthRequest: {
+            /** @description Пароль текущего пользователя (re-auth для cookie-сессии; Bearer может опустить) */
+            current_password: string;
+        };
         GeoWizardDismissRequest: {
             dismissed: boolean;
         };
@@ -4245,6 +4360,13 @@ export interface components {
             name: string;
             /** @enum {string} */
             scope: "read" | "ops" | "admin";
+            /**
+             * Format: date-time
+             * @description RFC3339; пусто/omit — без срока (макс. 365 дней от сейчас)
+             */
+            expires_at?: string;
+            /** @description Пароль текущего администратора (re-auth для cookie-сессии) */
+            current_password?: string;
         };
         AnomalyAssignRequest: {
             assigned_to: string;
@@ -4299,6 +4421,8 @@ export interface components {
         TlsCertUploadRequest: {
             cert_pem: string;
             key_pem: string;
+            /** @description Пароль текущего администратора (re-auth для cookie-сессии) */
+            current_password?: string;
         };
         BackupScheduleUpdateRequest: {
             enabled?: boolean;
@@ -4521,8 +4645,6 @@ export interface components {
             beacon_min_regularity?: number;
             lateral_hosts?: number;
             lateral_events?: number;
-        } & {
-            [key: string]: unknown;
         };
         AnomalySettingsResponse: {
             ok?: boolean;
@@ -4745,6 +4867,11 @@ export interface components {
             /** @enum {string} */
             scope: "read" | "ops" | "admin";
             created_at?: string;
+            /**
+             * Format: date-time
+             * @description RFC3339; отсутствует — без срока
+             */
+            expires_at?: string;
         };
         ApiTokenList: {
             tokens?: components["schemas"]["ApiToken"][];
@@ -4950,7 +5077,17 @@ export interface components {
             assigned_to?: string;
         };
     };
-    responses: never;
+    responses: {
+        /** @description Request validation failed */
+        ValidationError: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ValidationError"];
+            };
+        };
+    };
     parameters: never;
     requestBodies: never;
     headers: never;

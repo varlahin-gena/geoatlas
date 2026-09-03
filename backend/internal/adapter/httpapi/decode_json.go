@@ -33,7 +33,11 @@ func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst any, maxBytes in
 		writeBadRequest(w, "invalid json")
 		return false
 	}
-	if err := threatprot.ValidateJSONStructure(body, threatprot.MaxJSONContainerDepth, threatprot.MaxJSONStringLength); err != nil {
+	maxStr := threatprot.MaxJSONStringLength
+	if maxBytes >= largeJSONBodyLimit {
+		maxStr = threatprot.MaxJSONStringLengthLarge
+	}
+	if err := threatprot.ValidateJSONStructure(body, threatprot.MaxJSONContainerDepth, maxStr); err != nil {
 		writeBadRequest(w, "invalid json")
 		return false
 	}

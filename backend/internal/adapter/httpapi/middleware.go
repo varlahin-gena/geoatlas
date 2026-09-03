@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"geoatlas/internal/adapter/httpapi/authmw"
+	"geoatlas/internal/adapter/httpapi/loginthrottle"
 	"geoatlas/internal/auth"
 )
 
@@ -215,6 +216,23 @@ func requireAdminMW(ba authmw.BearerAuth, sessions SessionParser, users UserDire
 
 func requireOpsMW(ba authmw.BearerAuth, sessions SessionParser, users UserDirectory, apiAuthDisabled, authDisabled bool) middleware {
 	return middleware(authmw.RequireOps(ba, sessionLoader(sessions), users, apiAuthDisabled, authDisabled))
+}
+
+// proxyGateMW — браузерный доступ только через nginx (GA_TRUSTED_PROXIES / loopback).
+// Прямой доступ с хоста к :8080 отклоняется; machine clients с валидным Bearer — ок.
+// Включается GA_REQUIRE_PROXY=1; также выкл. при AUTH_DISABLED / API_AUTH_DISABLED.
+func proxyGateMW(ba authmw.BearerAuth, enabled bool) middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !enabled || loginthrottle.RequestFromTrustedHop(r) || ba.Any(r) {
+				next.ServeHTTP(w, r)
+				return
+			}
+			writeJSON(w, http.StatusForbidden, map[string]any{
+				"error": "direct backend access denied; use reverse proxy",
+			})
+		})
+	}
 }
 
 // withTimeout навешивает жёсткий дедлайн на быстрые read-эндпоинты.

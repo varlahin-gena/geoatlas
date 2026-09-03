@@ -24,6 +24,7 @@ func apiThreatMW(cfg config.Config) middleware {
 			if !rateLimitExempt(r.URL.Path) {
 				key := threatprot.RateLimitKey(r, loginthrottle.ClientIP)
 				if !limiter.Allow(key) {
+					w.Header().Set("Retry-After", "1")
 					writeJSON(w, http.StatusTooManyRequests, map[string]any{
 						"error":   "rate limit exceeded",
 						"details": map[string]any{"reason": "rate_limited"},

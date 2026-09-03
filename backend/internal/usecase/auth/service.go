@@ -37,6 +37,15 @@ type LoginResult struct {
 	Token string
 }
 
+// VerifyPassword — re-auth: пароль текущего актёра без выдачи сессии.
+func (s *Service) VerifyPassword(username, password string) bool {
+	if s == nil || s.users == nil {
+		return false
+	}
+	_, ok := s.users.Authenticate(username, password)
+	return ok
+}
+
 func (s *Service) Login(username, password string) (LoginResult, error) {
 	if s == nil || s.users == nil || s.sessions == nil {
 		return LoginResult{}, ErrNotConfigured

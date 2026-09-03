@@ -121,10 +121,13 @@ services:
       dockerfile: backend/Dockerfile
     image: geoatlas-backend:latest
     container_name: backend
+    # 8080 только внутри docker-сети (expose). Не публиковать ports: "8080:8080" —
+    # снаружи API доступен через frontend/nginx. GA_REQUIRE_PROXY режет прямой заход.
     expose:
       - "8080"
       - "1514"
     environment:
+      GA_REQUIRE_PROXY: "1"
       CLICKHOUSE_HOST: clickhouse
       CLICKHOUSE_PORT: "9000"
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}

@@ -26,7 +26,7 @@ interface AuthContextValue {
   login: (username: string, password: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
   /** Завершить все сессии (все устройства) и перейти на /login. */
-  logoutAll: () => Promise<void>;
+  logoutAll: (currentPassword: string) => Promise<void>;
   toggleTheme: () => void;
 }
 
@@ -95,12 +95,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     navigate('/login');
   }, [navigate]);
 
-  const logoutAll = useCallback(async () => {
-    try {
-      await authApi.logoutAll();
-    } catch {
-      /* ignore — всё равно сбрасываем локальную сессию */
-    }
+  const logoutAll = useCallback(async (currentPassword: string) => {
+    await authApi.logoutAll(currentPassword);
     setUser(null);
     navigate('/login');
   }, [navigate]);

@@ -5,6 +5,8 @@ import { isAbortError } from '@/api/client';
 import { fetchSystemStatus, fetchSystemVersion } from '@/api/system';
 import { roleLabelRu } from '@/auth/roles';
 import { themeLabel } from '@/auth/theme';
+import { ReauthModal } from '@/components/ReauthModal';
+import { useToast } from '@/components/Toast';
 import { usePolling } from '@/lib/usePolling';
 import { filterNav, PAGE_NAV } from './nav';
 import { NavSections } from './NavSections';
@@ -39,7 +41,11 @@ export function AdminSidebar() {
 
 export function UserMenu() {
   const { user, theme, toggleTheme, logout, logoutAll } = useAuth();
+  const { toast } = useToast();
   const [open, setOpen] = useState(false);
+  const [logoutAllOpen, setLogoutAllOpen] = useState(false);
+  const [logoutAllPassword, setLogoutAllPassword] = useState('');
+  const [logoutAllBusy, setLogoutAllBusy] = useState(false);
   const [versionText, setVersionText] = useState('');
   const [versionTitle, setVersionTitle] = useState('');
   const ref = useRef<HTMLDivElement>(null);
@@ -143,14 +149,8 @@ export function UserMenu() {
           onClick={(e) => {
             e.stopPropagation();
             setOpen(false);
-            if (
-              !window.confirm(
-                'Завершить все сессии на всех устройствах?\nПотребуется войти снова на каждом из них.',
-              )
-            ) {
-              return;
-            }
-            void logoutAll();
+            setLogoutAllPassword('');
+            setLogoutAllOpen(true);
           }}
         >
           Выйти везде
@@ -168,6 +168,31 @@ export function UserMenu() {
           Выйти
         </button>
       </div>
+      <ReauthModal
+        open={logoutAllOpen}
+        title="Выйти на всех устройствах?"
+        message="Все активные сессии будут завершены. Потребуется войти снова на каждом устройстве."
+        confirmLabel="Выйти везде"
+        busy={logoutAllBusy}
+        password={logoutAllPassword}
+        onPasswordChange={setLogoutAllPassword}
+        onCancel={() => {
+          if (logoutAllBusy) return;
+          setLogoutAllOpen(false);
+          setLogoutAllPassword('');
+        }}
+        onConfirm={() => {
+          void (async () => {
+            setLogoutAllBusy(true);
+            try {
+              await logoutAll(logoutAllPassword);
+            } catch (err) {
+              toast(err instanceof Error ? err.message : 'Не удалось завершить сессии', 'error');
+              setLogoutAllBusy(false);
+            }
+          })();
+        }}
+      />
     </div>
   );
 }

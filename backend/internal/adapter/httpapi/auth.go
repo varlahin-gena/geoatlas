@@ -46,6 +46,11 @@ type createUserRequest struct {
 type resetPasswordRequest struct {
 	Password          string `json:"password"`
 	MustResetPassword *bool  `json:"must_reset_password"`
+	CurrentPassword   string `json:"current_password"`
+}
+
+type reauthOnlyRequest struct {
+	CurrentPassword string `json:"current_password"`
 }
 
 type setRoleRequest struct {
@@ -117,7 +122,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if lim == nil {
 		lim = loginthrottle.New(10, time.Minute, 5*time.Minute)
 	}
-	if !lim.Allow(ip) {
+	if !lim.Allow(ip, req.Username) {
 		lim.RecordFailure(ip, req.Username)
 		writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
 			Actor:        req.Username,
@@ -156,7 +161,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "session error"})
 		return
 	}
-	lim.RecordSuccess(ip)
+	lim.RecordSuccess(ip, out.User.Username)
 	writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
 		Actor:        out.User.Username,
 		Action:       "auth.login.success",
@@ -281,6 +286,13 @@ func (h *AuthHandler) LogoutAll(w http.ResponseWriter, r *http.Request) {
 	if h.authDisabled() {
 		ClearCookie(w, r)
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+		return
+	}
+	var req reauthOnlyRequest
+	if !decodeJSONBody(w, r, &req, defaultJSONBodyLimit) {
+		return
+	}
+	if _, ok := h.reauth.Require(w, r, req.CurrentPassword); !ok {
 		return
 	}
 	sess, err := SessionFromRequest(r, h.sessions)
@@ -643,6 +655,9 @@ func (h *UsersHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		writeBadRequest(w, "must_reset_password is required")
 		return
 	}
+	if _, ok := h.reauth.Require(w, r, req.CurrentPassword); !ok {
+		return
+	}
 	pub, err := h.authUC.ResetPassword(usecaseauth.ResetPasswordInput{
 		Username:          username,
 		Password:          req.Password,
@@ -682,6 +697,13 @@ func (h *UsersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	username := r.PathValue("username")
+	var req reauthOnlyRequest
+	if !decodeJSONBody(w, r, &req, defaultJSONBodyLimit) {
+		return
+	}
+	if _, ok := h.reauth.Require(w, r, req.CurrentPassword); !ok {
+		return
+	}
 	actor := ""
 	if sess, ok := SessionFromContext(r.Context()); ok {
 		actor = sess.Username

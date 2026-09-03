@@ -31,6 +31,7 @@ type AuthDeps struct {
 	users        UserDirectory
 	sessions     SessionParser
 	apiTokens    APITokenStore
+	reauth       ReauthChecker
 	loginLimiter *loginthrottle.Limiter
 	logs         *usecaseaudit.Service
 }
@@ -42,6 +43,7 @@ type SystemDeps struct {
 	retentionUC  *usecaseretention.Service
 	backupUC     *usecasebackup.Service
 	tlsUC        *usecasetls.Service
+	reauth       ReauthChecker
 	loginLimiter *loginthrottle.Limiter
 	logs         *usecaseaudit.Service
 }
@@ -150,6 +152,7 @@ type MetricsRecorder interface {
 
 func NewDeps(p Params) *Deps {
 	lim := loginthrottle.New(10, time.Minute, 5*time.Minute)
+	reauth := NewReauthChecker(p.Cfg, p.AuthUC, p.Sessions, p.APITokens)
 	return &Deps{
 		auth: &AuthDeps{
 			cfg:          p.Cfg,
@@ -157,6 +160,7 @@ func NewDeps(p Params) *Deps {
 			users:        p.Users,
 			sessions:     p.Sessions,
 			apiTokens:    p.APITokens,
+			reauth:       reauth,
 			loginLimiter: lim,
 			logs:         p.Logs,
 		},
@@ -165,6 +169,7 @@ func NewDeps(p Params) *Deps {
 			systemUC:     p.SystemUC,
 			retentionUC:  p.RetentionUC,
 			backupUC:     p.BackupUC,
+			reauth:       reauth,
 			tlsUC: usecasetls.New(usecasetls.Config{
 				CertDir:      p.Cfg.TLSCertDir,
 				CertFile:     p.Cfg.TLSCertFile,

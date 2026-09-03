@@ -31,6 +31,9 @@
 | `HTTPS_PORT` | `443` | Хостовый порт TLS |
 | `HTTP_REDIRECT` | `1` | Редирект HTTP→HTTPS |
 
+При HTTPS nginx отдаёт `Strict-Transport-Security: max-age=31536000; includeSubDomains`.
+`preload` не включён — подключать только после стабильного prod-домена и проверки на [hstspreload.org](https://hstspreload.org).
+
 Подробнее: [HTTPS](install.md#https-свои-сертификаты), `certs/README.md`.
 
 ## Модули и Compose-профили
@@ -59,9 +62,21 @@
 | `AUTH_ADMIN_USER` | `admin` | Seed administrator |
 | `SESSION_TTL_HOURS` | `12` | TTL cookie для admin/operator (не dashboard) |
 | `API_AUTH_PREVIOUS_TOKEN` / `API_OPS_PREVIOUS_TOKEN` | пусто | Ротация env-токенов |
-| `GA_TRUSTED_PROXIES` | `frontend` | Доверенные hop для X-Real-IP (login throttle) |
+| `GA_TRUSTED_PROXIES` | `frontend` | Доверенные hop для X-Real-IP (login throttle) и proxy-gate |
+| `GA_REQUIRE_PROXY` | `0` (`1` в compose) | Резать прямой доступ к backend `:8080` (только nginx / loopback / Bearer) |
 
 Роли, cookie и scopes: [ui.md](ui.md#роли-и-доступ).
+
+## API threat protection (edge)
+
+Эквивалент Apigee PreFlow на backend (пакет `threatprot`): injection/path guard, SpikeArrest, JSON structure limits, security headers на API-ответах. HSTS и снятие `Server` — на nginx edge.
+
+| Переменная | По умолчанию | Назначение |
+|------------|--------------|------------|
+| `GA_API_RATE_LIMIT_RPS` | `30` | SpikeArrest: средняя скорость на клиент (IP или Bearer-prefix); `0` — выкл. |
+| `GA_API_RATE_BURST` | `60` | Burst token bucket |
+
+Exempt от rate limit: `/live`, `/ready`, `/metrics`, `/api/live`, `/api/ready`, `/api/health`, `/api/auth/check*`. JSON-лимиты (depth 5, object keys ≤64, array ≤256, string ≤8192 / 65536 для TLS PEM) зашиты в код и проверяются до decode.
 
 ## Ingest и syslog
 

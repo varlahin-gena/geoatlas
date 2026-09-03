@@ -6,6 +6,7 @@ import {
   type TlsStatus,
 } from '@/api/system';
 import { AdminLayout } from '@/components/AdminLayout';
+import { ReauthField } from '@/components/ReauthModal';
 import { useToast } from '@/components/Toast';
 import { fmtDate } from '@/lib/format';
 import './tls.css';
@@ -30,6 +31,7 @@ export default function TlsPage() {
   const [certName, setCertName] = useState('');
   const [keyName, setKeyName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [reauthPassword, setReauthPassword] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -74,13 +76,22 @@ export default function TlsPage() {
       toast('Выберите fullchain.pem и privkey.pem', 'error');
       return;
     }
+    if (!reauthPassword.trim()) {
+      toast('Введите пароль для подтверждения', 'error');
+      return;
+    }
     setBusy(true);
     try {
-      const res = await putTls({ cert_pem: certPEM.trim(), key_pem: keyPEM.trim() });
+      const res = await putTls({
+        cert_pem: certPEM.trim(),
+        key_pem: keyPEM.trim(),
+        current_password: reauthPassword,
+      });
       setCertPEM('');
       setKeyPEM('');
       setCertName('');
       setKeyName('');
+      setReauthPassword('');
       if (certInputRef.current) certInputRef.current.value = '';
       if (keyInputRef.current) keyInputRef.current.value = '';
       toast('Сертификаты сохранены', 'success');
@@ -109,7 +120,7 @@ export default function TlsPage() {
 
   const cert = status?.cert;
   const expiringSoon = cert?.days_left != null && cert.days_left <= 30;
-  const canSave = Boolean(status?.writable && certPEM && keyPEM && !busy);
+  const canSave = Boolean(status?.writable && certPEM && keyPEM && reauthPassword.trim() && !busy);
 
   return (
     <AdminLayout
@@ -241,6 +252,9 @@ export default function TlsPage() {
             >
               {keyName ? `Ключ: ${keyName}` : 'Выбрать privkey.pem'}
             </button>
+          </div>
+          <ReauthField value={reauthPassword} onChange={setReauthPassword} id="tlsReauthPassword" />
+          <div className="tls-upload-actions">
             <button type="submit" className="btn primary" disabled={!canSave}>
               {busy ? 'Сохранение…' : 'Сохранить сертификаты'}
             </button>

@@ -19,8 +19,11 @@ export function logout(): Promise<void> {
 }
 
 /** Revoke всех сессий пользователя (session_version bump) + clear cookie. */
-export function logoutAll(): Promise<void> {
-  return apiFetch('/api/auth/logout-all', { method: 'POST' }).then(() => undefined);
+export function logoutAll(currentPassword: string): Promise<void> {
+  return apiFetch('/api/auth/logout-all', {
+    method: 'POST',
+    body: JSON.stringify({ current_password: currentPassword }),
+  }).then(() => undefined);
 }
 
 export function changePassword(oldPassword: string, newPassword: string): Promise<void> {

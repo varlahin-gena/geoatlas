@@ -17,7 +17,12 @@ OPENAPI = ROOT / "openapi.yaml"
 
 MUTATION_PATHS: list[tuple[str, str]] = [
     ("post", "/api/auth/login"),
+    ("post", "/api/auth/change-password"),
     ("post", "/api/auth/geo-wizard-dismiss"),
+    ("post", "/api/users"),
+    ("post", "/api/users/{username}/role"),
+    ("post", "/api/users/{username}/full-name"),
+    ("post", "/api/users/{username}/reset-password"),
     ("post", "/api/tokens"),
     ("post", "/api/anomalies/{fingerprint}/assign"),
     ("put", "/api/anomalies/settings"),
@@ -33,9 +38,34 @@ MUTATION_PATHS: list[tuple[str, str]] = [
     ("put", "/api/me/hunts/{id}"),
 ]
 
-STRING_MUTATION_SCHEMAS: list[str] = [
+# Request schemas that must reject unknown properties and bound string fields.
+CLOSED_REQUEST_SCHEMAS: list[str] = [
     "AuthLoginRequest",
+    "AuthChangePasswordRequest",
+    "AuthCreateUserRequest",
+    "AuthSetRoleRequest",
+    "AuthSetFullNameRequest",
+    "AuthResetPasswordRequest",
+    "GeoWizardDismissRequest",
     "ApiTokenCreateRequest",
+    "AnomalyAssignRequest",
+    "AnomalyEngineSettings",
+    "GeoRangeAppendRequest",
+    "GeoRangeUpdateRequest",
+    "EnterpriseNetCreateRequest",
+    "ReputationFeedCreateRequest",
+    "TlsCertUploadRequest",
+    "BackupScheduleUpdateRequest",
+    "ParseErrorsDeleteRequest",
+    "RetentionSettings",
+    "SavedHuntInput",
+]
+
+SENSITIVE_RESPONSE_SCHEMAS: list[str] = [
+    "AuthUser",
+    "AuthUserPublic",
+    "ValidationError",
+    "AnomalyThresholds",
 ]
 
 
@@ -58,6 +88,19 @@ def blocks_mass_assignment(doc: dict, schema: dict) -> bool:
     return schema.get("additionalProperties") is False
 
 
+def check_string_bounds(schema_name: str, schema: dict, errors: list[str]) -> None:
+    props = schema.get("properties") or {}
+    for field, prop in props.items():
+        if not isinstance(prop, dict):
+            continue
+        if prop.get("$ref"):
+            continue
+        if prop.get("type") != "string":
+            continue
+        if "maxLength" not in prop and "enum" not in prop and prop.get("format") != "date-time":
+            errors.append(f"{schema_name}.{field}: missing maxLength")
+
+
 def main() -> int:
     if not OPENAPI.is_file():
         print(f"missing {OPENAPI}", file=sys.stderr)
@@ -65,6 +108,9 @@ def main() -> int:
 
     doc = load_doc()
     errors: list[str] = []
+
+    if "ValidationError" not in (doc.get("components") or {}).get("responses", {}):
+        errors.append("components.responses.ValidationError: missing")
 
     paths = doc.get("paths", {})
     for method, path in MUTATION_PATHS:
@@ -87,18 +133,15 @@ def main() -> int:
             )
 
     schemas = doc.get("components", {}).get("schemas", {})
-    for name in STRING_MUTATION_SCHEMAS:
+    for name in CLOSED_REQUEST_SCHEMAS + SENSITIVE_RESPONSE_SCHEMAS:
         schema = schemas.get(name)
         if not schema:
             errors.append(f"components.schemas.{name}: missing")
             continue
-        props = schema.get("properties") or {}
-        for field in ("username", "password", "name"):
-            prop = props.get(field)
-            if not prop or prop.get("type") != "string":
-                continue
-            if "maxLength" not in prop:
-                errors.append(f"{name}.{field}: missing maxLength")
+        if schema.get("type") == "object" and schema.get("additionalProperties") is not False:
+            errors.append(f"{name}: must set additionalProperties: false")
+        if name in CLOSED_REQUEST_SCHEMAS:
+            check_string_bounds(name, schema, errors)
 
     if errors:
         print("schema_security_check FAILED:")

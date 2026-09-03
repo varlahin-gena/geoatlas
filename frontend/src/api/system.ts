@@ -108,7 +108,11 @@ export function fetchTlsStatus(): Promise<components['schemas']['TlsStatusRespon
   return apiGet('/api/system/tls');
 }
 
-export function putTls(body: { cert_pem: string; key_pem: string }): Promise<TlsMutationResponse> {
+export function putTls(body: {
+  cert_pem: string;
+  key_pem: string;
+  current_password: string;
+}): Promise<TlsMutationResponse> {
   return apiPut('/api/system/tls', body);
 }
 

@@ -113,6 +113,7 @@ func expectedAuthMatrix() map[string]authTier {
 		"GET /api/hunts":                            tierAdmin,
 		"GET /api/tokens":                           tierAdmin,
 		"POST /api/tokens":                          tierAdmin,
+		"POST /api/tokens/{id}/rotate":              tierAdmin,
 		"DELETE /api/tokens/{id}":                   tierAdmin,
 	}
 }

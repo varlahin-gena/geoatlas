@@ -149,6 +149,24 @@ smoke_frontend() {
     if html="$(curl -sf "http://127.0.0.1:${port}/health" 2>/dev/null)"; then
       echo "$html" | grep -q '"ok":true' || fail "frontend /health body: ${html}"
       ok "frontend /health"
+      hdrs="$(curl -sI "http://127.0.0.1:${port}/health" 2>/dev/null || true)"
+      echo "$hdrs" | grep -qi 'x-content-type-options: *nosniff' \
+        || fail "frontend /health missing X-Content-Type-Options: nosniff"
+      echo "$hdrs" | grep -qi 'permissions-policy:' \
+        || fail "frontend /health missing Permissions-Policy"
+      # /health uses edge headers (no SPA CSP); CSP belongs on UI shell + backend API
+      if echo "$hdrs" | grep -qi 'content-security-policy:'; then
+        fail "frontend /health must not send SPA Content-Security-Policy"
+      fi
+      # server_tokens off → "Server: nginx" without version (e.g. nginx/1.30.4)
+      if echo "$hdrs" | grep -qiE '^server: *nginx/[0-9]'; then
+        fail "frontend /health Server header leaks nginx version"
+      fi
+      ok "frontend /health security headers"
+      root_hdrs="$(curl -sI "http://127.0.0.1:${port}/" 2>/dev/null || true)"
+      echo "$root_hdrs" | grep -qi 'content-security-policy:' \
+        || fail "frontend / missing Content-Security-Policy"
+      ok "frontend index CSP"
       curl -sf "http://127.0.0.1:${port}/" | grep -q 'id="root"' \
         || fail "frontend index: missing id=root"
       ok "frontend index root"

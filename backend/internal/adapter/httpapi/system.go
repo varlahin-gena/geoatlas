@@ -414,10 +414,14 @@ func (h *SystemHandler) PutTLS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		CertPEM string `json:"cert_pem"`
-		KeyPEM  string `json:"key_pem"`
+		CertPEM         string `json:"cert_pem"`
+		KeyPEM          string `json:"key_pem"`
+		CurrentPassword string `json:"current_password"`
 	}
 	if !decodeJSONBody(w, r, &req, largeJSONBodyLimit) {
+		return
+	}
+	if _, ok := h.reauth.Require(w, r, req.CurrentPassword); !ok {
 		return
 	}
 	err := h.tlsUC.Update(usecasetls.UpdateInput{CertPEM: req.CertPEM, KeyPEM: req.KeyPEM})

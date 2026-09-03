@@ -1,4 +1,4 @@
-// Package loginthrottle — per-IP login lockout + failed-login audit + trusted-proxy client IP.
+// Package loginthrottle — per-IP и per-account login lockout + failed-login audit + trusted-proxy client IP.
 package loginthrottle
 
 import (
@@ -10,16 +10,17 @@ import (
 	"time"
 )
 
-// Limiter — per-IP throttle + аудит неуспешных попыток по паре username+IP.
+// Limiter — throttle по IP и по username + аудит неуспешных попыток по паре username+IP.
 type Limiter struct {
-	mu       sync.Mutex
-	attempts map[string]*loginBucket
-	failures map[string]*FailedLoginEvent // key: lower(username)|ip
-	maxFails int
-	window   time.Duration
-	lockout  time.Duration
-	retain   time.Duration
-	maxAudit int
+	mu           sync.Mutex
+	attempts     map[string]*loginBucket // key: IP
+	userAttempts map[string]*loginBucket // key: lower(username)
+	failures     map[string]*FailedLoginEvent // key: lower(username)|ip
+	maxFails     int
+	window       time.Duration
+	lockout      time.Duration
+	retain       time.Duration
+	maxAudit     int
 }
 
 type loginBucket struct {
@@ -51,13 +52,14 @@ func New(maxFails int, window, lockout time.Duration) *Limiter {
 		lockout = 5 * time.Minute
 	}
 	return &Limiter{
-		attempts: make(map[string]*loginBucket),
-		failures: make(map[string]*FailedLoginEvent),
-		maxFails: maxFails,
-		window:   window,
-		lockout:  lockout,
-		retain:   24 * time.Hour,
-		maxAudit: 200,
+		attempts:     make(map[string]*loginBucket),
+		userAttempts: make(map[string]*loginBucket),
+		failures:     make(map[string]*FailedLoginEvent),
+		maxFails:     maxFails,
+		window:       window,
+		lockout:      lockout,
+		retain:       24 * time.Hour,
+		maxAudit:     200,
 	}
 }
 
@@ -171,8 +173,53 @@ func failureKey(username, ip string) string {
 	return strings.ToLower(strings.TrimSpace(username)) + "\x00" + strings.TrimSpace(ip)
 }
 
-func (l *Limiter) Allow(ip string) bool {
-	if l == nil || ip == "" {
+func normalizeUsername(username string) string {
+	return strings.ToLower(strings.TrimSpace(username))
+}
+
+// RequestFromTrustedHop — RemoteAddr loopback или GA_TRUSTED_PROXIES (nginx/frontend).
+func RequestFromTrustedHop(r *http.Request) bool {
+	return isTrustedProxy(remoteIP(r))
+}
+
+func bucketAllows(b *loginBucket, now time.Time, window time.Duration, maxFails int) (allow bool, stale bool) {
+	if b == nil {
+		return true, false
+	}
+	if now.Before(b.lockedUntil) {
+		return false, false
+	}
+	if now.Sub(b.windowAt) > window {
+		return true, true
+	}
+	return b.fails < maxFails, false
+}
+
+func bumpBucket(m map[string]*loginBucket, key string, now time.Time, window, lockout time.Duration, maxFails int) {
+	if key == "" || m == nil {
+		return
+	}
+	b := m[key]
+	if b == nil || now.Sub(b.windowAt) > window {
+		m[key] = &loginBucket{fails: 1, windowAt: now}
+		return
+	}
+	b.fails++
+	if b.fails >= maxFails {
+		b.lockedUntil = now.Add(lockout)
+	}
+}
+
+func lockState(b *loginBucket, now time.Time) (locked bool, until time.Time) {
+	if b != nil && now.Before(b.lockedUntil) {
+		return true, b.lockedUntil
+	}
+	return false, time.Time{}
+}
+
+// Allow — false, если IP или username в lockout (распределённый брутфорс по аккаунту).
+func (l *Limiter) Allow(ip, username string) bool {
+	if l == nil {
 		return true
 	}
 	now := time.Now()
@@ -180,18 +227,26 @@ func (l *Limiter) Allow(ip string) bool {
 	defer l.mu.Unlock()
 	l.gcLocked(now)
 
-	b := l.attempts[ip]
-	if b == nil {
-		return true
+	if ip != "" {
+		allow, stale := bucketAllows(l.attempts[ip], now, l.window, l.maxFails)
+		if stale {
+			delete(l.attempts, ip)
+		}
+		if !allow {
+			return false
+		}
 	}
-	if now.Before(b.lockedUntil) {
-		return false
+	user := normalizeUsername(username)
+	if user != "" {
+		allow, stale := bucketAllows(l.userAttempts[user], now, l.window, l.maxFails)
+		if stale {
+			delete(l.userAttempts, user)
+		}
+		if !allow {
+			return false
+		}
 	}
-	if now.Sub(b.windowAt) > l.window {
-		delete(l.attempts, ip)
-		return true
-	}
-	return b.fails < l.maxFails
+	return true
 }
 
 func (l *Limiter) RecordFailure(ip, username string) {
@@ -202,18 +257,8 @@ func (l *Limiter) RecordFailure(ip, username string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	if ip != "" {
-		b := l.attempts[ip]
-		if b == nil || now.Sub(b.windowAt) > l.window {
-			l.attempts[ip] = &loginBucket{fails: 1, windowAt: now}
-		} else {
-			b.fails++
-			if b.fails >= l.maxFails {
-				b.lockedUntil = now.Add(l.lockout)
-			}
-		}
-	}
-
+	bumpBucket(l.attempts, strings.TrimSpace(ip), now, l.window, l.lockout, l.maxFails)
+	bumpBucket(l.userAttempts, normalizeUsername(username), now, l.window, l.lockout, l.maxFails)
 	l.recordAuditLocked(now, ip, username)
 }
 
@@ -228,11 +273,12 @@ func (l *Limiter) recordAuditLocked(now time.Time, ip, username string) {
 	}
 	key := failureKey(username, ip)
 	ev := l.failures[key]
-	locked := false
-	var lockedUntil time.Time
-	if b := l.attempts[ip]; b != nil && now.Before(b.lockedUntil) {
+	locked, lockedUntil := lockState(l.attempts[ip], now)
+	if ulocked, uUntil := lockState(l.userAttempts[normalizeUsername(username)], now); ulocked {
 		locked = true
-		lockedUntil = b.lockedUntil
+		if uUntil.After(lockedUntil) {
+			lockedUntil = uUntil
+		}
 	}
 	if ev == nil {
 		l.failures[key] = &FailedLoginEvent{
@@ -253,13 +299,18 @@ func (l *Limiter) recordAuditLocked(now time.Time, ip, username string) {
 	l.trimAuditLocked(now)
 }
 
-func (l *Limiter) RecordSuccess(ip string) {
-	if l == nil || ip == "" {
+func (l *Limiter) RecordSuccess(ip, username string) {
+	if l == nil {
 		return
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	delete(l.attempts, ip)
+	if ip != "" {
+		delete(l.attempts, strings.TrimSpace(ip))
+	}
+	if user := normalizeUsername(username); user != "" {
+		delete(l.userAttempts, user)
+	}
 }
 
 func (l *Limiter) SnapshotFailures() []FailedLoginEvent {
@@ -274,13 +325,15 @@ func (l *Limiter) SnapshotFailures() []FailedLoginEvent {
 	out := make([]FailedLoginEvent, 0, len(l.failures))
 	for _, ev := range l.failures {
 		cp := *ev
-		if b := l.attempts[ev.IP]; b != nil && now.Before(b.lockedUntil) {
-			cp.Locked = true
-			cp.LockedUntil = b.lockedUntil
-		} else {
-			cp.Locked = false
-			cp.LockedUntil = time.Time{}
+		locked, until := lockState(l.attempts[ev.IP], now)
+		if ulocked, uUntil := lockState(l.userAttempts[normalizeUsername(ev.Username)], now); ulocked {
+			locked = true
+			if uUntil.After(until) {
+				until = uUntil
+			}
 		}
+		cp.Locked = locked
+		cp.LockedUntil = until
 		out = append(out, cp)
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -320,12 +373,16 @@ func (l *Limiter) trimAuditLocked(now time.Time) {
 }
 
 func (l *Limiter) gcLocked(now time.Time) {
-	if len(l.attempts) < 1024 {
-		return
-	}
-	for ip, b := range l.attempts {
-		if now.After(b.lockedUntil) && now.Sub(b.windowAt) > l.window {
-			delete(l.attempts, ip)
+	gcMap := func(m map[string]*loginBucket, threshold int) {
+		if len(m) < threshold {
+			return
+		}
+		for k, b := range m {
+			if now.After(b.lockedUntil) && now.Sub(b.windowAt) > l.window {
+				delete(m, k)
+			}
 		}
 	}
+	gcMap(l.attempts, 1024)
+	gcMap(l.userAttempts, 1024)
 }

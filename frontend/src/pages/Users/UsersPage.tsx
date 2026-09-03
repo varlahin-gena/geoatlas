@@ -13,6 +13,7 @@ import type { UserRole } from '@/api/types';
 import { ROLE_OPERATOR } from '@/api/types';
 import { USER_ROLE_OPTIONS } from '@/auth/roles';
 import { AdminLayout } from '@/components/AdminLayout';
+import { ReauthField, ReauthModal } from '@/components/ReauthModal';
 import { useToast } from '@/components/Toast';
 import { fmtDate } from '@/lib/format';
 import { MIN_PASSWORD_LEN, validatePasswordClient } from '@/lib/passwordPolicy';
@@ -31,6 +32,10 @@ export default function UsersPage() {
   const [resetTarget, setResetTarget] = useState<string | null>(null);
   const [resetPass, setResetPass] = useState('');
   const [resetMust, setResetMust] = useState(true);
+  const [reauthPassword, setReauthPassword] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [deleteReauth, setDeleteReauth] = useState('');
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -190,15 +195,9 @@ export default function UsersPage() {
                             type="button"
                             className="btn danger"
                             disabled={isSelf}
-                            onClick={async () => {
-                              if (!confirm(`Удалить пользователя «${u.username}»?`)) return;
-                              try {
-                                await deleteUser(u.username);
-                                toast('Удалено', 'success');
-                                void load();
-                              } catch (err) {
-                                toast(err instanceof Error ? err.message : 'Ошибка', 'error');
-                              }
+                            onClick={() => {
+                              setDeleteTarget(u.username);
+                              setDeleteReauth('');
                             }}
                           >
                             Удалить
@@ -304,7 +303,10 @@ export default function UsersPage() {
         <div
           className="modal-backdrop show"
           onClick={(e) => {
-            if (e.target === e.currentTarget) setResetTarget(null);
+            if (e.target === e.currentTarget) {
+              setResetTarget(null);
+              setReauthPassword('');
+            }
           }}
         >
           <form
@@ -322,10 +324,12 @@ export default function UsersPage() {
                 await resetUserPassword(resetTarget, {
                   password: resetPass,
                   must_reset_password: resetMust,
+                  current_password: reauthPassword,
                 });
                 toast('Пароль сброшен', 'success');
                 setResetTarget(null);
                 setResetPass('');
+                setReauthPassword('');
                 void load();
               } catch (err) {
                 toast(err instanceof Error ? err.message : 'Ошибка', 'error');
@@ -352,8 +356,16 @@ export default function UsersPage() {
               <input type="checkbox" checked={resetMust} onChange={(e) => setResetMust(e.target.checked)} />
               <span>Сброс пароля при первом входе</span>
             </label>
+            <ReauthField value={reauthPassword} onChange={setReauthPassword} />
             <div className="modal-actions">
-              <button type="button" className="btn" onClick={() => setResetTarget(null)}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  setResetTarget(null);
+                  setReauthPassword('');
+                }}
+              >
                 Отмена
               </button>
               <button type="submit" className="btn primary">
@@ -363,6 +375,38 @@ export default function UsersPage() {
           </form>
         </div>
       ) : null}
+
+      <ReauthModal
+        open={!!deleteTarget}
+        title={`Удалить пользователя «${deleteTarget ?? ''}»?`}
+        message="Учётная запись будет удалена без возможности восстановления."
+        confirmLabel="Удалить"
+        busy={deleteBusy}
+        password={deleteReauth}
+        onPasswordChange={setDeleteReauth}
+        onCancel={() => {
+          if (deleteBusy) return;
+          setDeleteTarget(null);
+          setDeleteReauth('');
+        }}
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          void (async () => {
+            setDeleteBusy(true);
+            try {
+              await deleteUser(deleteTarget, deleteReauth);
+              toast('Удалено', 'success');
+              setDeleteTarget(null);
+              setDeleteReauth('');
+              void load();
+            } catch (err) {
+              toast(err instanceof Error ? err.message : 'Ошибка', 'error');
+            } finally {
+              setDeleteBusy(false);
+            }
+          })();
+        }}
+      />
       <style>{`
         .fio-input { width: 100%; min-width: 180px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 6px 8px; }
         .actions { display: flex; flex-wrap: wrap; gap: 6px; }

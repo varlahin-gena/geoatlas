@@ -1,17 +1,34 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { createToken, deleteToken, listTokens, type TokenRow } from '@/api/tokens';
+import { createToken, deleteToken, listTokens, rotateToken, type TokenRow, type TokenScope } from '@/api/tokens';
 import { AdminLayout } from '@/components/AdminLayout';
-import { useToast } from '@/components/Toast';
-import { fmtDate } from '@/lib/format';
+import { ReauthField, ReauthModal } from '@/components/ReauthModal';
+import { useToast } from '@/components/Toast';import { fmtDate } from '@/lib/format';
+
+type ExpiryPreset = 'never' | '30d' | '90d' | '365d';
+
+function expiryISO(preset: ExpiryPreset): string | undefined {
+  if (preset === 'never') return undefined;
+  const days = preset === '30d' ? 30 : preset === '90d' ? 90 : 365;
+  return new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+}
 
 export default function ApiTokensPage() {
   const { toast } = useToast();
   const [tokens, setTokens] = useState<TokenRow[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState('');
-  const [scope, setScope] = useState('ops');
+  const [scope, setScope] = useState<TokenScope>('ops');
+  const [expiry, setExpiry] = useState<ExpiryPreset>('never');
   const [secret, setSecret] = useState('');
+  const [secretTitle, setSecretTitle] = useState('Токен создан');
   const [error, setError] = useState('');
+  const [reauthPassword, setReauthPassword] = useState('');
+  const [pendingAction, setPendingAction] = useState<
+    | { type: 'rotate'; id: string; name: string }
+    | { type: 'revoke'; id: string; name: string }
+    | null
+  >(null);
+  const [actionBusy, setActionBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -31,18 +48,29 @@ export default function ApiTokensPage() {
   function resetCreateForm() {
     setName('');
     setScope('ops');
+    setExpiry('never');
+    setReauthPassword('');
   }
 
   function closeCreateModal() {
     setCreateOpen(false);
     resetCreateForm();
     setSecret('');
+    setSecretTitle('Токен создан');
   }
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
     try {
-      const data = await createToken({ name: name.trim(), scope });
+      const body: { name: string; scope: TokenScope; expires_at?: string; current_password: string } = {
+        name: name.trim(),
+        scope,
+        current_password: reauthPassword,
+      };
+      const exp = expiryISO(expiry);
+      if (exp) body.expires_at = exp;
+      const data = await createToken(body);
+      setSecretTitle('Токен создан');
       setSecret(data.secret || '');
       resetCreateForm();
       toast('Токен создан', 'success');
@@ -71,6 +99,7 @@ export default function ApiTokensPage() {
                   <th scope="col">Имя</th>
                   <th scope="col">Scope</th>
                   <th scope="col">Создан</th>
+                  <th scope="col">Истекает</th>
                   <th scope="col">
                     <span className="visually-hidden">Действия</span>
                   </th>
@@ -79,13 +108,13 @@ export default function ApiTokensPage() {
               <tbody>
                 {error ? (
                   <tr>
-                    <td colSpan={4} className="empty">
+                    <td colSpan={5} className="empty">
                       Ошибка: {error}
                     </td>
                   </tr>
                 ) : tokens.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="empty">
+                    <td colSpan={5} className="empty">
                       Пока нет именованных токенов
                     </td>
                   </tr>
@@ -97,19 +126,24 @@ export default function ApiTokensPage() {
                         <span className="scope-badge">{t.scope}</span>
                       </td>
                       <td>{fmtDate(t.created_at)}</td>
+                      <td>{t.expires_at ? fmtDate(t.expires_at) : '—'}</td>
                       <td className="actions">
                         <button
                           type="button"
+                          className="btn"
+                          onClick={() => {
+                            setPendingAction({ type: 'rotate', id: t.id, name: t.name });
+                            setReauthPassword('');
+                          }}
+                        >
+                          Ротация
+                        </button>
+                        <button
+                          type="button"
                           className="btn danger"
-                          onClick={async () => {
-                            if (!confirm('Отозвать токен?')) return;
-                            try {
-                              await deleteToken(t.id);
-                              toast('Отозван', 'success');
-                              void load();
-                            } catch (err) {
-                              toast(err instanceof Error ? err.message : 'Ошибка', 'error');
-                            }
+                          onClick={() => {
+                            setPendingAction({ type: 'revoke', id: t.id, name: t.name });
+                            setReauthPassword('');
                           }}
                         >
                           Отозвать
@@ -137,7 +171,7 @@ export default function ApiTokensPage() {
         >
           {secret ? (
             <div className="modal" role="dialog" aria-modal="true" aria-labelledby="token-secret-title">
-              <h3 id="token-secret-title">Токен создан</h3>
+              <h3 id="token-secret-title">{secretTitle}</h3>
               <div className="secret-panel">
                 <p>Секрет показывается один раз:</p>
                 <code>{secret}</code>
@@ -188,12 +222,30 @@ export default function ApiTokensPage() {
               </div>
               <div className="field">
                 <label htmlFor="cScope">Scope</label>
-                <select id="cScope" value={scope} onChange={(e) => setScope(e.target.value)}>
+                <select
+                  id="cScope"
+                  value={scope}
+                  onChange={(e) => setScope(e.target.value as TokenScope)}
+                >
                   <option value="read">read</option>
                   <option value="ops">ops</option>
                   <option value="admin">admin</option>
                 </select>
               </div>
+              <div className="field">
+                <label htmlFor="cExpiry">Срок действия</label>
+                <select
+                  id="cExpiry"
+                  value={expiry}
+                  onChange={(e) => setExpiry(e.target.value as ExpiryPreset)}
+                >
+                  <option value="never">Без срока</option>
+                  <option value="30d">30 дней</option>
+                  <option value="90d">90 дней</option>
+                  <option value="365d">1 год</option>
+                </select>
+              </div>
+              <ReauthField value={reauthPassword} onChange={setReauthPassword} />
               <div className="modal-actions">
                 <button type="button" className="btn" onClick={closeCreateModal}>
                   Отмена
@@ -206,6 +258,54 @@ export default function ApiTokensPage() {
           )}
         </div>
       ) : null}
+
+      <ReauthModal
+        open={!!pendingAction}
+        title={
+          pendingAction?.type === 'rotate'
+            ? `Ротация токена «${pendingAction.name}»`
+            : `Отозвать токен «${pendingAction?.name ?? ''}»?`
+        }
+        message={
+          pendingAction?.type === 'rotate'
+            ? 'Будет сгенерирован новый секрет. Старый сразу перестанет работать.'
+            : 'Токен будет отозван без возможности восстановления.'
+        }
+        confirmLabel={pendingAction?.type === 'rotate' ? 'Ротировать' : 'Отозвать'}
+        busy={actionBusy}
+        password={reauthPassword}
+        onPasswordChange={setReauthPassword}
+        onCancel={() => {
+          if (actionBusy) return;
+          setPendingAction(null);
+          setReauthPassword('');
+        }}
+        onConfirm={() => {
+          if (!pendingAction) return;
+          void (async () => {
+            setActionBusy(true);
+            try {
+              if (pendingAction.type === 'rotate') {
+                const data = await rotateToken(pendingAction.id, reauthPassword);
+                setSecretTitle('Секрет обновлён');
+                setSecret(data.secret || '');
+                setCreateOpen(true);
+                toast('Секрет обновлён', 'success');
+              } else {
+                await deleteToken(pendingAction.id, reauthPassword);
+                toast('Отозван', 'success');
+              }
+              setPendingAction(null);
+              setReauthPassword('');
+              void load();
+            } catch (err) {
+              toast(err instanceof Error ? err.message : 'Ошибка', 'error');
+            } finally {
+              setActionBusy(false);
+            }
+          })();
+        }}
+      />
       <style>{`.actions { display: flex; flex-wrap: wrap; gap: 6px; }`}</style>
     </AdminLayout>
   );

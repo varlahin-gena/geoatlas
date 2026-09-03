@@ -28,7 +28,7 @@
 | 80          | TCP      | Веб-интерфейс (HTTP)    | Да             |
 | 443         | TCP      | Веб-интерфейс (HTTPS)   | Опционально    |
 | 514         | TCP/UDP  | Syslog от МСЭ           | Да             |
-| 8080        | TCP      | Backend API             | Нет (docker)   |
+| 8080        | TCP      | Backend API             | Нет (только docker-сеть + nginx; не публиковать `ports`) |
 | 1514        | TCP      | Ingest от syslog-ng     | Нет (docker)   |
 | 8123 / 9000 | TCP      | ClickHouse HTTP/native  | Нет (docker)   |
 

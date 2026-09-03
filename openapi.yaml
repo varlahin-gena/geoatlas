@@ -18,7 +18,7 @@ info:
     Bearer:
     - env `API_AUTH_TOKEN` (+ опционально `API_AUTH_PREVIOUS_TOKEN`) — всегда scope **admin**;
     - именованные токены (`/api/tokens`, файл `API_TOKENS_FILE`): scopes **read** | **ops** | **admin**
-      (admin ⊃ ops ⊃ read).
+      (admin ⊃ ops ⊃ read); опциональный `expires_at`, ротация `POST /api/tokens/{id}/rotate`.
 
     Уровни доступа (backend middleware):
     - **public** — `/live`, `/api/live`, `/ready`, `/api/ready`, `/health`, `/api/health`, login/logout/logout-all/me/change-password/check*;
@@ -62,6 +62,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AuthUser"
+        "400":
+          $ref: "#/components/responses/ValidationError"
         "401":
           description: Неверные учётные данные
   /api/auth/logout:
@@ -76,7 +78,14 @@ paths:
       tags: [auth]
       summary: Revoke всех сессий текущего пользователя (bump session_version) + clear cookie
       description: |
-        Инвалидирует все cookie с прежним `session_version`. Требует валидную сессию и CSRF.
+        Инвалидирует все cookie с прежним `session_version`. Требует валидную сессию, CSRF
+        и повторный ввод пароля (`current_password`) для cookie-сессии.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReauthRequest"
       responses:
         "200":
           description: OK
@@ -102,9 +111,17 @@ paths:
       description: |
         Bump `session_version` и перевыпускает `ga_session` для текущего браузера.
         Остальные сессии того же пользователя перестают быть валидными.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthChangePasswordRequest"
       responses:
         "200":
           description: OK
+        "400":
+          $ref: "#/components/responses/ValidationError"
         "401":
           description: Неверный текущий пароль / нет сессии
   /api/auth/geo-wizard-dismiss:
@@ -131,7 +148,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/AuthUser"
         "400":
-          description: Неверный JSON
+          $ref: "#/components/responses/ValidationError"
         "401":
           description: Нет сессии
   /api/auth/check:
@@ -179,6 +196,12 @@ paths:
     post:
       tags: [auth]
       summary: Создать УЗ (обязательно must_reset_password)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthCreateUserRequest"
       responses:
         "201":
           description: Created
@@ -186,6 +209,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AuthUserPublic"
+        "400":
+          $ref: "#/components/responses/ValidationError"
   /api/users/directory:
     get:
       tags: [auth]
@@ -218,10 +243,18 @@ paths:
         - name: username
           in: path
           required: true
-          schema: { type: string }
+          schema: { type: string, minLength: 1, maxLength: 128 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthSetRoleRequest"
       responses:
         "200":
           description: OK
+        "400":
+          $ref: "#/components/responses/ValidationError"
   /api/users/{username}/full-name:
     post:
       tags: [auth]
@@ -230,10 +263,18 @@ paths:
         - name: username
           in: path
           required: true
-          schema: { type: string }
+          schema: { type: string, minLength: 1, maxLength: 128 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthSetFullNameRequest"
       responses:
         "200":
           description: OK
+        "400":
+          $ref: "#/components/responses/ValidationError"
   /api/users/{username}/reset-password:
     post:
       tags: [auth]
@@ -242,10 +283,18 @@ paths:
         - name: username
           in: path
           required: true
-          schema: { type: string }
+          schema: { type: string, minLength: 1, maxLength: 128 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthResetPasswordRequest"
       responses:
         "200":
           description: OK
+        "400":
+          $ref: "#/components/responses/ValidationError"
   /api/users/{username}:
     delete:
       tags: [auth]
@@ -255,6 +304,12 @@ paths:
           in: path
           required: true
           schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReauthRequest"
       responses:
         "200":
           description: OK
@@ -432,9 +487,42 @@ paths:
           in: path
           required: true
           schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReauthRequest"
       responses:
         "200":
           description: OK
+  /api/tokens/{id}/rotate:
+    post:
+      tags: [auth]
+      summary: Ротация секрета токена
+      description: |
+        Генерирует новый secret (возвращается один раз). id, name, scope и expires_at сохраняются.
+        Старый secret сразу перестаёт работать. Истёкший токен ротировать нельзя (404).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReauthRequest"
+      responses:
+        "200":
+          description: OK (token metadata + новый secret)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiTokenCreateResponse"
+        "404":
+          description: Not found or expired
 
   /live:
     get:
@@ -2051,6 +2139,14 @@ components:
       name: ga_session
       description: Сессия после POST /api/auth/login
 
+  responses:
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationError"
+
   schemas:
     ValidationError:
       type: object
@@ -2069,6 +2165,67 @@ components:
         username: { type: string, minLength: 1, maxLength: 128 }
         password: { type: string, minLength: 1, maxLength: 256 }
 
+    AuthChangePasswordRequest:
+      type: object
+      required: [old_password, new_password]
+      additionalProperties: false
+      properties:
+        old_password: { type: string, minLength: 1, maxLength: 256 }
+        new_password: { type: string, minLength: 1, maxLength: 256 }
+
+    AuthCreateUserRequest:
+      type: object
+      required: [username, password, role, must_reset_password]
+      additionalProperties: false
+      properties:
+        username: { type: string, minLength: 1, maxLength: 128 }
+        full_name: { type: string, maxLength: 256 }
+        password: { type: string, minLength: 1, maxLength: 256 }
+        role:
+          type: string
+          enum: [administrator, operator, dashboard]
+        must_reset_password: { type: boolean }
+
+    AuthSetRoleRequest:
+      type: object
+      required: [role]
+      additionalProperties: false
+      properties:
+        role:
+          type: string
+          enum: [administrator, operator, dashboard]
+
+    AuthSetFullNameRequest:
+      type: object
+      required: [full_name]
+      additionalProperties: false
+      properties:
+        full_name: { type: string, maxLength: 256 }
+
+    AuthResetPasswordRequest:
+      type: object
+      required: [password, must_reset_password]
+      additionalProperties: false
+      properties:
+        password: { type: string, minLength: 1, maxLength: 256 }
+        must_reset_password: { type: boolean }
+        current_password:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Пароль текущего администратора (re-auth для cookie-сессии)
+
+    ReauthRequest:
+      type: object
+      required: [current_password]
+      additionalProperties: false
+      properties:
+        current_password:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Пароль текущего пользователя (re-auth для cookie-сессии; Bearer может опустить)
+
     GeoWizardDismissRequest:
       type: object
       required: [dismissed]
@@ -2083,6 +2240,15 @@ components:
       properties:
         name: { type: string, minLength: 1, maxLength: 128 }
         scope: { type: string, enum: [read, ops, admin] }
+        expires_at:
+          type: string
+          format: date-time
+          description: RFC3339; пусто/omit — без срока (макс. 365 дней от сейчас)
+        current_password:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Пароль текущего администратора (re-auth для cookie-сессии)
 
     AnomalyAssignRequest:
       type: object
@@ -2154,6 +2320,11 @@ components:
       properties:
         cert_pem: { type: string, maxLength: 65536 }
         key_pem: { type: string, maxLength: 65536 }
+        current_password:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Пароль текущего администратора (re-auth для cookie-сессии)
 
     BackupScheduleUpdateRequest:
       type: object
@@ -2362,15 +2533,15 @@ components:
       type: object
       additionalProperties: false
       properties:
-        period: { type: string }
-        period_from: { type: string }
-        period_to: { type: string }
-        group_by: { type: string }
-        filter: { type: string }
-        query: { type: string }
-        country: { type: string }
-        limit: { type: integer }
-        data_source: { type: string }
+        period: { type: string, maxLength: 64 }
+        period_from: { type: string, maxLength: 64 }
+        period_to: { type: string, maxLength: 64 }
+        group_by: { type: string, maxLength: 64 }
+        filter: { type: string, maxLength: 4000 }
+        query: { type: string, maxLength: 4000 }
+        country: { type: string, maxLength: 128 }
+        limit: { type: integer, minimum: 1, maximum: 100000 }
+        data_source: { type: string, maxLength: 64 }
 
     HuntSchedule:
       type: object
@@ -2386,8 +2557,8 @@ components:
       required: [name, map]
       additionalProperties: false
       properties:
-        name: { type: string }
-        notes: { type: string }
+        name: { type: string, minLength: 1, maxLength: 128 }
+        notes: { type: string, maxLength: 4000 }
         map:
           $ref: "#/components/schemas/HuntMapState"
         schedule:
@@ -2414,7 +2585,7 @@ components:
 
     AnomalyThresholds:
       type: object
-      additionalProperties: true
+      additionalProperties: false
       properties:
         port_scan_ports: { type: integer }
         port_scan_events: { type: integer }
@@ -2475,8 +2646,8 @@ components:
       required: [username, role, reputationEnabled]
       additionalProperties: false
       properties:
-        username: { type: string }
-        full_name: { type: string }
+        username: { type: string, maxLength: 128 }
+        full_name: { type: string, maxLength: 256 }
         role:
           type: string
           enum: [administrator, operator, dashboard]
@@ -2709,12 +2880,13 @@ components:
     AuthUserPublic:
       type: object
       required: [username, role]
+      additionalProperties: false
       properties:
-        username: { type: string }
-        full_name: { type: string }
+        username: { type: string, maxLength: 128 }
+        full_name: { type: string, maxLength: 256 }
         role: { type: string, enum: [administrator, operator, dashboard] }
         must_reset_password: { type: boolean }
-        created_at: { type: string }
+        created_at: { type: string, maxLength: 64 }
 
     AuthUserList:
       type: object
@@ -2732,6 +2904,10 @@ components:
         name: { type: string }
         scope: { type: string, enum: [read, ops, admin] }
         created_at: { type: string }
+        expires_at:
+          type: string
+          format: date-time
+          description: RFC3339; отсутствует — без срока
 
     ApiTokenList:
       type: object

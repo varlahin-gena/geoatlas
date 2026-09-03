@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"geoatlas/internal/auth"
 	"geoatlas/internal/config"
@@ -16,7 +17,7 @@ func TestCheckOpsAllowsOpsBearer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, secret, err := store.Create("ops", auth.ScopeOps)
+	_, secret, err := store.Create("ops", auth.ScopeOps, time.Time{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +48,7 @@ func TestScopedBearerOpsVsAdmin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, opsSecret, err := store.Create("ops-bot", auth.ScopeOps)
+	_, opsSecret, err := store.Create("ops-bot", auth.ScopeOps, time.Time{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -17,8 +17,13 @@ ok() { echo "ok: $*"; }
 [[ -f frontend/nginx.conf ]] || fail "missing frontend/nginx.conf"
 [[ -f frontend/nginx-app.inc ]] || fail "missing frontend/nginx-app.inc"
 [[ -f frontend/nginx-security-headers.inc ]] || fail "missing frontend/nginx-security-headers.inc"
+[[ -f frontend/nginx-security-headers-common.inc ]] || fail "missing frontend/nginx-security-headers-common.inc"
+[[ -f frontend/nginx-security-headers-ui.inc ]] || fail "missing frontend/nginx-security-headers-ui.inc"
+[[ -f frontend/nginx-security-headers-hsts.inc ]] || fail "missing frontend/nginx-security-headers-hsts.inc"
+[[ -f frontend/nginx-security-headers-edge.inc ]] || fail "missing frontend/nginx-security-headers-edge.inc"
 [[ -f frontend/nginx-proxy-headers.inc ]] || fail "missing frontend/nginx-proxy-headers.inc"
 [[ -f frontend/nginx-auth-subrequest.inc ]] || fail "missing frontend/nginx-auth-subrequest.inc"
+[[ -f frontend/nginx-server-tokens.conf ]] || fail "missing frontend/nginx-server-tokens.conf"
 [[ -f frontend/docker-entrypoint.sh ]] || fail "missing frontend/docker-entrypoint.sh"
 [[ -f frontend/src/main.tsx ]] || fail "missing frontend/src/main.tsx"
 [[ -f frontend/src/App.tsx ]] || fail "missing frontend/src/App.tsx"
@@ -228,16 +233,46 @@ grep -q 'HTTPS_ENABLED' frontend/docker-entrypoint.sh || fail "entrypoint: HTTPS
 grep -q 'listen 443 ssl' frontend/docker-entrypoint.sh || fail "entrypoint: listen 443 ssl"
 ok "nginx SPA / HTTPS"
 
-grep -q 'Content-Security-Policy' frontend/nginx-security-headers.inc || fail "nginx-security-headers: CSP"
-grep -q "style-src-elem 'self'" frontend/nginx-security-headers.inc || fail "nginx-security-headers: style-src-elem"
-grep -q "style-src-attr 'unsafe-inline'" frontend/nginx-security-headers.inc || fail "nginx-security-headers: style-src-attr"
-grep -qE "script-src 'self'" frontend/nginx-security-headers.inc || fail "nginx-security-headers: script-src self"
+grep -q 'security-headers-common.inc' frontend/nginx-security-headers.inc || fail "nginx-security-headers: common include"
+grep -q 'security-headers-ui.inc' frontend/nginx-security-headers.inc || fail "nginx-security-headers: ui include"
+grep -q 'security-headers-hsts.inc' frontend/nginx-security-headers.inc || fail "nginx-security-headers: hsts include"
+grep -q 'Content-Security-Policy' frontend/nginx-security-headers-ui.inc || fail "nginx-security-headers-ui: CSP"
+grep -q "style-src-elem 'self'" frontend/nginx-security-headers-ui.inc || fail "nginx-security-headers-ui: style-src-elem"
+grep -q "style-src-attr 'unsafe-inline'" frontend/nginx-security-headers-ui.inc || fail "nginx-security-headers-ui: style-src-attr"
+grep -qE "script-src 'self'" frontend/nginx-security-headers-ui.inc || fail "nginx-security-headers-ui: script-src self"
+grep -qE 'X-Frame-Options "DENY"' frontend/nginx-security-headers-ui.inc || fail "nginx-security-headers-ui: X-Frame-Options DENY"
+grep -q "frame-ancestors 'none'" frontend/nginx-security-headers-ui.inc || fail "nginx-security-headers-ui: frame-ancestors none"
+if grep -q 'SAMEORIGIN' frontend/nginx-security-headers-ui.inc; then
+  fail "nginx-security-headers-ui: SAMEORIGIN must be gone"
+fi
+if grep -q "frame-ancestors 'self'" frontend/nginx-security-headers-ui.inc; then
+  fail "nginx-security-headers-ui: frame-ancestors self must be gone"
+fi
+grep -q 'Permissions-Policy' frontend/nginx-security-headers-common.inc || fail "nginx-security-headers-common: Permissions-Policy"
+grep -q 'camera=()' frontend/nginx-security-headers-common.inc || fail "nginx-security-headers-common: Permissions-Policy camera"
+grep -q 'X-XSS-Protection' frontend/nginx-security-headers-common.inc || fail "nginx-security-headers-common: X-XSS-Protection"
+grep -qE 'X-XSS-Protection "0"' frontend/nginx-security-headers-common.inc || fail "nginx-security-headers-common: X-XSS-Protection 0"
+grep -q 'Strict-Transport-Security' frontend/nginx-security-headers-hsts.inc || fail "nginx-security-headers-hsts: HSTS"
+grep -q 'includeSubDomains' frontend/nginx-security-headers-hsts.inc || fail "nginx-security-headers-hsts: includeSubDomains"
+grep -q 'max-age=31536000' frontend/nginx-security-headers-hsts.inc || fail "nginx-security-headers-hsts: max-age"
+grep -q 'security-headers-common.inc' frontend/nginx-security-headers-edge.inc || fail "nginx-security-headers-edge: common"
+grep -q 'security-headers-hsts.inc' frontend/nginx-security-headers-edge.inc || fail "nginx-security-headers-edge: hsts"
+if grep -q 'security-headers-ui.inc' frontend/nginx-security-headers-edge.inc; then
+  fail "nginx-security-headers-edge: must not include SPA UI CSP"
+fi
 grep -q 'include /etc/nginx/includes/security-headers.inc' frontend/nginx-app.inc || fail "nginx-app: security-headers include"
 grep -q 'include /etc/nginx/includes/proxy-headers.inc' frontend/nginx-app.inc || fail "nginx-app: proxy-headers include"
 grep -q 'include /etc/nginx/includes/auth-subrequest.inc' frontend/nginx-app.inc || fail "nginx-app: auth-subrequest include"
-"$PYTHON_BIN" - <<'PY' || fail "nginx-app: HTML location missing security-headers (add_header inheritance)"
+"$PYTHON_BIN" - <<'PY' || fail "nginx-app: security-headers split / inheritance"
 from pathlib import Path
+import re
+
 text = Path("frontend/nginx-app.inc").read_text(encoding="utf-8")
+
+# server{} scope must not attach SPA CSP to /api/* proxy responses
+head = text.split("location ", 1)[0]
+if "security-headers" in head:
+    raise SystemExit("server-scope security-headers must be removed (duplicates API CSP)")
 
 def block(loc: str) -> str:
     i = text.find(loc)
@@ -246,13 +281,38 @@ def block(loc: str) -> str:
     j = text.find("\n    location ", i + len(loc))
     return text[i : j if j >= 0 else None]
 
-for loc in ("location / {", "location @spa {", "location ^~ /assets/ {", "location = /config.js {"):
+ui_locs = (
+    "location / {",
+    "location @spa {",
+    "location ^~ /assets/ {",
+    "location = /config.js {",
+)
+for loc in ui_locs:
     b = block(loc)
     if "add_header Cache-Control" in b or loc.startswith("location = /config.js"):
         if "includes/security-headers.inc" not in b:
-            raise SystemExit(f"{loc}: Cache-Control without security-headers include")
-print("security-headers on HTML/assets ok")
+            raise SystemExit(f"{loc}: Cache-Control without SPA security-headers include")
+
+health = block("location = /health {")
+if "security-headers-edge.inc" not in health:
+    raise SystemExit("location = /health {: missing security-headers-edge.inc")
+if "includes/security-headers.inc" in health and "security-headers-edge" not in health:
+    raise SystemExit("location = /health {: must use edge include, not SPA bundle")
+
+# proxy_pass locations must not pin SPA CSP include
+for m in re.finditer(r"(?m)^    location[^{]+\{", text):
+    loc_start = m.start()
+    # find end of this location block (next sibling location at same indent, or EOF)
+    rest = text[m.end() :]
+    nxt = re.search(r"(?m)^    location ", rest)
+    body = rest[: nxt.start()] if nxt else rest
+    if "proxy_pass" in body and "security-headers.inc" in body:
+        raise SystemExit(f"{m.group(0).strip()}: proxy must not include SPA security-headers")
+
+print("security-headers split ok (UI / health / no server-scope / no proxy SPA CSP)")
 PY
+grep -A8 'location = /health {' frontend/docker-entrypoint.sh | grep -q 'security-headers-edge.inc' \
+  || fail "entrypoint: /health missing security-headers-edge include"
 grep -q 'theme-boot.js' frontend/index.html || fail "index.html: theme-boot.js"
 [[ -f frontend/public/theme-boot.js ]] || fail "missing theme-boot.js"
 [[ -f frontend/src/api/users.ts ]] || fail "missing api/users.ts"
@@ -267,6 +327,13 @@ if grep -q 'dangerouslySetInnerHTML' frontend/src/pages/Map/mapDetail.tsx; then
   fail "mapDetail: dangerouslySetInnerHTML must be gone"
 fi
 grep -q 'nginx-security-headers.inc' frontend/Dockerfile || fail "Dockerfile: security-headers copy"
+grep -q 'nginx-security-headers-common.inc' frontend/Dockerfile || fail "Dockerfile: security-headers-common copy"
+grep -q 'nginx-security-headers-ui.inc' frontend/Dockerfile || fail "Dockerfile: security-headers-ui copy"
+grep -q 'nginx-security-headers-hsts.inc' frontend/Dockerfile || fail "Dockerfile: security-headers-hsts copy"
+grep -q 'nginx-security-headers-edge.inc' frontend/Dockerfile || fail "Dockerfile: security-headers-edge copy"
+grep -q 'server_tokens off' frontend/nginx-server-tokens.conf || fail "nginx-server-tokens: server_tokens off"
+grep -q 'nginx-server-tokens.conf' frontend/Dockerfile || fail "Dockerfile: server-tokens copy"
+grep -q '00-server-tokens.conf' frontend/Dockerfile || fail "Dockerfile: server-tokens conf.d path"
 grep -q 'parseMapViewSearch' frontend/src/pages/Map/mapQuery.ts || fail "mapQuery: parseMapViewSearch"
 grep -q 'SESSION_EXPIRED_EVENT' frontend/src/api/client.ts || fail "client.ts: session expired event"
 grep -q 'rep_cat' frontend/src/api/events.ts || fail "events API: rep_cat"
@@ -274,9 +341,11 @@ grep -q 'rep_cat' frontend/src/api/events.ts || fail "events API: rep_cat"
 [[ -f frontend/src/api/openapi.d.ts ]] || fail "missing generated openapi.d.ts"
 grep -q 'location = /api/ready' frontend/nginx-app.inc || fail "nginx-app: /api/ready public"
 grep -q 'location = /api/live' frontend/nginx-app.inc || fail "nginx-app: /api/live public"
-if grep -A6 'location = /health {' frontend/nginx-app.inc | grep -q 'proxy_pass http://backend'; then
+if grep -A8 'location = /health {' frontend/nginx-app.inc | grep -q 'proxy_pass http://backend'; then
   fail "nginx-app: /health must not proxy to backend"
 fi
+grep -A8 'location = /health {' frontend/nginx-app.inc | grep -q 'security-headers-edge.inc' \
+  || fail "nginx-app: /health missing security-headers-edge include"
 grep -q "return 200 '{\"ok\":true,\"status\":\"live\"}'" frontend/nginx-app.inc || fail "nginx-app: /health local live stub"
 grep -q 'location = /health' frontend/docker-entrypoint.sh || fail "entrypoint: /health on HTTP :80 when HTTPS redirect"
 grep -q 'globeCullKey' frontend/src/pages/Map/mapViewport.ts || fail "mapViewport: globeCullKey"

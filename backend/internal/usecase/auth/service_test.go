@@ -147,3 +147,14 @@ func TestLogoutAll(t *testing.T) {
 		t.Fatalf("session version = %d, want 3", users.user.SessionVersion)
 	}
 }
+
+func TestVerifyPassword(t *testing.T) {
+	users := &fakeUsers{user: &domain.User{Username: "u1", Role: domain.RoleAdministrator}}
+	svc := New(users, nil)
+	if !svc.VerifyPassword("u1", "ok") {
+		t.Fatal("expected valid password")
+	}
+	if svc.VerifyPassword("u1", "bad") {
+		t.Fatal("expected invalid password")
+	}
+}

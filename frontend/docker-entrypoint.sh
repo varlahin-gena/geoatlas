@@ -62,6 +62,7 @@ server {
         access_log off;
         default_type application/json;
         add_header Cache-Control "no-store" always;
+        include /etc/nginx/includes/security-headers-edge.inc;
         return 200 '{"ok":true,"status":"live"}';
     }
     location / {

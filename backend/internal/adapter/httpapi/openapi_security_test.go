@@ -13,7 +13,12 @@ var mutationPaths = []struct {
 	path   string
 }{
 	{"post", "/api/auth/login"},
+	{"post", "/api/auth/change-password"},
 	{"post", "/api/auth/geo-wizard-dismiss"},
+	{"post", "/api/users"},
+	{"post", "/api/users/{username}/role"},
+	{"post", "/api/users/{username}/full-name"},
+	{"post", "/api/users/{username}/reset-password"},
 	{"post", "/api/tokens"},
 	{"post", "/api/anomalies/{fingerprint}/assign"},
 	{"put", "/api/anomalies/settings"},
@@ -112,5 +117,26 @@ func TestOpenAPIRetentionSettingsBlocksExtraFields(t *testing.T) {
 	doc := loadOpenAPIDoc(t)
 	schemaBlocksMassAssignment(t, doc, map[string]any{
 		"$ref": "#/components/schemas/RetentionSettings",
+	})
+}
+
+func TestOpenAPIValidationErrorResponseExists(t *testing.T) {
+	doc := loadOpenAPIDoc(t)
+	if _, ok := doc.Components.Responses["ValidationError"]; !ok {
+		t.Fatal("components.responses.ValidationError missing")
+	}
+	schema, ok := doc.Components.Schemas["ValidationError"].(map[string]any)
+	if !ok {
+		t.Fatal("components.schemas.ValidationError missing")
+	}
+	if ap, ok := schema["additionalProperties"].(bool); !ok || ap {
+		t.Fatalf("ValidationError additionalProperties = %v, want false", schema["additionalProperties"])
+	}
+}
+
+func TestOpenAPIAuthCreateUserBlocksMassAssignment(t *testing.T) {
+	doc := loadOpenAPIDoc(t)
+	schemaBlocksMassAssignment(t, doc, map[string]any{
+		"$ref": "#/components/schemas/AuthCreateUserRequest",
 	})
 }

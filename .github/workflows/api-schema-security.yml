@@ -50,4 +50,4 @@ jobs:
 
       - name: Go openapi security tests
         working-directory: backend
-        run: go test -count=1 ./internal/adapter/httpapi/ -run 'TestOpenAPIMutation|TestOpenAPIAuthUser|TestOpenAPIRetention'
+        run: go test -count=1 ./internal/adapter/httpapi/ -run 'TestOpenAPIMutation|TestOpenAPIAuthUser|TestOpenAPIRetention|TestOpenAPIValidation|TestOpenAPIAuthCreate'

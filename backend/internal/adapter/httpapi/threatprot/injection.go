@@ -41,7 +41,20 @@ func suspiciousPath(path string) bool {
 	if strings.Contains(lower, "/../") || strings.Contains(lower, "/..") {
 		return true
 	}
-	if strings.HasPrefix(lower, "../") || strings.Contains(lower, "%2e%2e") {
+	if strings.Contains(lower, `\..`) || strings.Contains(lower, `..\`) {
+		return true
+	}
+	if strings.HasPrefix(lower, "../") || strings.HasPrefix(lower, `..\`) {
+		return true
+	}
+	// Encoded traversal (Apigee URIPath /\.\./)
+	if strings.Contains(lower, "%2e%2e") ||
+		strings.Contains(lower, "%2e.") ||
+		strings.Contains(lower, ".%2e") ||
+		strings.Contains(lower, "..%2f") ||
+		strings.Contains(lower, "%2e%2e%2f") ||
+		strings.Contains(lower, "%2e%2e\\") ||
+		strings.Contains(lower, "%2e%2e%5c") {
 		return true
 	}
 	return false
@@ -52,7 +65,14 @@ func suspiciousQuery(raw string) bool {
 		return true
 	}
 	lower := strings.ToLower(raw)
-	return strings.Contains(lower, "%00") || strings.Contains(lower, "%0d") || strings.Contains(lower, "%0a")
+	if strings.Contains(lower, "%00") || strings.Contains(lower, "%0d") || strings.Contains(lower, "%0a") {
+		return true
+	}
+	// Encoded path traversal smuggled via query (Apigee URIPath patterns).
+	if strings.Contains(lower, "%2e%2e%2f") || strings.Contains(lower, "%2e%2e/") || strings.Contains(lower, "/../") {
+		return true
+	}
+	return false
 }
 
 func suspiciousHeaderName(name string) bool {

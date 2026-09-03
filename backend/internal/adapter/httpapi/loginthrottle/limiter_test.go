@@ -11,18 +11,37 @@ import (
 func TestLoginLimiterLockout(t *testing.T) {
 	lim := New(3, time.Minute, time.Minute)
 	ip := "203.0.113.10"
-	if !lim.Allow(ip) {
+	if !lim.Allow(ip, "admin") {
 		t.Fatal("should allow initially")
 	}
 	for i := 0; i < 3; i++ {
 		lim.RecordFailure(ip, "admin")
 	}
-	if lim.Allow(ip) {
+	if lim.Allow(ip, "admin") {
 		t.Fatal("should be locked after max fails")
 	}
-	lim.RecordSuccess(ip)
-	if !lim.Allow(ip) {
+	lim.RecordSuccess(ip, "admin")
+	if !lim.Allow(ip, "admin") {
 		t.Fatal("success should clear lockout")
+	}
+}
+
+func TestLoginLimiterAccountLockoutAcrossIPs(t *testing.T) {
+	lim := New(3, time.Minute, time.Minute)
+	for _, ip := range []string{"203.0.113.10", "203.0.113.11", "203.0.113.12"} {
+		lim.RecordFailure(ip, "admin")
+	}
+	// Same account from a fresh IP must still be locked.
+	if lim.Allow("198.51.100.50", "admin") {
+		t.Fatal("account should be locked across IPs")
+	}
+	// Other accounts from a used IP remain allowed (IP bucket not exhausted alone).
+	if !lim.Allow("203.0.113.10", "operator") {
+		t.Fatal("other username should still be allowed")
+	}
+	lim.RecordSuccess("198.51.100.50", "admin")
+	if !lim.Allow("198.51.100.99", "admin") {
+		t.Fatal("success should clear account lockout")
 	}
 }
 
@@ -73,16 +92,37 @@ func TestClientIPIgnoresInvalidXRealIP(t *testing.T) {
 	}
 }
 
+func TestRequestFromTrustedHop(t *testing.T) {
+	ConfigureTrustedProxies([]string{"10.0.0.1"})
+	t.Cleanup(func() { ConfigureTrustedProxies([]string{"frontend"}) })
+
+	ok := httptest.NewRequest(http.MethodGet, "/api/live", nil)
+	ok.RemoteAddr = "10.0.0.1:80"
+	if !RequestFromTrustedHop(ok) {
+		t.Fatal("trusted hop should pass")
+	}
+	loop := httptest.NewRequest(http.MethodGet, "/live", nil)
+	loop.RemoteAddr = "127.0.0.1:1"
+	if !RequestFromTrustedHop(loop) {
+		t.Fatal("loopback should pass")
+	}
+	bad := httptest.NewRequest(http.MethodGet, "/api/live", nil)
+	bad.RemoteAddr = "203.0.113.9:443"
+	if RequestFromTrustedHop(bad) {
+		t.Fatal("external hop should fail")
+	}
+}
+
 func TestLoginThrottleWindowReset(t *testing.T) {
 	lim := New(2, 20*time.Millisecond, 30*time.Millisecond)
 	ip := "198.51.100.1"
 	lim.RecordFailure(ip, "op")
 	lim.RecordFailure(ip, "op")
-	if lim.Allow(ip) {
+	if lim.Allow(ip, "op") {
 		t.Fatal("expected lockout")
 	}
 	time.Sleep(40 * time.Millisecond)
-	if !lim.Allow(ip) {
+	if !lim.Allow(ip, "op") {
 		t.Fatal("expected unlock after lockout")
 	}
 }

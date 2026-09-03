@@ -14,9 +14,14 @@ RUN apk upgrade --no-cache && \
     mkdir -p /etc/nginx/includes
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx-app.inc /etc/nginx/includes/app.inc
+COPY nginx-security-headers-common.inc /etc/nginx/includes/security-headers-common.inc
+COPY nginx-security-headers-ui.inc /etc/nginx/includes/security-headers-ui.inc
+COPY nginx-security-headers-hsts.inc /etc/nginx/includes/security-headers-hsts.inc
+COPY nginx-security-headers-edge.inc /etc/nginx/includes/security-headers-edge.inc
 COPY nginx-security-headers.inc /etc/nginx/includes/security-headers.inc
 COPY nginx-proxy-headers.inc /etc/nginx/includes/proxy-headers.inc
 COPY nginx-auth-subrequest.inc /etc/nginx/includes/auth-subrequest.inc
+COPY nginx-server-tokens.conf /etc/nginx/conf.d/00-server-tokens.conf
 COPY docker-entrypoint.sh /docker-entrypoint-nm.sh
 RUN chmod +x /docker-entrypoint-nm.sh \
   && rm -f /etc/nginx/conf.d/default.conf
