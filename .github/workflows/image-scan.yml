@@ -126,44 +126,44 @@ jobs:
           output: trivy-syslog-ng.sarif
           exit-code: "1"
 
-      - uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
+      - uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
         if: always() && hashFiles('trivy-frontend.sarif') != ''
         with:
           sarif_file: trivy-frontend.sarif
           category: trivy-frontend
 
-      - uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
+      - uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
         if: always() && hashFiles('trivy-backend.sarif') != ''
         with:
           sarif_file: trivy-backend.sarif
           category: trivy-backend
 
-      - uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
+      - uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
         if: always() && hashFiles('trivy-stats.sarif') != ''
         with:
           sarif_file: trivy-stats.sarif
           category: trivy-stats
 
-      - uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
+      - uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
         if: always() && hashFiles('trivy-clickhouse.sarif') != ''
         with:
           sarif_file: trivy-clickhouse.sarif
           category: trivy-clickhouse
 
-      - uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
+      - uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
         if: always() && hashFiles('trivy-syslog-ng.sarif') != ''
         with:
           sarif_file: trivy-syslog-ng.sarif
           category: trivy-syslog-ng
       # Close orphaned alerts from former categories (raw alpine/nginx tags).
       # GitHub only auto-closes when the same category uploads again with fewer findings.
-      - uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
+      - uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
         if: always()
         with:
           sarif_file: trivy-empty.sarif
           category: trivy-alpine
 
-      - uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
+      - uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
         if: always()
         with:
           sarif_file: trivy-empty.sarif
