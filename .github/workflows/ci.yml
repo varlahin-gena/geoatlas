@@ -55,6 +55,7 @@ jobs:
             frontend:
               - 'frontend/**'
               - 'openapi.yaml'
+              - 'scripts/ci-npm-audit.sh'
               - '.github/workflows/ci.yml'
             stats:
               - 'stats-collector/**'
@@ -588,7 +589,8 @@ jobs:
         run: npm run test:coverage
 
       - name: npm audit (production, high+)
-        run: npm audit --omit=dev --audit-level=high
+        working-directory: .
+        run: bash scripts/ci-npm-audit.sh
 
       - name: typecheck
         run: npm run typecheck
