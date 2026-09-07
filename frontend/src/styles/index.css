@@ -263,7 +263,7 @@ body.page-map {
     position: relative;
     z-index: 100;
 }
-.topbar .search-box { position: relative; flex: 1; max-width: 560px; }
+.topbar .search-box { position: relative; flex: 1; max-width: 560px; min-width: 0; }
 .topbar .search-box input {
     width: 100%; background: var(--panel-2); color: var(--text);
     border: 1px solid var(--border); border-radius: 6px;
@@ -273,6 +273,14 @@ body.page-map {
 .topbar .search-box .search-icon {
     position: absolute; left: 9px; top: 50%;
     transform: translateY(-50%); width: 14px; height: 14px; color: var(--text-muted);
+    pointer-events: none;
+}
+.topbar .map-save-hunt-btn {
+    flex-shrink: 0;
+    white-space: nowrap;
+    height: 32px;
+    padding: 0 10px;
+    font-size: 12px;
 }
 .topbar .search-builder-toggle {
     position: absolute; right: 6px; top: 50%; transform: translateY(-50%);

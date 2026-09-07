@@ -77,6 +77,37 @@ export function arcCrossesAntimeridian(sLon: number, tLon: number): boolean {
 }
 
 /**
+ * Shift target longitude into the same ±180° window as source so a flat ArcLayer
+ * takes the short path across the date line (no geodesic / no horizontal streak).
+ */
+export function unwrapLonNear(sLon: number, tLon: number): number {
+  let t = tLon;
+  while (t - sLon > 180) t -= 360;
+  while (t - sLon < -180) t += 360;
+  return t;
+}
+
+/**
+ * Geodesic mid-latitude on the sphere. Used to detect polar-routing arcs that
+ * shoot off-screen on 2D Mercator (kept for tests / diagnostics).
+ */
+export function greatCircleMidLat(sLon: number, sLat: number, tLon: number, tLat: number): number {
+  const toRad = Math.PI / 180;
+  const φ1 = sLat * toRad;
+  const λ1 = sLon * toRad;
+  const φ2 = tLat * toRad;
+  const λ2 = tLon * toRad;
+  const Δλ = λ2 - λ1;
+  const Bx = Math.cos(φ2) * Math.cos(Δλ);
+  const By = Math.cos(φ2) * Math.sin(Δλ);
+  const φ3 = Math.atan2(
+    Math.sin(φ1) + Math.sin(φ2),
+    Math.sqrt((Math.cos(φ1) + Bx) ** 2 + By ** 2),
+  );
+  return (φ3 * 180) / Math.PI;
+}
+
+/**
  * Geodesic arcs between similar mid/high latitudes route over the pole; on 2D Mercator
  * the control point shoots off-screen (e.g. Europe ↔ North America).
  */
@@ -86,53 +117,26 @@ export function greatCircleOffScreenOnMercator(
   tLon: number,
   tLat: number,
 ): boolean {
+  const midLat = greatCircleMidLat(sLon, sLat, tLon, tLat);
+  const endMax = Math.max(Math.abs(sLat), Math.abs(tLat));
+  // Midpoint climbs toward a pole, or already high-lat long east-west hop.
+  if (Math.abs(midLat) >= 72) return true;
+  if (Math.abs(midLat) > endMax + 12) return true;
   const absLat = Math.max(Math.abs(sLat), Math.abs(tLat));
   let dLon = Math.abs(tLon - sLon);
   if (dLon > 180) dLon = 360 - dLon;
   const dLat = Math.abs(tLat - sLat);
-  return absLat >= 35 && dLon >= 70 && dLat < 35;
+  return absLat >= 30 && dLon >= 50 && dLat < 40;
 }
 
-/** Whether ArcLayer should use greatCircle on the flat map (globe always uses geodesic). */
+/** 2D map always uses flat arcs; globe keeps geodesic. Helper kept for tests. */
 export function shouldUseGreatCircleArcOnMap(
-  sLon: number,
-  sLat: number,
-  tLon: number,
-  tLat: number,
+  _sLon: number,
+  _sLat: number,
+  _tLon: number,
+  _tLat: number,
 ): boolean {
-  if (arcCrossesAntimeridian(sLon, tLon)) return true;
-  return !greatCircleOffScreenOnMercator(sLon, sLat, tLon, tLat);
-}
-
-function partitionMapArcLines(
-  lines: MapLine[],
-  allPoints: Record<string, MapPoint>,
-  lineFallback: Map<string, { lon: number; lat: number }>,
-  displayCoords: Map<string, [number, number]>,
-): { geodesic: MapLine[]; flat: MapLine[] } {
-  const geodesic: MapLine[] = [];
-  const flat: MapLine[] = [];
-  for (const line of lines) {
-    const [sLon, sLat] = displayLonLat(
-      line.src,
-      line.src_lon,
-      line.src_lat,
-      allPoints,
-      lineFallback,
-      displayCoords,
-    );
-    const [tLon, tLat] = displayLonLat(
-      line.dst,
-      line.dst_lon,
-      line.dst_lat,
-      allPoints,
-      lineFallback,
-      displayCoords,
-    );
-    if (shouldUseGreatCircleArcOnMap(sLon, sLat, tLon, tLat)) geodesic.push(line);
-    else flat.push(line);
-  }
-  return { geodesic, flat };
+  return false;
 }
 
 /** Weighted lon/lat from visible line endpoints — matches arc anchor coords. */
@@ -306,7 +310,8 @@ function mapArcHeight(
   let dLon = Math.abs(tLon - sLon);
   if (dLon > 180) dLon = 360 - dLon;
   const dist = Math.max(1, Math.hypot(dLon, Math.abs(tLat - sLat)));
-  return Math.max(0.15, Math.min(0.35, 0.1 + dist / 160));
+  // Keep peaks inside the viewport on Mercator (long hauls used to hit ~0.35).
+  return Math.max(0.08, Math.min(0.22, 0.06 + dist / 280));
 }
 
 function globeArcHeight(
@@ -596,8 +601,27 @@ export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
         wrapLongitude: !isGlobe,
         getSourcePosition: (d: MapLine) =>
           displayLonLat(d.src, d.src_lon, d.src_lat, opts.points, lineFallback, displayCoords),
-        getTargetPosition: (d: MapLine) =>
-          displayLonLat(d.dst, d.dst_lon, d.dst_lat, opts.points, lineFallback, displayCoords),
+        getTargetPosition: (d: MapLine) => {
+          const [sLon] = displayLonLat(
+            d.src,
+            d.src_lon,
+            d.src_lat,
+            opts.points,
+            lineFallback,
+            displayCoords,
+          );
+          const [tLon, tLat] = displayLonLat(
+            d.dst,
+            d.dst_lon,
+            d.dst_lat,
+            opts.points,
+            lineFallback,
+            displayCoords,
+          );
+          // Flat map: unwrap across ±180 so short Pacific hops stay on-screen.
+          if (!isGlobe && !greatCircle) return [unwrapLonNear(sLon, tLon), tLat];
+          return [tLon, tLat];
+        },
         getSourceColor: (d: MapLine) => [
           ...arcRGB(d.status, d, opts.monoArcColor, opts.repColorArcs),
           d._flowAlpha || 210,
@@ -640,6 +664,7 @@ export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
         updateTriggers: {
           getWidth: [opts.highlightEdgeKeys],
           getSourceColor: [opts.monoArcColor, opts.repColorArcs],
+          getTargetPosition: [isGlobe],
         },
         onClick: (info: { object?: MapLine }) => {
           if (info.object) opts.onLineClick(info.object);
@@ -648,18 +673,9 @@ export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
     );
   };
 
-  if (isGlobe) {
-    pushArcLayer('arcs', lines, true);
-  } else {
-    const { geodesic, flat } = partitionMapArcLines(
-      lines,
-      opts.points,
-      lineFallback,
-      displayCoords,
-    );
-    pushArcLayer('arcs-geodesic', geodesic, true);
-    pushArcLayer('arcs-flat', flat, false);
-  }
+  // 2D Mercator: always flat arcs (geodesic shoots over the pole off-screen).
+  // Globe: geodesic. Antimeridian on map uses longitude unwrap in getTargetPosition.
+  pushArcLayer('arcs', lines, isGlobe);
 
   layers.push(
     new ScatterplotLayer({
