@@ -103,6 +103,8 @@ services:
     tmpfs:
       - /tmp:noexec,nosuid,size=64m
       - /var/run:noexec,nosuid,size=16m
+      # persist-name / runtime state; without this read_only breaks destinations + stats-exporter
+      - /var/lib/syslog-ng:noexec,nosuid,size=32m
     pids_limit: 200
     deploy:
       resources:
