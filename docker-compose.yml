@@ -52,12 +52,13 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
-    pids_limit: 1000
+    # pids только в deploy.resources.limits: Compose v5+ конфликтует с top-level pids_limit
     deploy:
       resources:
         limits:
           cpus: "4.0"
           memory: 6g
+          pids: 1000
     logging:
       driver: json-file
       options:
@@ -105,12 +106,12 @@ services:
       - /var/run:noexec,nosuid,size=16m
       # persist-name / runtime state; without this read_only breaks destinations + stats-exporter
       - /var/lib/syslog-ng:noexec,nosuid,size=32m
-    pids_limit: 200
     deploy:
       resources:
         limits:
           cpus: "2.0"
           memory: 1g
+          pids: 200
     logging:
       driver: json-file
       options:
@@ -226,12 +227,12 @@ services:
     tmpfs:
       - /tmp:noexec,nosuid,size=64m
     init: true
-    pids_limit: 500
     deploy:
       resources:
         limits:
           cpus: "4.0"
           memory: 4g
+          pids: 500
     logging:
       driver: json-file
       options:
@@ -277,12 +278,12 @@ services:
     tmpfs:
       - /tmp:noexec,nosuid,size=32m
     init: true
-    pids_limit: 100
     deploy:
       resources:
         limits:
           cpus: "0.5"
           memory: 256m
+          pids: 100
     logging:
       driver: json-file
       options:
@@ -312,12 +313,12 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    pids_limit: 100
     deploy:
       resources:
         limits:
           cpus: "0.5"
           memory: 128m
+          pids: 100
     logging:
       driver: json-file
       options:
@@ -366,12 +367,12 @@ services:
       - /var/cache/nginx:noexec,nosuid,size=64m
       - /var/run:noexec,nosuid,size=16m
       - /etc/nginx/conf.d:noexec,nosuid,size=1m
-    pids_limit: 100
     deploy:
       resources:
         limits:
           cpus: "1.0"
           memory: 256m
+          pids: 100
     logging:
       driver: json-file
       options:
