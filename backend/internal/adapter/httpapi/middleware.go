@@ -220,11 +220,13 @@ func requireOpsMW(ba authmw.BearerAuth, sessions SessionParser, users UserDirect
 
 // proxyGateMW — браузерный доступ только через nginx (GA_TRUSTED_PROXIES / loopback).
 // Прямой доступ с хоста к :8080 отклоняется; machine clients с валидным Bearer — ок.
+// Health probes (/live, /ready, /health) открыты: docker healthcheck (loopback) и
+// stats-collector (http://backend:8080/live) не несут Bearer и не идут через nginx.
 // Включается GA_REQUIRE_PROXY=1; также выкл. при AUTH_DISABLED / API_AUTH_DISABLED.
 func proxyGateMW(ba authmw.BearerAuth, enabled bool) middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if !enabled || loginthrottle.RequestFromTrustedHop(r) || ba.Any(r) {
+			if !enabled || proxyGateExempt(r.URL.Path) || loginthrottle.RequestFromTrustedHop(r) || ba.Any(r) {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -232,6 +234,16 @@ func proxyGateMW(ba authmw.BearerAuth, enabled bool) middleware {
 				"error": "direct backend access denied; use reverse proxy",
 			})
 		})
+	}
+}
+
+func proxyGateExempt(path string) bool {
+	switch path {
+	case "/live", "/ready", "/health",
+		"/api/live", "/api/ready", "/api/health":
+		return true
+	default:
+		return false
 	}
 }
 

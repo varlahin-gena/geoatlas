@@ -30,12 +30,24 @@ func TestProxyGateMW(t *testing.T) {
 	})
 
 	t.Run("rejects external without bearer", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/live", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/ingest/stats", nil)
 		req.RemoteAddr = "203.0.113.9:443"
 		rec := httptest.NewRecorder()
 		gated.ServeHTTP(rec, req)
 		if rec.Code != http.StatusForbidden {
 			t.Fatalf("status=%d want 403", rec.Code)
+		}
+	})
+
+	t.Run("allows health probes without bearer", func(t *testing.T) {
+		for _, path := range []string{"/live", "/api/live", "/health", "/api/health", "/ready", "/api/ready"} {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			req.RemoteAddr = "203.0.113.9:443"
+			rec := httptest.NewRecorder()
+			gated.ServeHTTP(rec, req)
+			if rec.Code != http.StatusNoContent {
+				t.Fatalf("%s status=%d want 204", path, rec.Code)
+			}
 		}
 	})
 
