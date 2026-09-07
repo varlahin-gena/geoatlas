@@ -104,7 +104,7 @@ export default function HuntsPage() {
           <code>hunt_threshold</code> в журнале аномалий.
         </p>
         <p className="hint">
-          Сохранить текущий вид карты — кнопка «Hunt» на карте или{' '}
+          Сохранить текущий вид карты — кнопка «Охота» на карте или{' '}
           <Link to="/">вернуться на карту</Link>.
         </p>
 

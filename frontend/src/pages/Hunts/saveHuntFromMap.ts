@@ -11,7 +11,7 @@ export async function promptSaveHuntFromMap(
   mapState: HuntMapState,
   toast: (msg: string, kind?: 'success' | 'error' | 'warn') => void,
 ) {
-  const name = window.prompt('Название saved hunt');
+  const name = window.prompt('Название охоты');
   if (!name?.trim()) return;
   try {
     await createHunt({
@@ -19,8 +19,8 @@ export async function promptSaveHuntFromMap(
       map: mapState,
       schedule: DEFAULT_SCHEDULE,
     });
-    toast('Hunt сохранён', 'success');
+    toast('Охота сохранена', 'success');
   } catch (e) {
-    toast(e instanceof Error ? e.message : 'Ошибка сохранения hunt', 'error');
+    toast(e instanceof Error ? e.message : 'Ошибка сохранения охоты', 'error');
   }
 }

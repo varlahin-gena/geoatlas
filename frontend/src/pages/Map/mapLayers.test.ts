@@ -16,6 +16,7 @@ import {
   statusRGB,
   topByCount,
   shouldUseGreatCircleArcOnMap,
+  unwrapLonNear,
   normalizeLonLat,
   resolveNodeLonLat,
   buildLineCoordFallback,
@@ -111,9 +112,16 @@ describe('mapLayers helpers', () => {
     expect(greatCircleOffScreenOnMercator(13.4, 52.5, 37.6, 55.75)).toBe(false);
   });
 
-  it('shouldUseGreatCircleArcOnMap keeps Pacific geodesic but flatens risky transatlantic', () => {
-    expect(shouldUseGreatCircleArcOnMap(49.1, 55.8, -171.8, -13.8)).toBe(true);
+  it('unwrapLonNear takes the short path across the date line', () => {
+    expect(unwrapLonNear(49.1, -171.8)).toBeCloseTo(188.2, 5);
+    expect(unwrapLonNear(151.2, -118.2)).toBeCloseTo(241.8, 5);
+    expect(unwrapLonNear(37.6, 13.4)).toBeCloseTo(13.4, 5);
+  });
+
+  it('shouldUseGreatCircleArcOnMap is always false (2D uses flat arcs)', () => {
+    expect(shouldUseGreatCircleArcOnMap(49.1, 55.8, -171.8, -13.8)).toBe(false);
     expect(shouldUseGreatCircleArcOnMap(15.2, 54.5, -105.2, 54.5)).toBe(false);
+    expect(shouldUseGreatCircleArcOnMap(13.4, 52.5, 37.6, 55.75)).toBe(false);
   });
 
   it('buildDisplayCoordMap spreads co-located nodes', () => {

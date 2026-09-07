@@ -384,7 +384,7 @@ export default function InvestigatePage() {
                   );
                 }}
               >
-                Сохранить как hunt
+                Сохранить как охоту
               </button>
               {!acked ? (
                 <button type="button" className="btn" disabled={acking} onClick={() => void hideAlert()}>

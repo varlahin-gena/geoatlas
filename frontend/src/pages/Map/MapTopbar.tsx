@@ -209,22 +209,22 @@ export function MapTopbar({
           search={search}
           onApply={setSearch}
         />
-        {huntSave ? (
-          <button
-            type="button"
-            className="btn sm map-save-hunt-btn"
-            title="Сохранить saved hunt"
-            onClick={() =>
-              void promptSaveHuntFromMap(
-                mapViewToHuntState({ ...huntSave, search }),
-                toast,
-              )
-            }
-          >
-            Hunt
-          </button>
-        ) : null}
       </div>
+      {huntSave ? (
+        <button
+          type="button"
+          className="btn sm map-save-hunt-btn"
+          title="Сохранить текущий вид карты как охоту"
+          onClick={() =>
+            void promptSaveHuntFromMap(
+              mapViewToHuntState({ ...huntSave, search }),
+              toast,
+            )
+          }
+        >
+          Охота
+        </button>
+      ) : null}
 
       <div className="period-control">
         <span>Период:</span>
