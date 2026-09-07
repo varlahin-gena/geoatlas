@@ -89,9 +89,9 @@ export function unwrapLonNear(sLon: number, tLon: number): number {
 
 /**
  * Geodesic mid-latitude on the sphere. Used to detect polar-routing arcs that
- * shoot off-screen on 2D Mercator (kept for tests / diagnostics).
+ * shoot off-screen on 2D Mercator.
  */
-export function greatCircleMidLat(sLon: number, sLat: number, tLon: number, tLat: number): number {
+function greatCircleMidLat(sLon: number, sLat: number, tLon: number, tLat: number): number {
   const toRad = Math.PI / 180;
   const φ1 = sLat * toRad;
   const λ1 = sLon * toRad;
