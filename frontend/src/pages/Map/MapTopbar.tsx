@@ -7,6 +7,7 @@ import { SearchBuilder } from './SearchBuilder';
 import { countActiveMapFilters, MapFiltersPanel } from './MapFiltersPanel';
 import { MapLayersPanel } from './MapLayersPanel';
 import { PERIODS } from './mapPeriods';
+import type { MapRefreshSec } from './mapRefreshInterval';
 import type { RepFilterSide } from './mapTypes';
 
 export type MapTopbarProps = {
@@ -78,8 +79,8 @@ export type MapTopbarProps = {
     data: {
       autoRefresh: boolean;
       setAutoRefresh: (v: boolean) => void;
-      refreshIntervalSec: number;
-      setRefreshIntervalSec: (v: number) => void;
+      refreshIntervalSec: MapRefreshSec;
+      setRefreshIntervalSec: (v: MapRefreshSec) => void;
       dataSource: 'live' | 'backup';
       selectDataSource: (v: 'live' | 'backup') => void;
       backupAttached: string;

@@ -3,6 +3,7 @@ import {
   MAP_REFRESH_DEFAULT_SEC,
   MAP_REFRESH_PRESETS_SEC,
   parseMapRefreshSec,
+  type MapRefreshSec,
 } from './mapRefreshInterval';
 
 export type MapLayersPanelProps = {
@@ -28,8 +29,8 @@ export type MapLayersPanelProps = {
   data: {
     autoRefresh: boolean;
     setAutoRefresh: (v: boolean) => void;
-    refreshIntervalSec: number;
-    setRefreshIntervalSec: (v: number) => void;
+    refreshIntervalSec: MapRefreshSec;
+    setRefreshIntervalSec: (v: MapRefreshSec) => void;
     dataSource: 'live' | 'backup';
     selectDataSource: (v: 'live' | 'backup') => void;
     backupAttached: string;
