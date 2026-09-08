@@ -1,5 +1,5 @@
 /** localStorage key for map auto-refresh interval (seconds). */
-export const MAP_REFRESH_STORAGE_KEY = 'ga.map.refreshSec';
+const MAP_REFRESH_STORAGE_KEY = 'ga.map.refreshSec';
 
 /** Allowed presets in seconds: 30s / 1m / 5m. */
 export const MAP_REFRESH_PRESETS_SEC = [30, 60, 300] as const;
