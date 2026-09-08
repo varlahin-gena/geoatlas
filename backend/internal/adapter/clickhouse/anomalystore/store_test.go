@@ -51,4 +51,10 @@ func TestPrivateSrcSQL(t *testing.T) {
 	if got == "" || !strings.Contains(got, "10.0.0.0") || !strings.Contains(got, "192.168.0.0") {
 		t.Fatalf("private filter: %q", got)
 	}
+	if !strings.Contains(got, "toIPv4OrZero(toString(src_ip))") {
+		t.Fatalf("want String/IPv4-safe cast, got: %q", got)
+	}
+	if strings.Contains(got, "(src_ip >= toIPv4") {
+		t.Fatalf("bare src_ip vs toIPv4 breaks on String columns: %q", got)
+	}
 }

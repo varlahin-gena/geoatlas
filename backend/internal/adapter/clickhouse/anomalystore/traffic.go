@@ -510,13 +510,16 @@ func privateSrcSQL(includePrivate bool) string {
 	if includePrivate {
 		return ""
 	}
-	return `
+	// Normalize String or IPv4 columns — bare src_ip >= toIPv4(...) fails with CH code 386
+	// when traffic_logs.src_ip is still String.
+	ip := "toIPv4OrZero(toString(src_ip))"
+	return fmt.Sprintf(`
 		AND NOT (
-			(src_ip >= toIPv4('10.0.0.0') AND src_ip <= toIPv4('10.255.255.255'))
-			OR (src_ip >= toIPv4('172.16.0.0') AND src_ip <= toIPv4('172.31.255.255'))
-			OR (src_ip >= toIPv4('192.168.0.0') AND src_ip <= toIPv4('192.168.255.255'))
-			OR (src_ip >= toIPv4('127.0.0.0') AND src_ip <= toIPv4('127.255.255.255'))
-			OR (src_ip >= toIPv4('169.254.0.0') AND src_ip <= toIPv4('169.254.255.255'))
-		)`
+			(%[1]s >= toIPv4('10.0.0.0') AND %[1]s <= toIPv4('10.255.255.255'))
+			OR (%[1]s >= toIPv4('172.16.0.0') AND %[1]s <= toIPv4('172.31.255.255'))
+			OR (%[1]s >= toIPv4('192.168.0.0') AND %[1]s <= toIPv4('192.168.255.255'))
+			OR (%[1]s >= toIPv4('127.0.0.0') AND %[1]s <= toIPv4('127.255.255.255'))
+			OR (%[1]s >= toIPv4('169.254.0.0') AND %[1]s <= toIPv4('169.254.255.255'))
+		)`, ip)
 }
 
