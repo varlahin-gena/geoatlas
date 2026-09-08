@@ -8,6 +8,8 @@ export function fmtDate(iso: unknown, timeZone?: string): string {
   try {
     const d = new Date(String(iso));
     if (Number.isNaN(d.getTime())) return String(iso);
+    // Go zero time / unset JSON timestamps marshal as 0001-01-01…
+    if (d.getUTCFullYear() < 1970) return '—';
     const opts: Intl.DateTimeFormatOptions = {};
     const tz = typeof timeZone === 'string' ? timeZone.trim() : '';
     if (tz) {

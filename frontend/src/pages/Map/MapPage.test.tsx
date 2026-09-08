@@ -52,6 +52,8 @@ vi.mock('./useMapEvents', () => ({
     repFacets: {},
     autoRefresh: false,
     setAutoRefresh: vi.fn(),
+    refreshIntervalSec: 300,
+    setRefreshIntervalSec: vi.fn(),
     dataSource: 'live' as const,
     selectDataSource: vi.fn(),
     backupAttached: '',

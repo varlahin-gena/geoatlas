@@ -302,6 +302,32 @@ func TestScanSkippedWithoutEnterpriseNets(t *testing.T) {
 	}
 }
 
+func TestLiveStatusRefreshesEnterpriseNets(t *testing.T) {
+	s := newSvc(&fakeStore{}, &fakeScan{}, nil)
+	st := s.LiveStatus(context.Background())
+	if st.EnterpriseNets != 0 {
+		t.Fatalf("without nets: got %d", st.EnterpriseNets)
+	}
+	s.setStatus(func(st *ScanStatus) {
+		st.EnterpriseNets = 0
+		st.LastSkip = "no_enterprise_nets"
+	})
+	s.SetEnterpriseNets(fakeNets{items: []model.EnterpriseNet{
+		{StartIP: 1, EndIP: 2, Network: "a"},
+		{StartIP: 3, EndIP: 4, Network: "b"},
+	}})
+	st = s.LiveStatus(context.Background())
+	if st.EnterpriseNets != 2 {
+		t.Fatalf("live count=%d want 2", st.EnterpriseNets)
+	}
+	if st.LastSkip != "" {
+		t.Fatalf("stale skip should clear when nets exist: %q", st.LastSkip)
+	}
+	if s.Status().EnterpriseNets != 0 {
+		t.Fatal("cached Status must stay stale until next Scan")
+	}
+}
+
 func TestNewCountryLearningSkip(t *testing.T) {
 	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
 	store := &fakeStore{exist: map[string]struct{}{}}

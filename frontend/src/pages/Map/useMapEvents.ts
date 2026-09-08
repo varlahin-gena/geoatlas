@@ -4,6 +4,13 @@ import { fetchMapEvents } from '@/api/events';
 import type { ToastKind } from '@/components/Toast';
 import { usePolling } from '@/lib/usePolling';
 import { buildPeriodQuery } from './mapConstants';
+import {
+  loadMapRefreshSec,
+  mapRefreshSecToMs,
+  parseMapRefreshSec,
+  saveMapRefreshSec,
+  type MapRefreshSec,
+} from './mapRefreshInterval';
 import { mapFetchLimit, mapServerScope, type MapActionFilter } from './mapQuery';
 import {
   assessMapQueryCost,
@@ -13,6 +20,7 @@ import {
 import type { MapLine, MapPoint } from './mapTypes';
 
 export type MapDataSource = 'live' | 'backup';
+export type { MapRefreshSec };
 
 export function useMapEvents(
   toast: (msg: string, kind?: ToastKind) => void,
@@ -60,9 +68,16 @@ export function useMapEvents(
   });
   const [repFacets, setRepFacets] = useState<Record<string, string[]>>({});
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [refreshIntervalSec, setRefreshIntervalSecState] = useState<MapRefreshSec>(loadMapRefreshSec);
   const [dataSource, setDataSource] = useState<MapDataSource>('live');
   const [backupAttached, setBackupAttached] = useState('');
   const abortRef = useRef<AbortController | null>(null);
+
+  const setRefreshIntervalSec = useCallback((sec: MapRefreshSec) => {
+    const next = parseMapRefreshSec(sec);
+    setRefreshIntervalSecState(next);
+    saveMapRefreshSec(next);
+  }, []);
 
   const periodQuery = useMemo(
     () => buildPeriodQuery(period, periodFrom, periodTo),
@@ -179,7 +194,7 @@ export function useMapEvents(
     async () => {
       await fetchData();
     },
-    30000,
+    mapRefreshSecToMs(refreshIntervalSec),
     autoRefresh && dataSource === 'live',
     { runImmediately: false },
   );
@@ -196,6 +211,8 @@ export function useMapEvents(
     repFacets,
     autoRefresh,
     setAutoRefresh,
+    refreshIntervalSec,
+    setRefreshIntervalSec,
     dataSource,
     selectDataSource,
     backupAttached,

@@ -1,4 +1,10 @@
 import { fmtNumber } from '@/lib/format';
+import {
+  MAP_REFRESH_DEFAULT_SEC,
+  MAP_REFRESH_PRESETS_SEC,
+  parseMapRefreshSec,
+  type MapRefreshSec,
+} from './mapRefreshInterval';
 
 export type MapLayersPanelProps = {
   open: boolean;
@@ -23,6 +29,8 @@ export type MapLayersPanelProps = {
   data: {
     autoRefresh: boolean;
     setAutoRefresh: (v: boolean) => void;
+    refreshIntervalSec: MapRefreshSec;
+    setRefreshIntervalSec: (v: MapRefreshSec) => void;
     dataSource: 'live' | 'backup';
     selectDataSource: (v: 'live' | 'backup') => void;
     backupAttached: string;
@@ -51,8 +59,10 @@ export function MapLayersPanel({ open, viewMode, viz, data, globe }: MapLayersPa
     monoArcs,
     setMonoArcs,
   } = viz;
-  const { autoRefresh, setAutoRefresh, dataSource, selectDataSource, backupAttached } = data;
+  const { autoRefresh, setAutoRefresh, refreshIntervalSec, setRefreshIntervalSec, dataSource, selectDataSource, backupAttached } =
+    data;
   const { autoRotate, setAutoRotate } = globe;
+  const refreshEnabled = autoRefresh && dataSource === 'live';
 
   if (!open) return null;
 
@@ -152,6 +162,25 @@ export function MapLayersPanel({ open, viewMode, viz, data, globe }: MapLayersPa
             onChange={(e) => setAutoRefresh(e.target.checked)}
           />
           <span>Авто-обновление</span>
+        </label>
+        <label className="side-field" style={{ marginTop: 8 }}>
+          <span className="map-chrome-panel-label" style={{ marginBottom: 0 }}>
+            Интервал обновления
+          </span>
+          <select
+            className="map-chrome-select"
+            value={parseMapRefreshSec(refreshIntervalSec)}
+            disabled={!refreshEnabled}
+            aria-label="Интервал авто-обновления линий"
+            onChange={(e) => setRefreshIntervalSec(parseMapRefreshSec(e.target.value))}
+          >
+            {MAP_REFRESH_PRESETS_SEC.map((sec) => (
+              <option key={sec} value={sec}>
+                {sec === 30 ? '30 секунд' : sec === 60 ? '1 минута' : '5 минут'}
+                {sec === MAP_REFRESH_DEFAULT_SEC ? ' (по умолчанию)' : ''}
+              </option>
+            ))}
+          </select>
         </label>
         <div
           className="mode-switch mode-switch-data"

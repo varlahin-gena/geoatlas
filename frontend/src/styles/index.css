@@ -629,6 +629,16 @@ body.page-map {
 .topbar .map-chrome-filter-tabs button.active.allowed { color: var(--green); }
 .topbar .map-chrome-filter-tabs button.active.blocked { color: var(--red); }
 .topbar .map-chrome-panel .side-toggle { padding: 6px 4px; margin: 2px 0; }
+.topbar .map-chrome-panel .side-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0 2px;
+}
+.topbar .map-chrome-panel .side-field .map-chrome-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 .viz-area { position: relative; background: var(--bg); overflow: hidden; min-height: 0; }
 .viz-host { position: absolute; inset: 0; }

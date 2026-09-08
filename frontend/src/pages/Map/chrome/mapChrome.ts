@@ -1,4 +1,5 @@
 import type { Dispatch, RefObject, SetStateAction } from 'react';
+import type { MapRefreshSec } from '../mapRefreshInterval';
 import type { MapSidebarProps } from '../MapSidebar';
 import type { MapTopbarProps } from '../MapTopbar';
 import type { RepFilterSide } from '../mapTypes';
@@ -90,6 +91,8 @@ export type MapChromeTopbarInput = {
   setMonoArcs: (v: boolean) => void;
   autoRefresh: boolean;
   setAutoRefresh: (v: boolean) => void;
+  refreshIntervalSec: MapRefreshSec;
+  setRefreshIntervalSec: (v: MapRefreshSec) => void;
   dataSource: 'live' | 'backup';
   selectDataSource: (v: 'live' | 'backup') => void;
   backupAttached: string;
@@ -175,6 +178,8 @@ export function buildMapTopbarProps(input: MapChromeTopbarInput): MapTopbarProps
       data: {
         autoRefresh: input.autoRefresh,
         setAutoRefresh: input.setAutoRefresh,
+        refreshIntervalSec: input.refreshIntervalSec,
+        setRefreshIntervalSec: input.setRefreshIntervalSec,
         dataSource: input.dataSource,
         selectDataSource: input.selectDataSource,
         backupAttached: input.backupAttached,

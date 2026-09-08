@@ -140,6 +140,21 @@ func (s *Service) Status() ScanStatus {
 	return out
 }
 
+// LiveStatus — Status с актуальным числом enterprise-сетей из ClickHouse
+// (кэш тика иначе показывает 0 после добавления сетей до следующего скана).
+func (s *Service) LiveStatus(ctx context.Context) ScanStatus {
+	st := s.Status()
+	if s == nil {
+		return st
+	}
+	n := len(s.loadEnterpriseNets(ctx))
+	st.EnterpriseNets = n
+	if n > 0 && st.LastSkip == "no_enterprise_nets" {
+		st.LastSkip = ""
+	}
+	return st
+}
+
 func (s *Service) setStatus(mut func(*ScanStatus)) {
 	s.statusMu.Lock()
 	defer s.statusMu.Unlock()
