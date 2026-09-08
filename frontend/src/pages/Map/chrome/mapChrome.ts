@@ -90,6 +90,8 @@ export type MapChromeTopbarInput = {
   setMonoArcs: (v: boolean) => void;
   autoRefresh: boolean;
   setAutoRefresh: (v: boolean) => void;
+  refreshIntervalSec: number;
+  setRefreshIntervalSec: (v: number) => void;
   dataSource: 'live' | 'backup';
   selectDataSource: (v: 'live' | 'backup') => void;
   backupAttached: string;
@@ -175,6 +177,8 @@ export function buildMapTopbarProps(input: MapChromeTopbarInput): MapTopbarProps
       data: {
         autoRefresh: input.autoRefresh,
         setAutoRefresh: input.setAutoRefresh,
+        refreshIntervalSec: input.refreshIntervalSec,
+        setRefreshIntervalSec: input.setRefreshIntervalSec,
         dataSource: input.dataSource,
         selectDataSource: input.selectDataSource,
         backupAttached: input.backupAttached,

@@ -78,6 +78,8 @@ export type MapTopbarProps = {
     data: {
       autoRefresh: boolean;
       setAutoRefresh: (v: boolean) => void;
+      refreshIntervalSec: number;
+      setRefreshIntervalSec: (v: number) => void;
       dataSource: 'live' | 'backup';
       selectDataSource: (v: 'live' | 'backup') => void;
       backupAttached: string;

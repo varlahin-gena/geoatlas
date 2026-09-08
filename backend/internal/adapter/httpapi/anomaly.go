@@ -67,7 +67,7 @@ func (h *AnomalyHandler) Status(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, usecaseanomaly.ScanStatus{Enabled: false})
 		return
 	}
-	writeJSON(w, http.StatusOK, h.anomalyUC.Status())
+	writeJSON(w, http.StatusOK, h.anomalyUC.LiveStatus(r.Context()))
 }
 
 func (h *AnomalyHandler) Ack(w http.ResponseWriter, r *http.Request) {
@@ -146,7 +146,7 @@ func (h *AnomalyHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "anomaly module unavailable"})
 		return
 	}
-	view, err := h.anomalySettings.GetView()
+	view, err := h.anomalySettings.GetView(r.Context())
 	if err != nil {
 		writeInternalError(w, "anomaly settings get failed", err)
 		return

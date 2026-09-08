@@ -46,6 +46,15 @@ function StatusPanel({ status }: { status: AnomalyScanStatus | null }) {
           <dt>Enterprise-сети</dt>
           <dd>{fmtNumber(status.enterprise_nets ?? 0)}</dd>
         </div>
+        {(status.enterprise_nets ?? 0) === 0 ? (
+          <div>
+            <dt>Подсказка</dt>
+            <dd className="hint">
+              Отметьте сети в <Link to="/geo-ranges">базе GeoIP</Link> → «Сети предприятия», иначе
+              сканер пропускает тики.
+            </dd>
+          </div>
+        ) : null}
         <div>
           <dt>Последний успешный тик</dt>
           <dd>{status.last_ok ? fmtDate(status.last_ok) : '—'}</dd>

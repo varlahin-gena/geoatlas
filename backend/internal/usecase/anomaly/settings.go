@@ -104,7 +104,7 @@ func (s *SettingsService) LoadAndApply() (Settings, error) {
 	return st, nil
 }
 
-func (s *SettingsService) GetView() (SettingsView, error) {
+func (s *SettingsService) GetView(ctx context.Context) (SettingsView, error) {
 	if s == nil || s.anomaly == nil {
 		return SettingsView{}, errors.New("anomaly settings service not configured")
 	}
@@ -121,7 +121,7 @@ func (s *SettingsService) GetView() (SettingsView, error) {
 		Settings:       st,
 		InstallProfile: cfg.InstallProfile,
 		Thresholds:     th,
-		Status:         s.anomaly.Status(),
+		Status:         s.anomaly.LiveStatus(ctx),
 	}, nil
 }
 
@@ -129,7 +129,6 @@ func (s *SettingsService) Update(ctx context.Context, in Settings) (SettingsView
 	if s == nil || s.store == nil || s.anomaly == nil {
 		return SettingsView{}, errors.New("anomaly settings service not configured")
 	}
-	_ = ctx
 	out, err := validateSettings(in)
 	if err != nil {
 		return SettingsView{}, err
@@ -142,7 +141,7 @@ func (s *SettingsService) Update(ctx context.Context, in Settings) (SettingsView
 	if s.onInterval != nil {
 		s.onInterval(time.Duration(out.ScanIntervalMin) * time.Minute)
 	}
-	return s.GetView()
+	return s.GetView(ctx)
 }
 
 func (s *SettingsService) loadNormalized() (Settings, error) {
