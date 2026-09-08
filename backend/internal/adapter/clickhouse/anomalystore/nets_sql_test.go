@@ -21,6 +21,12 @@ func TestTouchNetsSQLRange(t *testing.T) {
 	if !strings.Contains(clause, "src_ip") || !strings.Contains(clause, "dst_ip") {
 		t.Fatalf("clause: %s", clause)
 	}
+	if !strings.Contains(clause, "toIPv4OrZero(toString(src_ip))") {
+		t.Fatalf("want IP-safe cast, got: %s", clause)
+	}
+	if strings.Contains(clause, "toUInt32(src_ip)") {
+		t.Fatalf("plain toUInt32(src_ip) breaks on String IPs: %s", clause)
+	}
 	if len(args) != 4 {
 		t.Fatalf("args=%v", args)
 	}

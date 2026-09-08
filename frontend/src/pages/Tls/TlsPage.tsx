@@ -20,6 +20,17 @@ function readFile(file: File): Promise<string> {
   });
 }
 
+function httpsModeLabel(raw?: string): string {
+  const v = (raw || 'auto').trim().toLowerCase();
+  if (v === '0' || v === 'false' || v === 'no' || v === 'off') {
+    return 'выкл (только HTTP)';
+  }
+  if (v === '1' || v === 'true' || v === 'yes' || v === 'on') {
+    return 'вкл';
+  }
+  return 'auto (вкл., если есть оба PEM)';
+}
+
 export default function TlsPage() {
   const { toast } = useToast();
   const certInputRef = useRef<HTMLInputElement>(null);
@@ -120,7 +131,11 @@ export default function TlsPage() {
 
   const cert = status?.cert;
   const expiringSoon = cert?.days_left != null && cert.days_left <= 30;
-  const canSave = Boolean(status?.writable && certPEM && keyPEM && reauthPassword.trim() && !busy);
+  const canUpload = Boolean(status?.writable);
+  const canSave = Boolean(canUpload && certPEM && keyPEM && reauthPassword.trim() && !busy);
+  const httpsOff =
+    status != null &&
+    ['0', 'false', 'no', 'off'].includes(String(status.https_enabled || '').trim().toLowerCase());
 
   return (
     <AdminLayout
@@ -133,16 +148,32 @@ export default function TlsPage() {
     >
       <div className="page-content-inner narrow">
         <p className="page-lead">
-          PEM-файлы сохраняются в каталог <code>certs/</code> на сервере и используются контейнером
-          frontend (nginx). После первой установки или смены режима HTTPS может потребоваться
-          перезапуск frontend.
+          Режим HTTPS задаётся в <code>.env</code> (<code>HTTPS_ENABLED</code>):{' '}
+          <code>0</code> — только HTTP, <code>1</code> — всегда HTTPS, <code>auto</code> — HTTPS
+          если на диске есть оба PEM. Загрузка через UI нужна том <code>./certs</code> в backend.
         </p>
 
         {!status?.configured ? (
           <p className="hint warn-banner">
-            Хранилище сертификатов недоступно (не смонтирован <code>TLS_CERT_DIR</code> в backend).
-            Загрузка через UI работает только при развёртывании через Docker с томом{' '}
-            <code>./certs</code>.
+            Управление сертификатами через веб недоступно: не смонтирован{' '}
+            <code>TLS_CERT_DIR</code> в backend. Положите PEM вручную в <code>certs/</code> на
+            сервере или разверните стек через Docker Compose с томом <code>./certs</code>.
+          </p>
+        ) : null}
+
+        {status?.configured && !status.writable ? (
+          <p className="hint warn-banner">
+            Каталог сертификатов смонтирован, но недоступен для записи процессу backend (uid 101).
+            На хосте: <code>sudo chown -R 101:101 certs</code>, затем перезапустите стек (
+            <code>./start.sh</code>). Форма загрузки скрыта, пока каталог не станет writable.
+          </p>
+        ) : null}
+
+        {httpsOff ? (
+          <p className="hint warn-banner">
+            В конфигурации сейчас <code>HTTPS_ENABLED=0</code> (только HTTP). Загрузка PEM всё
+            равно возможна; чтобы включить HTTPS, выставьте <code>HTTPS_ENABLED=auto</code> или{' '}
+            <code>1</code> в <code>.env</code> и перезапустите стек.
           </p>
         ) : null}
 
@@ -154,7 +185,12 @@ export default function TlsPage() {
             <dl className="tls-status-grid">
               <div>
                 <dt>HTTPS</dt>
-                <dd>{status?.https_enabled || 'auto'}</dd>
+                <dd>
+                  {httpsModeLabel(status?.https_enabled)}
+                  {status?.https_enabled ? (
+                    <span className="hint"> ({status.https_enabled})</span>
+                  ) : null}
+                </dd>
               </div>
               <div>
                 <dt>Порт HTTPS</dt>
@@ -163,6 +199,16 @@ export default function TlsPage() {
               <div>
                 <dt>Редирект HTTP→HTTPS</dt>
                 <dd>{status?.http_redirect === '0' ? 'выкл' : 'вкл'}</dd>
+              </div>
+              <div>
+                <dt>Хранилище UI</dt>
+                <dd>
+                  {!status?.configured
+                    ? 'нет (TLS_CERT_DIR)'
+                    : status.writable
+                      ? 'доступно для записи'
+                      : 'только чтение / нет прав'}
+                </dd>
               </div>
               <div>
                 <dt>Файлы на диске</dt>
@@ -201,7 +247,8 @@ export default function TlsPage() {
             </div>
           ) : status?.configured ? (
             <p className="hint">
-              Сертификат ещё не загружен — HTTPS включится после добавления PEM и перезапуска frontend.
+              Сертификат ещё не загружен — HTTPS включится после добавления PEM и перезапуска
+              frontend (при режиме auto или вкл.).
             </p>
           ) : null}
 
@@ -212,54 +259,56 @@ export default function TlsPage() {
           ) : null}
         </div>
 
-        <form className="card tls-upload-form" onSubmit={(e) => void onSubmit(e)}>
-          <h2>Загрузить сертификат</h2>
-          <p className="hint">
-            Выберите <code>fullchain.pem</code> и <code>privkey.pem</code>, затем сохраните.
-          </p>
+        {canUpload ? (
+          <form className="card tls-upload-form" onSubmit={(e) => void onSubmit(e)}>
+            <h2>Загрузить сертификат</h2>
+            <p className="hint">
+              Выберите <code>fullchain.pem</code> и <code>privkey.pem</code>, затем сохраните.
+            </p>
 
-          <input
-            ref={certInputRef}
-            type="file"
-            accept=".pem,.crt,.cer,.txt"
-            className="visually-hidden"
-            disabled={!status?.writable || busy}
-            onChange={(e) => void onPickCert(e.target.files?.[0] || null)}
-          />
-          <input
-            ref={keyInputRef}
-            type="file"
-            accept=".pem,.key,.txt"
-            className="visually-hidden"
-            disabled={!status?.writable || busy}
-            onChange={(e) => void onPickKey(e.target.files?.[0] || null)}
-          />
+            <input
+              ref={certInputRef}
+              type="file"
+              accept=".pem,.crt,.cer,.txt"
+              className="visually-hidden"
+              disabled={busy}
+              onChange={(e) => void onPickCert(e.target.files?.[0] || null)}
+            />
+            <input
+              ref={keyInputRef}
+              type="file"
+              accept=".pem,.key,.txt"
+              className="visually-hidden"
+              disabled={busy}
+              onChange={(e) => void onPickKey(e.target.files?.[0] || null)}
+            />
 
-          <div className="tls-upload-actions">
-            <button
-              type="button"
-              className="btn"
-              disabled={!status?.writable || busy}
-              onClick={() => certInputRef.current?.click()}
-            >
-              {certName ? `Сертификат: ${certName}` : 'Выбрать fullchain.pem'}
-            </button>
-            <button
-              type="button"
-              className="btn"
-              disabled={!status?.writable || busy}
-              onClick={() => keyInputRef.current?.click()}
-            >
-              {keyName ? `Ключ: ${keyName}` : 'Выбрать privkey.pem'}
-            </button>
-          </div>
-          <ReauthField value={reauthPassword} onChange={setReauthPassword} id="tlsReauthPassword" />
-          <div className="tls-upload-actions">
-            <button type="submit" className="btn primary" disabled={!canSave}>
-              {busy ? 'Сохранение…' : 'Сохранить сертификаты'}
-            </button>
-          </div>
-        </form>
+            <div className="tls-upload-actions">
+              <button
+                type="button"
+                className="btn"
+                disabled={busy}
+                onClick={() => certInputRef.current?.click()}
+              >
+                {certName ? `Сертификат: ${certName}` : 'Выбрать fullchain.pem'}
+              </button>
+              <button
+                type="button"
+                className="btn"
+                disabled={busy}
+                onClick={() => keyInputRef.current?.click()}
+              >
+                {keyName ? `Ключ: ${keyName}` : 'Выбрать privkey.pem'}
+              </button>
+            </div>
+            <ReauthField value={reauthPassword} onChange={setReauthPassword} id="tlsReauthPassword" />
+            <div className="tls-upload-actions">
+              <button type="submit" className="btn primary" disabled={!canSave}>
+                {busy ? 'Сохранение…' : 'Сохранить сертификаты'}
+              </button>
+            </div>
+          </form>
+        ) : null}
       </div>
     </AdminLayout>
   );
