@@ -23,8 +23,9 @@ const (
 	lateralFanoutWindow        = 15 * time.Minute
 	beaconLookback             = 24 * time.Hour
 	countryBaselineDays        = 7
-	detectorTimeout            = 8 * time.Second
-	tickTimeout                = 25 * time.Second
+	detectorTimeout            = 12 * time.Second
+	heavyDetectorTimeout       = 20 * time.Second
+	tickTimeout                = 45 * time.Second
 	eventTTL                   = 30 * 24 * time.Hour
 	summarySince               = 24 * time.Hour
 	blockedSurgeRepeatCooldown = 6 * time.Hour
@@ -311,11 +312,14 @@ func (s *Service) Scan(ctx context.Context, now time.Time) ScanResult {
 	}
 
 	var candidates []Event
-	run := func(code string, fn func(context.Context) ([]Event, error)) {
+	run := func(code string, timeout time.Duration, fn func(context.Context) ([]Event, error)) {
 		if tctx.Err() != nil {
 			return
 		}
-		dctx, dcancel := context.WithTimeout(tctx, detectorTimeout)
+		if timeout <= 0 {
+			timeout = detectorTimeout
+		}
+		dctx, dcancel := context.WithTimeout(tctx, timeout)
 		hits, err := fn(dctx)
 		dcancel()
 		if err != nil {
@@ -329,31 +333,31 @@ func (s *Service) Scan(ctx context.Context, now time.Time) ScanResult {
 		candidates = append(candidates, hits...)
 	}
 
-	run(CodeBlockedSurge, func(c context.Context) ([]Event, error) {
+	run(CodeBlockedSurge, detectorTimeout, func(c context.Context) ([]Event, error) {
 		return s.detectBlockedSurge(c, now, th, ent)
 	})
-	run(CodeNewCountryDst, func(c context.Context) ([]Event, error) {
+	run(CodeNewCountryDst, detectorTimeout, func(c context.Context) ([]Event, error) {
 		if learning {
 			return nil, nil
 		}
 		return s.detectNewCountry(c, now, th, ent)
 	})
-	run(CodePortScan, func(c context.Context) ([]Event, error) {
+	run(CodePortScan, detectorTimeout, func(c context.Context) ([]Event, error) {
 		return s.detectPortScan(c, now, th, ent)
 	})
-	run(CodeHorizontalScan, func(c context.Context) ([]Event, error) {
+	run(CodeHorizontalScan, detectorTimeout, func(c context.Context) ([]Event, error) {
 		return s.detectHorizontalScan(c, now, th, ent)
 	})
-	run(CodeRepNewDst, func(c context.Context) ([]Event, error) {
+	run(CodeRepNewDst, detectorTimeout, func(c context.Context) ([]Event, error) {
 		return s.detectRepNewDst(c, now, th, ent)
 	})
-	run(CodeByteSurge, func(c context.Context) ([]Event, error) {
+	run(CodeByteSurge, detectorTimeout, func(c context.Context) ([]Event, error) {
 		return s.detectByteSurge(c, now, th, ent)
 	})
-	run(CodeLateralFanout, func(c context.Context) ([]Event, error) {
+	run(CodeLateralFanout, detectorTimeout, func(c context.Context) ([]Event, error) {
 		return s.detectLateralFanout(c, now, th, ent)
 	})
-	run(CodeBeaconing, func(c context.Context) ([]Event, error) {
+	run(CodeBeaconing, heavyDetectorTimeout, func(c context.Context) ([]Event, error) {
 		return s.detectBeaconing(c, now, th, ent)
 	})
 
