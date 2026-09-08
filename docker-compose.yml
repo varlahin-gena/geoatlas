@@ -7,13 +7,16 @@ services:
     volumes:
       - clickhouse-backups:/var/lib/clickhouse-backups
       - auth-users:/app/data
+      # Backend (uid 101) пишет PEM через UI; без chown кнопки на /tls остаются disabled.
+      - ./certs:/certs
     command:
       - sh
       - -c
       - |
-        mkdir -p /var/lib/clickhouse-backups /app/data
-        chown -R 101:101 /var/lib/clickhouse-backups /app/data
+        mkdir -p /var/lib/clickhouse-backups /app/data /certs
+        chown -R 101:101 /var/lib/clickhouse-backups /app/data /certs
         chmod 2775 /var/lib/clickhouse-backups /app/data
+        chmod 0755 /certs
     restart: "no"
 
   clickhouse:

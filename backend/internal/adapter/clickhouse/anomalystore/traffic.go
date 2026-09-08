@@ -57,7 +57,7 @@ func (r *Repository) HorizontalScan(ctx context.Context, window time.Duration, h
 	q := fmt.Sprintf(`
 		SELECT
 			toString(src_ip) AS src_ip,
-			concat(IPv4NumToString(bitAnd(toUInt32(dst_ip), toUInt32(4294967040))), '/24') AS net24,
+			concat(IPv4NumToString(bitAnd(%s, toUInt32(4294967040))), '/24') AS net24,
 			uniqExact(dst_ip) AS hosts,
 			count() AS events
 		FROM traffic_logs
@@ -70,7 +70,7 @@ func (r *Repository) HorizontalScan(ctx context.Context, window time.Duration, h
 		ORDER BY hosts DESC
 		LIMIT 10
 		%s
-	`, int(window.Seconds()), privateSrcSQL(includePrivate), touch, query.AggSettings())
+	`, ipv4AsUInt32SQL("dst_ip"), int(window.Seconds()), privateSrcSQL(includePrivate), touch, query.AggSettings())
 	args := append(touchArgs, hostsTh, eventsTh)
 	rows, err := r.ch.Query(ctx, q, args...)
 	if err != nil {
@@ -479,6 +479,12 @@ func colInNetsSQL(col string, nets []usecaseanomaly.IPRange) (string, []any) {
 	return ipNetsSQL([]string{col}, nets)
 }
 
+// ipv4AsUInt32SQL converts IPv4 or String IP columns to UInt32.
+// Plain toUInt32(col) fails on String IPs like '10.1.0.1' (parses only '10').
+func ipv4AsUInt32SQL(col string) string {
+	return fmt.Sprintf("toUInt32(toIPv4OrZero(toString(%s)))", col)
+}
+
 func ipNetsSQL(cols []string, nets []usecaseanomaly.IPRange) (string, []any) {
 	if len(nets) == 0 || len(cols) == 0 {
 		return "", nil
@@ -490,7 +496,7 @@ func ipNetsSQL(cols []string, nets []usecaseanomaly.IPRange) (string, []any) {
 			continue
 		}
 		for _, col := range cols {
-			parts = append(parts, fmt.Sprintf("(toUInt32(%s) BETWEEN ? AND ?)", col))
+			parts = append(parts, fmt.Sprintf("(%s BETWEEN ? AND ?)", ipv4AsUInt32SQL(col)))
 			args = append(args, n.Start, n.End)
 		}
 	}
