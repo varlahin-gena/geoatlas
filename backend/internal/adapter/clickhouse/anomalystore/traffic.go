@@ -2,9 +2,12 @@ package anomalystore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/ClickHouse/clickhouse-go/v2"
 
 	"geoatlas/internal/adapter/clickhouse/query"
 	"geoatlas/internal/adapter/clickhouse/sqlclause"
@@ -361,15 +364,18 @@ func (r *Repository) Beaconing(ctx context.Context, lookback time.Duration, minH
 	if minHours < 2 {
 		minHours = 2
 	}
+	sec := int(lookback.Seconds())
 	touch, touchArgs := touchNetsSQL(nets)
-	q := fmt.Sprintf(`
+	args := append(append([]any{}, touchArgs...), minHours, maxAvgBytes)
+
+	// Phase 1: candidate pairs without hour arrays (groupUniqArray over all pairs is too heavy).
+	qHourly := fmt.Sprintf(`
 		SELECT
 			toString(src_ip) AS src_ip,
 			toString(dst_ip) AS dst_ip,
 			uniqExact(hour) AS active_hours,
 			sum(bytes_sent) + sum(bytes_recv) AS total_bytes,
-			sum(cnt) AS events,
-			arraySort(groupUniqArray(toUnixTimestamp(toStartOfHour(hour)))) AS hour_ts
+			sum(cnt) AS events
 		FROM traffic_edges_hourly
 		WHERE hour >= now() - INTERVAL %d SECOND
 		  %s
@@ -379,18 +385,20 @@ func (r *Repository) Beaconing(ctx context.Context, lookback time.Duration, minH
 		ORDER BY active_hours DESC, total_bytes ASC
 		LIMIT 30
 		%s
-	`, int(lookback.Seconds()), touch, query.AggSettings())
-	args := append(touchArgs, minHours, maxAvgBytes)
-	rows, err := r.ch.Query(ctx, q, args...)
+	`, sec, touch, query.AggSettings())
+
+	cands, err := r.scanBeaconingCandidates(ctx, qHourly, args)
 	if err != nil {
-		q2 := fmt.Sprintf(`
+		if !shouldFallbackToLogs(ctx, err) {
+			return nil, err
+		}
+		qLogs := fmt.Sprintf(`
 			SELECT
 				toString(src_ip) AS src_ip,
 				toString(dst_ip) AS dst_ip,
 				uniqExact(toStartOfHour(timestamp)) AS active_hours,
 				sum(bytes_sent) + sum(bytes_recv) AS total_bytes,
-				count() AS events,
-				arraySort(groupUniqArray(toUnixTimestamp(toStartOfHour(timestamp)))) AS hour_ts
+				count() AS events
 			FROM traffic_logs
 			WHERE timestamp >= now() - INTERVAL %d SECOND
 			  %s
@@ -400,22 +408,114 @@ func (r *Repository) Beaconing(ctx context.Context, lookback time.Duration, minH
 			ORDER BY active_hours DESC, total_bytes ASC
 			LIMIT 30
 			%s
-		`, int(lookback.Seconds()), touch, query.AggSettings())
-		rows, err = r.ch.Query(ctx, q2, args...)
+		`, sec, touch, query.AggSettings())
+		cands, err = r.scanBeaconingCandidates(ctx, qLogs, args)
 		if err != nil {
 			return nil, err
 		}
+		return r.attachBeaconingHours(ctx, cands, sec, true)
+	}
+	return r.attachBeaconingHours(ctx, cands, sec, false)
+}
+
+type beaconingCand struct {
+	SrcIP       string
+	DstIP       string
+	ActiveHours uint64
+	TotalBytes  uint64
+	Events      uint64
+}
+
+func (r *Repository) scanBeaconingCandidates(ctx context.Context, q string, args []any) ([]beaconingCand, error) {
+	rows, err := r.ch.Query(ctx, q, args...)
+	if err != nil {
+		return nil, err
 	}
 	defer rows.Close()
-	var out []usecaseanomaly.BeaconingHit
+	var out []beaconingCand
 	for rows.Next() {
-		var h usecaseanomaly.BeaconingHit
-		if err := rows.Scan(&h.SrcIP, &h.DstIP, &h.ActiveHours, &h.TotalBytes, &h.Events, &h.HourUnix); err != nil {
+		var c beaconingCand
+		if err := rows.Scan(&c.SrcIP, &c.DstIP, &c.ActiveHours, &c.TotalBytes, &c.Events); err != nil {
 			return nil, err
 		}
-		out = append(out, h)
+		out = append(out, c)
 	}
 	return out, rows.Err()
+}
+
+func (r *Repository) attachBeaconingHours(ctx context.Context, cands []beaconingCand, lookbackSec int, fromLogs bool) ([]usecaseanomaly.BeaconingHit, error) {
+	out := make([]usecaseanomaly.BeaconingHit, 0, len(cands))
+	if len(cands) == 0 {
+		return out, nil
+	}
+	placeholders := make([]string, 0, len(cands))
+	args := make([]any, 0, len(cands)*2)
+	index := make(map[string]int, len(cands))
+	for i, c := range cands {
+		placeholders = append(placeholders, "(?, ?)")
+		args = append(args, c.SrcIP, c.DstIP)
+		index[c.SrcIP+"\x00"+c.DstIP] = i
+		out = append(out, usecaseanomaly.BeaconingHit{
+			SrcIP: c.SrcIP, DstIP: c.DstIP,
+			ActiveHours: c.ActiveHours, TotalBytes: c.TotalBytes, Events: c.Events,
+		})
+	}
+	var q string
+	if fromLogs {
+		q = fmt.Sprintf(`
+			SELECT toString(src_ip), toString(dst_ip),
+				arraySort(groupUniqArray(toUnixTimestamp(toStartOfHour(timestamp))))
+			FROM traffic_logs
+			WHERE timestamp >= now() - INTERVAL %d SECOND
+			  AND (toString(src_ip), toString(dst_ip)) IN (%s)
+			GROUP BY src_ip, dst_ip
+			%s
+		`, lookbackSec, strings.Join(placeholders, ","), query.AggSettings())
+	} else {
+		q = fmt.Sprintf(`
+			SELECT toString(src_ip), toString(dst_ip),
+				arraySort(groupUniqArray(toUnixTimestamp(toStartOfHour(hour))))
+			FROM traffic_edges_hourly
+			WHERE hour >= now() - INTERVAL %d SECOND
+			  AND (toString(src_ip), toString(dst_ip)) IN (%s)
+			GROUP BY src_ip, dst_ip
+			%s
+		`, lookbackSec, strings.Join(placeholders, ","), query.AggSettings())
+	}
+	rows, err := r.ch.Query(ctx, q, args...)
+	if err != nil {
+		// Candidates alone are enough for emit with regularity=0 filter skipping;
+		// return without hours rather than failing the whole detector.
+		return out, nil
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var src, dst string
+		var hours []int64
+		if err := rows.Scan(&src, &dst, &hours); err != nil {
+			return nil, err
+		}
+		if i, ok := index[src+"\x00"+dst]; ok {
+			out[i].HourUnix = hours
+		}
+	}
+	return out, rows.Err()
+}
+
+// shouldFallbackToLogs — только отсутствие hourly-таблицы; не при timeout/type errors.
+func shouldFallbackToLogs(ctx context.Context, err error) bool {
+	if err == nil || ctx.Err() != nil {
+		return false
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	var ex *clickhouse.Exception
+	if errors.As(err, &ex) {
+		return ex.Code == 60 // UNKNOWN_TABLE
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "unknown table") || strings.Contains(msg, "doesn't exist")
 }
 
 func (r *Repository) LateralFanout(ctx context.Context, window time.Duration, hostsTh, eventsTh int, nets []usecaseanomaly.IPRange) ([]usecaseanomaly.LateralFanoutHit, error) {

@@ -2,9 +2,12 @@ package anomalystore
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/ClickHouse/clickhouse-go/v2"
 
 	usecaseanomaly "geoatlas/internal/usecase/anomaly"
 )
@@ -71,5 +74,26 @@ func TestTrafficScannerNilCH(t *testing.T) {
 	}
 	if _, err := r.CountSummary(ctx, time.Now()); err == nil {
 		t.Fatal("CountSummary want error")
+	}
+}
+
+func TestShouldFallbackToLogs(t *testing.T) {
+	ctx := context.Background()
+	if shouldFallbackToLogs(ctx, nil) {
+		t.Fatal("nil err")
+	}
+	if shouldFallbackToLogs(ctx, context.DeadlineExceeded) {
+		t.Fatal("deadline must not fallback")
+	}
+	canceled, cancel := context.WithCancel(ctx)
+	cancel()
+	if shouldFallbackToLogs(canceled, errors.New("unknown table")) {
+		t.Fatal("canceled ctx must not fallback")
+	}
+	if !shouldFallbackToLogs(ctx, &clickhouse.Exception{Code: 60, Message: "UNKNOWN_TABLE"}) {
+		t.Fatal("want fallback on UNKNOWN_TABLE")
+	}
+	if shouldFallbackToLogs(ctx, &clickhouse.Exception{Code: 386, Message: "no supertype"}) {
+		t.Fatal("type errors must not fallback to logs")
 	}
 }
