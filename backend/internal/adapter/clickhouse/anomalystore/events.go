@@ -45,6 +45,7 @@ func (r *Repository) Insert(ctx context.Context, events []usecaseanomaly.Event) 
 			src, dst, e.SrcCountry, e.DstCountry, e.SrcCity, e.DstCity, e.Device,
 			e.EventCount, e.Fingerprint, string(e.SuppressionKey), e.EpisodeID, e.ExpiresAt,
 		); err != nil {
+			_ = batch.Abort()
 			return err
 		}
 	}

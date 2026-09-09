@@ -26,7 +26,10 @@ func New(svc *hunts.Service, interval time.Duration) *Scheduler {
 }
 
 func (s *Scheduler) Start(parent context.Context) {
-	if s == nil || s.svc == nil {
+	if s == nil {
+		return
+	}
+	if s.svc == nil {
 		select {
 		case <-s.done:
 		default:
