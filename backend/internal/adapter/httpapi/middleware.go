@@ -108,6 +108,10 @@ func (s *statusRecorder) WriteHeader(code int) {
 	s.ResponseWriter.WriteHeader(code)
 }
 
+// Unwrap отдаёт исходный writer в http.ResponseController: без него Flush и
+// SetWriteDeadline не пробиваются сквозь logging/metrics до сетевого соединения.
+func (s *statusRecorder) Unwrap() http.ResponseWriter { return s.ResponseWriter }
+
 func (s *statusRecorder) Write(b []byte) (int, error) {
 	if !s.wrote {
 		s.status = http.StatusOK

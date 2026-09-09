@@ -69,9 +69,14 @@ func formatAggSettings(maxMem, spillGroup, spillSort int64, threads int) string 
 		spillGroup, spillSort, maxMem, threads)
 }
 
+// maxRowLimit — потолок для любого сканирующего запроса. Все вызывающие уже
+// клампят limit сами; это страховка от полного GROUP BY по traffic_logs, если
+// новый путь передаст 0.
+const maxRowLimit = 200000
+
 func limitClause(limit int) string {
-	if limit <= 0 {
-		return ""
+	if limit <= 0 || limit > maxRowLimit {
+		limit = maxRowLimit
 	}
 	return fmt.Sprintf("LIMIT %d", limit)
 }
