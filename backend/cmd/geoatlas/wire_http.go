@@ -79,15 +79,15 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 		dataDir = "/app/data"
 	}
 	opts := usecasebackup.Options{
-		Enabled:      cfg.BackupEnabled,
-		Dir:          cfg.BackupDir,
+		Enabled:      cfg.Backup.Enabled,
+		Dir:          cfg.Backup.Dir,
 		DataDir:      dataDir,
-		Keep:         cfg.BackupKeep,
-		IncludeEdges: cfg.BackupIncludeEdges,
-		IncludeAuth:  cfg.BackupIncludeAuth,
+		Keep:         cfg.Backup.Keep,
+		IncludeEdges: cfg.Backup.IncludeEdges,
+		IncludeAuth:  cfg.Backup.IncludeAuth,
 	}
-	schedStore := backupschedulefile.New(cfg.BackupScheduleFile, usecasebackup.DefaultsSchedule(opts))
-	backupUC := usecasebackup.New(opts, backupstore.NewBackupRunner(a.pools.Background), backupfs.New(cfg.BackupDir), schedStore)
+	schedStore := backupschedulefile.New(cfg.Backup.ScheduleFile, usecasebackup.DefaultsSchedule(opts))
+	backupUC := usecasebackup.New(opts, backupstore.NewBackupRunner(a.pools.Background), backupfs.New(cfg.Backup.Dir), schedStore)
 	backupUC.SetLogService(logsUC)
 	backupUC.SetHeavySlot(a.heavy)
 	a.backupJobs = backupjob.NewFromService(backupUC, time.Minute)
