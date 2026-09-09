@@ -8,27 +8,6 @@ export type AnomalyMapLink = components['schemas']['AnomalyMapLink'];
 export type AnomalyAckResponse = components['schemas']['AnomalyAckResponse'];
 export type AnomalyAssignResponse = components['schemas']['AnomalyAssignResponse'];
 
-export type AnomalyEngineSettings = {
-  enabled: boolean;
-  scan_interval_min: number;
-  learning_days: number;
-  suppress_hours: number;
-  include_private: boolean;
-  new_country_min_share: number;
-  updated_at?: string;
-};
-
-export type AnomalyScanStatus = {
-  enabled?: boolean;
-  learning?: boolean;
-  last_ok?: string;
-  last_error?: string;
-  last_duration?: string;
-  last_inserted?: number;
-  last_skip?: string;
-  enterprise_nets?: number;
-};
-
 export type AnomalyThresholds = {
   port_scan_ports?: number;
   port_scan_events?: number;
@@ -51,11 +30,34 @@ export type AnomalyThresholds = {
   lateral_events?: number;
 };
 
+export type AnomalyEngineSettings = {
+  enabled: boolean;
+  scan_interval_min: number;
+  learning_days: number;
+  suppress_hours: number;
+  include_private: boolean;
+  new_country_min_share: number;
+  thresholds?: AnomalyThresholds | null;
+  updated_at?: string;
+};
+
+export type AnomalyScanStatus = {
+  enabled?: boolean;
+  learning?: boolean;
+  last_ok?: string;
+  last_error?: string;
+  last_duration?: string;
+  last_inserted?: number;
+  last_skip?: string;
+  enterprise_nets?: number;
+};
+
 export type AnomalyEngineSettingsView = {
   ok?: boolean;
   settings?: AnomalyEngineSettings;
   install_profile?: string;
   thresholds?: AnomalyThresholds;
+  threshold_defaults?: AnomalyThresholds;
   status?: AnomalyScanStatus;
 };
 

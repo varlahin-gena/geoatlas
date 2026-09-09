@@ -78,6 +78,38 @@ func TestSettingsServiceUpdateApplies(t *testing.T) {
 	}
 }
 
+func TestSettingsServiceUpdateWithThresholds(t *testing.T) {
+	store := &memSettingsStore{}
+	svc := New(Config{Enabled: true, InstallProfile: "small"}, nil, nil, nil, nil, nil)
+	settings := NewSettingsService(store, svc, DefaultSettingsFromConfig(config.Config{
+		AnomalyScanInterval: 5 * time.Minute,
+	}), nil)
+
+	th := ThresholdsForProfile("small")
+	th.PortScanPorts = 45
+	in := Settings{
+		Enabled:            true,
+		ScanIntervalMin:    5,
+		LearningDays:       3,
+		SuppressHours:      24,
+		NewCountryMinShare: 0.05,
+		Thresholds:         &th,
+	}
+	view, err := settings.Update(context.Background(), in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if view.Thresholds.PortScanPorts != 45 {
+		t.Fatalf("effective: %d", view.Thresholds.PortScanPorts)
+	}
+	if view.ThresholdDefaults.PortScanPorts != 40 {
+		t.Fatalf("defaults: %d", view.ThresholdDefaults.PortScanPorts)
+	}
+	if svc.cfgSnapshot().ThresholdOverrides == nil || svc.cfgSnapshot().ThresholdOverrides.PortScanPorts != 45 {
+		t.Fatalf("cfg overrides: %+v", svc.cfgSnapshot().ThresholdOverrides)
+	}
+}
+
 func TestDefaultSettingsFromConfig(t *testing.T) {
 	st := DefaultSettingsFromConfig(config.Config{
 		AnomalyScanInterval:       10 * time.Minute,

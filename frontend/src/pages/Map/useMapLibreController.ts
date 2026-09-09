@@ -8,7 +8,7 @@ import {
   type RefObject,
   type SetStateAction,
 } from 'react';
-import maplibregl from 'maplibre-gl';
+import * as maplibregl from 'maplibre-gl';
 import { MapboxOverlay } from '@deck.gl/mapbox';
 import type { Theme } from '@/auth/theme';
 import type { ToastKind } from '@/components/Toast';
@@ -26,6 +26,7 @@ import {
   globeCullKey,
   readViewStateFromMap,
 } from './mapViewport';
+import './maplibreSetup';
 import type { ViewState } from './mapTypes';
 import { useGlobeAutoRotate } from './useGlobeAutoRotate';
 

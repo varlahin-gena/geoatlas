@@ -152,11 +152,12 @@ func (h *AnomalyHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok":              true,
-		"settings":        view.Settings,
-		"install_profile": view.InstallProfile,
-		"thresholds":      view.Thresholds,
-		"status":          view.Status,
+		"ok":                  true,
+		"settings":            view.Settings,
+		"install_profile":     view.InstallProfile,
+		"thresholds":          view.Thresholds,
+		"threshold_defaults":  view.ThresholdDefaults,
+		"status":              view.Status,
 	})
 }
 
@@ -198,20 +199,22 @@ func (h *AnomalyHandler) PutSettings(w http.ResponseWriter, r *http.Request) {
 		Result:       "succeeded",
 		IP:           clientIPFromRequest(r),
 		Details: map[string]any{
-			"enabled":              view.Settings.Enabled,
-			"scan_interval_min":    view.Settings.ScanIntervalMin,
-			"learning_days":        view.Settings.LearningDays,
-			"suppress_hours":       view.Settings.SuppressHours,
-			"include_private":      view.Settings.IncludePrivate,
+			"enabled":               view.Settings.Enabled,
+			"scan_interval_min":     view.Settings.ScanIntervalMin,
+			"learning_days":         view.Settings.LearningDays,
+			"suppress_hours":        view.Settings.SuppressHours,
+			"include_private":       view.Settings.IncludePrivate,
 			"new_country_min_share": view.Settings.NewCountryMinShare,
+			"thresholds_customized": view.Settings.Thresholds != nil,
 		},
 	})
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok":              true,
-		"settings":        view.Settings,
-		"install_profile": view.InstallProfile,
-		"thresholds":      view.Thresholds,
-		"status":          view.Status,
+		"ok":                  true,
+		"settings":            view.Settings,
+		"install_profile":     view.InstallProfile,
+		"thresholds":          view.Thresholds,
+		"threshold_defaults":  view.ThresholdDefaults,
+		"status":              view.Status,
 	})
 }
 

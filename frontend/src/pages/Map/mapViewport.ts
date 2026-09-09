@@ -1,4 +1,4 @@
-import type maplibregl from 'maplibre-gl';
+import type * as maplibregl from 'maplibre-gl';
 import { DEFAULT_GLOBE_VIEW, DEFAULT_MAP_VIEW } from './mapConstants';
 import type { ViewState } from './mapTypes';
 

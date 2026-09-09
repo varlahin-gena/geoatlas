@@ -83,6 +83,20 @@ func ThresholdsForProfile(name string) Thresholds {
 	}
 }
 
+// EffectiveThresholds — пороги install profile с optional overrides из settings.
+// Если overrides заданы целиком — заменяют профиль; NewCountryMinShare из settings
+// всегда имеет приоритет (обратная совместимость с отдельным полем).
+func EffectiveThresholds(profile string, overrides *Thresholds, newCountryMinShare float64) Thresholds {
+	th := ThresholdsForProfile(profile)
+	if overrides != nil {
+		th = *overrides
+	}
+	if newCountryMinShare > 0 {
+		th.NewCountryMinShare = newCountryMinShare
+	}
+	return th
+}
+
 func scoreAgainst(observed, threshold float64, severity string) float32 {
 	w := float32(0.6)
 	switch severity {

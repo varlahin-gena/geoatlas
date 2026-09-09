@@ -1923,7 +1923,8 @@ export interface paths {
         /**
          * Настройки движка аномалий
          * @description Только administrator или Bearer.
-         *     Редактируемые параметры из `/app/data/anomaly_settings.json` и read-only пороги install profile.
+         *     Редактируемые параметры и пороги детекторов из `/app/data/anomaly_settings.json`;
+         *     baseline порогов — install profile (`threshold_defaults`).
          */
         get: {
             parameters: {
@@ -4614,6 +4615,7 @@ export interface components {
             suppress_hours: number;
             include_private: boolean;
             new_country_min_share: number;
+            thresholds?: components["schemas"]["AnomalyThresholds"];
             /** Format: date-time */
             updated_at?: string;
         };
@@ -4651,6 +4653,7 @@ export interface components {
             settings?: components["schemas"]["AnomalyEngineSettings"];
             install_profile?: string;
             thresholds?: components["schemas"]["AnomalyThresholds"];
+            threshold_defaults?: components["schemas"]["AnomalyThresholds"];
             status?: components["schemas"]["AnomalyScanStatus"];
         };
         AnomalyList: {

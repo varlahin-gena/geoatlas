@@ -913,7 +913,8 @@ paths:
       summary: Настройки движка аномалий
       description: |
         Только administrator или Bearer.
-        Редактируемые параметры из `/app/data/anomaly_settings.json` и read-only пороги install profile.
+        Редактируемые параметры и пороги детекторов из `/app/data/anomaly_settings.json`;
+        baseline порогов — install profile (`threshold_defaults`).
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -2581,6 +2582,8 @@ components:
         suppress_hours: { type: integer, minimum: 1, maximum: 168 }
         include_private: { type: boolean }
         new_country_min_share: { type: number, minimum: 0.01, maximum: 1 }
+        thresholds:
+          $ref: "#/components/schemas/AnomalyThresholds"
         updated_at: { type: string, format: date-time }
 
     AnomalyThresholds:
@@ -2615,6 +2618,8 @@ components:
           $ref: "#/components/schemas/AnomalyEngineSettings"
         install_profile: { type: string }
         thresholds:
+          $ref: "#/components/schemas/AnomalyThresholds"
+        threshold_defaults:
           $ref: "#/components/schemas/AnomalyThresholds"
         status:
           $ref: "#/components/schemas/AnomalyScanStatus"
