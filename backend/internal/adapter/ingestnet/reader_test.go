@@ -1,6 +1,7 @@
 package ingestnet
 
 import (
+	"errors"
 	"io"
 	"strconv"
 	"strings"
@@ -44,7 +45,7 @@ func TestFrameReaderIPLineNotSplit(t *testing.T) {
 func TestFrameReaderEOF(t *testing.T) {
 	fr := newFrameReader(strings.NewReader(""))
 	_, err := fr.ReadLine()
-	if err != io.EOF {
+	if !errors.Is(err, io.EOF) {
 		t.Fatalf("err = %v, want EOF", err)
 	}
 }
@@ -54,7 +55,7 @@ func TestFrameReaderLFTooLarge(t *testing.T) {
 	huge := strings.Repeat("a", maxFrameBytes+64) + "\nnext\n"
 	fr := newFrameReader(strings.NewReader(huge))
 	_, err := fr.ReadLine()
-	if err != errFrameTooLarge {
+	if !errors.Is(err, errFrameTooLarge) {
 		t.Fatalf("err = %v, want %v", err, errFrameTooLarge)
 	}
 	got, err := fr.ReadLine()

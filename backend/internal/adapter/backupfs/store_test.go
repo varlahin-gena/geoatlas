@@ -3,6 +3,7 @@ package backupfs
 import (
 	"archive/tar"
 	"compress/gzip"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -51,7 +52,7 @@ func TestWriteAuthTarballSkipsSymlinkEscape(t *testing.T) {
 	tr := tar.NewReader(gz)
 	for {
 		hdr, err := tr.Next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
@@ -109,7 +110,7 @@ func TestWriteAuthTarballSkipsSnapLockTmp(t *testing.T) {
 	seenUsers := false
 	for {
 		hdr, err := tr.Next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

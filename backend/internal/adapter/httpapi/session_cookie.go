@@ -3,8 +3,8 @@ package httpapi
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,7 +26,7 @@ func ClearCookie(w http.ResponseWriter, r *http.Request) {
 func NewCSRFToken() string {
 	var b [32]byte
 	if _, err := rand.Read(b[:]); err != nil {
-		return hex.EncodeToString([]byte(fmt.Sprintf("%d", time.Now().UnixNano())))
+		return hex.EncodeToString([]byte(strconv.FormatInt(time.Now().UnixNano(), 10)))
 	}
 	return hex.EncodeToString(b[:])
 }

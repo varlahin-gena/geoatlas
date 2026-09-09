@@ -99,27 +99,27 @@ type ListQuery struct {
 
 // Summary — дешёвый badge.
 type Summary struct {
-	High      int       `json:"high"`
-	Warn      int       `json:"warn"`
-	Total     int       `json:"total"`
-	Acked     int       `json:"acked"`
-	Learning     bool      `json:"learning"`
-	Enabled      bool      `json:"enabled"`
-	ModuleLoaded bool      `json:"module_loaded"`
-	UpdatedAt    time.Time `json:"updated_at"`
-	EnterpriseNets int  `json:"enterprise_nets"`
+	High           int       `json:"high"`
+	Warn           int       `json:"warn"`
+	Total          int       `json:"total"`
+	Acked          int       `json:"acked"`
+	Learning       bool      `json:"learning"`
+	Enabled        bool      `json:"enabled"`
+	ModuleLoaded   bool      `json:"module_loaded"`
+	UpdatedAt      time.Time `json:"updated_at"`
+	EnterpriseNets int       `json:"enterprise_nets"`
 }
 
 // ScanStatus — live-состояние сканера.
 type ScanStatus struct {
-	Enabled      bool      `json:"enabled"`
-	Learning     bool      `json:"learning"`
-	LastOK       time.Time `json:"last_ok,omitempty"`
-	LastError    string    `json:"last_error,omitempty"`
-	LastDuration string    `json:"last_duration,omitempty"`
-	LastInserted int       `json:"last_inserted"`
-	LastSkip     string    `json:"last_skip,omitempty"`
-	EnterpriseNets int     `json:"enterprise_nets"`
+	Enabled        bool      `json:"enabled"`
+	Learning       bool      `json:"learning"`
+	LastOK         time.Time `json:"last_ok,omitempty"`
+	LastError      string    `json:"last_error,omitempty"`
+	LastDuration   string    `json:"last_duration,omitempty"`
+	LastInserted   int       `json:"last_inserted"`
+	LastSkip       string    `json:"last_skip,omitempty"`
+	EnterpriseNets int       `json:"enterprise_nets"`
 }
 
 // ListResult — ответ списка.

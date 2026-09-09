@@ -33,7 +33,7 @@ func (ProfileAdapter) Load(path string) (*system.CapacityProfile, error) {
 				ProfileServiceLimits: system.ProfileServiceLimits{
 					MemoryGB: profile.Limits.Backend.MemoryGB, CPUs: profile.Limits.Backend.CPUs,
 				},
-				IngestWorkers: profile.Limits.Backend.IngestWorkers,
+				IngestWorkers:   profile.Limits.Backend.IngestWorkers,
 				IngestQueueSize: profile.Limits.Backend.IngestQueueSize,
 				IngestBatchSize: profile.Limits.Backend.IngestBatchSize,
 			},
@@ -41,7 +41,7 @@ func (ProfileAdapter) Load(path string) (*system.CapacityProfile, error) {
 				MemoryMB: profile.Limits.SyslogNG.MemoryMB, CPUs: profile.Limits.SyslogNG.CPUs,
 				FifoSize: profile.Limits.SyslogNG.FifoSize, MemBufBytes: profile.Limits.SyslogNG.MemBufBytes,
 				DiskBufBytes: profile.Limits.SyslogNG.DiskBufBytes, UDPRcvbufBytes: profile.Limits.SyslogNG.UDPRcvbufBytes,
-				IWSize: profile.Limits.SyslogNG.IWSize,
+				IWSize:    profile.Limits.SyslogNG.IWSize,
 				TCPIWSize: profile.Limits.SyslogNG.TCPIWSize, TCPMaxConn: profile.Limits.SyslogNG.TCPMaxConn,
 			},
 		},

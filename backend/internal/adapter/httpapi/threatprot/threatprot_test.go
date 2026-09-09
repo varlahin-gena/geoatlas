@@ -1,6 +1,7 @@
 package threatprot
 
 import (
+	"errors"
 	"fmt"
 	"net/http/httptest"
 	"strings"
@@ -38,14 +39,14 @@ func TestSuspiciousRequestClean(t *testing.T) {
 
 func TestValidateJSONStructureDepth(t *testing.T) {
 	deep := `{"a":{"b":{"c":{"d":{"e":{"f":1}}}}}}`
-	if err := ValidateJSONStructure([]byte(deep), 5, 500); err != ErrJSONTooDeep {
+	if err := ValidateJSONStructure([]byte(deep), 5, 500); !errors.Is(err, ErrJSONTooDeep) {
 		t.Fatalf("err = %v, want ErrJSONTooDeep", err)
 	}
 }
 
 func TestValidateJSONStructureStringLength(t *testing.T) {
 	long := `{"x":"` + strings.Repeat("a", 501) + `"}`
-	if err := ValidateJSONStructure([]byte(long), 5, 500); err != ErrJSONStringTooLong {
+	if err := ValidateJSONStructure([]byte(long), 5, 500); !errors.Is(err, ErrJSONStringTooLong) {
 		t.Fatalf("err = %v, want ErrJSONStringTooLong", err)
 	}
 }
@@ -53,7 +54,7 @@ func TestValidateJSONStructureStringLength(t *testing.T) {
 func TestValidateJSONStructureObjectNameLength(t *testing.T) {
 	name := strings.Repeat("k", MaxJSONObjectEntryNameLength+1)
 	payload := `{"` + name + `":1}`
-	if err := ValidateJSONStructure([]byte(payload), 5, 500); err != ErrJSONObjectNameTooLong {
+	if err := ValidateJSONStructure([]byte(payload), 5, 500); !errors.Is(err, ErrJSONObjectNameTooLong) {
 		t.Fatalf("err = %v, want ErrJSONObjectNameTooLong", err)
 	}
 }
@@ -68,7 +69,7 @@ func TestValidateJSONStructureObjectEntryCount(t *testing.T) {
 		fmt.Fprintf(&b, `"k%d":1`, i)
 	}
 	b.WriteByte('}')
-	if err := ValidateJSONStructure([]byte(b.String()), 5, 500); err != ErrJSONObjectEntriesExceed {
+	if err := ValidateJSONStructure([]byte(b.String()), 5, 500); !errors.Is(err, ErrJSONObjectEntriesExceed) {
 		t.Fatalf("err = %v, want ErrJSONObjectEntriesExceed", err)
 	}
 }
@@ -83,7 +84,7 @@ func TestValidateJSONStructureArrayElementCount(t *testing.T) {
 		b.WriteByte('1')
 	}
 	b.WriteString(`]}`)
-	if err := ValidateJSONStructure([]byte(b.String()), 5, 500); err != ErrJSONArrayElementsExceed {
+	if err := ValidateJSONStructure([]byte(b.String()), 5, 500); !errors.Is(err, ErrJSONArrayElementsExceed) {
 		t.Fatalf("err = %v, want ErrJSONArrayElementsExceed", err)
 	}
 }

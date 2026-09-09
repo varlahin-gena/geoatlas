@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"geoatlas/internal/geoip"
-	"geoatlas/internal/model"
 	"geoatlas/internal/mapagg"
+	"geoatlas/internal/model"
 )
 
 const MaxEnterpriseNets = 200

@@ -32,9 +32,9 @@ const (
 	ScopeOps   = "ops"
 	ScopeAdmin = "admin"
 
-	maxAPITokens   = 64
-	tokenBytes     = 32
-	maxTokenTTL    = 365 * 24 * time.Hour
+	maxAPITokens = 64
+	tokenBytes   = 32
+	maxTokenTTL  = 365 * 24 * time.Hour
 )
 
 var tokenNameRe = regexp.MustCompile(`^[a-zA-Z0-9._\- ]{2,64}$`)

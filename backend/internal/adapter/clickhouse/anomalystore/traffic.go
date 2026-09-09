@@ -622,4 +622,3 @@ func privateSrcSQL(includePrivate bool) string {
 			OR (%[1]s >= toIPv4('169.254.0.0') AND %[1]s <= toIPv4('169.254.255.255'))
 		)`, ip)
 }
-

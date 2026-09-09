@@ -21,7 +21,7 @@ type rangeRow struct {
 }
 
 var (
-	rangeRowSize    = uint64(unsafe.Sizeof(rangeRow{}))
+	rangeRowSize     = uint64(unsafe.Sizeof(rangeRow{}))
 	stringHeaderSize = uint64(unsafe.Sizeof(""))
 )
 

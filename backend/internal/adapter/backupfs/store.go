@@ -295,11 +295,9 @@ func dirSize(root string) (int64, error) {
 		if d.IsDir() {
 			return nil
 		}
-		info, err := d.Info()
-		if err != nil {
-			return nil
+		if info, infoErr := d.Info(); infoErr == nil {
+			total += info.Size()
 		}
-		total += info.Size()
 		return nil
 	})
 	return total, err

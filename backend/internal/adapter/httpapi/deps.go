@@ -14,14 +14,14 @@ import (
 	usecasebackup "geoatlas/internal/usecase/backup"
 	usecaseevents "geoatlas/internal/usecase/events"
 	usecasegeo "geoatlas/internal/usecase/geo"
+	usecasehunts "geoatlas/internal/usecase/hunts"
 	"geoatlas/internal/usecase/parseerrors"
 	"geoatlas/internal/usecase/parsetest"
 	usecasereputation "geoatlas/internal/usecase/reputation"
 	usecaseretention "geoatlas/internal/usecase/retention"
 	"geoatlas/internal/usecase/searchtemplates"
-	usecasetls "geoatlas/internal/usecase/tls"
-	usecasehunts "geoatlas/internal/usecase/hunts"
 	usecasesystem "geoatlas/internal/usecase/system"
+	usecasetls "geoatlas/internal/usecase/tls"
 )
 
 // AuthDeps — зависимости auth/users/api-tokens handlers (без domain UC).
@@ -165,11 +165,11 @@ func NewDeps(p Params) *Deps {
 			logs:         p.Logs,
 		},
 		system: &SystemDeps{
-			cfg:          p.Cfg,
-			systemUC:     p.SystemUC,
-			retentionUC:  p.RetentionUC,
-			backupUC:     p.BackupUC,
-			reauth:       reauth,
+			cfg:         p.Cfg,
+			systemUC:    p.SystemUC,
+			retentionUC: p.RetentionUC,
+			backupUC:    p.BackupUC,
+			reauth:      reauth,
 			tlsUC: usecasetls.New(usecasetls.Config{
 				CertDir:      p.Cfg.TLSCertDir,
 				CertFile:     p.Cfg.TLSCertFile,

@@ -42,9 +42,9 @@ func (r HuntAnomalyReporter) ReportHuntBreach(ctx context.Context, hunt hunts.Hu
 			"ratio":      run.Ratio,
 			"query_cost": run.QueryCost,
 		},
-		EventCount: uint64(run.EdgeCount),
+		EventCount:  uint64(run.EdgeCount),
 		Fingerprint: fp,
-		ExpiresAt:  now.Add(30 * 24 * time.Hour),
+		ExpiresAt:   now.Add(30 * 24 * time.Hour),
 		Map: usecaseanomaly.MapLink{
 			Period:  hunt.Map.Period,
 			Group:   hunt.Map.GroupBy,
