@@ -1923,7 +1923,8 @@ export interface paths {
         /**
          * Настройки движка аномалий
          * @description Только administrator или Bearer.
-         *     Редактируемые параметры из `/app/data/anomaly_settings.json` и read-only пороги install profile.
+         *     Редактируемые параметры и пороги детекторов из `/app/data/anomaly_settings.json`;
+         *     baseline порогов — install profile (`threshold_defaults`).
          */
         get: {
             parameters: {
