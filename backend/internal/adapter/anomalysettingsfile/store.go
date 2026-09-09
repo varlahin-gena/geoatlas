@@ -5,13 +5,16 @@ import (
 	"errors"
 	"os"
 	"strings"
+	"sync"
 
 	"geoatlas/internal/fileatomic"
 	usecaseanomaly "geoatlas/internal/usecase/anomaly"
 )
 
 // Store — JSON-файл настроек движка аномалий (/app/data/anomaly_settings.json).
+// mu сериализует Load/Save при параллельных PUT /api/anomalies/settings.
 type Store struct {
+	mu   sync.RWMutex
 	path string
 }
 
@@ -23,7 +26,9 @@ func (s *Store) Load() (usecaseanomaly.Settings, error) {
 	if s == nil || s.path == "" {
 		return usecaseanomaly.Settings{}, nil
 	}
-	data, err := os.ReadFile(s.path)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	data, err := fileatomic.ReadFile(s.path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return usecaseanomaly.Settings{}, nil
@@ -41,5 +46,7 @@ func (s *Store) Save(st usecaseanomaly.Settings) error {
 	if s == nil || s.path == "" {
 		return errors.New("anomaly settings file path is empty")
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return fileatomic.WriteJSON(s.path, st)
 }

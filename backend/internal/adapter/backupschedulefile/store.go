@@ -5,13 +5,17 @@ import (
 	"errors"
 	"os"
 	"strings"
+	"sync"
 
 	"geoatlas/internal/fileatomic"
 	"geoatlas/internal/usecase/backup"
 )
 
 // Store — JSON-файл расписания бэкапов (/app/data/backup_schedule.json).
+// mu сериализует Load/Save: параллельные PUT и фоновый тик автобэкапа
+// пишут один и тот же файл.
 type Store struct {
+	mu   sync.RWMutex
 	path string
 	seed backup.Schedule
 }
@@ -24,7 +28,9 @@ func (s *Store) Load() (backup.Schedule, error) {
 	if s == nil || s.path == "" {
 		return s.seedOrDefault(), nil
 	}
-	data, err := os.ReadFile(s.path)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	data, err := fileatomic.ReadFile(s.path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return s.seedOrDefault(), nil
@@ -63,6 +69,8 @@ func (s *Store) Save(st backup.Schedule) error {
 	out.LastRunAt = strings.TrimSpace(st.LastRunAt)
 	out.LastRunDate = strings.TrimSpace(st.LastRunDate)
 	out.UpdatedAt = strings.TrimSpace(st.UpdatedAt)
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return fileatomic.WriteJSON(s.path, out)
 }
 
