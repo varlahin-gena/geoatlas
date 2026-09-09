@@ -26,19 +26,23 @@ import (
 
 // AuthDeps — зависимости auth/users/api-tokens handlers (без domain UC).
 type AuthDeps struct {
-	cfg          config.Config
-	authUC       *usecaseauth.Service
-	users        UserDirectory
-	sessions     SessionParser
-	apiTokens    APITokenStore
-	reauth       ReauthChecker
-	loginLimiter *loginthrottle.Limiter
-	logs         *usecaseaudit.Service
+	authDisabled      bool
+	apiAuthDisabled   bool
+	reputationEnabled bool
+	apiAuthTokens     []string
+	apiOpsTokens      []string
+	authUC            *usecaseauth.Service
+	users             UserDirectory
+	sessions          SessionParser
+	apiTokens         APITokenStore
+	reauth            ReauthChecker
+	loginLimiter      *loginthrottle.Limiter
+	logs              *usecaseaudit.Service
 }
 
 // SystemDeps — зависимости SystemHandler (system/retention/backup + shared loginLimiter).
 type SystemDeps struct {
-	cfg          config.Config
+	queryTimeout time.Duration
 	systemUC     *usecasesystem.Service
 	retentionUC  *usecaseretention.Service
 	backupUC     *usecasebackup.Service
@@ -56,26 +60,28 @@ type HealthDeps struct {
 
 // EventsDeps — зависимости EventsHandler (map/series + attached backup name).
 type EventsDeps struct {
-	cfg      config.Config
-	eventsUC *usecaseevents.Service
-	backupUC *usecasebackup.Service
+	queryTimeout time.Duration
+	eventsUC     *usecaseevents.Service
+	backupUC     *usecasebackup.Service
 }
 
 // GeoDeps — зависимости GeoHandler.
 type GeoDeps struct {
-	cfg   config.Config
-	geoUC *usecasegeo.Service
+	maxGeoUploadSize   int64
+	maxGeoUploadRanges int
+	queryTimeout       time.Duration
+	geoUC              *usecasegeo.Service
 }
 
 // IngestDeps — зависимости IngestHandler.
 type IngestDeps struct {
-	cfg    config.Config
-	ingest Ingester
+	ingestFlushSec int
+	ingest         Ingester
 }
 
 // ParseDeps — зависимости ParseHandler (parse-errors + parse-test).
 type ParseDeps struct {
-	cfg           config.Config
+	queryTimeout  time.Duration
 	parseErrorsUC *parseerrors.Service
 	parseTestUC   *parsetest.Service
 }
@@ -87,14 +93,15 @@ type ReputationDeps struct {
 
 // SearchTemplatesDeps — зависимости SearchTemplatesHandler.
 type SearchTemplatesDeps struct {
-	cfg             config.Config
+	authDisabled    bool
 	searchTemplates *searchtemplates.Service
 	sessions        SessionParser
 }
 
 // AnomalyDeps — зависимости AnomalyHandler.
 type AnomalyDeps struct {
-	cfg             config.Config
+	queryTimeout    time.Duration
+	authDisabled    bool
 	anomalyUC       *usecaseanomaly.Service
 	anomalySettings *usecaseanomaly.SettingsService
 	logs            *usecaseaudit.Service
@@ -153,48 +160,56 @@ type MetricsRecorder interface {
 func NewDeps(p Params) *Deps {
 	lim := loginthrottle.New(10, time.Minute, 5*time.Minute)
 	reauth := NewReauthChecker(p.Cfg, p.AuthUC, p.Sessions, p.APITokens)
+	envTokens := p.Cfg.APIAuthTokens()
+	opsTokens := p.Cfg.APIOpsTokens()
+	if p.Cfg.Auth.APIAuthDisabled {
+		envTokens = nil
+		opsTokens = nil
+	}
 	return &Deps{
 		auth: &AuthDeps{
-			cfg:          p.Cfg,
-			authUC:       p.AuthUC,
-			users:        p.Users,
-			sessions:     p.Sessions,
-			apiTokens:    p.APITokens,
-			reauth:       reauth,
-			loginLimiter: lim,
-			logs:         p.Logs,
+			authDisabled:      p.Cfg.Auth.Disabled,
+			apiAuthDisabled:   p.Cfg.Auth.APIAuthDisabled,
+			reputationEnabled: p.Cfg.Reputation.FetchEnabled,
+			apiAuthTokens:     envTokens,
+			apiOpsTokens:      opsTokens,
+			authUC:            p.AuthUC,
+			users:             p.Users,
+			sessions:          p.Sessions,
+			apiTokens:         p.APITokens,
+			reauth:            reauth,
+			loginLimiter:      lim,
+			logs:              p.Logs,
 		},
 		system: &SystemDeps{
-			cfg:          p.Cfg,
+			queryTimeout: p.Cfg.QueryTimeout,
 			systemUC:     p.SystemUC,
 			retentionUC:  p.RetentionUC,
 			backupUC:     p.BackupUC,
 			reauth:       reauth,
-			tlsUC: usecasetls.New(usecasetls.Config{
-				CertDir:      p.Cfg.TLSCertDir,
-				CertFile:     p.Cfg.TLSCertFile,
-				KeyFile:      p.Cfg.TLSKeyFile,
-				HTTPSEnabled: p.Cfg.HTTPSEnabled,
-				HTTPSPort:    p.Cfg.HTTPSPort,
-				HTTPRedirect: p.Cfg.HTTPRedirect,
-				ReloadCmd:    p.Cfg.TLSReloadCmd,
-			}),
+			tlsUC:        usecasetls.New(usecasetls.Config(p.Cfg.TLS)),
 			loginLimiter: lim,
 			logs:         p.Logs,
 		},
-		health:     &HealthDeps{systemUC: p.SystemUC, systemPinger: p.SystemPinger},
-		events:     &EventsDeps{cfg: p.Cfg, eventsUC: p.EventsUC, backupUC: p.BackupUC},
-		geo:        &GeoDeps{cfg: p.Cfg, geoUC: p.GeoUC},
-		ingest:     &IngestDeps{cfg: p.Cfg, ingest: p.Ingest},
-		parse:      &ParseDeps{cfg: p.Cfg, parseErrorsUC: p.ParseErrorsUC, parseTestUC: p.ParseTestUC},
+		health: &HealthDeps{systemUC: p.SystemUC, systemPinger: p.SystemPinger},
+		events: &EventsDeps{queryTimeout: p.Cfg.QueryTimeout, eventsUC: p.EventsUC, backupUC: p.BackupUC},
+		geo: &GeoDeps{
+			maxGeoUploadSize:   p.Cfg.Geo.MaxUploadSize,
+			maxGeoUploadRanges: p.Cfg.Geo.MaxUploadRanges,
+			queryTimeout:       p.Cfg.QueryTimeout,
+			geoUC:              p.GeoUC,
+		},
+		ingest: &IngestDeps{ingestFlushSec: p.Cfg.Ingest.FlushSec, ingest: p.Ingest},
+		parse:  &ParseDeps{queryTimeout: p.Cfg.QueryTimeout, parseErrorsUC: p.ParseErrorsUC, parseTestUC: p.ParseTestUC},
 		reputation: &ReputationDeps{reputationUC: p.ReputationUC},
 		templates: &SearchTemplatesDeps{
-			cfg:             p.Cfg,
+			authDisabled:    p.Cfg.Auth.Disabled,
 			searchTemplates: p.SearchTemplatesUC,
 			sessions:        p.Sessions,
 		},
 		anomaly: &AnomalyDeps{
-			cfg:             p.Cfg,
+			queryTimeout:    p.Cfg.QueryTimeout,
+			authDisabled:    p.Cfg.Auth.Disabled,
 			anomalyUC:       p.AnomalyUC,
 			anomalySettings: p.AnomalySettingsUC,
 			logs:            p.Logs,

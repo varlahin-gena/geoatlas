@@ -123,7 +123,7 @@ func (h *SearchTemplatesHandler) ListAll(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *SearchTemplatesHandler) currentUsername(r *http.Request) (string, bool) {
-	if h != nil && h.cfg.AuthDisabled {
+	if h != nil && h.authDisabled {
 		return "anonymous", true
 	}
 	if sess, ok := SessionFromContext(r.Context()); ok && strings.TrimSpace(sess.Username) != "" {

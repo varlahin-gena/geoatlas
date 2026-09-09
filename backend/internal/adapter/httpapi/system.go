@@ -26,7 +26,7 @@ func (h *SystemHandler) GetSystemStats(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "system service unavailable"})
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), h.cfg.QueryTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), h.queryTimeout)
 	defer cancel()
 
 	resp, err := h.systemUC.CollectStats(ctx)
@@ -45,7 +45,7 @@ func (h *SystemHandler) GetSystemStatus(w http.ResponseWriter, r *http.Request) 
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "system service unavailable"})
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), h.cfg.QueryTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), h.queryTimeout)
 	defer cancel()
 
 	resp, err := h.systemUC.Status(ctx)
@@ -77,7 +77,7 @@ func (h *SystemHandler) GetSystemHistory(w http.ResponseWriter, r *http.Request)
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "system service unavailable"})
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), h.cfg.QueryTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), h.queryTimeout)
 	defer cancel()
 
 	q := r.URL.Query()
@@ -146,7 +146,7 @@ func (h *SystemHandler) PutRetention(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSONBody(w, r, &req, defaultJSONBodyLimit) {
 		return
 	}
-	timeout := h.cfg.QueryTimeout
+	timeout := h.queryTimeout
 	if timeout <= 0 {
 		timeout = 2 * time.Minute
 	}
@@ -326,7 +326,7 @@ func (h *SystemHandler) GetDRHistory(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "history service unavailable"})
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), h.cfg.QueryTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), h.queryTimeout)
 	defer cancel()
 	items, err := h.listDRHistory(ctx, r)
 	if err != nil {
@@ -341,7 +341,7 @@ func (h *SystemHandler) GetAuditLog(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "audit service unavailable"})
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), h.cfg.QueryTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), h.queryTimeout)
 	defer cancel()
 	items, err := h.listAuditLog(ctx, r)
 	if err != nil {

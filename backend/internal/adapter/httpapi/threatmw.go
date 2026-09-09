@@ -11,7 +11,7 @@ import (
 // apiThreatMW applies Apigee-equivalent edge controls: injection guard, SpikeArrest,
 // and API security response headers.
 func apiThreatMW(cfg config.Config) middleware {
-	limiter := threatprot.NewRateLimiter(cfg.APIRateLimitRPS, cfg.APIRateLimitBurst)
+	limiter := threatprot.NewRateLimiter(cfg.HTTPThreat.APIRateLimitRPS, cfg.HTTPThreat.APIRateLimitBurst)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			threatprot.SetAPIResponseHeaders(w)

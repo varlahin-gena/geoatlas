@@ -73,13 +73,15 @@ func TestIntegrationMapPathLogToEvents(t *testing.T) {
 
 	eventsUC := usecaseevents.New(trafficstore.NewTrafficRepository(conn), geoIdx, nil)
 	cfg := config.Config{
-		ListenAddr:         ":0",
-		APIAuthToken:       mapPathBearer,
-		MaxLogUploadSize:   1 << 20,
-		MaxGeoUploadSize:   1 << 20,
-		MaxGeoUploadRanges: 100_000,
-		QueryTimeout:       30 * time.Second,
-		IngestFlushSec:     1,
+		ListenAddr:       ":0",
+		MaxLogUploadSize: 1 << 20,
+		Auth:             config.AuthConfig{APIAuthToken: mapPathBearer},
+		Geo: config.GeoConfig{
+			MaxUploadSize:   1 << 20,
+			MaxUploadRanges: 100_000,
+		},
+		QueryTimeout: 30 * time.Second,
+		Ingest:       config.IngestConfig{FlushSec: 1},
 	}
 	srv := httpapi.NewServer(httpapi.Params{
 		Cfg:      cfg,

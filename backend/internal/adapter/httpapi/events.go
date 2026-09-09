@@ -240,7 +240,7 @@ func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 		RepLists:      repLists,
 		RepSide:       normalizeRepSide(q.Get("rep_side")),
 		DataSource:    dataSource,
-		Timeout:       h.cfg.QueryTimeout,
+		Timeout:       h.queryTimeout,
 	})
 	if err != nil {
 		writeInternalError(w, "events: get map failed", err)
@@ -309,7 +309,7 @@ func (h *EventsHandler) GetEventsSeries(w http.ResponseWriter, r *http.Request) 
 		TimeRange:  model.TimeRange{Mode: tr.Mode, Amount: tr.Amount, From: tr.From, To: tr.To},
 		Country:    country,
 		DataSource: dataSource,
-		Timeout:    h.cfg.QueryTimeout,
+		Timeout:    h.queryTimeout,
 	})
 	if err != nil {
 		writeInternalError(w, "events: get series failed", err)

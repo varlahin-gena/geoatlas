@@ -25,18 +25,18 @@ var (
 func (c Config) ValidateSecurity() error {
 	allowInsecure := envBool("GA_ALLOW_INSECURE", false)
 
-	if (c.APIAuthDisabled || c.AuthDisabled) && !allowInsecure {
+	if (c.Auth.APIAuthDisabled || c.Auth.Disabled) && !allowInsecure {
 		which := "AUTH_DISABLED"
-		if c.APIAuthDisabled && c.AuthDisabled {
+		if c.Auth.APIAuthDisabled && c.Auth.Disabled {
 			which = "AUTH_DISABLED and API_AUTH_DISABLED"
-		} else if c.APIAuthDisabled {
+		} else if c.Auth.APIAuthDisabled {
 			which = "API_AUTH_DISABLED"
 		}
 		return fmt.Errorf("%s requires GA_ALLOW_INSECURE=1 (local/dev only)", which)
 	}
 
-	if !c.APIAuthDisabled {
-		token := strings.TrimSpace(c.APIAuthToken)
+	if !c.Auth.APIAuthDisabled {
+		token := strings.TrimSpace(c.Auth.APIAuthToken)
 		if token == "" {
 			return fmt.Errorf("API_AUTH_TOKEN is required; set API_AUTH_DISABLED=1 only for local/dev (with GA_ALLOW_INSECURE=1)")
 		}
@@ -46,7 +46,7 @@ func (c Config) ValidateSecurity() error {
 		if err := requireMinSecretLen("API_AUTH_TOKEN", token, allowInsecure); err != nil {
 			return err
 		}
-		prev := strings.TrimSpace(c.APIAuthPreviousToken)
+		prev := strings.TrimSpace(c.Auth.APIAuthPreviousToken)
 		if prev != "" {
 			if !allowInsecure && isListed(prev, insecureAPIAuthTokens) {
 				return fmt.Errorf("API_AUTH_PREVIOUS_TOKEN is a known insecure placeholder; use a real previous token or unset it")
@@ -57,8 +57,8 @@ func (c Config) ValidateSecurity() error {
 		}
 	}
 
-	if !c.AuthDisabled {
-		secret := strings.TrimSpace(c.SessionSecret)
+	if !c.Auth.Disabled {
+		secret := strings.TrimSpace(c.Auth.SessionSecret)
 		if secret == "" {
 			return fmt.Errorf("SESSION_SECRET is required when AUTH_DISABLED is not set")
 		}
@@ -70,7 +70,7 @@ func (c Config) ValidateSecurity() error {
 		}
 	}
 
-	ingestSecret := strings.TrimSpace(c.IngestSharedSecret)
+	ingestSecret := strings.TrimSpace(c.Ingest.SharedSecret)
 	if ingestSecret == "" && !allowInsecure {
 		return fmt.Errorf("INGEST_SHARED_SECRET is required; generate via start.sh (GA_ALLOW_INSECURE=1 to override for local/dev)")
 	}
@@ -90,17 +90,17 @@ func (c Config) ValidateSecurity() error {
 		}
 	}
 
-	ops := strings.TrimSpace(c.APIOpsToken)
+	ops := strings.TrimSpace(c.Auth.APIOpsToken)
 	if ops != "" {
 		if err := requireMinSecretLen("API_OPS_TOKEN", ops, allowInsecure); err != nil {
 			return err
 		}
-		admin := strings.TrimSpace(c.APIAuthToken)
+		admin := strings.TrimSpace(c.Auth.APIAuthToken)
 		if admin != "" && ops == admin {
 			return fmt.Errorf("API_OPS_TOKEN must differ from API_AUTH_TOKEN (ops is for sidecars; admin must stay separate)")
 		}
 	}
-	opsPrev := strings.TrimSpace(c.APIOpsPreviousToken)
+	opsPrev := strings.TrimSpace(c.Auth.APIOpsPreviousToken)
 	if opsPrev != "" {
 		if err := requireMinSecretLen("API_OPS_PREVIOUS_TOKEN", opsPrev, allowInsecure); err != nil {
 			return err
@@ -119,14 +119,14 @@ func requireMinSecretLen(name, value string, allowInsecure bool) error {
 
 // SecurityWarnings — нефатальные замечания (слабые seed-пароли).
 func (c Config) SecurityWarnings() []string {
-	if c.AuthDisabled || envBool("GA_ALLOW_INSECURE", false) {
+	if c.Auth.Disabled || envBool("GA_ALLOW_INSECURE", false) {
 		return nil
 	}
 	var out []string
-	if strings.TrimSpace(c.AuthAdminPassword) != "" && isWeakSeedPassword(c.AuthAdminUser, c.AuthAdminPassword) {
+	if strings.TrimSpace(c.Auth.AdminPassword) != "" && isWeakSeedPassword(c.Auth.AdminUser, c.Auth.AdminPassword) {
 		out = append(out, "AUTH_ADMIN_PASSWORD is a weak default — change after first login (must_reset_password)")
 	}
-	if strings.TrimSpace(c.AuthOperatorPassword) != "" && isWeakSeedPassword(c.AuthOperatorUser, c.AuthOperatorPassword) {
+	if strings.TrimSpace(c.Auth.OperatorPassword) != "" && isWeakSeedPassword(c.Auth.OperatorUser, c.Auth.OperatorPassword) {
 		out = append(out, "AUTH_OPERATOR_PASSWORD is a weak default — change after first login (must_reset_password)")
 	}
 	return out

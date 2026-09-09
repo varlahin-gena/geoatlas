@@ -50,7 +50,7 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 		repLookuper = bg.repIdx
 	}
 	eventsUC := usecaseevents.New(trafficRepo, bg.geo, repLookuper)
-	geoUC := usecasegeo.New(geoRepo, trafficRepo, bg.geo, a.geoJobs, geoipcodec.New(), cfg.MaxGeoUploadRanges)
+	geoUC := usecasegeo.New(geoRepo, trafficRepo, bg.geo, a.geoJobs, geoipcodec.New(), cfg.Geo.MaxUploadRanges)
 	geoUC.SetEnterpriseStore(geoRepo)
 	geoUC.SetHeavySlot(a.heavy)
 	if p, err := installprofile.Load(cfg.InstallProfilePath); err == nil && p != nil && p.Limits.Backend.MemoryGB > 0 {
@@ -74,27 +74,27 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 		Maintenance:        a.geoJobs,
 	})
 	authUC := usecaseauth.New(auth.users, auth.sessions)
-	dataDir := filepath.Dir(cfg.AuthUsersFile)
+	dataDir := filepath.Dir(cfg.Auth.UsersFile)
 	if dataDir == "." || dataDir == "" {
 		dataDir = "/app/data"
 	}
 	opts := usecasebackup.Options{
-		Enabled:      cfg.BackupEnabled,
-		Dir:          cfg.BackupDir,
+		Enabled:      cfg.Backup.Enabled,
+		Dir:          cfg.Backup.Dir,
 		DataDir:      dataDir,
-		Keep:         cfg.BackupKeep,
-		IncludeEdges: cfg.BackupIncludeEdges,
-		IncludeAuth:  cfg.BackupIncludeAuth,
+		Keep:         cfg.Backup.Keep,
+		IncludeEdges: cfg.Backup.IncludeEdges,
+		IncludeAuth:  cfg.Backup.IncludeAuth,
 	}
-	schedStore := backupschedulefile.New(cfg.BackupScheduleFile, usecasebackup.DefaultsSchedule(opts))
-	backupUC := usecasebackup.New(opts, backupstore.NewBackupRunner(a.pools.Background), backupfs.New(cfg.BackupDir), schedStore)
+	schedStore := backupschedulefile.New(cfg.Backup.ScheduleFile, usecasebackup.DefaultsSchedule(opts))
+	backupUC := usecasebackup.New(opts, backupstore.NewBackupRunner(a.pools.Background), backupfs.New(cfg.Backup.Dir), schedStore)
 	backupUC.SetLogService(logsUC)
 	backupUC.SetHeavySlot(a.heavy)
 	a.backupJobs = backupjob.NewFromService(backupUC, time.Minute)
 
 	var anomalyUC *usecaseanomaly.Service
 	var anomalySettingsUC *usecaseanomaly.SettingsService
-	if cfg.AnomalyEnabled {
+	if cfg.Anomaly.Enabled {
 		apiRepo := anomalystore.New(a.pools.API)
 		bgRepo := anomalystore.New(a.pools.Background)
 		var anomRep usecaseanomaly.ReputationLookuper
@@ -107,19 +107,19 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 		}
 		anomalyUC = usecaseanomaly.New(usecaseanomaly.Config{
 			Enabled:                       true,
-			IncludePrivate:                cfg.AnomalyIncludePrivate,
-			LearningDays:                  cfg.AnomalyLearningDays,
+			IncludePrivate:                cfg.Anomaly.IncludePrivate,
+			LearningDays:                  cfg.Anomaly.LearningDays,
 			InstallProfile:                profileName,
-			SuppressHours:                 cfg.AnomalySuppressHours,
-			NewCountryMinShare:            cfg.AnomalyNewCountryMinShare,
-			NewCountryRepeatCooldownHours: cfg.AnomalyNewCountryRepeatCooldownHours,
+			SuppressHours:                 cfg.Anomaly.SuppressHours,
+			NewCountryMinShare:            cfg.Anomaly.NewCountryMinShare,
+			NewCountryRepeatCooldownHours: cfg.Anomaly.NewCountryRepeatCooldownHours,
 		}, apiRepo, bgRepo, anomRep, anomalyjob.Gate{Ingest: a.ingestSvc}, a.prom)
 		anomalyUC.SetEnterpriseNets(geoUC)
-		a.anomalyJobs = anomalyjob.New(anomalyUC, cfg.AnomalyScanInterval, time.Minute)
+		a.anomalyJobs = anomalyjob.New(anomalyUC, cfg.Anomaly.ScanInterval, time.Minute)
 		a.anomalyJobs.SetLimiter(a.heavy)
-		seed := usecaseanomaly.DefaultSettingsFromConfig(cfg)
+		seed := usecaseanomaly.DefaultSettingsFromConfig(cfg.Anomaly)
 		anomalySettingsUC = usecaseanomaly.NewSettingsService(
-			anomalysettingsfile.New(cfg.AnomalySettingsFile),
+			anomalysettingsfile.New(cfg.Anomaly.SettingsFile),
 			anomalyUC,
 			seed,
 			a.anomalyJobs.SetInterval,

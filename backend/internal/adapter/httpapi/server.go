@@ -58,16 +58,16 @@ func NewServer(p Params, opts ...ServerOption) *Server {
 
 	cfg := p.Cfg
 	envTokens := cfg.APIAuthTokens()
-	if cfg.APIAuthDisabled {
+	if cfg.Auth.APIAuthDisabled {
 		envTokens = nil
 	}
 	opsTokens := cfg.APIOpsTokens()
-	if cfg.APIAuthDisabled {
+	if cfg.Auth.APIAuthDisabled {
 		opsTokens = nil
 	}
 	ba := newBearerAuth(envTokens, opsTokens, p.APITokens)
-	uiAuthOff := cfg.AuthDisabled
-	apiAuthOff := cfg.APIAuthDisabled
+	uiAuthOff := cfg.Auth.Disabled
+	apiAuthOff := cfg.Auth.APIAuthDisabled
 
 	loginMW := requireLoginMW(ba, p.Sessions, p.Users, uiAuthOff)
 	adminMW := requireAdminMW(ba, p.Sessions, p.Users, uiAuthOff)
@@ -353,10 +353,10 @@ func NewServer(p Params, opts ...ServerOption) *Server {
 		chain(http.HandlerFunc(ingestH.UploadLogs), opsMW, csrf, maxBytesMW(cfg.MaxLogUploadSize)),
 	)
 	rr.Handle("POST", "/upload-geo",
-		chain(http.HandlerFunc(geoH.UploadGeo), opsMW, csrf, maxBytesMW(cfg.MaxGeoUploadSize)),
+		chain(http.HandlerFunc(geoH.UploadGeo), opsMW, csrf, maxBytesMW(cfg.Geo.MaxUploadSize)),
 	)
 	rr.Handle("POST", "/upload-reputation",
-		chain(http.HandlerFunc(repH.UploadReputation), opsMW, csrf, maxBytesMW(cfg.MaxReputationUploadSize)),
+		chain(http.HandlerFunc(repH.UploadReputation), opsMW, csrf, maxBytesMW(cfg.Reputation.MaxUploadSize)),
 	)
 
 	h := rr.Handler()
@@ -365,12 +365,12 @@ func NewServer(p Params, opts ...ServerOption) *Server {
 		h = metricsMW(deps.prom)(h)
 	}
 	h = apiThreatMW(cfg)(h)
-	proxyGateOn := cfg.RequireProxy && !uiAuthOff && !apiAuthOff
+	proxyGateOn := cfg.HTTPThreat.RequireProxy && !uiAuthOff && !apiAuthOff
 	h = proxyGateMW(ba, proxyGateOn)(h)
 	h = recoverMW(h)
 	h = requestIDMW(h) // outermost
 
-	loginthrottle.ConfigureTrustedProxies(strings.Split(cfg.TrustedProxies, ","))
+	loginthrottle.ConfigureTrustedProxies(strings.Split(cfg.HTTPThreat.TrustedProxies, ","))
 
 	return &Server{
 		deps:   deps,

@@ -78,14 +78,16 @@ func TestPostCASmoke(t *testing.T) {
 	}, ingestnet.ProcessorDeps{})
 
 	cfg := config.Config{
-		ListenAddr:              ":0",
-		APIAuthToken:            "smoke-bearer-token",
-		MaxLogUploadSize:        1 << 20,
-		MaxGeoUploadSize:        1 << 20,
-		MaxGeoUploadRanges:      100_000,
-		MaxReputationUploadSize: 1 << 20,
-		QueryTimeout:            time.Minute,
-		IngestFlushSec:          1,
+		ListenAddr:       ":0",
+		MaxLogUploadSize: 1 << 20,
+		Auth:             config.AuthConfig{APIAuthToken: "smoke-bearer-token"},
+		Geo: config.GeoConfig{
+			MaxUploadSize:   1 << 20,
+			MaxUploadRanges: 100_000,
+		},
+		Reputation:   config.ReputationConfig{MaxUploadSize: 1 << 20},
+		QueryTimeout: time.Minute,
+		Ingest:       config.IngestConfig{FlushSec: 1},
 	}
 	srv := httpapi.NewServer(httpapi.Params{
 		Cfg:          cfg,

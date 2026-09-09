@@ -20,7 +20,7 @@ func (h *ParseHandler) ListParseErrors(w http.ResponseWriter, r *http.Request) {
 		limit = n
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), h.cfg.QueryTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), h.queryTimeout)
 	defer cancel()
 
 	result, err := h.parseErrorsUC.List(ctx, parseerrors.ListInput{
@@ -51,7 +51,7 @@ func (h *ParseHandler) DeleteParseErrors(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), h.cfg.QueryTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), h.queryTimeout)
 	defer cancel()
 
 	err := h.parseErrorsUC.Delete(ctx, parseerrors.DeleteInput{IDs: req.IDs, All: req.All})

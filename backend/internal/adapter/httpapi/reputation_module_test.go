@@ -35,10 +35,10 @@ func TestReputationEnabledOnMe(t *testing.T) {
 	systemUC := usecasesystem.New(usecasesystem.Dependencies{})
 
 	cfg := config.Config{
-		ListenAddr:             ":0",
-		APIAuthToken:           "rep-flag-token",
-		QueryTimeout:           time.Minute,
-		ReputationFetchEnabled: true,
+		ListenAddr:   ":0",
+		Auth:         config.AuthConfig{APIAuthToken: "rep-flag-token"},
+		QueryTimeout: time.Minute,
+		Reputation:   config.ReputationConfig{FetchEnabled: true},
 	}
 	srv := httpapi.NewServer(httpapi.Params{
 		Cfg:          cfg,

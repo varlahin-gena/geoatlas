@@ -17,23 +17,23 @@ type authParts struct {
 
 func buildAuth(cfg config.Config) (authParts, error) {
 	var out authParts
-	if cfg.AuthDisabled {
+	if cfg.Auth.Disabled {
 		slog.Warn("UI auth disabled — login and role checks are off")
 	} else {
 		seed, err := auth.SeedUsersFromEnv(
-			cfg.AuthAdminUser, cfg.AuthAdminPassword,
-			cfg.AuthOperatorUser, cfg.AuthOperatorPassword,
-			cfg.AuthAdminMustReset,
+			cfg.Auth.AdminUser, cfg.Auth.AdminPassword,
+			cfg.Auth.OperatorUser, cfg.Auth.OperatorPassword,
+			cfg.Auth.AdminMustReset,
 		)
 		if err != nil {
 			return out, fmt.Errorf("auth seed: %w", err)
 		}
-		users, err := auth.OpenOrSeed(cfg.AuthUsersFile, seed)
+		users, err := auth.OpenOrSeed(cfg.Auth.UsersFile, seed)
 		if err != nil {
-			return out, fmt.Errorf("auth users file %q: %w", cfg.AuthUsersFile, err)
+			return out, fmt.Errorf("auth users file %q: %w", cfg.Auth.UsersFile, err)
 		}
-		ttl := time.Duration(cfg.SessionTTLHours) * time.Hour
-		sessions, err := auth.NewSessionManager(cfg.SessionSecret, ttl)
+		ttl := time.Duration(cfg.Auth.SessionTTLHours) * time.Hour
+		sessions, err := auth.NewSessionManager(cfg.Auth.SessionSecret, ttl)
 		if err != nil {
 			return out, fmt.Errorf("session manager: %w", err)
 		}
@@ -41,17 +41,17 @@ func buildAuth(cfg config.Config) (authParts, error) {
 		out.sessions = sessions
 		slog.Info("UI auth enabled",
 			"users", users.Len(),
-			"users_file", cfg.AuthUsersFile,
+			"users_file", cfg.Auth.UsersFile,
 			"session_ttl", ttl.String(),
 		)
 	}
-	if !cfg.APIAuthDisabled {
-		apiTokens, err := auth.OpenOrCreateTokenStore(cfg.APITokensFile)
+	if !cfg.Auth.APIAuthDisabled {
+		apiTokens, err := auth.OpenOrCreateTokenStore(cfg.Auth.APITokensFile)
 		if err != nil {
-			return out, fmt.Errorf("api tokens file %q: %w", cfg.APITokensFile, err)
+			return out, fmt.Errorf("api tokens file %q: %w", cfg.Auth.APITokensFile, err)
 		}
 		out.apiTokens = apiTokens
-		slog.Info("API token store ready", "tokens", apiTokens.Len(), "file", cfg.APITokensFile)
+		slog.Info("API token store ready", "tokens", apiTokens.Len(), "file", cfg.Auth.APITokensFile)
 	}
 	return out, nil
 }

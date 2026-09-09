@@ -42,7 +42,7 @@ type app struct {
 }
 
 func buildApp(ctx context.Context, cfg config.Config) (*app, error) {
-	dataDir := filepath.Dir(cfg.AuthUsersFile)
+	dataDir := filepath.Dir(cfg.Auth.UsersFile)
 	if dataDir == "" || dataDir == "." {
 		dataDir = "/app/data"
 	}

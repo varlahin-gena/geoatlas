@@ -170,7 +170,7 @@ func (h *AnomalyHandler) PutSettings(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSONBody(w, r, &req, defaultJSONBodyLimit) {
 		return
 	}
-	timeout := h.cfg.QueryTimeout
+	timeout := h.queryTimeout
 	if timeout <= 0 {
 		timeout = 30 * time.Second
 	}
@@ -219,7 +219,7 @@ func (h *AnomalyHandler) PutSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AnomalyHandler) actorName(r *http.Request) string {
-	if h != nil && h.cfg.AuthDisabled {
+	if h != nil && h.authDisabled {
 		return "anonymous"
 	}
 	if sess, ok := SessionFromContext(r.Context()); ok && strings.TrimSpace(sess.Username) != "" {

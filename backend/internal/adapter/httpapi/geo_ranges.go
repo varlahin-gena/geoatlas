@@ -94,8 +94,8 @@ func (h *GeoHandler) ListGeoRanges(w http.ResponseWriter, r *http.Request) {
 	}
 
 	limits := map[string]any{
-		"upload_max_bytes":  h.cfg.MaxGeoUploadSize,
-		"upload_max_ranges": h.cfg.MaxGeoUploadRanges,
+		"upload_max_bytes":  h.maxGeoUploadSize,
+		"upload_max_ranges": h.maxGeoUploadRanges,
 	}
 
 	if result.IPLookup {

@@ -38,114 +38,26 @@ type Config struct {
 	parseErrors []string
 
 	ListenAddr           string
-	IngestListenAddr     string
-	IngestUDPListenAddr  string
-	IngestTCPListenAddr  string
-	ClickHouse           ClickHouseConfig
-	APIAuthToken         string
-	APIAuthPreviousToken string // API_AUTH_PREVIOUS_TOKEN — ротация Bearer без даунтайма
-	APIAuthDisabled      bool   // API_AUTH_DISABLED=1 — только local/dev; иначе токен обязателен
-	// APIOpsToken — env Bearer со scope=ops (sidecars: stats-collector). Не admin.
-	APIOpsToken         string
-	APIOpsPreviousToken string // API_OPS_PREVIOUS_TOKEN — ротация ops Bearer
-
-	// Локальная авторизация UI (логин/роли). AUTH_DISABLED=1 — без логина (dev).
-	AuthDisabled         bool
-	SessionSecret        string
-	SessionTTLHours      int
-	AuthAdminUser        string
-	AuthAdminPassword    string
-	AuthAdminMustReset   bool
-	AuthOperatorUser     string
-	AuthOperatorPassword string
-	AuthUsersFile        string
-	// GeoSnapshotFile — compact GeoIP snapshot рядом с users.json (пустая строка = выкл.).
-	GeoSnapshotFile string
-	// APITokensFile — JSON с именованными Bearer (scope read|ops|admin).
-	APITokensFile string
-	// RetentionFile — JSON с TTL таблиц CH (том /app/data рядом с users.json).
-	RetentionFile string
-	// TLS cert dir on host (./certs mounted in backend for HTTPS UI).
-	TLSCertDir   string
-	TLSCertFile  string
-	TLSKeyFile   string
-	HTTPSEnabled string
-	HTTPSPort    string
-	HTTPRedirect string
-	TLSReloadCmd string
-	// SearchTemplatesFile — персональные шаблоны поиска карты по username.
-	SearchTemplatesFile string
-
-	// AllowMultiInstance — отключить exclusive lock на data dir (только тесты/особые стенды).
-	// По умолчанию false: один backend на том /app/data (JSON control plane).
-	AllowMultiInstance bool
-
+	QueryTimeout         time.Duration
+	AllowMultiInstance   bool
 	MaxLogUploadSize     int64
-	MaxGeoUploadSize     int64 // байты тела /upload-geo (GEOIP_UPLOAD_MAX_BYTES или MAX_GEO_UPLOAD_SIZE)
-	MaxGeoUploadRanges   int   // макс. диапазонов в одном CSV (GEOIP_UPLOAD_MAX_RANGES)
-	IngestBatchSize      int
-	IngestQueueSize      int
-	IngestQueueMaxBytes  int
-	IngestWorkers        int
-	IngestFlushSec       int
-	IngestMaxConnections int
-	IngestConnIdleSec    int
-	// IngestSharedSecret — токен в маркере @@ga/{udp|tcp}/<token>/@@ (syslog-ng → :1514).
-	IngestSharedSecret string
-	// IngestAllowFrom — CSV hostnames/CIDRs peer для Accept (дефолт syslog-ng).
-	IngestAllowFrom string
-	// TrustedProxies — CSV hostnames/CIDRs для X-Real-IP (login throttle); дефолт frontend.
-	TrustedProxies string
-	// RequireProxy — отклонять прямой доступ к API (не через trusted hop / Bearer).
-	// В docker-compose: GA_REQUIRE_PROXY=1; локальные тесты/go run — выкл.
-	RequireProxy bool
-	// APIRateLimitRPS — SpikeArrest (GA_API_RATE_LIMIT_RPS); 0 = выкл, дефолт 30 rps.
-	APIRateLimitRPS    float64
-	APIRateLimitBurst  int // GA_API_RATE_BURST
-	QueryTimeout       time.Duration
-	InstallProfilePath string
-	InstallMetaPath    string
-	SyslogStatsURL     string // SYSLOG_STATS_URL; empty = do not scrape syslog-ng
+	RetentionFile        string
+	SearchTemplatesFile  string
+	HuntsFile            string
+	InstallProfilePath   string
+	InstallMetaPath      string
+	SyslogStatsURL       string // SYSLOG_STATS_URL; empty = do not scrape syslog-ng
 
-	// GeoEnrichOnIngest заполняет пустые/unknown/Reserved/ISO country из GeoIP при записи.
-	// false — аварийный opt-out (city/coords всё равно обогащаются).
-	GeoEnrichOnIngest bool
-	// GeoBackfillLookbackDays — окно для EnrichLogsMissingGeo + rebuild geo-edges (0 = весь объём).
-	GeoBackfillLookbackDays int
-	// SkipStartupBackfill — на старте только schema Ensure*; тяжёлый backfill
-	// через POST /api/system/maintenance/backfill (или оставьте false — поведение как раньше).
-	SkipStartupBackfill bool
-
-	// Backup: UI + native BACKUP TO Disk('backups').
-	BackupEnabled      bool
-	BackupDir          string // смонтированный том clickhouse-backups
-	BackupKeep         int
-	BackupIncludeEdges bool
-	BackupIncludeAuth  bool
-	BackupScheduleFile string // BACKUP_SCHEDULE_FILE
-
-	// Reputation: офлайн-списки (FireHOL и др.).
-	MaxReputationUploadSize int64
-	// ReputationFetchEnabled — полный выключатель модуля репутации IP
-	// (API, UI, обогащение карты, фоновые фиды). REPUTATION_FETCH_ENABLED.
-	ReputationFetchEnabled  bool
-	ReputationFetchInterval time.Duration
-	ReputationFeeds         []ReputationFeed // seed, если файла ещё нет
-	ReputationFeedsFile     string           // REPUTATION_FEEDS_FILE
-
-	// Anomaly engine (карта): детерминированные детекторы + журнал.
-	AnomalyEnabled                       bool
-	AnomalyScanInterval                  time.Duration
-	AnomalyIncludePrivate                bool
-	AnomalyLearningDays                  int
-	AnomalySuppressHours                 int
-	AnomalyNewCountryMinShare            float64
-	AnomalyNewCountryRepeatCooldownHours int
-	AnomalySettingsFile                  string
-	HuntsFile                            string
-
-	LogLevel  string // debug|info|warn|error
-	LogFormat string // text|json
+	ClickHouse  ClickHouseConfig
+	Backup      BackupConfig
+	TLS         TLSConfig
+	Auth        AuthConfig
+	Ingest      IngestConfig
+	HTTPThreat  HTTPThreatConfig
+	Geo         GeoConfig
+	Reputation  ReputationConfig
+	Anomaly     AnomalyConfig
+	Log         LogConfig
 }
 
 // ReputationFeed — URL-фид для фонового обновления.
@@ -160,9 +72,15 @@ func FromEnv() Config {
 	var parser envParser
 	cfg := Config{
 		ListenAddr:          envOr("LISTEN_ADDR", ":8080"),
-		IngestListenAddr:    envOr("INGEST_LISTEN_ADDR", ":1514"),
-		IngestUDPListenAddr: envOr("INGEST_UDP_LISTEN_ADDR", ""),
-		IngestTCPListenAddr: envOr("INGEST_TCP_LISTEN_ADDR", ""),
+		QueryTimeout:        parser.durationSeconds("QUERY_TIMEOUT_SEC", 3*time.Minute),
+		AllowMultiInstance:  parser.bool("GA_ALLOW_MULTI_INSTANCE", false),
+		MaxLogUploadSize:    parser.int64("MAX_LOG_UPLOAD_SIZE", 1<<30), // 1 GiB
+		RetentionFile:       envOr("RETENTION_FILE", "/app/data/retention.json"),
+		SearchTemplatesFile: envOr("SEARCH_TEMPLATES_FILE", "/app/data/search_templates.json"),
+		HuntsFile:           envOr("HUNTS_FILE", "/app/data/saved_hunts.json"),
+		InstallProfilePath:  envOr("INSTALL_PROFILE_PATH", "/app/install-profile.json"),
+		InstallMetaPath:     envOr("INSTALL_META_PATH", "/app/install-meta.json"),
+		SyslogStatsURL:      strings.TrimSpace(os.Getenv("SYSLOG_STATS_URL")),
 		ClickHouse: ClickHouseConfig{
 			Host:              envOr("CLICKHOUSE_HOST", "clickhouse"),
 			Port:              parser.port("CLICKHOUSE_PORT", "9000"),
@@ -178,80 +96,91 @@ func FromEnv() Config {
 			BackgroundMaxOpen: parser.int("CH_BACKGROUND_MAX_OPEN_CONNS", 2),
 			IngestAsyncInsert: parser.bool("CH_INGEST_ASYNC_INSERT", true),
 		},
-		APIAuthToken:         envOr("API_AUTH_TOKEN", ""),
-		APIAuthPreviousToken: envOr("API_AUTH_PREVIOUS_TOKEN", ""),
-		APIAuthDisabled:      parser.bool("API_AUTH_DISABLED", false),
-		APIOpsToken:          envOr("API_OPS_TOKEN", ""),
-		APIOpsPreviousToken:  envOr("API_OPS_PREVIOUS_TOKEN", ""),
-		AuthDisabled:         parser.bool("AUTH_DISABLED", false),
-		SessionSecret:        envOr("SESSION_SECRET", ""),
-		SessionTTLHours:      parser.int("SESSION_TTL_HOURS", 12),
-		AuthAdminUser:        envOr("AUTH_ADMIN_USER", "admin"),
-		AuthAdminPassword:    envOr("AUTH_ADMIN_PASSWORD", ""),
-		AuthAdminMustReset:   parser.bool("AUTH_ADMIN_MUST_RESET", false),
-		AuthOperatorUser:     envOr("AUTH_OPERATOR_USER", ""),
-		AuthOperatorPassword: envOr("AUTH_OPERATOR_PASSWORD", ""),
-		AuthUsersFile:        envOr("AUTH_USERS_FILE", "/app/data/users.json"),
-		APITokensFile:        envOr("API_TOKENS_FILE", "/app/data/api_tokens.json"),
-		RetentionFile:        envOr("RETENTION_FILE", "/app/data/retention.json"),
-		TLSCertDir:           strings.TrimSpace(os.Getenv("TLS_CERT_DIR")),
-		TLSCertFile:          envOr("TLS_CERT_FILE", "fullchain.pem"),
-		TLSKeyFile:           envOr("TLS_KEY_FILE", "privkey.pem"),
-		HTTPSEnabled:         envOr("HTTPS_ENABLED", "auto"),
-		HTTPSPort:            envOr("HTTPS_PORT", "443"),
-		HTTPRedirect:         envOr("HTTP_REDIRECT", "1"),
-		TLSReloadCmd:         strings.TrimSpace(os.Getenv("GA_TLS_RELOAD_CMD")),
-		SearchTemplatesFile:  envOr("SEARCH_TEMPLATES_FILE", "/app/data/search_templates.json"),
-		AllowMultiInstance:   parser.bool("GA_ALLOW_MULTI_INSTANCE", false),
-		MaxLogUploadSize:     parser.int64("MAX_LOG_UPLOAD_SIZE", 1<<30), // 1 GiB
+		Auth: AuthConfig{
+			Disabled:             parser.bool("AUTH_DISABLED", false),
+			SessionSecret:        envOr("SESSION_SECRET", ""),
+			SessionTTLHours:      parser.int("SESSION_TTL_HOURS", 12),
+			AdminUser:            envOr("AUTH_ADMIN_USER", "admin"),
+			AdminPassword:        envOr("AUTH_ADMIN_PASSWORD", ""),
+			AdminMustReset:       parser.bool("AUTH_ADMIN_MUST_RESET", false),
+			OperatorUser:         envOr("AUTH_OPERATOR_USER", ""),
+			OperatorPassword:     envOr("AUTH_OPERATOR_PASSWORD", ""),
+			UsersFile:            envOr("AUTH_USERS_FILE", "/app/data/users.json"),
+			APITokensFile:        envOr("API_TOKENS_FILE", "/app/data/api_tokens.json"),
+			APIAuthToken:         envOr("API_AUTH_TOKEN", ""),
+			APIAuthPreviousToken: envOr("API_AUTH_PREVIOUS_TOKEN", ""),
+			APIAuthDisabled:      parser.bool("API_AUTH_DISABLED", false),
+			APIOpsToken:          envOr("API_OPS_TOKEN", ""),
+			APIOpsPreviousToken:  envOr("API_OPS_PREVIOUS_TOKEN", ""),
+		},
+		TLS: TLSConfig{
+			CertDir:      strings.TrimSpace(os.Getenv("TLS_CERT_DIR")),
+			CertFile:     envOr("TLS_CERT_FILE", "fullchain.pem"),
+			KeyFile:      envOr("TLS_KEY_FILE", "privkey.pem"),
+			HTTPSEnabled: envOr("HTTPS_ENABLED", "auto"),
+			HTTPSPort:    envOr("HTTPS_PORT", "443"),
+			HTTPRedirect: envOr("HTTP_REDIRECT", "1"),
+			ReloadCmd:    strings.TrimSpace(os.Getenv("GA_TLS_RELOAD_CMD")),
+		},
+		Ingest: IngestConfig{
+			ListenAddr:     envOr("INGEST_LISTEN_ADDR", ":1514"),
+			UDPListenAddr:  envOr("INGEST_UDP_LISTEN_ADDR", ""),
+			TCPListenAddr:  envOr("INGEST_TCP_LISTEN_ADDR", ""),
+			BatchSize:      parser.int("INGEST_BATCH_SIZE", 10000),
+			QueueSize:      parser.int("INGEST_QUEUE_SIZE", 300000),
+			QueueMaxBytes:  parser.int("INGEST_QUEUE_MAX_BYTES", 256<<20), // 256 MiB
+			Workers:        parser.int("INGEST_WORKERS", 4),
+			FlushSec:       parser.int("INGEST_FLUSH_SEC", 3),
+			MaxConnections: parser.int("INGEST_MAX_CONNECTIONS", 256),
+			ConnIdleSec:    parser.int("INGEST_CONN_IDLE_SEC", 300),
+			SharedSecret:   envOr("INGEST_SHARED_SECRET", ""),
+			AllowFrom:      envOr("INGEST_ALLOW_FROM", "syslog-ng"),
+		},
+		HTTPThreat: HTTPThreatConfig{
+			TrustedProxies:    envOr("GA_TRUSTED_PROXIES", "frontend"),
+			RequireProxy:      envBool("GA_REQUIRE_PROXY", false),
+			APIRateLimitRPS:   parser.float("GA_API_RATE_LIMIT_RPS", 30),
+			APIRateLimitBurst: parser.int("GA_API_RATE_BURST", 60),
+		},
 		// GeoIP: временные дефолты (small/2 GiB); ResolveGeoUploadLimits подставит профиль.
-		MaxGeoUploadSize:     firstEnvInt64(&parser, 512<<20, "GEOIP_UPLOAD_MAX_BYTES", "MAX_GEO_UPLOAD_SIZE"),
-		MaxGeoUploadRanges:   firstEnvInt(&parser, 4_000_000, "GEOIP_UPLOAD_MAX_RANGES"),
-		IngestBatchSize:      parser.int("INGEST_BATCH_SIZE", 10000),
-		IngestQueueSize:      parser.int("INGEST_QUEUE_SIZE", 300000),
-		IngestQueueMaxBytes:  parser.int("INGEST_QUEUE_MAX_BYTES", 256<<20), // 256 MiB
-		IngestWorkers:        parser.int("INGEST_WORKERS", 4),
-		IngestFlushSec:       parser.int("INGEST_FLUSH_SEC", 3),
-		IngestMaxConnections: parser.int("INGEST_MAX_CONNECTIONS", 256),
-		IngestConnIdleSec:    parser.int("INGEST_CONN_IDLE_SEC", 300),
-		IngestSharedSecret:   envOr("INGEST_SHARED_SECRET", ""),
-		IngestAllowFrom:      envOr("INGEST_ALLOW_FROM", "syslog-ng"),
-		TrustedProxies:       envOr("GA_TRUSTED_PROXIES", "frontend"),
-		RequireProxy:         envBool("GA_REQUIRE_PROXY", false),
-		APIRateLimitRPS:      parser.float("GA_API_RATE_LIMIT_RPS", 30),
-		APIRateLimitBurst:    parser.int("GA_API_RATE_BURST", 60),
-		QueryTimeout:         parser.durationSeconds("QUERY_TIMEOUT_SEC", 3*time.Minute),
-		InstallProfilePath:   envOr("INSTALL_PROFILE_PATH", "/app/install-profile.json"),
-		InstallMetaPath:      envOr("INSTALL_META_PATH", "/app/install-meta.json"),
-		SyslogStatsURL:       strings.TrimSpace(os.Getenv("SYSLOG_STATS_URL")),
-
-		GeoEnrichOnIngest:                    parser.bool("GEO_ENRICH_ON_INGEST", true),
-		GeoBackfillLookbackDays:              parser.int("GEO_BACKFILL_LOOKBACK_DAYS", 7),
-		SkipStartupBackfill:                  parser.bool("SKIP_STARTUP_BACKFILL", false),
-		BackupEnabled:                        parser.bool("BACKUP_ENABLED", true),
-		BackupDir:                            envOr("BACKUP_DIR", "/var/lib/clickhouse-backups"),
-		BackupKeep:                           parser.int("BACKUP_KEEP", 7),
-		BackupIncludeEdges:                   parser.bool("BACKUP_INCLUDE_EDGES", true),
-		BackupIncludeAuth:                    parser.bool("BACKUP_INCLUDE_AUTH", true),
-		BackupScheduleFile:                   envOr("BACKUP_SCHEDULE_FILE", "/app/data/backup_schedule.json"),
-		MaxReputationUploadSize:              parser.int64("MAX_REPUTATION_UPLOAD_SIZE", 1<<30),
-		ReputationFetchEnabled:               parser.bool("REPUTATION_FETCH_ENABLED", true),
-		ReputationFetchInterval:              parser.durationFlexible("REPUTATION_FETCH_INTERVAL", 6*time.Hour),
-		ReputationFeeds:                      parser.reputationFeeds("REPUTATION_FEEDS"),
-		ReputationFeedsFile:                  envOr("REPUTATION_FEEDS_FILE", "/app/data/reputation_feeds.json"),
-		AnomalyEnabled:                       parser.bool("ANOMALY_ENABLED", true),
-		AnomalyScanInterval:                  parser.durationFlexible("ANOMALY_SCAN_INTERVAL", 5*time.Minute),
-		AnomalyIncludePrivate:                parser.bool("ANOMALY_INCLUDE_PRIVATE", false),
-		AnomalyLearningDays:                  parser.int("ANOMALY_LEARNING_DAYS", 3),
-		AnomalySuppressHours:                 parser.int("ANOMALY_SUPPRESS_HOURS", 24),
-		AnomalyNewCountryMinShare:            parser.float("ANOMALY_NEW_COUNTRY_MIN_SHARE", 0.05),
-		AnomalyNewCountryRepeatCooldownHours: parser.int("ANOMALY_NEW_COUNTRY_REPEAT_COOLDOWN_HOURS", 24),
-		AnomalySettingsFile:                  envOr("ANOMALY_SETTINGS_FILE", "/app/data/anomaly_settings.json"),
-		HuntsFile:                            envOr("HUNTS_FILE", "/app/data/saved_hunts.json"),
-		LogLevel:                             strings.ToLower(envOr("LOG_LEVEL", "info")),
-		LogFormat:                            strings.ToLower(envOr("LOG_FORMAT", "text")),
+		Geo: GeoConfig{
+			MaxUploadSize:        firstEnvInt64(&parser, 512<<20, "GEOIP_UPLOAD_MAX_BYTES", "MAX_GEO_UPLOAD_SIZE"),
+			MaxUploadRanges:      firstEnvInt(&parser, 4_000_000, "GEOIP_UPLOAD_MAX_RANGES"),
+			EnrichOnIngest:       parser.bool("GEO_ENRICH_ON_INGEST", true),
+			BackfillLookbackDays: parser.int("GEO_BACKFILL_LOOKBACK_DAYS", 7),
+			SkipStartupBackfill:  parser.bool("SKIP_STARTUP_BACKFILL", false),
+		},
+		Backup: BackupConfig{
+			Enabled:      parser.bool("BACKUP_ENABLED", true),
+			Dir:          envOr("BACKUP_DIR", "/var/lib/clickhouse-backups"),
+			Keep:         parser.int("BACKUP_KEEP", 7),
+			IncludeEdges: parser.bool("BACKUP_INCLUDE_EDGES", true),
+			IncludeAuth:  parser.bool("BACKUP_INCLUDE_AUTH", true),
+			ScheduleFile: envOr("BACKUP_SCHEDULE_FILE", "/app/data/backup_schedule.json"),
+		},
+		Reputation: ReputationConfig{
+			MaxUploadSize: parser.int64("MAX_REPUTATION_UPLOAD_SIZE", 1<<30),
+			FetchEnabled:  parser.bool("REPUTATION_FETCH_ENABLED", true),
+			FetchInterval: parser.durationFlexible("REPUTATION_FETCH_INTERVAL", 6*time.Hour),
+			Feeds:         parser.reputationFeeds("REPUTATION_FEEDS"),
+			FeedsFile:     envOr("REPUTATION_FEEDS_FILE", "/app/data/reputation_feeds.json"),
+		},
+		Anomaly: AnomalyConfig{
+			Enabled:                       parser.bool("ANOMALY_ENABLED", true),
+			ScanInterval:                  parser.durationFlexible("ANOMALY_SCAN_INTERVAL", 5*time.Minute),
+			IncludePrivate:                parser.bool("ANOMALY_INCLUDE_PRIVATE", false),
+			LearningDays:                  parser.int("ANOMALY_LEARNING_DAYS", 3),
+			SuppressHours:                 parser.int("ANOMALY_SUPPRESS_HOURS", 24),
+			NewCountryMinShare:            parser.float("ANOMALY_NEW_COUNTRY_MIN_SHARE", 0.05),
+			NewCountryRepeatCooldownHours: parser.int("ANOMALY_NEW_COUNTRY_REPEAT_COOLDOWN_HOURS", 24),
+			SettingsFile:                  envOr("ANOMALY_SETTINGS_FILE", "/app/data/anomaly_settings.json"),
+		},
+		Log: LogConfig{
+			Level:  strings.ToLower(envOr("LOG_LEVEL", "info")),
+			Format: strings.ToLower(envOr("LOG_FORMAT", "text")),
+		},
 	}
-	cfg.GeoSnapshotFile = geoSnapshotFile(cfg.AuthUsersFile)
+	cfg.Geo.SnapshotFile = geoSnapshotFile(cfg.Auth.UsersFile)
 	cfg.parseErrors = parser.errors
 	return cfg
 }
@@ -317,12 +246,12 @@ func (c Config) ClickHouseAddr() string {
 
 // APIAuthTokens — текущий Bearer и опциональный previous (ротация).
 func (c Config) APIAuthTokens() []string {
-	return tokenPair(c.APIAuthToken, c.APIAuthPreviousToken)
+	return tokenPair(c.Auth.APIAuthToken, c.Auth.APIAuthPreviousToken)
 }
 
 // APIOpsTokens — env Bearer со scope=ops (stats-collector и др. sidecars).
 func (c Config) APIOpsTokens() []string {
-	return tokenPair(c.APIOpsToken, c.APIOpsPreviousToken)
+	return tokenPair(c.Auth.APIOpsToken, c.Auth.APIOpsPreviousToken)
 }
 
 func tokenPair(primary, prev string) []string {

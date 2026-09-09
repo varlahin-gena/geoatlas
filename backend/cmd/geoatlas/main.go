@@ -12,7 +12,7 @@ import (
 
 func main() {
 	cfg := config.FromEnv()
-	logging.Setup(cfg.LogLevel, cfg.LogFormat)
+	logging.Setup(cfg.Log.Level, cfg.Log.Format)
 	cfg.ResolveGeoUploadLimits()
 
 	if err := cfg.ValidateConfig(); err != nil {
@@ -26,11 +26,11 @@ func main() {
 	for _, w := range cfg.SecurityWarnings() {
 		slog.Warn(w)
 	}
-	if cfg.APIAuthDisabled {
+	if cfg.Auth.APIAuthDisabled {
 		slog.Warn("API auth disabled — mutating endpoints are open")
 	}
 
-	slog.Info("geoatlas starting", "edges_agg", true, "geo_enrich_on_ingest", cfg.GeoEnrichOnIngest)
+	slog.Info("geoatlas starting", "edges_agg", true, "geo_enrich_on_ingest", cfg.Geo.EnrichOnIngest)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
