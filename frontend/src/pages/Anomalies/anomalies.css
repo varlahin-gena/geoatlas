@@ -69,6 +69,54 @@
   margin-bottom: 16px;
 }
 
+.anomaly-thresholds-panel {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.anomaly-thresholds-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.thresholds-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.thresholds-group {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel-2) 70%, transparent);
+}
+
+.thresholds-group legend {
+  padding: 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.threshold-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 100px;
+  font-size: 13px;
+}
+
+.threshold-field input {
+  width: 100%;
+}
+
 .anomaly-toolbar {
   display: flex;
   flex-wrap: wrap;

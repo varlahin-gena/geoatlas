@@ -23,9 +23,29 @@ const DEFAULT_SETTINGS: AnomalyEngineSettings = {
   new_country_min_share: 0.05,
 };
 
-function fmtShare(v: number | undefined): string {
-  if (v == null || Number.isNaN(v)) return '—';
-  return `${(v * 100).toFixed(1)}%`;
+function thresholdsFromView(view: AnomalyEngineSettingsView): AnomalyThresholds {
+  const src = view.thresholds ?? view.threshold_defaults;
+  return {
+    port_scan_ports: src?.port_scan_ports ?? 50,
+    port_scan_events: src?.port_scan_events ?? 100,
+    horizontal_hosts: src?.horizontal_hosts ?? 40,
+    horizontal_events: src?.horizontal_events ?? 80,
+    surge_ratio: src?.surge_ratio ?? 5,
+    surge_abs_min: src?.surge_abs_min ?? 200,
+    surge_floor: src?.surge_floor ?? 20,
+    new_country_min: src?.new_country_min ?? 5,
+    new_country_baseline: src?.new_country_baseline ?? 10,
+    new_country_min_share: src?.new_country_min_share ?? 0.05,
+    rep_min_events: src?.rep_min_events ?? 3,
+    byte_surge_ratio: src?.byte_surge_ratio ?? 5,
+    byte_surge_abs_min: src?.byte_surge_abs_min ?? 100_000_000,
+    byte_surge_floor: src?.byte_surge_floor ?? 5_000_000,
+    beacon_min_hours: src?.beacon_min_hours ?? 10,
+    beacon_max_avg_bytes: src?.beacon_max_avg_bytes ?? 300_000,
+    beacon_min_regularity: src?.beacon_min_regularity ?? 0.55,
+    lateral_hosts: src?.lateral_hosts ?? 25,
+    lateral_events: src?.lateral_events ?? 50,
+  };
 }
 
 function StatusPanel({ status }: { status: AnomalyScanStatus | null }) {
@@ -84,72 +104,218 @@ function StatusPanel({ status }: { status: AnomalyScanStatus | null }) {
   );
 }
 
+type ThresholdFieldProps = {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+};
+
+function ThresholdField({ label, value, onChange, min = 1, max, step = 1 }: ThresholdFieldProps) {
+  return (
+    <label className="threshold-field">
+      {label}
+      <input
+        type="number"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
+    </label>
+  );
+}
+
 function ThresholdsPanel({
   profile,
   thresholds,
+  defaults,
+  customized,
+  onChange,
+  onReset,
 }: {
   profile: string;
-  thresholds: AnomalyThresholds | null;
+  thresholds: AnomalyThresholds;
+  defaults: AnomalyThresholds | null;
+  customized: boolean;
+  onChange: (next: AnomalyThresholds) => void;
+  onReset: () => void;
 }) {
-  if (!thresholds) return null;
+  const set = (patch: Partial<AnomalyThresholds>) => onChange({ ...thresholds, ...patch });
+
   return (
-    <section className="card card-compact">
-      <h3 className="card-title">Пороги детекторов (read-only)</h3>
-      <p className="hint">
-        Install profile: <strong>{profile || 'medium'}</strong>. Переопределение порогов по детекторам —
-        в следующих версиях; сейчас только просмотр эффективных значений.
-      </p>
-      <dl className="anomaly-engine-dl thresholds-grid">
+    <section className="card card-compact anomaly-thresholds-panel">
+      <div className="anomaly-thresholds-head">
         <div>
-          <dt>Port scan</dt>
-          <dd>
-            {thresholds.port_scan_ports} портов / {thresholds.port_scan_events} событий
-          </dd>
+          <h3 className="card-title">Пороги детекторов</h3>
+          <p className="hint">
+            Install profile: <strong>{profile || 'medium'}</strong>.
+            {customized ? ' Используются переопределённые значения.' : ' Значения по умолчанию профиля.'}
+          </p>
         </div>
-        <div>
-          <dt>Horizontal scan</dt>
-          <dd>
-            {thresholds.horizontal_hosts} хостов / {thresholds.horizontal_events} событий
-          </dd>
-        </div>
-        <div>
-          <dt>Blocked surge</dt>
-          <dd>
-            ×{thresholds.surge_ratio}, min {fmtNumber(thresholds.surge_abs_min ?? 0)}, floor{' '}
-            {fmtNumber(thresholds.surge_floor ?? 0)}
-          </dd>
-        </div>
-        <div>
-          <dt>Byte surge</dt>
-          <dd>
-            ×{thresholds.byte_surge_ratio}, min {fmtNumber(thresholds.byte_surge_abs_min ?? 0)}
-          </dd>
-        </div>
-        <div>
-          <dt>Beaconing</dt>
-          <dd>
-            ≥{thresholds.beacon_min_hours} ч, ≤{fmtNumber(thresholds.beacon_max_avg_bytes ?? 0)} B,
-            regularity {thresholds.beacon_min_regularity}
-          </dd>
-        </div>
-        <div>
-          <dt>Lateral fanout</dt>
-          <dd>
-            {thresholds.lateral_hosts} хостов / {thresholds.lateral_events} событий
-          </dd>
-        </div>
-        <div>
-          <dt>New country</dt>
-          <dd>
-            min {fmtNumber(thresholds.new_country_min ?? 0)}, baseline{' '}
-            {fmtNumber(thresholds.new_country_baseline ?? 0)}, share {fmtShare(thresholds.new_country_min_share)}
-          </dd>
-        </div>
-        <div>
-          <dt>Reputation peer</dt>
-          <dd>min {fmtNumber(thresholds.rep_min_events ?? 0)} событий</dd>
-        </div>
-      </dl>
+        <button type="button" className="btn sm" onClick={onReset} disabled={!defaults}>
+          Сбросить к профилю
+        </button>
+      </div>
+
+      <div className="thresholds-groups">
+        <fieldset className="thresholds-group">
+          <legend>Port scan</legend>
+          <div className="form-row">
+            <ThresholdField
+              label="Портов"
+              value={thresholds.port_scan_ports}
+              onChange={(v) => set({ port_scan_ports: v })}
+            />
+            <ThresholdField
+              label="Событий"
+              value={thresholds.port_scan_events}
+              onChange={(v) => set({ port_scan_events: v })}
+            />
+          </div>
+        </fieldset>
+
+        <fieldset className="thresholds-group">
+          <legend>Horizontal scan</legend>
+          <div className="form-row">
+            <ThresholdField
+              label="Хостов"
+              value={thresholds.horizontal_hosts}
+              onChange={(v) => set({ horizontal_hosts: v })}
+            />
+            <ThresholdField
+              label="Событий"
+              value={thresholds.horizontal_events}
+              onChange={(v) => set({ horizontal_events: v })}
+            />
+          </div>
+        </fieldset>
+
+        <fieldset className="thresholds-group">
+          <legend>Blocked surge</legend>
+          <div className="form-row">
+            <ThresholdField
+              label="Ratio (×)"
+              value={thresholds.surge_ratio}
+              min={1}
+              step={0.1}
+              onChange={(v) => set({ surge_ratio: v })}
+            />
+            <ThresholdField
+              label="Min событий"
+              value={thresholds.surge_abs_min}
+              onChange={(v) => set({ surge_abs_min: v })}
+            />
+            <ThresholdField
+              label="Floor"
+              value={thresholds.surge_floor}
+              onChange={(v) => set({ surge_floor: v })}
+            />
+          </div>
+        </fieldset>
+
+        <fieldset className="thresholds-group">
+          <legend>Byte surge</legend>
+          <div className="form-row">
+            <ThresholdField
+              label="Ratio (×)"
+              value={thresholds.byte_surge_ratio}
+              min={1}
+              step={0.1}
+              onChange={(v) => set({ byte_surge_ratio: v })}
+            />
+            <ThresholdField
+              label="Min байт"
+              value={thresholds.byte_surge_abs_min}
+              onChange={(v) => set({ byte_surge_abs_min: v })}
+            />
+            <ThresholdField
+              label="Floor байт"
+              value={thresholds.byte_surge_floor}
+              onChange={(v) => set({ byte_surge_floor: v })}
+            />
+          </div>
+        </fieldset>
+
+        <fieldset className="thresholds-group">
+          <legend>Beaconing</legend>
+          <div className="form-row">
+            <ThresholdField
+              label="Min часов"
+              value={thresholds.beacon_min_hours}
+              max={168}
+              onChange={(v) => set({ beacon_min_hours: v })}
+            />
+            <ThresholdField
+              label="Max avg байт"
+              value={thresholds.beacon_max_avg_bytes}
+              onChange={(v) => set({ beacon_max_avg_bytes: v })}
+            />
+            <ThresholdField
+              label="Regularity"
+              value={thresholds.beacon_min_regularity}
+              min={0}
+              max={1}
+              step={0.01}
+              onChange={(v) => set({ beacon_min_regularity: v })}
+            />
+          </div>
+        </fieldset>
+
+        <fieldset className="thresholds-group">
+          <legend>Lateral fanout</legend>
+          <div className="form-row">
+            <ThresholdField
+              label="Хостов"
+              value={thresholds.lateral_hosts}
+              onChange={(v) => set({ lateral_hosts: v })}
+            />
+            <ThresholdField
+              label="Событий"
+              value={thresholds.lateral_events}
+              onChange={(v) => set({ lateral_events: v })}
+            />
+          </div>
+        </fieldset>
+
+        <fieldset className="thresholds-group">
+          <legend>New country</legend>
+          <div className="form-row">
+            <ThresholdField
+              label="Min событий"
+              value={thresholds.new_country_min}
+              onChange={(v) => set({ new_country_min: v })}
+            />
+            <ThresholdField
+              label="Baseline"
+              value={thresholds.new_country_baseline}
+              onChange={(v) => set({ new_country_baseline: v })}
+            />
+            <ThresholdField
+              label="Min share"
+              value={thresholds.new_country_min_share}
+              min={0.01}
+              max={1}
+              step={0.01}
+              onChange={(v) => set({ new_country_min_share: v })}
+            />
+          </div>
+        </fieldset>
+
+        <fieldset className="thresholds-group">
+          <legend>Reputation peer</legend>
+          <div className="form-row">
+            <ThresholdField
+              label="Min событий"
+              value={thresholds.rep_min_events}
+              onChange={(v) => set({ rep_min_events: v })}
+            />
+          </div>
+        </fieldset>
+      </div>
     </section>
   );
 }
@@ -158,21 +324,31 @@ export default function AnomalyEnginePage() {
   const { toast } = useToast();
   const [view, setView] = useState<AnomalyEngineSettingsView | null>(null);
   const [settings, setSettings] = useState<AnomalyEngineSettings>(DEFAULT_SETTINGS);
+  const [thresholds, setThresholds] = useState<AnomalyThresholds>(() => thresholdsFromView({}));
+  const [thresholdCustomized, setThresholdCustomized] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const applyView = useCallback((data: AnomalyEngineSettingsView) => {
+    setView(data);
+    if (data.settings) {
+      setSettings({ ...DEFAULT_SETTINGS, ...data.settings });
+      setThresholdCustomized(Boolean(data.settings.thresholds));
+    }
+    setThresholds(thresholdsFromView(data));
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const data = await fetchAnomalyEngineSettings();
-      setView(data);
-      if (data.settings) setSettings({ ...DEFAULT_SETTINGS, ...data.settings });
+      applyView(data);
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Не удалось загрузить настройки движка', 'error');
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [applyView, toast]);
 
   useEffect(() => {
     document.title = 'ГеоАтлас — Движок аномалий';
@@ -182,13 +358,30 @@ export default function AnomalyEnginePage() {
     void load();
   }, [load]);
 
+  const onThresholdChange = (next: AnomalyThresholds) => {
+    setThresholds(next);
+    setThresholdCustomized(true);
+    setSettings((prev) => ({ ...prev, new_country_min_share: next.new_country_min_share }));
+  };
+
+  const onResetThresholds = () => {
+    if (!view?.threshold_defaults) return;
+    const defaults = thresholdsFromView({ threshold_defaults: view.threshold_defaults });
+    setThresholds(defaults);
+    setThresholdCustomized(false);
+    setSettings((prev) => ({ ...prev, new_country_min_share: defaults.new_country_min_share }));
+  };
+
   const onSave = async (e: FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      const data = await putAnomalyEngineSettings(settings);
-      setView(data);
-      if (data.settings) setSettings({ ...DEFAULT_SETTINGS, ...data.settings });
+      const payload: AnomalyEngineSettings = {
+        ...settings,
+        thresholds: thresholdCustomized ? thresholds : null,
+      };
+      const data = await putAnomalyEngineSettings(payload);
+      applyView(data);
       toast('Настройки движка сохранены', 'success');
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Не удалось сохранить настройки', 'error');
@@ -202,7 +395,7 @@ export default function AnomalyEnginePage() {
       <ObserveSectionNav />
       <div className="page-intro">
         <p>
-          Параметры сканера и подавления повторов. Журнал алертов — на странице{' '}
+          Параметры сканера, пороги детекторов и подавление повторов. Журнал алертов — на странице{' '}
           <Link to="/anomalies">Аномалии</Link>. Enterprise-сети задаются в{' '}
           <Link to="/geo-ranges">базе GeoIP</Link>.
         </p>
@@ -267,22 +460,6 @@ export default function AnomalyEnginePage() {
               </label>
             </div>
 
-            <div className="form-row">
-              <label>
-                Min share new country
-                <input
-                  type="number"
-                  min={0.01}
-                  max={1}
-                  step={0.01}
-                  value={settings.new_country_min_share}
-                  onChange={(e) =>
-                    setSettings({ ...settings, new_country_min_share: Number(e.target.value) })
-                  }
-                />
-              </label>
-            </div>
-
             <label className="anomaly-include-acked">
               <input
                 type="checkbox"
@@ -296,6 +473,15 @@ export default function AnomalyEnginePage() {
               <p className="hint">Сохранено: {fmtDate(settings.updated_at)}</p>
             ) : null}
 
+            <ThresholdsPanel
+              profile={view.install_profile ?? 'medium'}
+              thresholds={thresholds}
+              defaults={view.threshold_defaults ?? null}
+              customized={thresholdCustomized}
+              onChange={onThresholdChange}
+              onReset={onResetThresholds}
+            />
+
             <div className="form-actions">
               <button type="submit" className="btn primary" disabled={saving}>
                 {saving ? 'Сохранение…' : 'Сохранить'}
@@ -305,8 +491,6 @@ export default function AnomalyEnginePage() {
               </button>
             </div>
           </form>
-
-          <ThresholdsPanel profile={view.install_profile ?? 'medium'} thresholds={view.thresholds ?? null} />
         </>
       ) : null}
     </AdminLayout>

@@ -40,6 +40,8 @@ type Config struct {
 	SuppressHours                 int
 	NewCountryMinShare            float64
 	NewCountryRepeatCooldownHours int
+	// ThresholdOverrides — optional admin overrides; nil = только install profile.
+	ThresholdOverrides *Thresholds
 }
 
 func (c Config) learningPeriod() time.Duration {
@@ -126,6 +128,12 @@ func (s *Service) ApplySettings(st Settings) {
 	s.cfg.LearningDays = st.LearningDays
 	s.cfg.SuppressHours = st.SuppressHours
 	s.cfg.NewCountryMinShare = st.NewCountryMinShare
+	if st.Thresholds != nil {
+		th := *st.Thresholds
+		s.cfg.ThresholdOverrides = &th
+	} else {
+		s.cfg.ThresholdOverrides = nil
+	}
 	s.cfgMu.Unlock()
 }
 
@@ -305,10 +313,7 @@ func (s *Service) Scan(ctx context.Context, now time.Time) ScanResult {
 	learning := s.isLearning(tctx, now)
 	res.Learning = learning
 	cfg := s.cfgSnapshot()
-	th := ThresholdsForProfile(cfg.InstallProfile)
-	if cfg.NewCountryMinShare > 0 {
-		th.NewCountryMinShare = cfg.NewCountryMinShare
-	}
+	th := EffectiveThresholds(cfg.InstallProfile, cfg.ThresholdOverrides, cfg.NewCountryMinShare)
 	ent := s.loadEnterpriseNets(tctx)
 	if len(ent) == 0 {
 		dur := time.Since(start)

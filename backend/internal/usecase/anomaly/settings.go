@@ -19,6 +19,17 @@ const (
 	maxSuppressHours   = 168
 	minNewCountryShare = 0.01
 	maxNewCountryShare = 1.0
+
+	minThresholdInt     = 1
+	maxThresholdInt     = 100_000
+	maxThresholdBytes   = uint64(10_000_000_000)
+	maxThresholdCount   = uint64(1_000_000)
+	minSurgeRatio       = 1.0
+	maxSurgeRatio       = 100.0
+	minBeaconRegularity = 0.0
+	maxBeaconRegularity = 1.0
+	minBeaconHours      = 1
+	maxBeaconHours      = 168
 )
 
 var (
@@ -27,13 +38,14 @@ var (
 
 // Settings — редактируемые параметры движка (JSON на диске).
 type Settings struct {
-	Enabled            bool    `json:"enabled"`
-	ScanIntervalMin    int     `json:"scan_interval_min"`
-	LearningDays       int     `json:"learning_days"`
-	SuppressHours      int     `json:"suppress_hours"`
-	IncludePrivate     bool    `json:"include_private"`
-	NewCountryMinShare float64 `json:"new_country_min_share"`
-	UpdatedAt          string  `json:"updated_at,omitempty"`
+	Enabled            bool        `json:"enabled"`
+	ScanIntervalMin    int         `json:"scan_interval_min"`
+	LearningDays       int         `json:"learning_days"`
+	SuppressHours      int         `json:"suppress_hours"`
+	IncludePrivate     bool        `json:"include_private"`
+	NewCountryMinShare float64     `json:"new_country_min_share"`
+	Thresholds         *Thresholds `json:"thresholds,omitempty"`
+	UpdatedAt          string      `json:"updated_at,omitempty"`
 }
 
 // SettingsStore — персистентность настроек.
@@ -44,10 +56,11 @@ type SettingsStore interface {
 
 // SettingsView — ответ GET /api/anomalies/settings.
 type SettingsView struct {
-	Settings       Settings   `json:"settings"`
-	InstallProfile string     `json:"install_profile"`
-	Thresholds     Thresholds `json:"thresholds"`
-	Status         ScanStatus `json:"status"`
+	Settings          Settings   `json:"settings"`
+	InstallProfile    string     `json:"install_profile"`
+	Thresholds        Thresholds `json:"thresholds"`
+	ThresholdDefaults Thresholds `json:"threshold_defaults"`
+	Status            ScanStatus `json:"status"`
 }
 
 // IntervalUpdater — hot-reload интервала планировщика.
@@ -113,15 +126,16 @@ func (s *SettingsService) GetView(ctx context.Context) (SettingsView, error) {
 		return SettingsView{}, err
 	}
 	cfg := s.anomaly.cfgSnapshot()
-	th := ThresholdsForProfile(cfg.InstallProfile)
-	if cfg.NewCountryMinShare > 0 {
-		th.NewCountryMinShare = cfg.NewCountryMinShare
+	profile := cfg.InstallProfile
+	if profile == "" {
+		profile = "medium"
 	}
 	return SettingsView{
-		Settings:       st,
-		InstallProfile: cfg.InstallProfile,
-		Thresholds:     th,
-		Status:         s.anomaly.LiveStatus(ctx),
+		Settings:          st,
+		InstallProfile:    profile,
+		Thresholds:        EffectiveThresholds(profile, st.Thresholds, st.NewCountryMinShare),
+		ThresholdDefaults: ThresholdsForProfile(profile),
+		Status:            s.anomaly.LiveStatus(ctx),
 	}, nil
 }
 
@@ -165,6 +179,7 @@ func isEmptySettings(st Settings) bool {
 		st.SuppressHours == 0 &&
 		!st.IncludePrivate &&
 		st.NewCountryMinShare == 0 &&
+		st.Thresholds == nil &&
 		st.UpdatedAt == ""
 }
 
@@ -212,8 +227,83 @@ func validateSettings(in Settings) (Settings, error) {
 	if in.NewCountryMinShare < minNewCountryShare || in.NewCountryMinShare > maxNewCountryShare {
 		return Settings{}, fmt.Errorf("%w: new_country_min_share out of range", ErrInvalidAnomalySettings)
 	}
+	if in.Thresholds != nil {
+		if err := validateThresholds(*in.Thresholds); err != nil {
+			return Settings{}, err
+		}
+	}
 	out := normalizeSettings(in)
 	out.Enabled = in.Enabled
 	out.IncludePrivate = in.IncludePrivate
+	out.Thresholds = in.Thresholds
 	return out, nil
+}
+
+func validateThresholds(th Thresholds) error {
+	checkInt := func(name string, v int) error {
+		if v < minThresholdInt || v > maxThresholdInt {
+			return fmt.Errorf("%w: %s out of range", ErrInvalidAnomalySettings, name)
+		}
+		return nil
+	}
+	checkUint := func(name string, v uint64) error {
+		if v < uint64(minThresholdInt) || v > maxThresholdCount {
+			return fmt.Errorf("%w: %s out of range", ErrInvalidAnomalySettings, name)
+		}
+		return nil
+	}
+	checkBytes := func(name string, v uint64) error {
+		if v < uint64(minThresholdInt) || v > maxThresholdBytes {
+			return fmt.Errorf("%w: %s out of range", ErrInvalidAnomalySettings, name)
+		}
+		return nil
+	}
+	checkRatio := func(name string, v float64) error {
+		if v < minSurgeRatio || v > maxSurgeRatio {
+			return fmt.Errorf("%w: %s out of range", ErrInvalidAnomalySettings, name)
+		}
+		return nil
+	}
+	checkShare := func(name string, v float64) error {
+		if v < minNewCountryShare || v > maxNewCountryShare {
+			return fmt.Errorf("%w: %s out of range", ErrInvalidAnomalySettings, name)
+		}
+		return nil
+	}
+	checkRegularity := func(name string, v float64) error {
+		if v < minBeaconRegularity || v > maxBeaconRegularity {
+			return fmt.Errorf("%w: %s out of range", ErrInvalidAnomalySettings, name)
+		}
+		return nil
+	}
+
+	checks := []error{
+		checkInt("port_scan_ports", th.PortScanPorts),
+		checkInt("port_scan_events", th.PortScanEvents),
+		checkInt("horizontal_hosts", th.HorizontalHosts),
+		checkInt("horizontal_events", th.HorizontalEvents),
+		checkRatio("surge_ratio", th.SurgeRatio),
+		checkUint("surge_abs_min", th.SurgeAbsMin),
+		checkUint("surge_floor", th.SurgeFloor),
+		checkUint("new_country_min", th.NewCountryMin),
+		checkUint("new_country_baseline", th.NewCountryBaseline),
+		checkShare("new_country_min_share", th.NewCountryMinShare),
+		checkUint("rep_min_events", th.RepMinEvents),
+		checkRatio("byte_surge_ratio", th.ByteSurgeRatio),
+		checkBytes("byte_surge_abs_min", th.ByteSurgeAbsMin),
+		checkBytes("byte_surge_floor", th.ByteSurgeFloor),
+		checkBytes("beacon_max_avg_bytes", th.BeaconMaxAvgBytes),
+		checkRegularity("beacon_min_regularity", th.BeaconMinRegularity),
+		checkInt("lateral_hosts", th.LateralHosts),
+		checkInt("lateral_events", th.LateralEvents),
+	}
+	for _, err := range checks {
+		if err != nil {
+			return err
+		}
+	}
+	if th.BeaconMinHours < minBeaconHours || th.BeaconMinHours > maxBeaconHours {
+		return fmt.Errorf("%w: beacon_min_hours out of range", ErrInvalidAnomalySettings)
+	}
+	return nil
 }

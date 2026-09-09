@@ -8,6 +8,28 @@ export type AnomalyMapLink = components['schemas']['AnomalyMapLink'];
 export type AnomalyAckResponse = components['schemas']['AnomalyAckResponse'];
 export type AnomalyAssignResponse = components['schemas']['AnomalyAssignResponse'];
 
+export type AnomalyThresholds = {
+  port_scan_ports: number;
+  port_scan_events: number;
+  horizontal_hosts: number;
+  horizontal_events: number;
+  surge_ratio: number;
+  surge_abs_min: number;
+  surge_floor: number;
+  new_country_min: number;
+  new_country_baseline: number;
+  new_country_min_share: number;
+  rep_min_events: number;
+  byte_surge_ratio: number;
+  byte_surge_abs_min: number;
+  byte_surge_floor: number;
+  beacon_min_hours: number;
+  beacon_max_avg_bytes: number;
+  beacon_min_regularity: number;
+  lateral_hosts: number;
+  lateral_events: number;
+};
+
 export type AnomalyEngineSettings = {
   enabled: boolean;
   scan_interval_min: number;
@@ -15,6 +37,7 @@ export type AnomalyEngineSettings = {
   suppress_hours: number;
   include_private: boolean;
   new_country_min_share: number;
+  thresholds?: AnomalyThresholds | null;
   updated_at?: string;
 };
 
@@ -29,33 +52,12 @@ export type AnomalyScanStatus = {
   enterprise_nets?: number;
 };
 
-export type AnomalyThresholds = {
-  port_scan_ports?: number;
-  port_scan_events?: number;
-  horizontal_hosts?: number;
-  horizontal_events?: number;
-  surge_ratio?: number;
-  surge_abs_min?: number;
-  surge_floor?: number;
-  new_country_min?: number;
-  new_country_baseline?: number;
-  new_country_min_share?: number;
-  rep_min_events?: number;
-  byte_surge_ratio?: number;
-  byte_surge_abs_min?: number;
-  byte_surge_floor?: number;
-  beacon_min_hours?: number;
-  beacon_max_avg_bytes?: number;
-  beacon_min_regularity?: number;
-  lateral_hosts?: number;
-  lateral_events?: number;
-};
-
 export type AnomalyEngineSettingsView = {
   ok?: boolean;
   settings?: AnomalyEngineSettings;
   install_profile?: string;
   thresholds?: AnomalyThresholds;
+  threshold_defaults?: AnomalyThresholds;
   status?: AnomalyScanStatus;
 };
 
