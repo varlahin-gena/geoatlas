@@ -1,84 +1,50 @@
 package backupschedulefile
 
 import (
-	"encoding/json"
-	"errors"
-	"os"
 	"strings"
-	"sync"
 
-	"geoatlas/internal/fileatomic"
+	"geoatlas/internal/jsonfile"
 	"geoatlas/internal/usecase/backup"
 )
 
 // Store — JSON-файл расписания бэкапов (/app/data/backup_schedule.json).
-// mu сериализует Load/Save: параллельные PUT и фоновый тик автобэкапа
-// пишут один и тот же файл.
-type Store struct {
-	mu   sync.RWMutex
-	path string
-	seed backup.Schedule
-}
+type Store = jsonfile.Store[backup.Schedule]
 
 func New(path string, seed backup.Schedule) *Store {
-	return &Store{path: strings.TrimSpace(path), seed: seed}
+	miss := validatedSeed(seed)
+	return jsonfile.New(path, "backup schedule file path is empty", miss,
+		jsonfile.WithLoadHook(func(raw backup.Schedule) (backup.Schedule, error) {
+			normalized, err := backup.ValidateSchedule(raw)
+			if err != nil {
+				// битый файл — fallback на seed, но сохраняем last_run если валидны
+				out := miss
+				out.LastRunAt = strings.TrimSpace(raw.LastRunAt)
+				out.LastRunDate = strings.TrimSpace(raw.LastRunDate)
+				return out, nil
+			}
+			if normalized.LastRunAt == "" {
+				normalized.LastRunAt = strings.TrimSpace(raw.LastRunAt)
+			}
+			if normalized.LastRunDate == "" {
+				normalized.LastRunDate = strings.TrimSpace(raw.LastRunDate)
+			}
+			return normalized, nil
+		}),
+		jsonfile.WithSaveHook(func(st backup.Schedule) (backup.Schedule, error) {
+			out, err := backup.ValidateSchedule(st)
+			if err != nil {
+				return backup.Schedule{}, err
+			}
+			out.LastRunAt = strings.TrimSpace(st.LastRunAt)
+			out.LastRunDate = strings.TrimSpace(st.LastRunDate)
+			out.UpdatedAt = strings.TrimSpace(st.UpdatedAt)
+			return out, nil
+		}),
+	)
 }
 
-func (s *Store) Load() (backup.Schedule, error) {
-	if s == nil || s.path == "" {
-		return s.seedOrDefault(), nil
-	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	data, err := fileatomic.ReadFile(s.path)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return s.seedOrDefault(), nil
-		}
-		return backup.Schedule{}, err
-	}
-	var out backup.Schedule
-	if err := json.Unmarshal(data, &out); err != nil {
-		return backup.Schedule{}, err
-	}
-	normalized, err := backup.ValidateSchedule(out)
-	if err != nil {
-		// битый файл — fallback на seed, но сохраняем last_run если валидны
-		seed := s.seedOrDefault()
-		seed.LastRunAt = strings.TrimSpace(out.LastRunAt)
-		seed.LastRunDate = strings.TrimSpace(out.LastRunDate)
-		return seed, nil
-	}
-	if normalized.LastRunAt == "" {
-		normalized.LastRunAt = strings.TrimSpace(out.LastRunAt)
-	}
-	if normalized.LastRunDate == "" {
-		normalized.LastRunDate = strings.TrimSpace(out.LastRunDate)
-	}
-	return normalized, nil
-}
-
-func (s *Store) Save(st backup.Schedule) error {
-	if s == nil || s.path == "" {
-		return errors.New("backup schedule file path is empty")
-	}
-	out, err := backup.ValidateSchedule(st)
-	if err != nil {
-		return err
-	}
-	out.LastRunAt = strings.TrimSpace(st.LastRunAt)
-	out.LastRunDate = strings.TrimSpace(st.LastRunDate)
-	out.UpdatedAt = strings.TrimSpace(st.UpdatedAt)
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return fileatomic.WriteJSON(s.path, out)
-}
-
-func (s *Store) seedOrDefault() backup.Schedule {
-	if s == nil {
-		return backup.DefaultsSchedule(backup.Options{Keep: 7, IncludeEdges: true, IncludeAuth: true})
-	}
-	out, err := backup.ValidateSchedule(s.seed)
+func validatedSeed(seed backup.Schedule) backup.Schedule {
+	out, err := backup.ValidateSchedule(seed)
 	if err != nil {
 		return backup.DefaultsSchedule(backup.Options{Keep: 7, IncludeEdges: true, IncludeAuth: true})
 	}
