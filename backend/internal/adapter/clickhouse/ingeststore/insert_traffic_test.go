@@ -40,26 +40,20 @@ func TestPackTrafficColumnsShape(t *testing.T) {
 	}
 }
 
-func TestPackTrafficColumnsPoolReusesCapacity(t *testing.T) {
-	now := time.Now()
-	logs := make([]model.TrafficLog, 100)
-	for i := range logs {
-		logs[i].Vendor = "v"
-		logs[i].SrcIP = "10.0.0.1"
-		logs[i].DstIP = "10.0.0.2"
+func TestTrafficColumnsEnsureKeepsCapacity(t *testing.T) {
+	// sync.Pool may drop entries under GC, so reuse is tested via grow-only
+	// ensure() rather than Get/Put round-trip.
+	c := &trafficColumns{}
+	c.ensure(100)
+	if cap(c.vendors) < 100 {
+		t.Fatalf("cap after ensure(100) = %d", cap(c.vendors))
 	}
-
-	c1 := packTrafficColumns(logs, now)
-	cap1 := cap(c1.vendors)
-	releaseTrafficColumns(c1)
-
-	c2 := packTrafficColumns(logs[:10], now)
-	defer releaseTrafficColumns(c2)
-	if cap(c2.vendors) < cap1 {
-		t.Fatalf("pool lost capacity: cap=%d, want >= %d", cap(c2.vendors), cap1)
+	c.ensure(10)
+	if cap(c.vendors) < 100 {
+		t.Fatalf("ensure shrank capacity: cap=%d, want >= 100", cap(c.vendors))
 	}
-	if len(c2.vendors) != 10 {
-		t.Fatalf("len(vendors) = %d, want 10", len(c2.vendors))
+	if len(c.vendors) != 10 {
+		t.Fatalf("len(vendors) = %d, want 10", len(c.vendors))
 	}
 }
 
