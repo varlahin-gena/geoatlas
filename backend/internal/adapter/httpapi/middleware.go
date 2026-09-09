@@ -148,6 +148,8 @@ func loggingMW(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		// Capture before defer: contextcheck flags RequestIDFromContext(r.Context()) inside nested defer.
+		reqID := RequestIDFromContext(r.Context())
 		// completed отличает нормальный возврат от разворачивания стека при панике:
 		// recover здесь не вызываем, чтобы recoverMW получил исходный стек.
 		completed := false
@@ -157,7 +159,7 @@ func loggingMW(next http.Handler) http.Handler {
 				status = http.StatusInternalServerError
 			}
 			slog.Info("http",
-				"request_id", RequestIDFromContext(r.Context()),
+				"request_id", reqID,
 				"method", r.Method,
 				"path", r.URL.Path,
 				"route", routeLabel(r),
