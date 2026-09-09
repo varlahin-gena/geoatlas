@@ -24,6 +24,19 @@ func InsertTrafficLogs(ctx context.Context, ch clickhouse.Conn, logs []model.Tra
 		return err
 	}
 
+	cols := packTrafficColumns(logs, time.Now())
+	for i, col := range cols {
+		if err := batch.Column(i).Append(col); err != nil {
+			_ = batch.Abort()
+			return err
+		}
+	}
+	return batch.Send()
+}
+
+// packTrafficColumns раскладывает строки в колонки для clickhouse-go Append.
+// Вынесено, чтобы бенчмарки меряли аллокации упаковки без живого ClickHouse.
+func packTrafficColumns(logs []model.TrafficLog, now time.Time) []any {
 	n := len(logs)
 	timestamps := make([]time.Time, n)
 	parsedAts := make([]time.Time, n)
@@ -53,7 +66,6 @@ func InsertTrafficLogs(ctx context.Context, ch clickhouse.Conn, logs []model.Tra
 	packetsSent := make([]uint64, n)
 	packetsRecv := make([]uint64, n)
 
-	now := time.Now()
 	for i, l := range logs {
 		timestamps[i] = l.Timestamp
 		parsedAts[i] = l.ParsedAt
@@ -87,18 +99,11 @@ func InsertTrafficLogs(ctx context.Context, ch clickhouse.Conn, logs []model.Tra
 		packetsRecv[i] = l.PacketsRecv
 	}
 
-	cols := []any{
+	return []any{
 		timestamps, parsedAts, vendors, devices, srcIPs, dstIPs, srcPorts, dstPorts,
 		actions, rules, protos, srcZones, dstZones,
 		srcCountries, dstCountries, srcCities, dstCities, srcRegions, dstRegions,
 		srcLats, srcLons, dstLats, dstLons,
 		bytesSent, bytesRecv, packetsSent, packetsRecv,
 	}
-	for i, col := range cols {
-		if err := batch.Column(i).Append(col); err != nil {
-			_ = batch.Abort()
-			return err
-		}
-	}
-	return batch.Send()
 }
