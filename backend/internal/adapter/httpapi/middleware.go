@@ -148,17 +148,28 @@ func loggingMW(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		// Capture before defer: contextcheck flags RequestIDFromContext(r.Context()) inside nested defer.
+		reqID := RequestIDFromContext(r.Context())
+		// completed отличает нормальный возврат от разворачивания стека при панике:
+		// recover здесь не вызываем, чтобы recoverMW получил исходный стек.
+		completed := false
+		defer func() {
+			status := rec.status
+			if !completed {
+				status = http.StatusInternalServerError
+			}
+			slog.Info("http",
+				"request_id", reqID,
+				"method", r.Method,
+				"path", r.URL.Path,
+				"route", routeLabel(r),
+				"status", status,
+				"bytes", rec.bytes,
+				"duration", time.Since(start).Round(time.Millisecond).String(),
+			)
+		}()
 		next.ServeHTTP(rec, r)
-		elapsed := time.Since(start)
-		slog.Info("http",
-			"request_id", RequestIDFromContext(r.Context()),
-			"method", r.Method,
-			"path", r.URL.Path,
-			"route", routeLabel(r),
-			"status", rec.status,
-			"bytes", rec.bytes,
-			"duration", elapsed.Round(time.Millisecond).String(),
-		)
+		completed = true
 	})
 }
 
@@ -177,9 +188,18 @@ func metricsMW(m MetricsRecorder) func(http.Handler) http.Handler {
 			start := time.Now()
 			m.IncInFlight()
 			rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+			completed := false
+			defer func() {
+				m.DecInFlight()
+				status := rec.status
+				if !completed {
+					// Паника: recoverMW ответит 500 мимо rec, здесь только учёт.
+					status = http.StatusInternalServerError
+				}
+				m.ObserveHTTP(r.Method, routeLabel(r), status, time.Since(start))
+			}()
 			next.ServeHTTP(rec, r)
-			m.DecInFlight()
-			m.ObserveHTTP(r.Method, routeLabel(r), rec.status, time.Since(start))
+			completed = true
 		})
 	}
 }
