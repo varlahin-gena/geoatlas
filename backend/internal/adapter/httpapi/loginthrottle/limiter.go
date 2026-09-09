@@ -7,14 +7,15 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 // Limiter — throttle по IP и по username + аудит неуспешных попыток по паре username+IP.
 type Limiter struct {
 	mu           sync.Mutex
-	attempts     map[string]*loginBucket // key: IP
-	userAttempts map[string]*loginBucket // key: lower(username)
+	attempts     map[string]*loginBucket      // key: IP
+	userAttempts map[string]*loginBucket      // key: lower(username)
 	failures     map[string]*FailedLoginEvent // key: lower(username)|ip
 	maxFails     int
 	window       time.Duration
@@ -63,23 +64,50 @@ func New(maxFails int, window, lockout time.Duration) *Limiter {
 	}
 }
 
+// trustedSet — неизменяемый снапшот доверенных прокси. Хостнеймы резолвятся
+// заранее, чтобы путь обработки запроса не ходил в DNS.
+type trustedSet struct {
+	nets       []*net.IPNet
+	hostNames  []string
+	hostIPs    []net.IP
+	resolvedAt time.Time
+}
+
 var (
-	trustedProxyMu   sync.RWMutex
-	trustedProxyNets []*net.IPNet
-	trustedProxyHost map[string]struct{}
+	trusted           atomic.Pointer[trustedSet]
+	trustedRefreshing atomic.Bool
+
+	// Подменяются в тестах.
+	lookupHost     = net.LookupHost
+	trustedHostTTL = 30 * time.Second
 )
 
-// ConfigureTrustedProxies — CIDR и/или hostnames (frontend). Loopback всегда доверен.
-func ConfigureTrustedProxies(entries []string) {
-	nets := make([]*net.IPNet, 0, len(entries)+2)
-	hosts := make(map[string]struct{})
-	addCIDR := func(cidr string) {
+func loopbackNets() []*net.IPNet {
+	nets := make([]*net.IPNet, 0, 2)
+	for _, cidr := range []string{"127.0.0.0/8", "::1/128"} {
 		if _, n, err := net.ParseCIDR(cidr); err == nil {
 			nets = append(nets, n)
 		}
 	}
-	addCIDR("127.0.0.0/8")
-	addCIDR("::1/128")
+	return nets
+}
+
+// loadTrusted — снапшот; до ConfigureTrustedProxies доверяем только loopback.
+func loadTrusted() *trustedSet {
+	if tp := trusted.Load(); tp != nil {
+		return tp
+	}
+	trusted.CompareAndSwap(nil, &trustedSet{nets: loopbackNets(), resolvedAt: time.Now()})
+	return trusted.Load()
+}
+
+// ConfigureTrustedProxies — CIDR и/или hostnames (frontend). Loopback всегда доверен.
+// Хостнеймы резолвятся здесь синхронно: вызывается один раз на старте, и первый
+// же запрос должен корректно опознаваться как пришедший через прокси.
+func ConfigureTrustedProxies(entries []string) {
+	nets := loopbackNets()
+	var hostNames []string
+	seen := make(map[string]struct{})
 
 	for _, raw := range entries {
 		raw = strings.TrimSpace(raw)
@@ -87,7 +115,9 @@ func ConfigureTrustedProxies(entries []string) {
 			continue
 		}
 		if strings.Contains(raw, "/") {
-			addCIDR(raw)
+			if _, n, err := net.ParseCIDR(raw); err == nil {
+				nets = append(nets, n)
+			}
 			continue
 		}
 		if ip := net.ParseIP(raw); ip != nil {
@@ -98,17 +128,53 @@ func ConfigureTrustedProxies(entries []string) {
 			nets = append(nets, &net.IPNet{IP: ip, Mask: net.CIDRMask(bits, bits)})
 			continue
 		}
-		hosts[strings.ToLower(raw)] = struct{}{}
+		name := strings.ToLower(raw)
+		if _, dup := seen[name]; dup {
+			continue
+		}
+		seen[name] = struct{}{}
+		hostNames = append(hostNames, name)
 	}
 
-	trustedProxyMu.Lock()
-	trustedProxyNets = nets
-	trustedProxyHost = hosts
-	trustedProxyMu.Unlock()
+	next := &trustedSet{nets: nets, hostNames: hostNames}
+	resolveHosts(next, nil)
+	trusted.Store(next)
 }
 
-func init() {
-	ConfigureTrustedProxies([]string{"frontend"})
+// resolveHosts заполняет hostIPs. prev — снапшот предыдущих адресов: если DNS
+// недоступен, держим их, иначе временный сбой резолвера снимет доверие к прокси
+// и весь API начнёт отвечать 403 при GA_REQUIRE_PROXY=1.
+func resolveHosts(s *trustedSet, prev []net.IP) {
+	s.resolvedAt = time.Now()
+	if len(s.hostNames) == 0 {
+		return
+	}
+	ips := make([]net.IP, 0, len(s.hostNames)*2)
+	for _, name := range s.hostNames {
+		addrs, err := lookupHost(name)
+		if err != nil {
+			continue
+		}
+		for _, a := range addrs {
+			if ip := net.ParseIP(a); ip != nil {
+				ips = append(ips, ip)
+			}
+		}
+	}
+	if len(ips) == 0 && len(prev) > 0 {
+		ips = prev
+	}
+	s.hostIPs = ips
+}
+
+func refreshTrustedHosts() {
+	cur := trusted.Load()
+	if cur == nil || len(cur.hostNames) == 0 {
+		return
+	}
+	next := &trustedSet{nets: cur.nets, hostNames: cur.hostNames}
+	resolveHosts(next, cur.hostIPs)
+	trusted.Store(next)
 }
 
 func remoteIP(r *http.Request) string {
@@ -127,25 +193,26 @@ func isTrustedProxy(ipStr string) bool {
 	if ip == nil {
 		return false
 	}
-	trustedProxyMu.RLock()
-	nets := trustedProxyNets
-	hosts := trustedProxyHost
-	trustedProxyMu.RUnlock()
-
-	for _, n := range nets {
+	tp := loadTrusted()
+	for _, n := range tp.nets {
 		if n.Contains(ip) {
 			return true
 		}
 	}
-	for name := range hosts {
-		addrs, err := net.LookupHost(name)
-		if err != nil {
-			continue
-		}
-		for _, a := range addrs {
-			if parsed := net.ParseIP(a); parsed != nil && parsed.Equal(ip) {
-				return true
-			}
+	if len(tp.hostNames) == 0 {
+		return false
+	}
+	// Снапшот устарел — обновляем в фоне ровно одной горутиной; запрос не ждёт
+	// DNS и отвечает по предыдущим адресам.
+	if time.Since(tp.resolvedAt) > trustedHostTTL && trustedRefreshing.CompareAndSwap(false, true) {
+		go func() {
+			defer trustedRefreshing.Store(false)
+			refreshTrustedHosts()
+		}()
+	}
+	for _, h := range tp.hostIPs {
+		if h.Equal(ip) {
+			return true
 		}
 	}
 	return false
