@@ -15,25 +15,51 @@ func TestPackTrafficColumnsShape(t *testing.T) {
 		{Vendor: "usergate", ParsedAt: now.Add(-time.Second), SrcIP: "10.0.0.2", DstIP: "1.1.1.1"},
 	}
 	cols := packTrafficColumns(logs, now)
-	if len(cols) != 27 {
-		t.Fatalf("columns = %d, want 27 (INSERT list)", len(cols))
+	defer releaseTrafficColumns(cols)
+
+	anyCols := cols.asAny()
+	if len(anyCols) != trafficColumnCount {
+		t.Fatalf("columns = %d, want %d (INSERT list)", len(anyCols), trafficColumnCount)
 	}
-	for i, col := range cols {
+	for i, col := range anyCols {
 		n := reflect.ValueOf(col).Len()
 		if n != len(logs) {
 			t.Fatalf("col %d len = %d, want %d", i, n, len(logs))
 		}
 	}
-	vendors := cols[2].([]string)
+	vendors := anyCols[2].([]string)
 	if vendors[0] != "fortigate" || vendors[1] != "usergate" {
 		t.Fatalf("vendors = %v", vendors)
 	}
-	parsed := cols[1].([]time.Time)
+	parsed := anyCols[1].([]time.Time)
 	if !parsed[0].Equal(now) {
 		t.Fatalf("zero ParsedAt should use now, got %v", parsed[0])
 	}
 	if !parsed[1].Equal(now.Add(-time.Second)) {
 		t.Fatalf("explicit ParsedAt overwritten: %v", parsed[1])
+	}
+}
+
+func TestPackTrafficColumnsPoolReusesCapacity(t *testing.T) {
+	now := time.Now()
+	logs := make([]model.TrafficLog, 100)
+	for i := range logs {
+		logs[i].Vendor = "v"
+		logs[i].SrcIP = "10.0.0.1"
+		logs[i].DstIP = "10.0.0.2"
+	}
+
+	c1 := packTrafficColumns(logs, now)
+	cap1 := cap(c1.vendors)
+	releaseTrafficColumns(c1)
+
+	c2 := packTrafficColumns(logs[:10], now)
+	defer releaseTrafficColumns(c2)
+	if cap(c2.vendors) < cap1 {
+		t.Fatalf("pool lost capacity: cap=%d, want >= %d", cap(c2.vendors), cap1)
+	}
+	if len(c2.vendors) != 10 {
+		t.Fatalf("len(vendors) = %d, want 10", len(c2.vendors))
 	}
 }
 
@@ -59,6 +85,8 @@ func BenchmarkPackTrafficColumns(b *testing.B) {
 	b.ReportAllocs()
 	b.SetBytes(int64(batch))
 	for b.Loop() {
-		_ = packTrafficColumns(logs, now)
+		cols := packTrafficColumns(logs, now)
+		_ = cols.asAny()
+		releaseTrafficColumns(cols)
 	}
 }
