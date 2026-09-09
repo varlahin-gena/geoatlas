@@ -223,8 +223,9 @@ func NewServer(p Params, opts ...ServerOption) *Server {
 	rr.Handle("GET", "/api/geo-missing",
 		withTimeout(chain(http.HandlerFunc(geoH.GetGeoMissing), adminMW), readTimeout),
 	)
+	// Без withTimeout: TimeoutHandler буферизует ответ целиком, экспорт стримит.
 	rr.Handle("GET", "/api/geo-ranges/export",
-		withTimeout(chain(http.HandlerFunc(geoH.ExportGeoRangesCSV), opsMW), 10*time.Minute),
+		chain(http.HandlerFunc(geoH.ExportGeoRangesCSV), opsMW),
 	)
 	rr.Handle("POST", "/api/geo-ranges/clear",
 		chain(http.HandlerFunc(geoH.ClearGeoRanges), adminMW, csrf, maxBytesMW(maxJSONBodySize)),

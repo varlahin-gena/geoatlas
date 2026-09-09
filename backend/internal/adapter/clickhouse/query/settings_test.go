@@ -52,6 +52,25 @@ func TestAggSettingsSpillBelowMemoryHeadroom(t *testing.T) {
 	}
 }
 
+// limitClause раньше отдавал пустую строку при limit<=0 — запрос уходил в CH
+// без LIMIT и делал полный GROUP BY по traffic_logs.
+func TestLimitClauseAlwaysBounded(t *testing.T) {
+	cases := []struct {
+		limit int
+		want  string
+	}{
+		{100, "LIMIT 100"},
+		{0, fmt.Sprintf("LIMIT %d", maxRowLimit)},
+		{-1, fmt.Sprintf("LIMIT %d", maxRowLimit)},
+		{maxRowLimit + 1, fmt.Sprintf("LIMIT %d", maxRowLimit)},
+	}
+	for _, tc := range cases {
+		if got := limitClause(tc.limit); got != tc.want {
+			t.Fatalf("limitClause(%d) = %q, want %q", tc.limit, got, tc.want)
+		}
+	}
+}
+
 func TestBackfillAggSettingsUsesSingleThread(t *testing.T) {
 	ConfigureQuerySettings(1288490188, 512<<20, 512<<20, 4)
 	t.Cleanup(func() {

@@ -1,12 +1,20 @@
 package httpapi
 
-import "net/http"
+import (
+	"net/http"
+	"time"
+)
 
 // RouteInfo describes a registered HTTP route (method + path template).
 type RouteInfo struct {
 	Method string // GET, POST, ...
 	Path   string // /api/users/{username}
 }
+
+// exportWriteTimeout — бюджет записи для стримингового CSV-экспорта.
+// Этот маршрут намеренно идёт мимо withTimeout: http.TimeoutHandler копит
+// весь ответ в памяти, что для полной выгрузки geo_ranges означает OOM.
+const exportWriteTimeout = 10 * time.Minute
 
 type routeRegistrar struct {
 	mux    *http.ServeMux
