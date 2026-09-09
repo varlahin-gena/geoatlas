@@ -9,25 +9,25 @@ export type AnomalyAckResponse = components['schemas']['AnomalyAckResponse'];
 export type AnomalyAssignResponse = components['schemas']['AnomalyAssignResponse'];
 
 export type AnomalyThresholds = {
-  port_scan_ports: number;
-  port_scan_events: number;
-  horizontal_hosts: number;
-  horizontal_events: number;
-  surge_ratio: number;
-  surge_abs_min: number;
-  surge_floor: number;
-  new_country_min: number;
-  new_country_baseline: number;
-  new_country_min_share: number;
-  rep_min_events: number;
-  byte_surge_ratio: number;
-  byte_surge_abs_min: number;
-  byte_surge_floor: number;
-  beacon_min_hours: number;
-  beacon_max_avg_bytes: number;
-  beacon_min_regularity: number;
-  lateral_hosts: number;
-  lateral_events: number;
+  port_scan_ports?: number;
+  port_scan_events?: number;
+  horizontal_hosts?: number;
+  horizontal_events?: number;
+  surge_ratio?: number;
+  surge_abs_min?: number;
+  surge_floor?: number;
+  new_country_min?: number;
+  new_country_baseline?: number;
+  new_country_min_share?: number;
+  rep_min_events?: number;
+  byte_surge_ratio?: number;
+  byte_surge_abs_min?: number;
+  byte_surge_floor?: number;
+  beacon_min_hours?: number;
+  beacon_max_avg_bytes?: number;
+  beacon_min_regularity?: number;
+  lateral_hosts?: number;
+  lateral_events?: number;
 };
 
 export type AnomalyEngineSettings = {

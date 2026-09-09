@@ -23,7 +23,7 @@ const DEFAULT_SETTINGS: AnomalyEngineSettings = {
   new_country_min_share: 0.05,
 };
 
-function thresholdsFromView(view: AnomalyEngineSettingsView): AnomalyThresholds {
+function thresholdsFromView(view: AnomalyEngineSettingsView): Required<AnomalyThresholds> {
   const src = view.thresholds ?? view.threshold_defaults;
   return {
     port_scan_ports: src?.port_scan_ports ?? 50,
@@ -138,10 +138,10 @@ function ThresholdsPanel({
   onReset,
 }: {
   profile: string;
-  thresholds: AnomalyThresholds;
+  thresholds: Required<AnomalyThresholds>;
   defaults: AnomalyThresholds | null;
   customized: boolean;
-  onChange: (next: AnomalyThresholds) => void;
+  onChange: (next: Required<AnomalyThresholds>) => void;
   onReset: () => void;
 }) {
   const set = (patch: Partial<AnomalyThresholds>) => onChange({ ...thresholds, ...patch });
@@ -324,7 +324,7 @@ export default function AnomalyEnginePage() {
   const { toast } = useToast();
   const [view, setView] = useState<AnomalyEngineSettingsView | null>(null);
   const [settings, setSettings] = useState<AnomalyEngineSettings>(DEFAULT_SETTINGS);
-  const [thresholds, setThresholds] = useState<AnomalyThresholds>(() => thresholdsFromView({}));
+  const [thresholds, setThresholds] = useState<Required<AnomalyThresholds>>(() => thresholdsFromView({}));
   const [thresholdCustomized, setThresholdCustomized] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -358,7 +358,7 @@ export default function AnomalyEnginePage() {
     void load();
   }, [load]);
 
-  const onThresholdChange = (next: AnomalyThresholds) => {
+  const onThresholdChange = (next: Required<AnomalyThresholds>) => {
     setThresholds(next);
     setThresholdCustomized(true);
     setSettings((prev) => ({ ...prev, new_country_min_share: next.new_country_min_share }));

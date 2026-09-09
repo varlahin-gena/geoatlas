@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, type MutableRefObject, type RefObject } from 'react';
-import type maplibregl from 'maplibre-gl';
+import type * as maplibregl from 'maplibre-gl';
 import { readViewStateFromMap } from './mapViewport';
 import type { ViewState } from './mapTypes';
 
