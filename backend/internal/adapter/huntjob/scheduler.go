@@ -2,9 +2,9 @@ package huntjob
 
 import (
 	"context"
-	"sync"
 	"time"
 
+	"geoatlas/internal/jobscheduler"
 	"geoatlas/internal/usecase/hunts"
 )
 
@@ -12,17 +12,14 @@ import (
 type Scheduler struct {
 	svc      *hunts.Service
 	interval time.Duration
-
-	mu     sync.Mutex
-	cancel context.CancelFunc
-	done   chan struct{}
+	loop     *jobscheduler.Loop
 }
 
 func New(svc *hunts.Service, interval time.Duration) *Scheduler {
 	if interval < 15*time.Second {
 		interval = time.Minute
 	}
-	return &Scheduler{svc: svc, interval: interval, done: make(chan struct{})}
+	return &Scheduler{svc: svc, interval: interval, loop: jobscheduler.NewLoop()}
 }
 
 func (s *Scheduler) Start(parent context.Context) {
@@ -30,45 +27,17 @@ func (s *Scheduler) Start(parent context.Context) {
 		return
 	}
 	if s.svc == nil {
-		select {
-		case <-s.done:
-		default:
-			close(s.done)
-		}
+		s.loop.CloseDone()
 		return
 	}
-	ctx, cancel := context.WithCancel(parent)
-	s.mu.Lock()
-	s.cancel = cancel
-	s.mu.Unlock()
-	go func() {
-		defer close(s.done)
+	s.loop.Start(parent, s.interval, func(ctx context.Context) {
 		s.svc.TickScheduled(ctx, time.Now().UTC())
-		t := time.NewTicker(s.interval)
-		defer t.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-t.C:
-				s.svc.TickScheduled(ctx, time.Now().UTC())
-			}
-		}
-	}()
+	})
 }
 
 func (s *Scheduler) Shutdown(ctx context.Context) {
 	if s == nil {
 		return
 	}
-	s.mu.Lock()
-	cancel := s.cancel
-	s.mu.Unlock()
-	if cancel != nil {
-		cancel()
-	}
-	select {
-	case <-s.done:
-	case <-ctx.Done():
-	}
+	s.loop.Shutdown(ctx)
 }

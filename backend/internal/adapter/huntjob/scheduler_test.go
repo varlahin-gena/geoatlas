@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Start на nil-приёмнике не должен разыменовывать s.done.
+// Start на nil-приёмнике не должен паниковать.
 func TestSchedulerStartNilReceiver(t *testing.T) {
 	var s *Scheduler
 	s.Start(context.Background())
@@ -21,13 +21,10 @@ func TestSchedulerStartWithoutServiceClosesDone(t *testing.T) {
 	s := New(nil, time.Minute)
 	s.Start(context.Background())
 
-	select {
-	case <-s.done:
-	case <-time.After(time.Second):
-		t.Fatal("done not closed when service is nil")
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	s.Shutdown(ctx)
+	if ctx.Err() != nil {
+		t.Fatal("Shutdown timed out; done was not closed when service is nil")
+	}
 }
