@@ -80,7 +80,7 @@ func (c Config) ValidateSecurity() error {
 		}
 	}
 
-	chPass := strings.TrimSpace(c.ClickHousePassword)
+	chPass := strings.TrimSpace(c.ClickHouse.Password)
 	if chPass == "" && !allowInsecure {
 		return fmt.Errorf("CLICKHOUSE_PASSWORD is required; generate via start.sh (GA_ALLOW_INSECURE=1 to override for local/dev)")
 	}

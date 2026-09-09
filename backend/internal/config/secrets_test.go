@@ -10,7 +10,7 @@ func okSecurityCfg() Config {
 		APIAuthToken:       "unique-token-xyz0", // 16+
 		SessionSecret:      "ok-secret-not-placeholder",
 		IngestSharedSecret: "ingest-secret-ok",
-		ClickHousePassword: "clickhouse-pass1",
+		ClickHouse:         ClickHouseConfig{Password: "clickhouse-pass1"},
 	}
 }
 
@@ -46,7 +46,7 @@ func TestValidateSecurityRequiresIngestSecret(t *testing.T) {
 func TestValidateSecurityRequiresClickHousePassword(t *testing.T) {
 	t.Setenv("GA_ALLOW_INSECURE", "")
 	cfg := okSecurityCfg()
-	cfg.ClickHousePassword = ""
+	cfg.ClickHouse.Password = ""
 	if err := cfg.ValidateSecurity(); err == nil {
 		t.Fatal("expected error for missing CLICKHOUSE_PASSWORD")
 	}
@@ -107,7 +107,7 @@ func TestValidateSecurityDisabledAuthRequiresInsecure(t *testing.T) {
 		APIAuthDisabled:    true,
 		AuthDisabled:       true,
 		IngestSharedSecret: "ingest-secret-ok",
-		ClickHousePassword: "clickhouse-pass1",
+		ClickHouse:         ClickHouseConfig{Password: "clickhouse-pass1"},
 	}
 	if err := cfg.ValidateSecurity(); err == nil {
 		t.Fatal("expected error when *_DISABLED without GA_ALLOW_INSECURE")
@@ -125,7 +125,7 @@ func TestValidateSecurityAPIAuthDisabledAlone(t *testing.T) {
 		APIAuthDisabled:    true,
 		SessionSecret:      "unique-session-secret",
 		IngestSharedSecret: "ingest-secret-ok",
-		ClickHousePassword: "clickhouse-pass1",
+		ClickHouse:         ClickHouseConfig{Password: "clickhouse-pass1"},
 	}
 	if err := cfg.ValidateSecurity(); err == nil {
 		t.Fatal("expected error for API_AUTH_DISABLED without GA_ALLOW_INSECURE")

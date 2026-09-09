@@ -10,6 +10,30 @@ import (
 	"time"
 )
 
+// ClickHouseConfig — connection, query limits, and pool sizes.
+type ClickHouseConfig struct {
+	Host     string
+	Port     string
+	User     string
+	Password string
+	Database string
+
+	MaxMemoryUsage  int64
+	ExternalGroupBy int64
+	ExternalSort    int64
+	MaxThreads      int
+
+	IngestMaxOpen     int
+	APIMaxOpen        int
+	BackgroundMaxOpen int
+	// IngestAsyncInsert включает async_insert на write-пуле (wait_for_async_insert=1).
+	IngestAsyncInsert bool
+}
+
+func (c ClickHouseConfig) Addr() string {
+	return fmt.Sprintf("%s:%s", c.Host, c.Port)
+}
+
 type Config struct {
 	parseErrors []string
 
@@ -17,11 +41,7 @@ type Config struct {
 	IngestListenAddr     string
 	IngestUDPListenAddr  string
 	IngestTCPListenAddr  string
-	ClickHouseHost       string
-	ClickHousePort       string
-	ClickHouseUser       string
-	ClickHousePassword   string
-	ClickHouseDatabase   string
+	ClickHouse           ClickHouseConfig
 	APIAuthToken         string
 	APIAuthPreviousToken string // API_AUTH_PREVIOUS_TOKEN — ротация Bearer без даунтайма
 	APIAuthDisabled      bool   // API_AUTH_DISABLED=1 — только local/dev; иначе токен обязателен
@@ -46,13 +66,13 @@ type Config struct {
 	// RetentionFile — JSON с TTL таблиц CH (том /app/data рядом с users.json).
 	RetentionFile string
 	// TLS cert dir on host (./certs mounted in backend for HTTPS UI).
-	TLSCertDir      string
-	TLSCertFile     string
-	TLSKeyFile      string
-	HTTPSEnabled    string
-	HTTPSPort       string
-	HTTPRedirect    string
-	TLSReloadCmd    string
+	TLSCertDir   string
+	TLSCertFile  string
+	TLSKeyFile   string
+	HTTPSEnabled string
+	HTTPSPort    string
+	HTTPRedirect string
+	TLSReloadCmd string
 	// SearchTemplatesFile — персональные шаблоны поиска карты по username.
 	SearchTemplatesFile string
 
@@ -80,24 +100,12 @@ type Config struct {
 	// В docker-compose: GA_REQUIRE_PROXY=1; локальные тесты/go run — выкл.
 	RequireProxy bool
 	// APIRateLimitRPS — SpikeArrest (GA_API_RATE_LIMIT_RPS); 0 = выкл, дефолт 30 rps.
-	APIRateLimitRPS   float64
-	APIRateLimitBurst int // GA_API_RATE_BURST
+	APIRateLimitRPS    float64
+	APIRateLimitBurst  int // GA_API_RATE_BURST
 	QueryTimeout       time.Duration
-	CHMaxMemoryUsage   int64
-	CHExternalGroupBy  int64
-	CHExternalSort     int64
-	CHMaxThreads       int
 	InstallProfilePath string
 	InstallMetaPath    string
 	SyslogStatsURL     string // SYSLOG_STATS_URL; empty = do not scrape syslog-ng
-
-	// Размеры пулов ClickHouse (отдельные Conn на write/read/background).
-	CHIngestMaxOpen     int
-	CHAPIMaxOpen        int
-	CHBackgroundMaxOpen int
-
-	// CHIngestAsyncInsert включает async_insert на write-пуле (wait_for_async_insert=1).
-	CHIngestAsyncInsert bool
 
 	// GeoEnrichOnIngest заполняет пустые/unknown/Reserved/ISO country из GeoIP при записи.
 	// false — аварийный opt-out (city/coords всё равно обогащаются).
@@ -151,15 +159,25 @@ type ReputationFeed struct {
 func FromEnv() Config {
 	var parser envParser
 	cfg := Config{
-		ListenAddr:           envOr("LISTEN_ADDR", ":8080"),
-		IngestListenAddr:     envOr("INGEST_LISTEN_ADDR", ":1514"),
-		IngestUDPListenAddr:  envOr("INGEST_UDP_LISTEN_ADDR", ""),
-		IngestTCPListenAddr:  envOr("INGEST_TCP_LISTEN_ADDR", ""),
-		ClickHouseHost:       envOr("CLICKHOUSE_HOST", "clickhouse"),
-		ClickHousePort:       parser.port("CLICKHOUSE_PORT", "9000"),
-		ClickHouseUser:       envOr("CLICKHOUSE_USER", "default"),
-		ClickHousePassword:   envOr("CLICKHOUSE_PASSWORD", ""),
-		ClickHouseDatabase:   envOr("CLICKHOUSE_DATABASE", "default"),
+		ListenAddr:          envOr("LISTEN_ADDR", ":8080"),
+		IngestListenAddr:    envOr("INGEST_LISTEN_ADDR", ":1514"),
+		IngestUDPListenAddr: envOr("INGEST_UDP_LISTEN_ADDR", ""),
+		IngestTCPListenAddr: envOr("INGEST_TCP_LISTEN_ADDR", ""),
+		ClickHouse: ClickHouseConfig{
+			Host:              envOr("CLICKHOUSE_HOST", "clickhouse"),
+			Port:              parser.port("CLICKHOUSE_PORT", "9000"),
+			User:              envOr("CLICKHOUSE_USER", "default"),
+			Password:          envOr("CLICKHOUSE_PASSWORD", ""),
+			Database:          envOr("CLICKHOUSE_DATABASE", "default"),
+			MaxMemoryUsage:    parser.int64("CH_MAX_MEMORY_USAGE", 2<<30),
+			ExternalGroupBy:   parser.int64("CH_EXTERNAL_GROUP_BY_BYTES", 256<<20),
+			ExternalSort:      parser.int64("CH_EXTERNAL_SORT_BYTES", 256<<20),
+			MaxThreads:        parser.int("CH_MAX_THREADS", 2),
+			IngestMaxOpen:     parser.int("CH_INGEST_MAX_OPEN_CONNS", 4),
+			APIMaxOpen:        parser.int("CH_API_MAX_OPEN_CONNS", 8),
+			BackgroundMaxOpen: parser.int("CH_BACKGROUND_MAX_OPEN_CONNS", 2),
+			IngestAsyncInsert: parser.bool("CH_INGEST_ASYNC_INSERT", true),
+		},
 		APIAuthToken:         envOr("API_AUTH_TOKEN", ""),
 		APIAuthPreviousToken: envOr("API_AUTH_PREVIOUS_TOKEN", ""),
 		APIAuthDisabled:      parser.bool("API_AUTH_DISABLED", false),
@@ -203,18 +221,10 @@ func FromEnv() Config {
 		APIRateLimitRPS:      parser.float("GA_API_RATE_LIMIT_RPS", 30),
 		APIRateLimitBurst:    parser.int("GA_API_RATE_BURST", 60),
 		QueryTimeout:         parser.durationSeconds("QUERY_TIMEOUT_SEC", 3*time.Minute),
-		CHMaxMemoryUsage:     parser.int64("CH_MAX_MEMORY_USAGE", 2<<30),
-		CHExternalGroupBy:    parser.int64("CH_EXTERNAL_GROUP_BY_BYTES", 256<<20),
-		CHExternalSort:       parser.int64("CH_EXTERNAL_SORT_BYTES", 256<<20),
-		CHMaxThreads:         parser.int("CH_MAX_THREADS", 2),
 		InstallProfilePath:   envOr("INSTALL_PROFILE_PATH", "/app/install-profile.json"),
 		InstallMetaPath:      envOr("INSTALL_META_PATH", "/app/install-meta.json"),
 		SyslogStatsURL:       strings.TrimSpace(os.Getenv("SYSLOG_STATS_URL")),
 
-		CHIngestMaxOpen:                      parser.int("CH_INGEST_MAX_OPEN_CONNS", 4),
-		CHAPIMaxOpen:                         parser.int("CH_API_MAX_OPEN_CONNS", 8),
-		CHBackgroundMaxOpen:                  parser.int("CH_BACKGROUND_MAX_OPEN_CONNS", 2),
-		CHIngestAsyncInsert:                  parser.bool("CH_INGEST_ASYNC_INSERT", true),
 		GeoEnrichOnIngest:                    parser.bool("GEO_ENRICH_ON_INGEST", true),
 		GeoBackfillLookbackDays:              parser.int("GEO_BACKFILL_LOOKBACK_DAYS", 7),
 		SkipStartupBackfill:                  parser.bool("SKIP_STARTUP_BACKFILL", false),
@@ -302,7 +312,7 @@ func envBool(key string, def bool) bool {
 }
 
 func (c Config) ClickHouseAddr() string {
-	return fmt.Sprintf("%s:%s", c.ClickHouseHost, c.ClickHousePort)
+	return c.ClickHouse.Addr()
 }
 
 // APIAuthTokens — текущий Bearer и опциональный previous (ротация).
