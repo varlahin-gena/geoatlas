@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useId, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import {
   fetchAnomalyEngineSettings,
@@ -12,6 +12,11 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { ObserveSectionNav } from '@/components/ObserveSectionNav';
 import { useToast } from '@/components/Toast';
 import { fmtDate, fmtNumber } from '@/lib/format';
+import {
+  DETECTOR_THRESHOLD_GROUPS,
+  type DetectorThresholdMeta,
+  type ThresholdFieldMeta,
+} from './anomalyThresholdMeta';
 import './anomalies.css';
 
 const DEFAULT_SETTINGS: AnomalyEngineSettings = {
@@ -104,28 +109,83 @@ function StatusPanel({ status }: { status: AnomalyScanStatus | null }) {
   );
 }
 
-type ThresholdFieldProps = {
-  label: string;
+function ThresholdField({
+  field,
+  value,
+  onChange,
+}: {
+  field: ThresholdFieldMeta;
   value: number;
   onChange: (v: number) => void;
-  min?: number;
-  max?: number;
-  step?: number;
-};
-
-function ThresholdField({ label, value, onChange, min = 1, max, step = 1 }: ThresholdFieldProps) {
+}) {
   return (
     <label className="threshold-field">
-      {label}
+      <span className="threshold-field-label">{field.label}</span>
       <input
         type="number"
-        min={min}
-        max={max}
-        step={step}
+        min={field.min ?? 1}
+        max={field.max}
+        step={field.step ?? 1}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
       />
+      {field.hint ? <span className="field-hint">{field.hint}</span> : null}
     </label>
+  );
+}
+
+function DetectorCard({
+  detector,
+  thresholds,
+  onChange,
+}: {
+  detector: DetectorThresholdMeta;
+  thresholds: Required<AnomalyThresholds>;
+  onChange: (patch: Partial<AnomalyThresholds>) => void;
+}) {
+  const adviceId = useId();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <article className="thresholds-detector">
+      <header className="thresholds-detector-head">
+        <div className="thresholds-detector-titles">
+          <h4 className="thresholds-detector-title">{detector.title}</h4>
+          <div className="thresholds-detector-meta">
+            <code className="thresholds-code">{detector.code}</code>
+            <span className="thresholds-window">{detector.window}</span>
+          </div>
+        </div>
+        <button
+          type="button"
+          className="btn sm thresholds-advice-toggle"
+          aria-expanded={open}
+          aria-controls={adviceId}
+          onClick={() => setOpen((v) => !v)}
+        >
+          {open ? 'Скрыть' : 'Как настроить'}
+        </button>
+      </header>
+
+      <p className="thresholds-detector-summary">{detector.summary}</p>
+
+      {open ? (
+        <p id={adviceId} className="thresholds-detector-advice">
+          <strong>Рекомендации.</strong> {detector.advice}
+        </p>
+      ) : null}
+
+      <div className="form-row thresholds-detector-fields">
+        {detector.fields.map((field) => (
+          <ThresholdField
+            key={field.key}
+            field={field}
+            value={thresholds[field.key]}
+            onChange={(v) => onChange({ [field.key]: v })}
+          />
+        ))}
+      </div>
+    </article>
   );
 }
 
@@ -152,8 +212,11 @@ function ThresholdsPanel({
         <div>
           <h3 className="card-title">Пороги детекторов</h3>
           <p className="hint">
-            Install profile: <strong>{profile || 'medium'}</strong>.
-            {customized ? ' Используются переопределённые значения.' : ' Значения по умолчанию профиля.'}
+            Профиль установки: <strong>{profile || 'medium'}</strong>.
+            {customized
+              ? ' Сейчас используются переопределённые значения.'
+              : ' Показаны значения по умолчанию профиля.'}{' '}
+            Детекторы сгруппированы по смыслу; у каждого типа — краткое описание и кнопка «Как настроить».
           </p>
         </div>
         <button type="button" className="btn sm" onClick={onReset} disabled={!defaults}>
@@ -161,160 +224,25 @@ function ThresholdsPanel({
         </button>
       </div>
 
-      <div className="thresholds-groups">
-        <fieldset className="thresholds-group">
-          <legend>Port scan</legend>
-          <div className="form-row">
-            <ThresholdField
-              label="Портов"
-              value={thresholds.port_scan_ports}
-              onChange={(v) => set({ port_scan_ports: v })}
-            />
-            <ThresholdField
-              label="Событий"
-              value={thresholds.port_scan_events}
-              onChange={(v) => set({ port_scan_events: v })}
-            />
-          </div>
-        </fieldset>
-
-        <fieldset className="thresholds-group">
-          <legend>Horizontal scan</legend>
-          <div className="form-row">
-            <ThresholdField
-              label="Хостов"
-              value={thresholds.horizontal_hosts}
-              onChange={(v) => set({ horizontal_hosts: v })}
-            />
-            <ThresholdField
-              label="Событий"
-              value={thresholds.horizontal_events}
-              onChange={(v) => set({ horizontal_events: v })}
-            />
-          </div>
-        </fieldset>
-
-        <fieldset className="thresholds-group">
-          <legend>Blocked surge</legend>
-          <div className="form-row">
-            <ThresholdField
-              label="Ratio (×)"
-              value={thresholds.surge_ratio}
-              min={1}
-              step={0.1}
-              onChange={(v) => set({ surge_ratio: v })}
-            />
-            <ThresholdField
-              label="Min событий"
-              value={thresholds.surge_abs_min}
-              onChange={(v) => set({ surge_abs_min: v })}
-            />
-            <ThresholdField
-              label="Floor"
-              value={thresholds.surge_floor}
-              onChange={(v) => set({ surge_floor: v })}
-            />
-          </div>
-        </fieldset>
-
-        <fieldset className="thresholds-group">
-          <legend>Byte surge</legend>
-          <div className="form-row">
-            <ThresholdField
-              label="Ratio (×)"
-              value={thresholds.byte_surge_ratio}
-              min={1}
-              step={0.1}
-              onChange={(v) => set({ byte_surge_ratio: v })}
-            />
-            <ThresholdField
-              label="Min байт"
-              value={thresholds.byte_surge_abs_min}
-              onChange={(v) => set({ byte_surge_abs_min: v })}
-            />
-            <ThresholdField
-              label="Floor байт"
-              value={thresholds.byte_surge_floor}
-              onChange={(v) => set({ byte_surge_floor: v })}
-            />
-          </div>
-        </fieldset>
-
-        <fieldset className="thresholds-group">
-          <legend>Beaconing</legend>
-          <div className="form-row">
-            <ThresholdField
-              label="Min часов"
-              value={thresholds.beacon_min_hours}
-              max={168}
-              onChange={(v) => set({ beacon_min_hours: v })}
-            />
-            <ThresholdField
-              label="Max avg байт"
-              value={thresholds.beacon_max_avg_bytes}
-              onChange={(v) => set({ beacon_max_avg_bytes: v })}
-            />
-            <ThresholdField
-              label="Regularity"
-              value={thresholds.beacon_min_regularity}
-              min={0}
-              max={1}
-              step={0.01}
-              onChange={(v) => set({ beacon_min_regularity: v })}
-            />
-          </div>
-        </fieldset>
-
-        <fieldset className="thresholds-group">
-          <legend>Lateral fanout</legend>
-          <div className="form-row">
-            <ThresholdField
-              label="Хостов"
-              value={thresholds.lateral_hosts}
-              onChange={(v) => set({ lateral_hosts: v })}
-            />
-            <ThresholdField
-              label="Событий"
-              value={thresholds.lateral_events}
-              onChange={(v) => set({ lateral_events: v })}
-            />
-          </div>
-        </fieldset>
-
-        <fieldset className="thresholds-group">
-          <legend>New country</legend>
-          <div className="form-row">
-            <ThresholdField
-              label="Min событий"
-              value={thresholds.new_country_min}
-              onChange={(v) => set({ new_country_min: v })}
-            />
-            <ThresholdField
-              label="Baseline"
-              value={thresholds.new_country_baseline}
-              onChange={(v) => set({ new_country_baseline: v })}
-            />
-            <ThresholdField
-              label="Min share"
-              value={thresholds.new_country_min_share}
-              min={0.01}
-              max={1}
-              step={0.01}
-              onChange={(v) => set({ new_country_min_share: v })}
-            />
-          </div>
-        </fieldset>
-
-        <fieldset className="thresholds-group">
-          <legend>Reputation peer</legend>
-          <div className="form-row">
-            <ThresholdField
-              label="Min событий"
-              value={thresholds.rep_min_events}
-              onChange={(v) => set({ rep_min_events: v })}
-            />
-          </div>
-        </fieldset>
+      <div className="thresholds-categories">
+        {DETECTOR_THRESHOLD_GROUPS.map((group) => (
+          <section key={group.id} className="thresholds-category">
+            <header className="thresholds-category-head">
+              <h4 className="thresholds-category-title">{group.title}</h4>
+              <p className="thresholds-category-blurb">{group.blurb}</p>
+            </header>
+            <div className="thresholds-category-grid">
+              {group.detectors.map((detector) => (
+                <DetectorCard
+                  key={detector.id}
+                  detector={detector}
+                  thresholds={thresholds}
+                  onChange={set}
+                />
+              ))}
+            </div>
+          </section>
+        ))}
       </div>
     </section>
   );
