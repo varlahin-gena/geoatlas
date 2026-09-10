@@ -20,12 +20,12 @@ const (
 )
 
 var (
-	ErrInvalidName      = apperr.InvalidInput("invalid hunt name")
-	ErrInvalidMapState  = apperr.InvalidInput("invalid hunt map state")
-	ErrInvalidSchedule  = apperr.InvalidInput("invalid hunt schedule")
-	ErrNotFound         = apperr.NotFound("hunt not found")
-	ErrLimitExceeded    = apperr.Conflict("hunt limit exceeded")
-	ErrUnavailable      = errors.New("hunts not configured")
+	ErrInvalidName     = apperr.InvalidInput("invalid hunt name")
+	ErrInvalidMapState = apperr.InvalidInput("invalid hunt map state")
+	ErrInvalidSchedule = apperr.InvalidInput("invalid hunt schedule")
+	ErrNotFound        = apperr.NotFound("hunt not found")
+	ErrLimitExceeded   = apperr.Conflict("hunt limit exceeded")
+	ErrUnavailable     = errors.New("hunts not configured")
 )
 
 // MapState — полное состояние карты для saved hunt.
@@ -63,14 +63,14 @@ type RunResult struct {
 
 // Hunt — saved hunt пользователя.
 type Hunt struct {
-	ID        string     `json:"id"`
-	Name      string     `json:"name"`
-	Notes     string     `json:"notes,omitempty"`
-	Map       MapState   `json:"map"`
-	Schedule  Schedule   `json:"schedule"`
+	ID        string      `json:"id"`
+	Name      string      `json:"name"`
+	Notes     string      `json:"notes,omitempty"`
+	Map       MapState    `json:"map"`
+	Schedule  Schedule    `json:"schedule"`
 	Runs      []RunResult `json:"runs,omitempty"`
-	UpdatedAt string     `json:"updated_at,omitempty"`
-	LastRunAt string     `json:"last_run_at,omitempty"`
+	UpdatedAt string      `json:"updated_at,omitempty"`
+	LastRunAt string      `json:"last_run_at,omitempty"`
 }
 
 // HuntWithAuthor — admin overview.

@@ -170,7 +170,6 @@ type staticSkip string
 
 func (s staticSkip) SkipReason() string { return string(s) }
 
-
 func TestRunStartupNoGeoSkipsEnrich(t *testing.T) {
 	enrich := &recEnrich{}
 	RunStartup(context.Background(), Dependencies{

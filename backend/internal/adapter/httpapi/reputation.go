@@ -91,7 +91,7 @@ func (h *ReputationHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok": true,
+		"ok":      true,
 		"updated": res.Updated, "skipped": res.Skipped, "failed": res.Failed,
 		"errors": res.Errors, "counts": res.Counts,
 	})

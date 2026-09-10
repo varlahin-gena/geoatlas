@@ -433,4 +433,3 @@ func TestWorkerPausesDequeueWhenCircuitOpen(t *testing.T) {
 		t.Fatal("Run did not stop")
 	}
 }
-

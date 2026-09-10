@@ -288,13 +288,13 @@ func (s *Service) InstallMeta() InstallMeta {
 func (s *Service) Health(ctx context.Context, pinger ClickHousePinger) (HealthResult, error) {
 	if pinger == nil {
 		return HealthResult{
-			OK: false,
+			OK:   false,
 			Body: map[string]any{"ok": false, "status": "unavailable", "error": "clickhouse not initialized"},
 		}, nil
 	}
-	if err := pinger.Ping(ctx); err != nil {
+	if pingOK := pinger.Ping(ctx) == nil; !pingOK {
 		return HealthResult{
-			OK: false,
+			OK:   false,
 			Body: map[string]any{"ok": false, "status": "unavailable", "error": "clickhouse unavailable"},
 		}, nil
 	}

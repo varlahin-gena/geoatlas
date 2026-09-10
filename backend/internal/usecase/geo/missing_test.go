@@ -3,8 +3,8 @@ package geo
 import (
 	"testing"
 
-	"geoatlas/internal/model"
 	"geoatlas/internal/mapagg"
+	"geoatlas/internal/model"
 )
 
 type stubGeoMissing map[string]model.GeoLookup

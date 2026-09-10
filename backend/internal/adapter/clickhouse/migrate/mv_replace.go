@@ -35,17 +35,17 @@ func replaceMaterializedView(ctx context.Context, ch clickhouse.Conn, name strin
 	}
 
 	next := name + "_next"
-	_ = execDDL(ctx, ch, fmt.Sprintf("DROP TABLE IF EXISTS %s", next))
+	_ = execDDL(ctx, ch, "DROP TABLE IF EXISTS "+next)
 	if err := execDDL(ctx, ch, createSQL(next)); err != nil {
-		_ = execDDL(ctx, ch, fmt.Sprintf("DROP TABLE IF EXISTS %s", next))
+		_ = execDDL(ctx, ch, "DROP TABLE IF EXISTS "+next)
 		return fmt.Errorf("create %s: %w", next, err)
 	}
 	if err := execDDL(ctx, ch, fmt.Sprintf("EXCHANGE TABLES %s AND %s", name, next)); err != nil {
-		_ = execDDL(ctx, ch, fmt.Sprintf("DROP TABLE IF EXISTS %s", next))
+		_ = execDDL(ctx, ch, "DROP TABLE IF EXISTS "+next)
 		return fmt.Errorf("exchange %s <-> %s: %w", name, next, err)
 	}
 	// После EXCHANGE в next лежит прежнее определение — убираем.
-	if err := execDDL(ctx, ch, fmt.Sprintf("DROP TABLE IF EXISTS %s", next)); err != nil {
+	if err := execDDL(ctx, ch, "DROP TABLE IF EXISTS "+next); err != nil {
 		return fmt.Errorf("drop old %s: %w", next, err)
 	}
 	return nil

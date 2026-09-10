@@ -195,7 +195,7 @@ func ReadCSVSnapshot(r io.Reader) ([]model.GeoRange, *BuiltSnapshot, error) {
 	var ranges []model.GeoRange
 	for {
 		row, err := reader.Read()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

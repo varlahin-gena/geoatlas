@@ -12,13 +12,14 @@ import (
 // CowrieJSON — парсер событий honeypot Cowrie.
 //
 // Поддерживает два формата доставки:
-//   1) jsonlog → файл cowrie.json: строгий JSON (двойные кавычки), одно событие в строке;
-//   2) remotesyslog → syslog-ng: Python-dict repr (одинарные кавычки) с syslog-префиксом,
-//      напр.: "Jun 30 18:50:43 172.18.0.1 {'eventid': 'cowrie.session.connect', ...}".
+//  1. jsonlog → файл cowrie.json: строгий JSON (двойные кавычки), одно событие в строке;
+//  2. remotesyslog → syslog-ng: Python-dict repr (одинарные кавычки) с syslog-префиксом,
+//     напр.: "Jun 30 18:50:43 172.18.0.1 {'eventid': 'cowrie.session.connect', ...}".
 //
 // В рёбра графа превращаются только:
 //   - cowrie.session.connect (атакующий → honeypot),
 //   - cowrie.login.* при наличии src_ip+dst_ip (типично remotesyslog).
+//
 // События вроде cowrie.direct-tcpip.* тоже содержат src/dst, но dst там —
 // цель проксирования (SMTP/DNS и т.п.), не honeypot; их пропускаем.
 // Остальные cowrie-события — ShouldSkip, не ошибка парсинга.

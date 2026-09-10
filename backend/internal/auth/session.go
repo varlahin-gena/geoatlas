@@ -32,7 +32,7 @@ const PersistentCookieTTL = 10 * 365 * 24 * time.Hour
 type Session struct {
 	Username       string `json:"u"`
 	Role           string `json:"r"`
-	Expires        int64  `json:"e"` // unix seconds
+	Expires        int64  `json:"e"`  // unix seconds
 	SessionVersion int64  `json:"sv"` // must match User.SessionVersion (revoke stamp)
 }
 

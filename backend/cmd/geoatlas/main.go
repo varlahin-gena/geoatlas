@@ -3,11 +3,12 @@ package main
 import (
 	"context"
 	"log/slog"
-	"geoatlas/internal/config"
-	"geoatlas/internal/logging"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"geoatlas/internal/config"
+	"geoatlas/internal/logging"
 )
 
 func main() {

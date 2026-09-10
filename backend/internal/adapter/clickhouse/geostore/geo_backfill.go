@@ -58,8 +58,8 @@ func EnrichLogsMissingGeo(ctx context.Context, ch clickhouse.Conn, geo GeoResolv
 		timeFilter = fmt.Sprintf(" AND timestamp >= now64(3) - INTERVAL %d DAY", lookbackDays)
 	}
 
-	srcNeed := fmt.Sprintf(`(src_lat = 0 AND src_lon = 0) OR %s`, sqlclause.CountryNeedsSQL("src_country"))
-	dstNeed := fmt.Sprintf(`(dst_lat = 0 AND dst_lon = 0) OR %s`, sqlclause.CountryNeedsSQL("dst_country"))
+	srcNeed := `(src_lat = 0 AND src_lon = 0) OR ` + sqlclause.CountryNeedsSQL("src_country")
+	dstNeed := `(dst_lat = 0 AND dst_lon = 0) OR ` + sqlclause.CountryNeedsSQL("dst_country")
 
 	rows, err := ch.Query(qctx, fmt.Sprintf(`
 		SELECT ip FROM (

@@ -156,7 +156,7 @@ func TestBuildMapFromGeoEdges(t *testing.T) {
 		SrcLabel: "Berlin", DstLabel: "United States",
 		SrcCity: "Berlin", SrcCountry: "Germany",
 		DstCountry: "United States",
-		SrcLat: 52.5, SrcLon: 13.4, DstLat: 39.0, DstLon: -77.0,
+		SrcLat:     52.5, SrcLon: 13.4, DstLat: 39.0, DstLon: -77.0,
 		Count: 10, AllowedCnt: 10,
 		LastAction: "allow",
 	}}

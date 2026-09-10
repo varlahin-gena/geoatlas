@@ -36,4 +36,3 @@ func displayIP(ip string) string {
 	}
 	return ip
 }
-

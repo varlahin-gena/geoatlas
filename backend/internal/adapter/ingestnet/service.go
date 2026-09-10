@@ -190,7 +190,6 @@ func (s *Service) Run(ctx context.Context) error {
 
 	var acceptWg sync.WaitGroup
 	for _, binding := range s.cfg.Bindings {
-		binding := binding
 		ln, err := net.Listen("tcp", binding.Addr)
 		if err != nil {
 			return err
@@ -414,7 +413,7 @@ func (s *Service) handleConn(ctx context.Context, conn net.Conn, transport strin
 			if errors.Is(err, errFrameTooLarge) {
 				slog.Warn("ingest: frame too large, closing connection",
 					"remote", remote, "max_bytes", maxFrameBytes, "lines", linesOnConn)
-			} else if err != io.EOF && !isClosedConn(err) && !isTimeout(err) {
+			} else if !errors.Is(err, io.EOF) && !isClosedConn(err) && !isTimeout(err) {
 				slog.Warn("ingest: read error", "remote", remote, "err", err, "lines", linesOnConn)
 			} else if isTimeout(err) {
 				slog.Info("ingest: idle timeout", "remote", remote, "idle", idle.String(), "lines", linesOnConn)
