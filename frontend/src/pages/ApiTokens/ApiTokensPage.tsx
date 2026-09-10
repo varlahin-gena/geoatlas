@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { createToken, deleteToken, listTokens, rotateToken, type TokenRow, type TokenScope } from '@/api/tokens';
 import { AdminLayout } from '@/components/AdminLayout';
+import { DataSectionNav } from '@/components/DataSectionNav';
 import { EmptyState, TableSkeleton } from '@/components/Skeleton';
 import { ReauthField, ReauthModal } from '@/components/ReauthModal';
 import { useToast } from '@/components/Toast';
@@ -96,6 +97,7 @@ export default function ApiTokensPage() {
       }
     >
       <div className="page-content-inner narrow">
+        <DataSectionNav />
         <div className="card">
           <h2>Токены</h2>
           <div className="table-wrap">
