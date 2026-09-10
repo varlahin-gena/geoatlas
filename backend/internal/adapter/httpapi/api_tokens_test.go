@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"geoatlas/internal/auth"
-	"geoatlas/internal/config"
 )
 
 func TestCheckOpsAllowsOpsBearer(t *testing.T) {
@@ -22,8 +21,8 @@ func TestCheckOpsAllowsOpsBearer(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := &AuthHandler{AuthDeps: &AuthDeps{
-		cfg:       config.Config{APIAuthToken: "env-admin-token"},
-		apiTokens: store,
+		apiAuthTokens: []string{"env-admin-token"},
+		apiTokens:     store,
 	}}
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/check-ops", nil)
 	req.Header.Set("Authorization", "Bearer "+secret)

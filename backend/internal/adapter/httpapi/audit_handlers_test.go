@@ -10,7 +10,6 @@ import (
 	"time"
 
 	domainauth "geoatlas/internal/auth"
-	"geoatlas/internal/config"
 	usecaseaudit "geoatlas/internal/usecase/auditlog"
 	usecaseauth "geoatlas/internal/usecase/auth"
 )
@@ -50,8 +49,8 @@ func TestGetDRHistoryReturnsItems(t *testing.T) {
 		}},
 	})
 	h := &SystemHandler{SystemDeps: &SystemDeps{
-		cfg:  config.Config{QueryTimeout: time.Second},
-		logs: logs,
+		queryTimeout: time.Second,
+		logs:         logs,
 	}}
 	req := httptest.NewRequest(http.MethodGet, "/api/dr/history?limit=10", nil)
 	rec := httptest.NewRecorder()

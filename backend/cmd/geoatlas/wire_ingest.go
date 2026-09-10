@@ -33,19 +33,19 @@ func startIngest(a *app, cfg config.Config, geo *geostore.ReloadableGeoIndex, pa
 	}
 	a.ingestSvc = ingestnet.NewService(ingestnet.Config{
 		Bindings:        ingestBindings(cfg),
-		BatchSize:       cfg.IngestBatchSize,
-		FlushInterval:   time.Duration(cfg.IngestFlushSec) * time.Second,
-		QueueSize:       cfg.IngestQueueSize,
-		QueueMaxBytes:   cfg.IngestQueueMaxBytes,
-		Workers:         cfg.IngestWorkers,
+		BatchSize:       cfg.Ingest.BatchSize,
+		FlushInterval:   time.Duration(cfg.Ingest.FlushSec) * time.Second,
+		QueueSize:       cfg.Ingest.QueueSize,
+		QueueMaxBytes:   cfg.Ingest.QueueMaxBytes,
+		Workers:         cfg.Ingest.Workers,
 		QueryTimeout:    cfg.QueryTimeout,
-		MaxConnections:  cfg.IngestMaxConnections,
-		ConnIdleTimeout: time.Duration(cfg.IngestConnIdleSec) * time.Second,
-		SharedSecret:    cfg.IngestSharedSecret,
-		AllowFrom:       cfg.IngestAllowFrom,
+		MaxConnections:  cfg.Ingest.MaxConnections,
+		ConnIdleTimeout: time.Duration(cfg.Ingest.ConnIdleSec) * time.Second,
+		SharedSecret:    cfg.Ingest.SharedSecret,
+		AllowFrom:       cfg.Ingest.AllowFrom,
 	}, ingestnet.ProcessorDeps{
 		Logs: ingestRepo, Errors: ingestRepo, Parser: lineParser,
-		Geo: geo, EnrichCountry: cfg.GeoEnrichOnIngest,
+		Geo: geo, EnrichCountry: cfg.Geo.EnrichOnIngest,
 		InsertObs: insertObs,
 		Retryable: usecaseingest.InsertErrorClassifyFunc(ingeststore.IsRetryableInsertError),
 	})
@@ -69,15 +69,15 @@ func startIngest(a *app, cfg config.Config, geo *geostore.ReloadableGeoIndex, pa
 }
 
 func ingestBindings(cfg config.Config) []ingestnet.Binding {
-	if cfg.IngestListenAddr != "" {
-		return []ingestnet.Binding{{Addr: cfg.IngestListenAddr}}
+	if cfg.Ingest.ListenAddr != "" {
+		return []ingestnet.Binding{{Addr: cfg.Ingest.ListenAddr}}
 	}
 	var bindings []ingestnet.Binding
-	if cfg.IngestUDPListenAddr != "" {
-		bindings = append(bindings, ingestnet.Binding{Addr: cfg.IngestUDPListenAddr, Transport: "udp"})
+	if cfg.Ingest.UDPListenAddr != "" {
+		bindings = append(bindings, ingestnet.Binding{Addr: cfg.Ingest.UDPListenAddr, Transport: "udp"})
 	}
-	if cfg.IngestTCPListenAddr != "" {
-		bindings = append(bindings, ingestnet.Binding{Addr: cfg.IngestTCPListenAddr, Transport: "tcp"})
+	if cfg.Ingest.TCPListenAddr != "" {
+		bindings = append(bindings, ingestnet.Binding{Addr: cfg.Ingest.TCPListenAddr, Transport: "tcp"})
 	}
 	return bindings
 }

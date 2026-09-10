@@ -58,16 +58,16 @@ func NewServer(p Params, opts ...ServerOption) *Server {
 
 	cfg := p.Cfg
 	envTokens := cfg.APIAuthTokens()
-	if cfg.APIAuthDisabled {
+	if cfg.Auth.APIAuthDisabled {
 		envTokens = nil
 	}
 	opsTokens := cfg.APIOpsTokens()
-	if cfg.APIAuthDisabled {
+	if cfg.Auth.APIAuthDisabled {
 		opsTokens = nil
 	}
 	ba := newBearerAuth(envTokens, opsTokens, p.APITokens)
-	uiAuthOff := cfg.AuthDisabled
-	apiAuthOff := cfg.APIAuthDisabled
+	uiAuthOff := cfg.Auth.Disabled
+	apiAuthOff := cfg.Auth.APIAuthDisabled
 
 	loginMW := requireLoginMW(ba, p.Sessions, p.Users, uiAuthOff)
 	adminMW := requireAdminMW(ba, p.Sessions, p.Users, uiAuthOff)
@@ -97,8 +97,8 @@ func NewServer(p Params, opts ...ServerOption) *Server {
 		csrf:                csrf,
 		prom:                deps.prom,
 		maxLogUpload:        cfg.MaxLogUploadSize,
-		maxGeoUpload:        cfg.MaxGeoUploadSize,
-		maxReputationUpload: cfg.MaxReputationUploadSize,
+		maxGeoUpload:        cfg.Geo.MaxUploadSize,
+		maxReputationUpload: cfg.Reputation.MaxUploadSize,
 	}
 	wiring.registerAll()
 
@@ -108,12 +108,12 @@ func NewServer(p Params, opts ...ServerOption) *Server {
 		h = metricsMW(deps.prom)(h)
 	}
 	h = apiThreatMW(cfg)(h)
-	proxyGateOn := cfg.RequireProxy && !uiAuthOff && !apiAuthOff
+	proxyGateOn := cfg.HTTPThreat.RequireProxy && !uiAuthOff && !apiAuthOff
 	h = proxyGateMW(ba, proxyGateOn)(h)
 	h = recoverMW(h)
 	h = requestIDMW(h) // outermost
 
-	loginthrottle.ConfigureTrustedProxies(strings.Split(cfg.TrustedProxies, ","))
+	loginthrottle.ConfigureTrustedProxies(strings.Split(cfg.HTTPThreat.TrustedProxies, ","))
 
 	return &Server{
 		deps:   deps,

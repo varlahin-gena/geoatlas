@@ -30,8 +30,8 @@ type backgroundParts struct {
 }
 
 func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backgroundParts {
-	geo := geostore.NewReloadableGeoIndex(a.pools.Background, cfg.GeoSnapshotFile)
-	a.geoJobs = geojob.New(geo, chadapter.NewMaintenanceStore(a.pools.Background), cfg.GeoBackfillLookbackDays)
+	geo := geostore.NewReloadableGeoIndex(a.pools.Background, cfg.Geo.SnapshotFile)
+	a.geoJobs = geojob.New(geo, chadapter.NewMaintenanceStore(a.pools.Background), cfg.Geo.BackfillLookbackDays)
 	a.geoJobs.SetLimiter(a.heavy)
 	a.geoJobs.SetGate(a.skipGate)
 	// Disk snapshot: карта работает сразу после рестарта. Полный Reload из CH
@@ -57,23 +57,23 @@ func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backg
 
 	var repIdx *repstore.ReloadableReputationIndex
 	var repUC *usecasereputation.Service
-	if cfg.ReputationFetchEnabled {
+	if cfg.Reputation.FetchEnabled {
 		repIdx = repstore.NewReloadableReputationIndex(a.pools.Background)
 		repRepo := repstore.NewReputationRepository(a.pools.API, a.pools.Ingest)
-		repFeedStore := reputationfeedsfile.New(cfg.ReputationFeedsFile)
-		seed := reputationFeedsFromConfig(cfg.ReputationFeeds)
+		repFeedStore := reputationfeedsfile.New(cfg.Reputation.FeedsFile)
+		seed := reputationFeedsFromConfig(cfg.Reputation.Feeds)
 		if len(seed) == 0 {
 			seed = usecasereputation.DefaultFeeds()
 		}
 		repFeeds, err := repFeedStore.LoadOrSeed(seed)
 		if err != nil {
-			slog.Warn("reputation feeds file load/seed failed", "err", err, "path", cfg.ReputationFeedsFile)
+			slog.Warn("reputation feeds file load/seed failed", "err", err, "path", cfg.Reputation.FeedsFile)
 			repFeeds = seed
 			if len(repFeeds) == 0 {
 				repFeeds = usecasereputation.DefaultFeeds()
 			}
 		} else {
-			slog.Info("reputation feeds loaded", "count", len(repFeeds), "path", cfg.ReputationFeedsFile)
+			slog.Info("reputation feeds loaded", "count", len(repFeeds), "path", cfg.Reputation.FeedsFile)
 		}
 		if cleaned, dropped := dropRetiredReputationFeeds(repFeeds); dropped > 0 {
 			repFeeds = cleaned
@@ -84,7 +84,7 @@ func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backg
 			}
 		}
 		repUC = usecasereputation.New(repRepo, repIdx, reputationcodec.New(), nil, repFeedStore)
-		a.repJobs = reputationjob.New(repFeeds, cfg.ReputationFetchInterval, true, repUC)
+		a.repJobs = reputationjob.New(repFeeds, cfg.Reputation.FetchInterval, true, repUC)
 		a.repJobs.SetLimiter(a.heavy)
 		repUC.SetRefresher(a.repJobs)
 		if err := migrate.EnsureReputationRanges(ctx, a.pools.Background); err != nil {
@@ -115,9 +115,9 @@ func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backg
 			Enrich: a.geoJobs, Geo: geo, Retention: retentionUC,
 			Gate: a.skipGate,
 		}, bootstrap.Options{
-			SkipStartupBackfill:     cfg.SkipStartupBackfill,
-			GeoBackfillLookbackDays: cfg.GeoBackfillLookbackDays,
-			ReputationEnabled:       cfg.ReputationFetchEnabled,
+			SkipStartupBackfill:     cfg.Geo.SkipStartupBackfill,
+			GeoBackfillLookbackDays: cfg.Geo.BackfillLookbackDays,
+			ReputationEnabled:       cfg.Reputation.FetchEnabled,
 			Timeout:                 6 * time.Hour,
 		}, func(msg string, err error) {
 			slog.Warn(msg, "err", err)

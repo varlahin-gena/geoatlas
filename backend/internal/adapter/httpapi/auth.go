@@ -87,7 +87,7 @@ func userPublicResponse(u auth.UserPublic) authUserResponse {
 
 func (h *AuthHandler) withModuleFlags(resp authUserResponse) authUserResponse {
 	if h != nil && h.AuthDeps != nil {
-		resp.ReputationEnabled = h.cfg.ReputationFetchEnabled
+		resp.ReputationEnabled = h.reputationEnabled
 	}
 	return resp
 }
@@ -390,7 +390,7 @@ func (h *AuthHandler) CheckOps(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	if h.cfg.APIAuthDisabled {
+	if h.apiAuthDisabled {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
@@ -423,7 +423,7 @@ func (h *AuthHandler) CheckAdmin(w http.ResponseWriter, r *http.Request) {
 	}
 	// Совпадает с requireOpsMW: при API_AUTH_DISABLED ops-эндпоинты открыты.
 	// Для HTML admin-страниц тоже открываем при API_AUTH_DISABLED (как раньше).
-	if h.cfg.APIAuthDisabled {
+	if h.apiAuthDisabled {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
@@ -449,22 +449,21 @@ func (h *AuthHandler) CheckAdmin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) authDisabled() bool {
-	return h == nil || h.AuthDeps == nil || h.cfg.AuthDisabled
+	return h == nil || h.AuthDeps == nil || h.AuthDeps.authDisabled
 }
 
 func (h *AuthHandler) bearerScopeOK(r *http.Request, need string) bool {
-	if h == nil || h.AuthDeps == nil || h.cfg.APIAuthDisabled {
+	if h == nil || h.AuthDeps == nil || h.apiAuthDisabled {
 		return false
 	}
-	env := h.cfg.APIAuthTokens()
-	ba := newBearerAuth(env, h.cfg.APIOpsTokens(), h.apiTokens)
+	ba := newBearerAuth(h.apiAuthTokens, h.apiOpsTokens, h.apiTokens)
 	return ba.OK(r, need)
 }
 
 // --- Users CRUD (admin) ---
 
 func (h *UsersHandler) authModuleDisabled(w http.ResponseWriter) bool {
-	if h != nil && h.AuthDeps != nil && h.cfg.AuthDisabled {
+	if h != nil && h.AuthDeps != nil && h.authDisabled {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "auth module disabled"})
 		return true
 	}
@@ -489,7 +488,7 @@ func (h *UsersHandler) List(w http.ResponseWriter, r *http.Request) {
 
 // Directory — краткий список УЗ для назначения алертов (login, без ролей/паролей).
 func (h *UsersHandler) Directory(w http.ResponseWriter, r *http.Request) {
-	if h != nil && h.AuthDeps != nil && h.cfg.AuthDisabled {
+	if h != nil && h.AuthDeps != nil && h.authDisabled {
 		writeJSON(w, http.StatusOK, map[string]any{"users": []any{}})
 		return
 	}

@@ -83,21 +83,21 @@ func NewSettingsService(store SettingsStore, anomaly *Service, seed Settings, on
 	}
 }
 
-func DefaultSettingsFromConfig(cfg config.Config) Settings {
-	min := int(cfg.AnomalyScanInterval / time.Minute)
+func DefaultSettingsFromConfig(cfg config.AnomalyConfig) Settings {
+	min := int(cfg.ScanInterval / time.Minute)
 	if min < minScanIntervalMin {
 		min = 5
 	}
-	share := cfg.AnomalyNewCountryMinShare
+	share := cfg.NewCountryMinShare
 	if share <= 0 {
 		share = 0.05
 	}
 	return Settings{
 		Enabled:            true,
 		ScanIntervalMin:    min,
-		LearningDays:       cfg.AnomalyLearningDays,
-		SuppressHours:      cfg.AnomalySuppressHours,
-		IncludePrivate:     cfg.AnomalyIncludePrivate,
+		LearningDays:       cfg.LearningDays,
+		SuppressHours:      cfg.SuppressHours,
+		IncludePrivate:     cfg.IncludePrivate,
 		NewCountryMinShare: share,
 	}
 }

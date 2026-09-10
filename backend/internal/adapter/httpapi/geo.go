@@ -36,7 +36,7 @@ func (h *GeoHandler) UploadGeo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if max := h.cfg.MaxGeoUploadSize; max > 0 && r.ContentLength > max {
+	if max := h.maxGeoUploadSize; max > 0 && r.ContentLength > max {
 		err := apperr.TooLarge(
 			"request body too large (Content-Length " + strconv.FormatInt(r.ContentLength, 10) +
 				", limit " + strconv.FormatInt(max, 10) + " bytes; GEOIP_UPLOAD_MAX_BYTES / MAX_GEO_UPLOAD_SIZE)",

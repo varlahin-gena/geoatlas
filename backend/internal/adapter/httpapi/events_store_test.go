@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"geoatlas/internal/config"
 	"geoatlas/internal/geoip"
 	"geoatlas/internal/model"
 	usecaseevents "geoatlas/internal/usecase/events"
@@ -43,8 +42,8 @@ func (s *stubTraffic) ScanCountrySeries(ctx context.Context, tr model.TimeRange,
 func TestGetEventsUsesTrafficStoreForHoursGeo(t *testing.T) {
 	stub := &stubTraffic{}
 	h := &EventsHandler{EventsDeps: &EventsDeps{
-		cfg:      config.Config{QueryTimeout: time.Minute},
-		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
+		queryTimeout: time.Minute,
+		eventsUC:     usecaseevents.New(stub, geoip.New(), nil),
 	}}
 	req := httptest.NewRequest(http.MethodGet, "/api/events?hours=6&group_by=city", nil)
 	rec := httptest.NewRecorder()
@@ -74,8 +73,8 @@ func TestGetEventsUsesTrafficStoreForHoursGeo(t *testing.T) {
 func TestGetEventsIPUsesGeoEdgesPath(t *testing.T) {
 	stub := &stubTraffic{}
 	h := &EventsHandler{EventsDeps: &EventsDeps{
-		cfg:      config.Config{QueryTimeout: time.Minute},
-		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
+		queryTimeout: time.Minute,
+		eventsUC:     usecaseevents.New(stub, geoip.New(), nil),
 	}}
 	req := httptest.NewRequest(http.MethodGet, "/api/events?hours=6&group_by=ip", nil)
 	rec := httptest.NewRecorder()
@@ -123,8 +122,8 @@ func (s *stubTrafficNoGeo) ScanMapAggs(ctx context.Context, tr model.TimeRange, 
 func TestGetEventsFallsBackToLiveGeoWhenStoredCoordsEmpty(t *testing.T) {
 	stub := &stubTrafficNoGeo{}
 	h := &EventsHandler{EventsDeps: &EventsDeps{
-		cfg:      config.Config{QueryTimeout: time.Minute},
-		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
+		queryTimeout: time.Minute,
+		eventsUC:     usecaseevents.New(stub, geoip.New(), nil),
 	}}
 	req := httptest.NewRequest(http.MethodGet, "/api/events?hours=24&group_by=city", nil)
 	rec := httptest.NewRecorder()
@@ -169,8 +168,8 @@ func (s *stubTrafficIPLogGeo) ScanMapAggs(ctx context.Context, tr model.TimeRang
 func TestGetEventsIPUsesStoredLogGeoWhenLiveMisses(t *testing.T) {
 	stub := &stubTrafficIPLogGeo{}
 	h := &EventsHandler{EventsDeps: &EventsDeps{
-		cfg:      config.Config{QueryTimeout: time.Minute},
-		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
+		queryTimeout: time.Minute,
+		eventsUC:     usecaseevents.New(stub, geoip.New(), nil),
 	}}
 	req := httptest.NewRequest(http.MethodGet, "/api/events?hours=6&group_by=ip", nil)
 	rec := httptest.NewRecorder()
@@ -214,8 +213,8 @@ func (s *stubTrafficIPCountryOnly) ScanMapAggs(ctx context.Context, tr model.Tim
 func TestGetEventsSubnetUsesCountryFallback(t *testing.T) {
 	stub := &stubTrafficIPCountryOnly{}
 	h := &EventsHandler{EventsDeps: &EventsDeps{
-		cfg:      config.Config{QueryTimeout: time.Minute},
-		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
+		queryTimeout: time.Minute,
+		eventsUC:     usecaseevents.New(stub, geoip.New(), nil),
 	}}
 	req := httptest.NewRequest(http.MethodGet, "/api/events?hours=6&group_by=subnet", nil)
 	rec := httptest.NewRecorder()
@@ -236,8 +235,8 @@ func TestGetEventsSubnetUsesCountryFallback(t *testing.T) {
 func TestGetEventsPassesFilterCountryAndQ(t *testing.T) {
 	stub := &stubTraffic{}
 	h := &EventsHandler{EventsDeps: &EventsDeps{
-		cfg:      config.Config{QueryTimeout: time.Minute},
-		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
+		queryTimeout: time.Minute,
+		eventsUC:     usecaseevents.New(stub, geoip.New(), nil),
 	}}
 	req := httptest.NewRequest(http.MethodGet, "/api/events?hours=6&group_by=city&filter=blocked&country=Russia&q=tcp&limit=5000", nil)
 	rec := httptest.NewRecorder()
@@ -260,8 +259,8 @@ func TestGetEventsPassesFilterCountryAndQ(t *testing.T) {
 func TestGetEventsPassesAdvancedQAndReputation(t *testing.T) {
 	stub := &stubTraffic{}
 	h := &EventsHandler{EventsDeps: &EventsDeps{
-		cfg:      config.Config{QueryTimeout: time.Minute},
-		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
+		queryTimeout: time.Minute,
+		eventsUC:     usecaseevents.New(stub, geoip.New(), nil),
 	}}
 	req := httptest.NewRequest(http.MethodGet, "/api/events?hours=6&group_by=ip&q=country:Germany+AND+rule:block&rep_cat=malware&rep_list=spamhaus&rep_side=src&limit=100", nil)
 	rec := httptest.NewRecorder()

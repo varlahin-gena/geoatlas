@@ -123,12 +123,14 @@ func TestAuthMatrixCoversServerRoutes(t *testing.T) {
 
 	srv := NewServer(Params{
 		Cfg: config.Config{
-			ListenAddr:              ":0",
-			APIAuthToken:            "test-token",
-			MaxLogUploadSize:        1 << 20,
-			MaxGeoUploadSize:        1 << 20,
-			MaxGeoUploadRanges:      100_000,
-			MaxReputationUploadSize: 1 << 20,
+			ListenAddr:       ":0",
+			MaxLogUploadSize: 1 << 20,
+			Auth:             config.AuthConfig{APIAuthToken: "test-token"},
+			Geo: config.GeoConfig{
+				MaxUploadSize:   1 << 20,
+				MaxUploadRanges: 100_000,
+			},
+			Reputation: config.ReputationConfig{MaxUploadSize: 1 << 20},
 		},
 	})
 

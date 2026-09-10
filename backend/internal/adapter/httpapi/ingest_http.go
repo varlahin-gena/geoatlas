@@ -81,8 +81,8 @@ func (h *IngestHandler) UploadLogs(w http.ResponseWriter, r *http.Request) {
 
 func (h *IngestHandler) ingestRetryAfterSec() int {
 	sec := 3
-	if h != nil && h.cfg.IngestFlushSec > 0 {
-		sec = h.cfg.IngestFlushSec
+	if h != nil && h.ingestFlushSec > 0 {
+		sec = h.ingestFlushSec
 	}
 	return sec
 }

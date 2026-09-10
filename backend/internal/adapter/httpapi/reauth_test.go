@@ -64,7 +64,7 @@ func TestReauthCheckerRequiresPasswordForCookieSession(t *testing.T) {
 }
 
 func TestReauthCheckerSkipsBearer(t *testing.T) {
-	checker := NewReauthChecker(config.Config{APIAuthToken: "env-admin-token"}, nil, nil, nil)
+	checker := NewReauthChecker(config.Config{Auth: config.AuthConfig{APIAuthToken: "env-admin-token"}}, nil, nil, nil)
 	req := httptest.NewRequest(http.MethodDelete, "/api/tokens/id", nil)
 	req.Header.Set("Authorization", "Bearer env-admin-token")
 	rec := httptest.NewRecorder()

@@ -51,8 +51,8 @@ func TestValidateSettings(t *testing.T) {
 func TestSettingsServiceUpdateApplies(t *testing.T) {
 	store := &memSettingsStore{}
 	svc := New(Config{Enabled: true, InstallProfile: "medium"}, nil, nil, nil, nil, nil)
-	settings := NewSettingsService(store, svc, DefaultSettingsFromConfig(config.Config{
-		AnomalyScanInterval: 5 * time.Minute,
+	settings := NewSettingsService(store, svc, DefaultSettingsFromConfig(config.AnomalyConfig{
+		ScanInterval: 5 * time.Minute,
 	}), nil)
 
 	in := Settings{
@@ -81,8 +81,8 @@ func TestSettingsServiceUpdateApplies(t *testing.T) {
 func TestSettingsServiceUpdateWithThresholds(t *testing.T) {
 	store := &memSettingsStore{}
 	svc := New(Config{Enabled: true, InstallProfile: "small"}, nil, nil, nil, nil, nil)
-	settings := NewSettingsService(store, svc, DefaultSettingsFromConfig(config.Config{
-		AnomalyScanInterval: 5 * time.Minute,
+	settings := NewSettingsService(store, svc, DefaultSettingsFromConfig(config.AnomalyConfig{
+		ScanInterval: 5 * time.Minute,
 	}), nil)
 
 	th := ThresholdsForProfile("small")
@@ -111,12 +111,12 @@ func TestSettingsServiceUpdateWithThresholds(t *testing.T) {
 }
 
 func TestDefaultSettingsFromConfig(t *testing.T) {
-	st := DefaultSettingsFromConfig(config.Config{
-		AnomalyScanInterval:       10 * time.Minute,
-		AnomalyLearningDays:       4,
-		AnomalySuppressHours:      36,
-		AnomalyIncludePrivate:     true,
-		AnomalyNewCountryMinShare: 0.07,
+	st := DefaultSettingsFromConfig(config.AnomalyConfig{
+		ScanInterval:       10 * time.Minute,
+		LearningDays:       4,
+		SuppressHours:      36,
+		IncludePrivate:     true,
+		NewCountryMinShare: 0.07,
 	})
 	if st.ScanIntervalMin != 10 || st.LearningDays != 4 || !st.IncludePrivate {
 		t.Fatalf("got %+v", st)

@@ -36,7 +36,7 @@ func (h *GeoHandler) GetGeoMissing(w http.ResponseWriter, r *http.Request) {
 	result, err := h.geoUC.ListMissing(r.Context(), usecasegeo.ListMissingInput{
 		TimeRange: model.TimeRange{Mode: tr.Mode, Amount: tr.Amount, From: tr.From, To: tr.To},
 		Limit:     parseGeoMissingLimit(r.URL.Query().Get("limit")),
-		Timeout:   h.cfg.QueryTimeout,
+		Timeout:   h.queryTimeout,
 	})
 	if err != nil {
 		writeInternalError(w, "geo-missing: list failed", err)

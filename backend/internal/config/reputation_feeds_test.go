@@ -45,7 +45,7 @@ func TestFromEnvAcceptsValidReputationFeeds(t *testing.T) {
 	if err := cfg.ValidateConfig(); err != nil {
 		t.Fatal(err)
 	}
-	if len(cfg.ReputationFeeds) != 1 || cfg.ReputationFeeds[0].Name != "x" {
-		t.Fatalf("%+v", cfg.ReputationFeeds)
+	if len(cfg.Reputation.Feeds) != 1 || cfg.Reputation.Feeds[0].Name != "x" {
+		t.Fatalf("%+v", cfg.Reputation.Feeds)
 	}
 }

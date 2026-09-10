@@ -59,21 +59,21 @@ func (c *Config) ResolveGeoUploadLimits() {
 	defBytes, defRanges := GeoUploadDefaultsForBackendMemoryGB(gb)
 
 	if !bytesFromEnv {
-		c.MaxGeoUploadSize = defBytes
+		c.Geo.MaxUploadSize = defBytes
 	}
 	if !rangesFromEnv {
-		c.MaxGeoUploadRanges = defRanges
+		c.Geo.MaxUploadRanges = defRanges
 	}
-	if c.MaxGeoUploadSize <= 0 {
-		c.MaxGeoUploadSize = defBytes
+	if c.Geo.MaxUploadSize <= 0 {
+		c.Geo.MaxUploadSize = defBytes
 	}
-	if c.MaxGeoUploadRanges <= 0 {
-		c.MaxGeoUploadRanges = defRanges
+	if c.Geo.MaxUploadRanges <= 0 {
+		c.Geo.MaxUploadRanges = defRanges
 	}
 
 	slog.Info("geo upload limits",
-		"max_bytes", c.MaxGeoUploadSize,
-		"max_ranges", c.MaxGeoUploadRanges,
+		"max_bytes", c.Geo.MaxUploadSize,
+		"max_ranges", c.Geo.MaxUploadRanges,
 		"backend_memory_gb", gb,
 		"source", src,
 		"bytes_from_env", bytesFromEnv,

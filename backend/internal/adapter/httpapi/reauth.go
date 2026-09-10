@@ -13,32 +13,32 @@ import (
 // ReauthChecker — повторная проверка пароля актёра для чувствительных операций cookie-сессии.
 // Bearer / AUTH_DISABLED пропускаются (как CSRF).
 type ReauthChecker struct {
-	cfg      config.Config
-	authUC   *usecaseauth.Service
-	sessions SessionParser
-	ba       authmw.BearerAuth
+	authDisabled bool
+	authUC       *usecaseauth.Service
+	sessions     SessionParser
+	ba           authmw.BearerAuth
 }
 
 func NewReauthChecker(cfg config.Config, authUC *usecaseauth.Service, sessions SessionParser, apiTokens APITokenStore) ReauthChecker {
 	envTokens := cfg.APIAuthTokens()
-	if cfg.APIAuthDisabled {
+	if cfg.Auth.APIAuthDisabled {
 		envTokens = nil
 	}
 	opsTokens := cfg.APIOpsTokens()
-	if cfg.APIAuthDisabled {
+	if cfg.Auth.APIAuthDisabled {
 		opsTokens = nil
 	}
 	return ReauthChecker{
-		cfg:      cfg,
-		authUC:   authUC,
-		sessions: sessions,
-		ba:       newBearerAuth(envTokens, opsTokens, apiTokens),
+		authDisabled: cfg.Auth.Disabled,
+		authUC:       authUC,
+		sessions:     sessions,
+		ba:           newBearerAuth(envTokens, opsTokens, apiTokens),
 	}
 }
 
 // Require проверяет current_password для cookie-сессии. Возвращает username актёра.
 func (c ReauthChecker) Require(w http.ResponseWriter, r *http.Request, password string) (string, bool) {
-	if c.cfg.AuthDisabled {
+	if c.authDisabled {
 		return actorFromRequest(r), true
 	}
 	if c.ba.Any(r) {
