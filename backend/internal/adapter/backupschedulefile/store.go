@@ -20,7 +20,7 @@ func New(path string, seed backup.Schedule) *Store {
 				out := miss
 				out.LastRunAt = strings.TrimSpace(raw.LastRunAt)
 				out.LastRunDate = strings.TrimSpace(raw.LastRunDate)
-				return out, nil
+				return out, nil //nolint:nilerr // corrupt schedule falls back to seed
 			}
 			if normalized.LastRunAt == "" {
 				normalized.LastRunAt = strings.TrimSpace(raw.LastRunAt)
