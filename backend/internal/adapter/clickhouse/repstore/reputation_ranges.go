@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 
+	"geoatlas/internal/adapter/clickhouse/chexchange"
 	"geoatlas/internal/model"
 )
 
@@ -88,46 +88,26 @@ func ReplaceReputationRanges(ctx context.Context, ch clickhouse.Conn, ranges []m
 	defer replaceReputationRangesMu.Unlock()
 
 	const staging = "reputation_ranges__staging"
-	_ = ch.Exec(ctx, "DROP TABLE IF EXISTS "+staging)
-	if err := ch.Exec(ctx, "CREATE TABLE "+staging+" AS reputation_ranges"); err != nil {
-		return 0, fmt.Errorf("create %s: %w", staging, err)
-	}
-	dropStaging := func(ctx context.Context) {
-		dctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
-		defer cancel()
-		_ = ch.Exec(dctx, "DROP TABLE IF EXISTS "+staging)
-	}
-
-	if len(ranges) == 0 {
-		// Пустая замена: exchange пустой staging.
-		if err := ch.Exec(ctx, "EXCHANGE TABLES reputation_ranges AND "+staging); err != nil {
-			dropStaging(ctx)
-			return 0, fmt.Errorf("exchange reputation_ranges: %w", err)
+	var count int
+	err := chexchange.ReplaceViaStaging(ctx, ch, "reputation_ranges", staging, func(ctx context.Context) error {
+		if len(ranges) == 0 {
+			return nil
 		}
-		dropStaging(ctx)
-		return 0, nil
-	}
-
-	count, err := insertReputationRangesInto(ctx, ch, staging, ranges)
-	if err != nil {
-		dropStaging(ctx)
-		return count, err
-	}
-	var got uint64
-	if err := ch.QueryRow(ctx, "SELECT count() FROM "+staging).Scan(&got); err != nil {
-		dropStaging(ctx)
-		return count, fmt.Errorf("count staging: %w", err)
-	}
-	if int(got) != count {
-		dropStaging(ctx)
-		return count, fmt.Errorf("staging row count mismatch: got %d want %d", got, count)
-	}
-	if err := ch.Exec(ctx, "EXCHANGE TABLES reputation_ranges AND "+staging); err != nil {
-		dropStaging(ctx)
-		return count, fmt.Errorf("exchange reputation_ranges: %w", err)
-	}
-	dropStaging(ctx)
-	return count, nil
+		var err error
+		count, err = insertReputationRangesInto(ctx, ch, staging, ranges)
+		if err != nil {
+			return err
+		}
+		var got uint64
+		if err := ch.QueryRow(ctx, "SELECT count() FROM "+staging).Scan(&got); err != nil {
+			return fmt.Errorf("count staging: %w", err)
+		}
+		if int(got) != count {
+			return fmt.Errorf("staging row count mismatch: got %d want %d", got, count)
+		}
+		return nil
+	})
+	return count, err
 }
 
 func insertReputationRangesInto(ctx context.Context, ch clickhouse.Conn, table string, ranges []model.ReputationRange) (int, error) {
