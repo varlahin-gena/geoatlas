@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { fetchAuditLog } from '@/api/system';
+import { ContentSkeleton, EmptyState } from '@/components/Skeleton';
 import { useToast } from '@/components/Toast';
 import { formatAuditRow } from '@/lib/auditFormat';
 import { fmtDate } from '@/lib/format';
@@ -72,8 +73,14 @@ export function SystemAuditTab() {
             Применить
           </button>
         </div>
-        {loading ? <p className="hint">Загрузка…</p> : null}
-        {!loading && !items.length ? <p className="auth-fails-empty empty">Событий пока нет</p> : null}
+        {loading ? <ContentSkeleton label="Загрузка журнала аудита…" /> : null}
+        {!loading && !items.length ? (
+          <EmptyState
+            compact
+            title="Событий пока нет"
+            description="Admin и security действия появятся здесь после входов, смены пользователей, токенов или backup."
+          />
+        ) : null}
         {items.length ? (
           <div className="table-wrap">
             <table className="auth-fails-table">

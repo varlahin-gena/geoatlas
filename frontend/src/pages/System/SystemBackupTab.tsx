@@ -8,6 +8,7 @@ import {
   fetchDRHistory,
   putBackupSchedule,
 } from '@/api/system';
+import { ContentSkeleton, EmptyState } from '@/components/Skeleton';
 import { useToast } from '@/components/Toast';
 import { formatDRMessage } from '@/lib/auditFormat';
 import { fmtDate, fmtNumber } from '@/lib/format';
@@ -243,7 +244,7 @@ export function SystemBackupTab() {
           Прямой эфир / Резервная копия. «Отключить» удаляет только shadow. Полный appliance restore (включая auth):{' '}
           <code>./scripts/restore-clickhouse.sh &lt;name&gt;</code>
         </p>
-        {loading && !cat ? <p className="hint">Загрузка…</p> : null}
+        {loading && !cat ? <ContentSkeleton label="Загрузка backup…" /> : null}
         {cat ? (
           <div className="kv-grid cols-2">
             <div className="kv-row">
@@ -521,7 +522,11 @@ export function SystemBackupTab() {
           трафик).
         </p>
         {backups.length === 0 ? (
-          <p className="hint">Пока нет бэкапов.</p>
+          <EmptyState
+            compact
+            title="Пока нет бэкапов"
+            description="Создайте снимок вручную или включите расписание выше."
+          />
         ) : (
           <div className="table-wrap">
             <table className="auth-fails-table">
@@ -623,7 +628,11 @@ export function SystemBackupTab() {
           <span className="hint">Последние 50 backup/attach/detach/delete/schedule событий</span>
         </div>
         {!history.length ? (
-          <p className="auth-fails-empty empty">Событий пока нет</p>
+          <EmptyState
+            compact
+            title="Событий пока нет"
+            description="Здесь появятся backup, attach, detach, delete и изменения расписания."
+          />
         ) : (
           <div className="table-wrap">
             <table className="auth-fails-table">

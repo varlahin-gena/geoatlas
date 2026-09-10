@@ -1,3 +1,4 @@
+import { EmptyState } from '@/components/Skeleton';
 import { fmtDate, fmtNumber } from '@/lib/format';
 import type { FailedLogin } from './systemTypes';
 
@@ -12,7 +13,7 @@ export function SystemSecurityTab({ failed }: { failed: FailedLogin[] }) {
           </summary>
           <div>
             {!failed.length ? (
-              <p className="auth-fails-empty empty">Нет неуспешных попыток</p>
+              <EmptyState compact title="Нет неуспешных попыток" description="Неудачные логины и блокировки появятся в этом списке." />
             ) : (
               <div className="table-wrap">
                 <table className="auth-fails-table">

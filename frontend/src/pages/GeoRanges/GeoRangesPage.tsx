@@ -15,6 +15,7 @@ import {
 } from '@/api/geo';
 import { AdminLayout } from '@/components/AdminLayout';
 import { DataSectionNav } from '@/components/DataSectionNav';
+import { EmptyState, TableSkeleton } from '@/components/Skeleton';
 import { useToast } from '@/components/Toast';
 import { fmtNumber } from '@/lib/format';
 
@@ -116,6 +117,8 @@ export default function GeoRangesPage() {
     lon: '',
   });
   const [busy, setBusy] = useState(false);
+  const [rangesLoading, setRangesLoading] = useState(true);
+  const [enterpriseLoading, setEnterpriseLoading] = useState(true);
   const geoFileRef = useRef<HTMLInputElement>(null);
   const [enterprise, setEnterprise] = useState<EnterpriseNet[]>([]);
   const [entSearch, setEntSearch] = useState('');
@@ -143,6 +146,7 @@ export default function GeoRangesPage() {
       setShownCount(0);
       setFilteredCount(0);
       setTruncated(false);
+      setRangesLoading(false);
       return;
     }
     const lookup = Boolean(resolved.params?.ip);
@@ -188,6 +192,8 @@ export default function GeoRangesPage() {
       }
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Ошибка', 'error');
+    } finally {
+      setRangesLoading(false);
     }
   }, [ipSearch, q, toast]);
 
@@ -197,6 +203,8 @@ export default function GeoRangesPage() {
       setEnterprise(data.items || []);
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Ошибка загрузки сетей предприятия', 'error');
+    } finally {
+      setEnterpriseLoading(false);
     }
   }, [toast]);
 
@@ -634,9 +642,19 @@ export default function GeoRangesPage() {
                     {!entHits.length ? (
                       <tr>
                         <td colSpan={5} className="empty">
-                          {entIP.trim()
-                            ? 'IP/подсеть не входит ни в один диапазон базы GeoIP'
-                            : 'Нет диапазонов по текстовому запросу'}
+                          <EmptyState
+                            compact
+                            title={
+                              entIP.trim()
+                                ? 'Нет совпадений по IP/подсети'
+                                : 'Нет диапазонов по запросу'
+                            }
+                            description={
+                              entIP.trim()
+                                ? 'IP/подсеть не входит ни в один диапазон базы GeoIP.'
+                                : 'Измените текстовый запрос или очистите фильтр.'
+                            }
+                          />
                         </td>
                       </tr>
                     ) : (
@@ -729,16 +747,22 @@ export default function GeoRangesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {!enterprise.length ? (
+                  {enterpriseLoading ? (
+                    <TableSkeleton cols={5} rows={3} />
+                  ) : !enterprise.length ? (
                     <tr>
                       <td colSpan={5} className="empty">
-                        Пока ничего не отмечено — найдите диапазон выше или добавьте CIDR вручную
+                        <EmptyState
+                          compact
+                          title="Ничего не отмечено"
+                          description="Найдите диапазон выше или добавьте CIDR вручную."
+                        />
                       </td>
                     </tr>
                   ) : !filteredMarked.length ? (
                     <tr>
                       <td colSpan={5} className="empty">
-                        Нет отмеченных сетей по запросу
+                        <EmptyState compact title="Нет отмеченных сетей по запросу" />
                       </td>
                     </tr>
                   ) : (
@@ -838,14 +862,28 @@ export default function GeoRangesPage() {
               </tr>
             </thead>
             <tbody>
-              {!rows.length ? (
+              {rangesLoading ? (
+                <TableSkeleton cols={7} rows={5} />
+              ) : !rows.length ? (
                 <tr>
                   <td colSpan={7} className="empty">
-                    {ipLookupActive
-                      ? 'IP/подсеть не входит ни в один диапазон базы GeoIP'
-                      : textSearchActive
-                        ? 'Нет диапазонов по текстовому запросу'
-                        : 'Нет диапазонов — загрузите CSV или добавьте со страницы IP без координат'}
+                    <EmptyState
+                      compact
+                      title={
+                        ipLookupActive
+                          ? 'Нет совпадений по IP/подсети'
+                          : textSearchActive
+                            ? 'Нет диапазонов по запросу'
+                            : 'База GeoIP пуста'
+                      }
+                      description={
+                        ipLookupActive
+                          ? 'IP/подсеть не входит ни в один диапазон базы GeoIP.'
+                          : textSearchActive
+                            ? 'Измените текстовый запрос или очистите фильтр.'
+                            : 'Загрузите CSV или добавьте диапазоны со страницы IP без координат.'
+                      }
+                    />
                   </td>
                 </tr>
               ) : (
