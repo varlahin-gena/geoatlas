@@ -609,6 +609,32 @@ func TestLateralFanoutEmits(t *testing.T) {
 	}
 }
 
+func TestBeaconingLearningSkip(t *testing.T) {
+	now := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	hours := make([]int64, 0, 12)
+	base := now.Add(-24 * time.Hour).Unix()
+	for i := 0; i < 12; i++ {
+		hours = append(hours, base+int64(i)*3600)
+	}
+	store := &fakeStore{exist: map[string]struct{}{}}
+	scan := &fakeScan{
+		oldest: now.Add(-2 * 24 * time.Hour),
+		beaconing: []BeaconingHit{{
+			SrcIP: "10.0.0.8", DstIP: "203.0.113.9",
+			ActiveHours: 12, TotalBytes: 1_200_000, Events: 40, HourUnix: hours,
+		}},
+	}
+	res := withEnterprise(newSvc(store, scan, nil)).Scan(context.Background(), now)
+	if !res.Learning {
+		t.Fatal("expected learning")
+	}
+	for _, e := range store.inserted {
+		if e.Code == CodeBeaconing {
+			t.Fatal("beaconing must skip during learning")
+		}
+	}
+}
+
 func TestBeaconingEmits(t *testing.T) {
 	now := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
 	hours := make([]int64, 0, 12)

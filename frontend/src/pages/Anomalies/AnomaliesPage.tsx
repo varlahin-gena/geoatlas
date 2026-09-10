@@ -271,7 +271,7 @@ export default function AnomaliesPage() {
         ) : null}
         {summary?.learning ? (
           <p className="hint warn-banner">
-            Базовая линия в режиме обучения — часть простых алертов может не появляться первые дни.
+            Режим обучения — алерты «новая страна» и «периодическая связь» не ищутся первые дни.
           </p>
         ) : null}
 

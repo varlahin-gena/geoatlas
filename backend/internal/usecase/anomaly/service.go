@@ -375,6 +375,9 @@ func (s *Service) Scan(ctx context.Context, now time.Time) ScanResult {
 		return s.detectLateralFanout(c, now, th, ent)
 	})
 	run(CodeBeaconing, heavyDetectorTimeout, func(c context.Context) ([]Event, error) {
+		if learning {
+			return nil, nil
+		}
 		return s.detectBeaconing(c, now, th, ent)
 	})
 
