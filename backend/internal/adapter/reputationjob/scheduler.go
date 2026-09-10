@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"geoatlas/internal/adapter/heavytask"
+	"geoatlas/internal/jobscheduler"
 	"geoatlas/internal/model"
 	reppkg "geoatlas/internal/reputation"
 	"geoatlas/internal/safeurl"
@@ -36,12 +37,11 @@ type Scheduler struct {
 	applier  Applier
 	client   *http.Client
 	heavy    *heavytask.Limiter
+	loop     *jobscheduler.Loop
 
 	mu      sync.Mutex
 	etag    map[string]string
 	lastMod map[string]string
-	cancel  context.CancelFunc
-	done    chan struct{}
 }
 
 // SetLimiter — общий слот тяжёлых задач.
@@ -66,7 +66,7 @@ func New(feeds []usecasereputation.Feed, interval time.Duration, enabled bool, a
 		}),
 		etag:    map[string]string{},
 		lastMod: map[string]string{},
-		done:    make(chan struct{}),
+		loop:    jobscheduler.NewLoop(),
 	}
 }
 
@@ -76,43 +76,19 @@ func (s *Scheduler) Start(parent context.Context) {
 		return
 	}
 	if !s.enabled || s.applier == nil {
-		select {
-		case <-s.done:
-		default:
-			close(s.done)
-		}
+		s.loop.CloseDone()
 		return
 	}
-	ctx, cancel := context.WithCancel(parent)
-	s.cancel = cancel
-	go func() {
-		defer close(s.done)
-		// Первый fetch сразу после старта.
+	s.loop.Start(parent, s.interval, func(ctx context.Context) {
 		s.runOnce(ctx, false)
-		t := time.NewTicker(s.interval)
-		defer t.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-t.C:
-				s.runOnce(ctx, false)
-			}
-		}
-	}()
+	})
 }
 
 func (s *Scheduler) Shutdown(ctx context.Context) {
 	if s == nil {
 		return
 	}
-	if s.cancel != nil {
-		s.cancel()
-	}
-	select {
-	case <-s.done:
-	case <-ctx.Done():
-	}
+	s.loop.Shutdown(ctx)
 }
 
 func (s *Scheduler) RefreshAll(ctx context.Context, force bool) (usecasereputation.RefreshResult, error) {
