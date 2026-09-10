@@ -154,10 +154,10 @@ func TestComputeAlertsBufferHighNeedsPressureSignal(t *testing.T) {
 		Pipeline: map[string]map[string]float64{
 			"ingest": {
 				"buffered_lines": 25000,
-				"queue_depth":     2500,
-				"queue_capacity":  200000,
-				"lag_sec":         12,
-				"dropped_total":   0,
+				"queue_depth":    2500,
+				"queue_capacity": 200000,
+				"lag_sec":        12,
+				"dropped_total":  0,
 			},
 			"rate": {"drops_per_sec": 0, "buffer_drops_per_sec": 0},
 		},
@@ -178,9 +178,9 @@ func TestComputeAlertsBufferCriticalNeedsPressureSignal(t *testing.T) {
 		Pipeline: map[string]map[string]float64{
 			"ingest": {
 				"buffered_lines": 120000,
-				"queue_depth":     5000,
-				"queue_capacity":  200000,
-				"lag_sec":         10,
+				"queue_depth":    5000,
+				"queue_capacity": 200000,
+				"lag_sec":        10,
 			},
 			"rate": {"drops_per_sec": 0, "buffer_drops_per_sec": 0},
 		},

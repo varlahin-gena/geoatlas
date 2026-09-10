@@ -100,4 +100,3 @@ func TestSchedulerMaintenanceSkippedByGate(t *testing.T) {
 type staticSkip string
 
 func (s staticSkip) SkipReason() string { return string(s) }
-

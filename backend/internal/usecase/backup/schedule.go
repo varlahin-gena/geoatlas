@@ -71,7 +71,7 @@ func ValidateSchedule(in Schedule) (Schedule, error) {
 		tz = "UTC"
 	}
 	if _, err := time.LoadLocation(tz); err != nil {
-		return Schedule{}, fmt.Errorf("%w: timezone %q: %v", ErrInvalidSchedule, tz, err)
+		return Schedule{}, fmt.Errorf("%w: timezone %q: %w", ErrInvalidSchedule, tz, err)
 	}
 	if in.Hour < 0 || in.Hour > 23 {
 		return Schedule{}, fmt.Errorf("%w: hour must be 0..23 (got %d)", ErrInvalidSchedule, in.Hour)

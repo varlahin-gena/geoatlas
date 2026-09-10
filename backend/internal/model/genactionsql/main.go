@@ -3,6 +3,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -27,7 +28,7 @@ func main() {
 func repoRoot() (string, error) {
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {
-		return "", fmt.Errorf("runtime.Caller failed")
+		return "", errors.New("runtime.Caller failed")
 	}
 	// …/backend/internal/model/genactionsql/main.go → repo root
 	root := filepath.Clean(filepath.Join(filepath.Dir(thisFile), "..", "..", "..", ".."))

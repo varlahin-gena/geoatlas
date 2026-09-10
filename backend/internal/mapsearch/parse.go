@@ -66,7 +66,7 @@ type Compiled struct {
 var fieldAliases = map[string]Field{
 	"all": "all", "any": "all", "text": "all",
 	"ip": "ip", "addr": "ip", "address": "ip",
-	"port": "port",
+	"port":    "port",
 	"country": "country", "страна": "country",
 	"city": "city", "город": "city",
 	"action": "action", "act": "action", "действие": "action",

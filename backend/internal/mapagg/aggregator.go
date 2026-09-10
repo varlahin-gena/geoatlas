@@ -58,7 +58,7 @@ func IPGroupMetaHinted(g GeoLookuper, ipStr, groupBy string, hint LogGeoHint) mo
 				Key:   key,
 				Label: city,
 				Lat:   lk.Lat, Lon: lk.Lon,
-				City:  lk.City, Region: lk.Region, Country: lk.Country,
+				City: lk.City, Region: lk.Region, Country: lk.Country,
 				Valid: true,
 			}
 			break
@@ -92,11 +92,11 @@ func IPGroupMetaHinted(g GeoLookuper, ipStr, groupBy string, hint LogGeoHint) mo
 			valid = true
 		}
 		m = model.GroupMeta{
-			Key:     "city:country:" + country,
-			Label:   country,
-			Lat:     lat, Lon: lon,
+			Key:   "city:country:" + country,
+			Label: country,
+			Lat:   lat, Lon: lon,
 			Country: country, Region: lk.Region,
-			Valid:   valid,
+			Valid: valid,
 		}
 	case "country":
 		label := lk.Country
@@ -298,14 +298,14 @@ func (n NodeAgg) ToNode() model.Node {
 // ---------- edgeAgg ----------
 
 type EdgeAgg struct {
-	SrcKey, DstKey, SrcLabel, DstLabel       string
+	SrcKey, DstKey, SrcLabel, DstLabel         string
 	SrcLatSum, SrcLonSum, DstLatSum, DstLonSum float64
-	CoordWeight                              uint64
-	Count, AllowedCount, BlockedCount        uint64
-	BytesSent, BytesRecv                     uint64
-	Rule, Proto, Device, LastAction          string
-	SrcPort, DstPort                         uint32
-	SrcZone, DstZone, SrcCountry, DstCountry string
+	CoordWeight                                uint64
+	Count, AllowedCount, BlockedCount          uint64
+	BytesSent, BytesRecv                       uint64
+	Rule, Proto, Device, LastAction            string
+	SrcPort, DstPort                           uint32
+	SrcZone, DstZone, SrcCountry, DstCountry   string
 }
 
 func (e *EdgeAgg) Add(row model.RawAgg, srcMeta, dstMeta model.GroupMeta) {

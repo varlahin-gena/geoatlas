@@ -2,6 +2,7 @@ package clickhouse
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -68,7 +69,7 @@ func (a *RetentionApplier) ApplyEdges(ctx context.Context, days int) error {
 
 func (a *RetentionApplier) modifyTTL(ctx context.Context, table, ttlExpr string) error {
 	if a == nil || a.ch == nil {
-		return fmt.Errorf("clickhouse not configured")
+		return errors.New("clickhouse not configured")
 	}
 	ok, err := a.tableExists(ctx, table)
 	if err != nil {

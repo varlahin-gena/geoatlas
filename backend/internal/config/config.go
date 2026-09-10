@@ -46,13 +46,13 @@ type Config struct {
 	// RetentionFile — JSON с TTL таблиц CH (том /app/data рядом с users.json).
 	RetentionFile string
 	// TLS cert dir on host (./certs mounted in backend for HTTPS UI).
-	TLSCertDir      string
-	TLSCertFile     string
-	TLSKeyFile      string
-	HTTPSEnabled    string
-	HTTPSPort       string
-	HTTPRedirect    string
-	TLSReloadCmd    string
+	TLSCertDir   string
+	TLSCertFile  string
+	TLSKeyFile   string
+	HTTPSEnabled string
+	HTTPSPort    string
+	HTTPRedirect string
+	TLSReloadCmd string
 	// SearchTemplatesFile — персональные шаблоны поиска карты по username.
 	SearchTemplatesFile string
 
@@ -80,8 +80,8 @@ type Config struct {
 	// В docker-compose: GA_REQUIRE_PROXY=1; локальные тесты/go run — выкл.
 	RequireProxy bool
 	// APIRateLimitRPS — SpikeArrest (GA_API_RATE_LIMIT_RPS); 0 = выкл, дефолт 30 rps.
-	APIRateLimitRPS   float64
-	APIRateLimitBurst int // GA_API_RATE_BURST
+	APIRateLimitRPS    float64
+	APIRateLimitBurst  int // GA_API_RATE_BURST
 	QueryTimeout       time.Duration
 	CHMaxMemoryUsage   int64
 	CHExternalGroupBy  int64

@@ -128,7 +128,7 @@ func cityKeyExpr(side, table string) string {
 	ip := fmt.Sprintf("toString(%s)", colRef(table, side+"_ip"))
 	// Без города/страны ключ = IP (не city:unknown): иначе разные адреса
 	// схлопываются в один узел и дуга на карте становится self-loop.
-	badCountry := fmt.Sprintf(`%[1]s IN ('', 'Неизвестно', 'Unknown', 'unknown', 'Reserved', 'reserved')`, country)
+	badCountry := country + ` IN ('', 'Неизвестно', 'Unknown', 'unknown', 'Reserved', 'reserved')`
 	return fmt.Sprintf(`multiIf(
 		trimBoth(%[1]s) != '' AND trimBoth(%[2]s) != '' AND NOT (%[4]s),
 			concat(%[1]s, ', ', %[2]s),
@@ -144,7 +144,7 @@ func cityLabelExpr(side, table string) string {
 	city := colRef(table, side+"_city")
 	country := colRef(table, side+"_country")
 	ip := fmt.Sprintf("toString(%s)", colRef(table, side+"_ip"))
-	badCountry := fmt.Sprintf(`%[1]s IN ('', 'Неизвестно', 'Unknown', 'unknown', 'Reserved', 'reserved')`, country)
+	badCountry := country + ` IN ('', 'Неизвестно', 'Unknown', 'unknown', 'Reserved', 'reserved')`
 	return fmt.Sprintf(`multiIf(
 		trimBoth(%[1]s) != '', %[1]s,
 		trimBoth(%[2]s) != '' AND NOT (%[4]s), %[2]s,

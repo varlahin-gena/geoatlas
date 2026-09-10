@@ -4,7 +4,12 @@ linters:
   enable:
     - bodyclose
     - contextcheck
+    - copyloopvar
+    - errorlint
     - gosec
+    - nilerr
+    - perfsprint
+    - prealloc
     - unused
   settings:
     gosec:
@@ -13,6 +18,10 @@ linters:
         - G304 # paths often from env/config
         - G115 # int conversions in metrics/limits
         - G124 # Secure follows TLS/X-Forwarded-Proto; CSRF cookie must be JS-readable
+    perfsprint:
+      # fmt.Errorf("static") → errors.New is style, not a hot-path win.
+      error-format: false
+      errorf: false
   exclusions:
     generated: lax
     presets:
@@ -26,3 +35,14 @@ linters:
           - errcheck
           - gosec
           - bodyclose
+          - prealloc
+          - perfsprint
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - geoatlas

@@ -408,4 +408,3 @@ func (r *Repository) CountSummary(ctx context.Context, since time.Time) (usecase
 	sum.Acked = int(acked)
 	return sum, nil
 }
-
