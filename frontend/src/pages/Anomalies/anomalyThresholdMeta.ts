@@ -179,7 +179,7 @@ export const DETECTOR_THRESHOLD_GROUPS: DetectorGroupMeta[] = [
         title: 'Периодическая связь',
         window: '24 ч',
         summary:
-          'Пара src→dst активна не меньше Min часов за сутки, средний объём в час не выше Max avg, а регулярность часовых интервалов ≥ Regularity (0…1). Fingerprint суточный — без спама каждый тик.',
+          'Пара src→dst активна не меньше Min часов за сутки, средний объём в час не выше Max avg, а регулярность часовых интервалов ≥ Regularity (0…1). Fingerprint суточный — без спама каждый тик. Во время обучения детектор пропускается.',
         advice:
           'Строже к C2-подобному: выше Min часов и Regularity, ниже Max avg. Мониторинг/NTP/heartbeat с ровным ритмом — ложные; поднимите Max avg или Regularity. Профиль small: 10 ч / 250 КБ/ч / 0.55.',
         fields: [
