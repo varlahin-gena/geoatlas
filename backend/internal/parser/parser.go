@@ -124,12 +124,3 @@ func parseUint64(s string) uint64 {
 	v, _ := strconv.ParseUint(strings.TrimSpace(s), 10, 64)
 	return v
 }
-
-func firstNonEmpty(vals ...string) string {
-	for _, v := range vals {
-		if s := strings.TrimSpace(v); s != "" {
-			return s
-		}
-	}
-	return ""
-}

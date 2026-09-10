@@ -2,6 +2,7 @@ package repstore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -19,7 +20,7 @@ var replaceReputationRangesMu sync.Mutex
 // LoadReputationRanges читает все диапазоны.
 func LoadReputationRanges(ctx context.Context, ch clickhouse.Conn) ([]model.ReputationRange, error) {
 	if ch == nil {
-		return nil, fmt.Errorf("clickhouse conn is nil")
+		return nil, errors.New("clickhouse conn is nil")
 	}
 	rows, err := ch.Query(ctx, `
 		SELECT list_name, category, start_ip, end_ip, source, updated_at
@@ -48,7 +49,7 @@ func scanReputationRangeRows(rows driver.Rows) ([]model.ReputationRange, error) 
 // ListReputationMeta — агрегаты по list_name.
 func ListReputationMeta(ctx context.Context, ch clickhouse.Conn) ([]model.ReputationListMeta, error) {
 	if ch == nil {
-		return nil, fmt.Errorf("clickhouse conn is nil")
+		return nil, errors.New("clickhouse conn is nil")
 	}
 	rows, err := ch.Query(ctx, `
 		SELECT
@@ -81,7 +82,7 @@ func ListReputationMeta(ctx context.Context, ch clickhouse.Conn) ([]model.Reputa
 // ReplaceReputationRanges атомарно заменяет всю таблицу.
 func ReplaceReputationRanges(ctx context.Context, ch clickhouse.Conn, ranges []model.ReputationRange) (int, error) {
 	if ch == nil {
-		return 0, fmt.Errorf("clickhouse conn is nil")
+		return 0, errors.New("clickhouse conn is nil")
 	}
 	replaceReputationRangesMu.Lock()
 	defer replaceReputationRangesMu.Unlock()

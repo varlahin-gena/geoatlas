@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -62,7 +63,7 @@ func ScanCountrySeries(
 ) ([]SeriesPoint, int, error) {
 	country = strings.TrimSpace(country)
 	if country == "" {
-		return nil, 0, fmt.Errorf("country is required")
+		return nil, 0, errors.New("country is required")
 	}
 	bucketSec := pickSeriesBucketSeconds(tr)
 

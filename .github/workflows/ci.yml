@@ -298,6 +298,13 @@ jobs:
           go test ./internal/parser/ -run=^$ -fuzz=FuzzParseVerbose -fuzztime=200000x
           go test ./internal/adapter/ingestnet/ -run=^$ -fuzz=FuzzFrameReader -fuzztime=200000x
 
+      - name: ingest benches (smoke)
+        # Compile + short run so a broken Benchmark fails CI. GHA runners are too
+        # noisy for benchstat gates; compare locally with scripts/bench-ingest.sh.
+        run: |
+          go test ./internal/parser/ ./internal/usecase/ingest/ ./internal/adapter/clickhouse/ingeststore/ ./internal/geoip/ \
+            -run=NONE -bench=. -benchmem -count=1 -benchtime=20ms
+
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           version: v2.12.2

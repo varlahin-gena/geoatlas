@@ -115,7 +115,10 @@ func (fr *frameReader) tryOctetCounting() (string, bool, error) {
 	}
 
 	n, convErr := strconv.Atoi(string(peek[:spaceIdx]))
-	if convErr != nil || n <= 0 || n > maxFrameBytes {
+	if convErr != nil {
+		n = -1
+	}
+	if n <= 0 || n > maxFrameBytes {
 		// Невалидная длина — оставляем байты, читаем как LF-строку.
 		return "", false, nil
 	}

@@ -2,6 +2,7 @@
 package datalock
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -19,7 +20,7 @@ type Lock struct {
 func Acquire(dataDir string) (*Lock, error) {
 	dataDir = filepath.Clean(dataDir)
 	if dataDir == "" || dataDir == "." {
-		return nil, fmt.Errorf("datalock: empty data dir")
+		return nil, errors.New("datalock: empty data dir")
 	}
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return nil, fmt.Errorf("datalock: mkdir %s: %w", dataDir, err)

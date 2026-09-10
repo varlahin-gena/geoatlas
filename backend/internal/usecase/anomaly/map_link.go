@@ -1,8 +1,8 @@
 package anomaly
 
 import (
-	"fmt"
 	"net"
+	"strconv"
 	"strings"
 )
 
@@ -112,7 +112,7 @@ func blockedSurgeQuery(e Event) string {
 	if prefix == "" {
 		return ""
 	}
-	return fmt.Sprintf("(src:%s OR dst:%s)", prefix, prefix)
+	return "(src:" + prefix + " OR dst:" + prefix + ")"
 }
 
 func fallbackMapLink(e Event) MapLink {
@@ -190,7 +190,7 @@ func prefixFromRange(start, end uint32) string {
 		if a != b {
 			break
 		}
-		parts = append(parts, fmt.Sprintf("%d", a))
+		parts = append(parts, strconv.FormatUint(uint64(a), 10))
 	}
 	switch len(parts) {
 	case 0:

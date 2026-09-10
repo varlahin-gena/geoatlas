@@ -94,7 +94,7 @@ func insertWithRetry(ctx context.Context, attemptTimeout time.Duration, table st
 			"table", table, "attempt", attempt, "max", attempts, "backoff", delay.String(), "err", err)
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("%w (during retry backoff): %v", ctx.Err(), lastErr)
+			return fmt.Errorf("%w (during retry backoff): %w", ctx.Err(), lastErr)
 		case <-time.After(delay):
 		}
 	}
