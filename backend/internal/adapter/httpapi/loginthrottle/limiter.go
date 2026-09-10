@@ -74,12 +74,17 @@ type trustedSet struct {
 }
 
 var (
-	trusted           atomic.Pointer[trustedSet]
-	trustedRefreshing atomic.Bool
+	trusted              atomic.Pointer[trustedSet]
+	trustedRefreshing    atomic.Bool
+	trustedEnsureRunning atomic.Bool
 
 	// Подменяются в тестах.
 	lookupHost     = net.LookupHost
 	trustedHostTTL = 30 * time.Second
+	// Пока hostname (frontend) ещё не резолвится — backend уже up, nginx ещё нет —
+	// короче дёргаем DNS, иначе GA_REQUIRE_PROXY=1 отдаёт 403 на логин после update.
+	trustedEmptyRetry = 500 * time.Millisecond
+	trustedEnsureWait = 2 * time.Minute
 )
 
 func loopbackNets() []*net.IPNet {
@@ -139,6 +144,9 @@ func ConfigureTrustedProxies(entries []string) {
 	next := &trustedSet{nets: nets, hostNames: hostNames}
 	resolveHosts(next, nil)
 	trusted.Store(next)
+	if len(hostNames) > 0 && len(next.hostIPs) == 0 {
+		ensureTrustedHostsResolved()
+	}
 }
 
 // resolveHosts заполняет hostIPs. prev — снапшот предыдущих адресов: если DNS
@@ -177,6 +185,46 @@ func refreshTrustedHosts() {
 	trusted.Store(next)
 }
 
+// ensureTrustedHostsResolved — cold-start race: backend healthy раньше frontend,
+// LookupHost("frontend") пустой → proxy gate режет UI. Догоняем DNS в фоне.
+func ensureTrustedHostsResolved() {
+	if !trustedEnsureRunning.CompareAndSwap(false, true) {
+		return
+	}
+	go func() {
+		defer trustedEnsureRunning.Store(false)
+		backoff := trustedEmptyRetry
+		if backoff <= 0 {
+			backoff = 500 * time.Millisecond
+		}
+		deadline := time.Now().Add(trustedEnsureWait)
+		for time.Now().Before(deadline) {
+			cur := trusted.Load()
+			if cur == nil || len(cur.hostNames) == 0 || len(cur.hostIPs) > 0 {
+				return
+			}
+			refreshTrustedHosts()
+			if tp := trusted.Load(); tp != nil && len(tp.hostIPs) > 0 {
+				return
+			}
+			time.Sleep(backoff)
+			if backoff < 5*time.Second {
+				backoff *= 2
+			}
+		}
+	}()
+}
+
+func needsTrustedHostRefresh(tp *trustedSet) bool {
+	if tp == nil || len(tp.hostNames) == 0 {
+		return false
+	}
+	if len(tp.hostIPs) == 0 {
+		return true
+	}
+	return time.Since(tp.resolvedAt) > trustedHostTTL
+}
+
 func remoteIP(r *http.Request) string {
 	if r == nil {
 		return ""
@@ -202,9 +250,9 @@ func isTrustedProxy(ipStr string) bool {
 	if len(tp.hostNames) == 0 {
 		return false
 	}
-	// Снапшот устарел — обновляем в фоне ровно одной горутиной; запрос не ждёт
-	// DNS и отвечает по предыдущим адресам.
-	if time.Since(tp.resolvedAt) > trustedHostTTL && trustedRefreshing.CompareAndSwap(false, true) {
+	// Снапшот устарел или hostname ещё не резолвился — одна фоновая горутина;
+	// запрос не ждёт DNS и отвечает по текущему снапшоту.
+	if needsTrustedHostRefresh(tp) && trustedRefreshing.CompareAndSwap(false, true) {
 		go func() {
 			defer trustedRefreshing.Store(false)
 			refreshTrustedHosts()
