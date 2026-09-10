@@ -95,10 +95,10 @@ export function applyMapProjection(map: maplibregl.Map, mode: 'map' | 'globe'): 
     if (typeof m.setFog === 'function') {
       if (mode === 'globe') {
         m.setFog({
-          color: 'rgba(13, 17, 23, 0.65)',
-          'high-color': 'rgba(20, 28, 40, 0.25)',
+          color: 'rgba(19, 18, 9, 0.65)',
+          'high-color': 'rgba(39, 39, 39, 0.25)',
           'horizon-blend': 0.015,
-          'space-color': 'rgb(5, 8, 12)',
+          'space-color': 'rgb(10, 9, 6)',
           'star-intensity': 0,
         });
       } else {

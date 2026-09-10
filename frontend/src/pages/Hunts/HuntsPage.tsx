@@ -9,6 +9,7 @@ import {
 } from '@/api/hunts';
 import { huntMapHref } from '@/pages/Hunts/huntMapState';
 import { AdminLayout } from '@/components/AdminLayout';
+import { EmptyState, ContentSkeleton } from '@/components/Skeleton';
 import { useToast } from '@/components/Toast';
 import { fmtDate, fmtNumber } from '@/lib/format';
 import './hunts.css';
@@ -108,8 +109,9 @@ export default function HuntsPage() {
           <Link to="/">вернуться на карту</Link>.
         </p>
 
-        {loading ? <p className="hint">Загрузка…</p> : null}
+        {loading ? <ContentSkeleton label="Загрузка hunts…" /> : null}
 
+        {!loading ? (
         <div className="hunts-grid">
           {rows.map((h) => (
             <article key={h.id} className="card card-compact hunt-card">
@@ -159,9 +161,18 @@ export default function HuntsPage() {
             </article>
           ))}
         </div>
+        ) : null}
 
         {!loading && !rows.length ? (
-          <p className="hint">Пока нет saved hunts. Сохраните текущий вид на карте.</p>
+          <EmptyState
+            title="Нет saved hunts"
+            description="Сохраните текущий вид карты кнопкой «Охота» — период, группировка и фильтры останутся в одном месте."
+            action={
+              <Link className="btn primary" to="/">
+                Открыть карту
+              </Link>
+            }
+          />
         ) : null}
 
         {editing ? (

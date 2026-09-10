@@ -4,13 +4,27 @@ body.page-auth {
   min-height: 100%;
   min-height: 100dvh;
   padding: 0;
-  background:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(88, 166, 255, 0.18), transparent),
-    var(--bg);
+  background: var(--bg);
+  position: relative;
+}
+
+/* Subtle grain — auth only (Wave 1). */
+body.page-auth::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.045;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 180px 180px;
 }
 
 /* #root is height:100% for map/admin — center the form inside it on auth pages. */
 body.page-auth #root {
+  position: relative;
+  z-index: 1;
   display: grid;
   place-items: center;
   width: 100%;
@@ -27,7 +41,7 @@ body.page-auth #root {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 28px 28px 24px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--shadow);
 }
 .auth-card.wide { max-width: 400px; }
 .auth-brand {
@@ -69,15 +83,19 @@ body.page-auth #root {
   width: 100%;
   margin-top: 4px;
   background: var(--accent);
-  color: #0d1117;
+  color: var(--on-accent);
   border: none;
   border-radius: 8px;
   padding: 11px 14px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+  transition:
+    filter var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 .auth-card button[type="submit"]:hover { filter: brightness(1.08); }
+.auth-card button[type="submit"]:active:not(:disabled) { transform: scale(0.98); }
 .auth-card button[type="submit"]:disabled { opacity: 0.6; cursor: wait; }
 .auth-error {
   display: none;

@@ -22,6 +22,7 @@ const AnomaliesPage = lazy(() => import('@/pages/Anomalies/AnomaliesPage'));
 const AnomalyEnginePage = lazy(() => import('@/pages/Anomalies/AnomalyEnginePage'));
 const HuntsPage = lazy(() => import('@/pages/Hunts/HuntsPage'));
 const InvestigatePage = lazy(() => import('@/pages/Investigate/InvestigatePage'));
+const NotFoundPage = lazy(() => import('@/pages/NotFound/NotFoundPage'));
 
 function Lazy({ children, label }: { children: React.ReactNode; label?: string }) {
   return (
@@ -201,7 +202,14 @@ export default function App() {
               <Route path="/anomalies.html" element={<Navigate to="/anomalies" replace />} />
               <Route path="/investigate.html" element={<Navigate to="/investigate" replace />} />
               <Route path="/change-password.html" element={<Navigate to="/change-password" replace />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
+              <Route
+                path="*"
+                element={
+                  <Lazy label="404">
+                    <NotFoundPage />
+                  </Lazy>
+                }
+              />
             </Routes>
           </ToastProvider>
         </AuthProvider>

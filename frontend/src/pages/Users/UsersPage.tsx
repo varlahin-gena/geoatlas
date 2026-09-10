@@ -13,6 +13,7 @@ import type { UserRole } from '@/api/types';
 import { ROLE_OPERATOR } from '@/api/types';
 import { USER_ROLE_OPTIONS } from '@/auth/roles';
 import { AdminLayout } from '@/components/AdminLayout';
+import { EmptyState, TableSkeleton } from '@/components/Skeleton';
 import { ReauthField, ReauthModal } from '@/components/ReauthModal';
 import { useToast } from '@/components/Toast';
 import { fmtDate } from '@/lib/format';
@@ -22,6 +23,7 @@ export default function UsersPage() {
   const { user: me, refresh } = useAuth();
   const { toast } = useToast();
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [fio, setFio] = useState('');
@@ -38,12 +40,15 @@ export default function UsersPage() {
   const [deleteBusy, setDeleteBusy] = useState(false);
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const data = await listUsers();
       setUsers(data.users || []);
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка');
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -119,10 +124,21 @@ export default function UsersPage() {
                       Ошибка: {error}
                     </td>
                   </tr>
+                ) : loading ? (
+                  <TableSkeleton cols={6} rows={4} />
                 ) : users.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="empty">
-                      Нет пользователей
+                      <EmptyState
+                        compact
+                        title="Нет пользователей"
+                        description="Создайте учётную запись для оператора или dashboard-просмотра."
+                        action={
+                          <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
+                            Создать пользователя
+                          </button>
+                        }
+                      />
                     </td>
                   </tr>
                 ) : (

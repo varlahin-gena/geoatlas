@@ -1,8 +1,10 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { createToken, deleteToken, listTokens, rotateToken, type TokenRow, type TokenScope } from '@/api/tokens';
 import { AdminLayout } from '@/components/AdminLayout';
+import { EmptyState, TableSkeleton } from '@/components/Skeleton';
 import { ReauthField, ReauthModal } from '@/components/ReauthModal';
-import { useToast } from '@/components/Toast';import { fmtDate } from '@/lib/format';
+import { useToast } from '@/components/Toast';
+import { fmtDate } from '@/lib/format';
 
 type ExpiryPreset = 'never' | '30d' | '90d' | '365d';
 
@@ -15,6 +17,7 @@ function expiryISO(preset: ExpiryPreset): string | undefined {
 export default function ApiTokensPage() {
   const { toast } = useToast();
   const [tokens, setTokens] = useState<TokenRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState('');
   const [scope, setScope] = useState<TokenScope>('ops');
@@ -31,12 +34,15 @@ export default function ApiTokensPage() {
   const [actionBusy, setActionBusy] = useState(false);
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const data = await listTokens();
       setTokens(data.tokens || []);
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка');
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -112,10 +118,21 @@ export default function ApiTokensPage() {
                       Ошибка: {error}
                     </td>
                   </tr>
+                ) : loading ? (
+                  <TableSkeleton cols={5} rows={4} />
                 ) : tokens.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="empty">
-                      Пока нет именованных токенов
+                      <EmptyState
+                        compact
+                        title="Нет API-токенов"
+                        description="Создайте именованный токен для автоматизации и интеграций."
+                        action={
+                          <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
+                            Создать токен
+                          </button>
+                        }
+                      />
                     </td>
                   </tr>
                 ) : (
