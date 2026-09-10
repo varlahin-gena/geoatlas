@@ -48,13 +48,13 @@ func (m *memStore) ListMeta(ctx context.Context) ([]model.ReputationListMeta, er
 
 type memIndex struct{}
 
-func (memIndex) Lookup(string) []model.ReputationHit             { return nil }
-func (memIndex) RangeCount() int                                 { return 0 }
-func (memIndex) ReplaceAll([]model.ReputationRange)              {}
-func (memIndex) ReplaceList(string, []model.ReputationRange)     {}
-func (memIndex) DeleteList(string)                               {}
-func (memIndex) ListMeta() []model.ReputationListMeta            { return nil }
-func (memIndex) Snapshot() []model.ReputationRange               { return nil }
+func (memIndex) Lookup(string) []model.ReputationHit         { return nil }
+func (memIndex) RangeCount() int                             { return 0 }
+func (memIndex) ReplaceAll([]model.ReputationRange)          {}
+func (memIndex) ReplaceList(string, []model.ReputationRange) {}
+func (memIndex) DeleteList(string)                           {}
+func (memIndex) ListMeta() []model.ReputationListMeta        { return nil }
+func (memIndex) Snapshot() []model.ReputationRange           { return nil }
 
 type stubRefresher struct {
 	feeds []usecasereputation.Feed

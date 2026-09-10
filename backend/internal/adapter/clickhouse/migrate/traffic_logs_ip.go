@@ -104,7 +104,7 @@ func EnsureTrafficLogsIPv4(ctx context.Context, ch clickhouse.Conn) error {
 		return fmt.Errorf("copy traffic_logs → layout: %w", err)
 	}
 
-	if err := execDDL(ctx, ch, fmt.Sprintf("EXCHANGE TABLES traffic_logs AND %s", trafficLogsIPv4Next)); err != nil {
+	if err := execDDL(ctx, ch, "EXCHANGE TABLES traffic_logs AND "+trafficLogsIPv4Next); err != nil {
 		dropNext()
 		return fmt.Errorf("exchange traffic_logs: %w", err)
 	}

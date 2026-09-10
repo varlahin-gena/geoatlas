@@ -41,16 +41,16 @@ func assignEpisodeIDs(events []Event, now time.Time) {
 
 // EpisodeSummary — агрегат для GET /api/anomalies/episodes.
 type EpisodeSummary struct {
-	EpisodeID   string    `json:"episode_id"`
-	AnchorIP    string    `json:"anchor_ip,omitempty"`
-	StartedAt   time.Time `json:"started_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	AlertCount  int       `json:"alert_count"`
-	HighCount   int       `json:"high_count"`
-	WarnCount   int       `json:"warn_count"`
-	MaxSeverity string    `json:"max_severity"`
-	Codes       []string  `json:"codes,omitempty"`
-	Fingerprints []string `json:"fingerprints,omitempty"`
+	EpisodeID    string    `json:"episode_id"`
+	AnchorIP     string    `json:"anchor_ip,omitempty"`
+	StartedAt    time.Time `json:"started_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	AlertCount   int       `json:"alert_count"`
+	HighCount    int       `json:"high_count"`
+	WarnCount    int       `json:"warn_count"`
+	MaxSeverity  string    `json:"max_severity"`
+	Codes        []string  `json:"codes,omitempty"`
+	Fingerprints []string  `json:"fingerprints,omitempty"`
 }
 
 func buildEpisodeSummaries(items []Event) []EpisodeSummary {
@@ -58,7 +58,7 @@ func buildEpisodeSummaries(items []Event) []EpisodeSummary {
 		return []EpisodeSummary{}
 	}
 	type acc struct {
-		sum EpisodeSummary
+		sum   EpisodeSummary
 		codes map[string]struct{}
 	}
 	byID := map[string]*acc{}

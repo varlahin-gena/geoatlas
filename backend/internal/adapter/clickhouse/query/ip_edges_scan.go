@@ -25,7 +25,7 @@ func scanIPEdgesRelative(
 	}
 	where := fmt.Sprintf("%s >= now() - INTERVAL ? %s", timeCol, unit)
 	if timeCol == "day" {
-		where = fmt.Sprintf("%s >= today() - ?", timeCol)
+		where = timeCol + " >= today() - ?"
 	}
 	return scanIPEdges(ctx, ch, table, where, []any{amount}, groupBy, sel, timeout)
 }

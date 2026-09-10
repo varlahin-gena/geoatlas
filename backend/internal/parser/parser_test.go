@@ -13,13 +13,13 @@ import (
 // ============================================================
 
 type tlWant struct {
-	vendor, src, dst              string
-	sport, dport                  uint32
-	action, proto, rule           string
-	szone, dzone, scountry, dcty  string
-	device                        string
-	bytesSent, bytesRecv          uint64
-	pktSent, pktRecv              uint64
+	vendor, src, dst             string
+	sport, dport                 uint32
+	action, proto, rule          string
+	szone, dzone, scountry, dcty string
+	device                       string
+	bytesSent, bytesRecv         uint64
+	pktSent, pktRecv             uint64
 }
 
 func checkTL(t *testing.T, name string, got model.TrafficLog, w tlWant) {
@@ -147,7 +147,6 @@ func TestParseVerboseSkipsNonIPv4Pair(t *testing.T) {
 func TestSampleCorpus(t *testing.T) {
 	r := testRegistry()
 	for _, s := range Samples() {
-		s := s
 		t.Run(s.Vendor+"/"+s.Desc, func(t *testing.T) {
 			res := r.ParseVerbose(s.Line)
 			switch {
@@ -439,7 +438,6 @@ func TestCiscoFTD(t *testing.T) {
 		})
 	})
 }
-
 
 // ============================================================
 // Cowrie: строгий JSON и Python-repr + skip

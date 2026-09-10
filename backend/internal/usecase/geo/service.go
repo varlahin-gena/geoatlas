@@ -26,15 +26,15 @@ type HeavySlot interface {
 
 // Service — application use cases для GeoIP.
 type Service struct {
-	store         RangeStore
-	missing       MissingIPStore
-	index         GeoIndex
-	jobs          GeoJobScheduler
-	codec         RangeCodec
-	maxRanges     int
-	softMemLimit  uint64 // 0 = headroom check off
-	heavy         HeavySlot
-	enterprise    EnterpriseNetStore
+	store        RangeStore
+	missing      MissingIPStore
+	index        GeoIndex
+	jobs         GeoJobScheduler
+	codec        RangeCodec
+	maxRanges    int
+	softMemLimit uint64 // 0 = headroom check off
+	heavy        HeavySlot
+	enterprise   EnterpriseNetStore
 }
 
 // New создаёт GeoIP service. maxRanges — лимит строк CSV на upload (0 = без лимита ranges, только HTTP bytes).
@@ -389,7 +389,7 @@ func (s *Service) UpdateRange(ctx context.Context, originalNetwork, network, cou
 		kept = append(kept, g)
 	}
 	if !found {
-		return MutateRangeResult{}, apperr.NotFound(fmt.Sprintf("original range not found: %s", strings.TrimSpace(originalNetwork)))
+		return MutateRangeResult{}, apperr.NotFound("original range not found: " + strings.TrimSpace(originalNetwork))
 	}
 	merged := append(kept, entry)
 	if err := s.codec.CheckNonOverlapping(merged); err != nil {

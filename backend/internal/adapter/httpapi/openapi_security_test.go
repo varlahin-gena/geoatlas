@@ -94,7 +94,6 @@ func schemaBlocksMassAssignment(t *testing.T, doc openAPIDoc, schema map[string]
 func TestOpenAPIMutationRequestBodiesBlockMassAssignment(t *testing.T) {
 	doc := loadOpenAPIDoc(t)
 	for _, tc := range mutationPaths {
-		tc := tc
 		t.Run(fmt.Sprintf("%s %s", strings.ToUpper(tc.method), tc.path), func(t *testing.T) {
 			schema := requestBodySchema(t, doc, tc.method, tc.path)
 			schemaBlocksMassAssignment(t, doc, schema)

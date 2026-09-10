@@ -18,13 +18,13 @@ type GetSeriesInput struct {
 
 // GetSeriesResult — ответ для sparkline.
 type GetSeriesResult struct {
-	Country    string
-	BucketSec  int
-	Points     []SeriesPoint
-	Period     string
-	Amount     int
-	From       time.Time
-	To         time.Time
+	Country   string
+	BucketSec int
+	Points    []SeriesPoint
+	Period    string
+	Amount    int
+	From      time.Time
+	To        time.Time
 }
 
 // GetSeries возвращает allowed/blocked по bucket для страны (src или dst).

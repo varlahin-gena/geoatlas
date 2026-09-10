@@ -43,7 +43,7 @@ func (*uploadCodec) ParseEntry(string, string, string, string, float64, float64)
 	return model.GeoRange{}, nil
 }
 func (*uploadCodec) ParseNetwork(string) (uint32, uint32, bool) { return 0, 0, false }
-func (*uploadCodec) FormatNetwork(uint32, uint32) string         { return "" }
+func (*uploadCodec) FormatNetwork(uint32, uint32) string        { return "" }
 
 type uploadStore struct {
 	replaced int
