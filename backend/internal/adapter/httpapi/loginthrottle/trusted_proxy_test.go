@@ -2,6 +2,7 @@ package loginthrottle
 
 import (
 	"errors"
+	"net"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -81,6 +82,55 @@ func TestTrustedProxyRefreshesAfterTTL(t *testing.T) {
 		time.Sleep(5 * time.Millisecond)
 	}
 	t.Fatal("snapshot was not refreshed after TTL expiry")
+}
+
+// Cold start: frontend ещё нет → hostIPs пустой; после появления DNS снапшот
+// должен догнаться без ожидания полного trustedHostTTL.
+func TestTrustedProxyRecoversWhenDNSAppearsLater(t *testing.T) {
+	var ready atomic.Bool
+	swapResolver(t, func(string) ([]string, error) {
+		if !ready.Load() {
+			return nil, errors.New("no such host")
+		}
+		return []string{"10.9.9.9"}, nil
+	})
+	swapTTL(t, time.Hour)
+	prevRetry, prevWait := trustedEmptyRetry, trustedEnsureWait
+	trustedEmptyRetry = 5 * time.Millisecond
+	trustedEnsureWait = 2 * time.Second
+	t.Cleanup(func() {
+		trustedEmptyRetry, trustedEnsureWait = prevRetry, prevWait
+	})
+	dropTrusted(t)
+
+	ConfigureTrustedProxies([]string{"frontend"})
+	if isTrustedProxy("10.9.9.9") {
+		t.Fatal("must not trust before DNS succeeds")
+	}
+
+	ready.Store(true)
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		_ = isTrustedProxy("10.9.9.9") // kick empty-host refresh
+		if isTrustedProxy("10.9.9.9") {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatal("empty host snapshot did not recover after DNS became available")
+}
+
+func TestNeedsTrustedHostRefreshWhenEmpty(t *testing.T) {
+	if !needsTrustedHostRefresh(&trustedSet{hostNames: []string{"frontend"}}) {
+		t.Fatal("empty hostIPs must need refresh")
+	}
+	if needsTrustedHostRefresh(&trustedSet{
+		hostNames:  []string{"frontend"},
+		hostIPs:    []net.IP{net.ParseIP("10.9.9.9")},
+		resolvedAt: time.Now(),
+	}) {
+		t.Fatal("fresh non-empty snapshot must not need refresh")
+	}
 }
 
 // Сбой резолвера не должен снимать доверие к прокси: иначе при
