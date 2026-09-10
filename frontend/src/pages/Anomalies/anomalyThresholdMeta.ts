@@ -1,6 +1,6 @@
 import type { AnomalyThresholds } from '@/api/anomalies';
 
-export type ThresholdFieldKey = keyof AnomalyThresholds;
+type ThresholdFieldKey = keyof AnomalyThresholds;
 
 export type ThresholdFieldMeta = {
   key: ThresholdFieldKey;
