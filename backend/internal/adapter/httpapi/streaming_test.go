@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -98,7 +99,9 @@ func TestExportRouteRegisteredWithoutTimeoutHandler(t *testing.T) {
 	}
 
 	buf := make([]byte, 12)
-	if _, err := resp.Body.Read(buf); err != nil {
+	// Read may return (n, EOF) once the response is fully consumed; ReadFull
+	// only fails if fewer than len(buf) bytes arrive.
+	if _, err := io.ReadFull(resp.Body, buf); err != nil {
 		t.Fatalf("read streamed chunk: %v", err)
 	}
 	if string(buf) != "net,country\n" {
