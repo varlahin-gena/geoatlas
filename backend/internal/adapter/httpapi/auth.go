@@ -463,7 +463,7 @@ func (h *AuthHandler) bearerScopeOK(r *http.Request, need string) bool {
 // --- Users CRUD (admin) ---
 
 func (h *UsersHandler) authModuleDisabled(w http.ResponseWriter) bool {
-	if h != nil && h.AuthDeps != nil && h.AuthDeps.authDisabled {
+	if h != nil && h.AuthDeps != nil && h.authDisabled {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "auth module disabled"})
 		return true
 	}
@@ -488,7 +488,7 @@ func (h *UsersHandler) List(w http.ResponseWriter, r *http.Request) {
 
 // Directory — краткий список УЗ для назначения алертов (login, без ролей/паролей).
 func (h *UsersHandler) Directory(w http.ResponseWriter, r *http.Request) {
-	if h != nil && h.AuthDeps != nil && h.AuthDeps.authDisabled {
+	if h != nil && h.AuthDeps != nil && h.authDisabled {
 		writeJSON(w, http.StatusOK, map[string]any{"users": []any{}})
 		return
 	}
