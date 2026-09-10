@@ -13,6 +13,7 @@ import {
 } from '@/api/reputation';
 import { useAuth } from '@/auth/AuthContext';
 import { AdminLayout } from '@/components/AdminLayout';
+import { EmptyState, TableSkeleton } from '@/components/Skeleton';
 import { ObserveSectionNav } from '@/components/ObserveSectionNav';
 import { useToast } from '@/components/Toast';
 import { fmtDate, fmtNumber } from '@/lib/format';
@@ -24,6 +25,7 @@ export default function ReputationPage() {
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [lists, setLists] = useState<RepList[]>([]);
   const [catalog, setCatalog] = useState<Feed[]>([]);
+  const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
   const [category, setCategory] = useState('attacks');
@@ -84,6 +86,8 @@ export default function ReputationPage() {
       setCatalog(c.feeds || []);
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Ошибка', 'error');
+    } finally {
+      setLoading(false);
     }
   }, [toast]);
 
@@ -278,10 +282,16 @@ export default function ReputationPage() {
                 </tr>
               </thead>
               <tbody>
-                {!activeRows.length ? (
+                {loading ? (
+                  <TableSkeleton cols={9} rows={4} />
+                ) : !activeRows.length ? (
                   <tr>
                     <td colSpan={9} className="empty">
-                      Нет активных списков
+                      <EmptyState
+                        compact
+                        title="Нет активных списков"
+                        description="Добавьте URL-фид выше, выберите пресет из каталога или загрузите CSV."
+                      />
                     </td>
                   </tr>
                 ) : (
@@ -345,16 +355,22 @@ export default function ReputationPage() {
                 </tr>
               </thead>
               <tbody>
-                {!catalog.length ? (
+                {loading ? (
+                  <TableSkeleton cols={5} rows={4} />
+                ) : !catalog.length ? (
                   <tr>
                     <td colSpan={5} className="empty">
-                      Каталог пуст
+                      <EmptyState compact title="Каталог пуст" description="Пресеты фидов недоступны на этом сервере." />
                     </td>
                   </tr>
                 ) : !catalogAvailable.length ? (
                   <tr>
                     <td colSpan={5} className="empty">
-                      Все пресеты уже в активных фидах
+                      <EmptyState
+                        compact
+                        title="Все пресеты уже подключены"
+                        description="Активные фиды покрывают весь каталог — остаётся обновить списки или добавить свой URL."
+                      />
                     </td>
                   </tr>
                 ) : (

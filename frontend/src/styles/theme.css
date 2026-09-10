@@ -37,6 +37,15 @@
   --z-toast: 5000;
   --z-skip: 10000;
 
+  /* Map chrome ladder (below modal/toast). */
+  --z-map-ctrl: 2;
+  --z-map-overlay: 40;
+  --z-map-loading: 46;
+  --z-map-dock: 51;
+  --z-map-chrome: 55;
+  --z-map-topbar: 100;
+  --z-map-detail: 800;
+
   --bg: #131209;
   --panel: #181818;
   --panel-2: #1f1f1f;
