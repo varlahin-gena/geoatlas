@@ -199,8 +199,8 @@ func NewDeps(p Params) *Deps {
 			queryTimeout:       p.Cfg.QueryTimeout,
 			geoUC:              p.GeoUC,
 		},
-		ingest: &IngestDeps{ingestFlushSec: p.Cfg.Ingest.FlushSec, ingest: p.Ingest},
-		parse:  &ParseDeps{queryTimeout: p.Cfg.QueryTimeout, parseErrorsUC: p.ParseErrorsUC, parseTestUC: p.ParseTestUC},
+		ingest:     &IngestDeps{ingestFlushSec: p.Cfg.Ingest.FlushSec, ingest: p.Ingest},
+		parse:      &ParseDeps{queryTimeout: p.Cfg.QueryTimeout, parseErrorsUC: p.ParseErrorsUC, parseTestUC: p.ParseTestUC},
 		reputation: &ReputationDeps{reputationUC: p.ReputationUC},
 		templates: &SearchTemplatesDeps{
 			authDisabled:    p.Cfg.Auth.Disabled,

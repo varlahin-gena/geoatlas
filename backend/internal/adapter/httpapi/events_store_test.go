@@ -43,7 +43,7 @@ func TestGetEventsUsesTrafficStoreForHoursGeo(t *testing.T) {
 	stub := &stubTraffic{}
 	h := &EventsHandler{EventsDeps: &EventsDeps{
 		queryTimeout: time.Minute,
-		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
+		eventsUC:     usecaseevents.New(stub, geoip.New(), nil),
 	}}
 	req := httptest.NewRequest(http.MethodGet, "/api/events?hours=6&group_by=city", nil)
 	rec := httptest.NewRecorder()
@@ -74,7 +74,7 @@ func TestGetEventsIPUsesGeoEdgesPath(t *testing.T) {
 	stub := &stubTraffic{}
 	h := &EventsHandler{EventsDeps: &EventsDeps{
 		queryTimeout: time.Minute,
-		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
+		eventsUC:     usecaseevents.New(stub, geoip.New(), nil),
 	}}
 	req := httptest.NewRequest(http.MethodGet, "/api/events?hours=6&group_by=ip", nil)
 	rec := httptest.NewRecorder()
@@ -123,7 +123,7 @@ func TestGetEventsFallsBackToLiveGeoWhenStoredCoordsEmpty(t *testing.T) {
 	stub := &stubTrafficNoGeo{}
 	h := &EventsHandler{EventsDeps: &EventsDeps{
 		queryTimeout: time.Minute,
-		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
+		eventsUC:     usecaseevents.New(stub, geoip.New(), nil),
 	}}
 	req := httptest.NewRequest(http.MethodGet, "/api/events?hours=24&group_by=city", nil)
 	rec := httptest.NewRecorder()
@@ -169,7 +169,7 @@ func TestGetEventsIPUsesStoredLogGeoWhenLiveMisses(t *testing.T) {
 	stub := &stubTrafficIPLogGeo{}
 	h := &EventsHandler{EventsDeps: &EventsDeps{
 		queryTimeout: time.Minute,
-		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
+		eventsUC:     usecaseevents.New(stub, geoip.New(), nil),
 	}}
 	req := httptest.NewRequest(http.MethodGet, "/api/events?hours=6&group_by=ip", nil)
 	rec := httptest.NewRecorder()
@@ -214,7 +214,7 @@ func TestGetEventsSubnetUsesCountryFallback(t *testing.T) {
 	stub := &stubTrafficIPCountryOnly{}
 	h := &EventsHandler{EventsDeps: &EventsDeps{
 		queryTimeout: time.Minute,
-		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
+		eventsUC:     usecaseevents.New(stub, geoip.New(), nil),
 	}}
 	req := httptest.NewRequest(http.MethodGet, "/api/events?hours=6&group_by=subnet", nil)
 	rec := httptest.NewRecorder()
@@ -236,7 +236,7 @@ func TestGetEventsPassesFilterCountryAndQ(t *testing.T) {
 	stub := &stubTraffic{}
 	h := &EventsHandler{EventsDeps: &EventsDeps{
 		queryTimeout: time.Minute,
-		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
+		eventsUC:     usecaseevents.New(stub, geoip.New(), nil),
 	}}
 	req := httptest.NewRequest(http.MethodGet, "/api/events?hours=6&group_by=city&filter=blocked&country=Russia&q=tcp&limit=5000", nil)
 	rec := httptest.NewRecorder()
@@ -260,7 +260,7 @@ func TestGetEventsPassesAdvancedQAndReputation(t *testing.T) {
 	stub := &stubTraffic{}
 	h := &EventsHandler{EventsDeps: &EventsDeps{
 		queryTimeout: time.Minute,
-		eventsUC: usecaseevents.New(stub, geoip.New(), nil),
+		eventsUC:     usecaseevents.New(stub, geoip.New(), nil),
 	}}
 	req := httptest.NewRequest(http.MethodGet, "/api/events?hours=6&group_by=ip&q=country:Germany+AND+rule:block&rep_cat=malware&rep_list=spamhaus&rep_side=src&limit=100", nil)
 	rec := httptest.NewRecorder()

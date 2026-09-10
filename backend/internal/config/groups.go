@@ -25,21 +25,21 @@ type TLSConfig struct {
 
 // AuthConfig — UI sessions, seed users, and API Bearer tokens.
 type AuthConfig struct {
-	Disabled            bool // AUTH_DISABLED
-	SessionSecret       string
-	SessionTTLHours     int
-	AdminUser           string
-	AdminPassword       string
-	AdminMustReset      bool
-	OperatorUser        string
-	OperatorPassword    string
-	UsersFile           string
-	APITokensFile       string
-	APIAuthToken        string
+	Disabled             bool // AUTH_DISABLED
+	SessionSecret        string
+	SessionTTLHours      int
+	AdminUser            string
+	AdminPassword        string
+	AdminMustReset       bool
+	OperatorUser         string
+	OperatorPassword     string
+	UsersFile            string
+	APITokensFile        string
+	APIAuthToken         string
 	APIAuthPreviousToken string
-	APIAuthDisabled     bool // API_AUTH_DISABLED
-	APIOpsToken         string
-	APIOpsPreviousToken string
+	APIAuthDisabled      bool // API_AUTH_DISABLED
+	APIOpsToken          string
+	APIOpsPreviousToken  string
 }
 
 // IngestConfig — syslog ingest listeners, queues, and peer auth.
@@ -60,20 +60,20 @@ type IngestConfig struct {
 
 // HTTPThreatConfig — proxy gate and API rate limits.
 type HTTPThreatConfig struct {
-	TrustedProxies   string
-	RequireProxy     bool
-	APIRateLimitRPS  float64
+	TrustedProxies    string
+	RequireProxy      bool
+	APIRateLimitRPS   float64
 	APIRateLimitBurst int
 }
 
 // GeoConfig — GeoIP snapshot, upload limits, and enrich/backfill.
 type GeoConfig struct {
-	SnapshotFile           string
-	MaxUploadSize          int64
-	MaxUploadRanges        int
-	EnrichOnIngest         bool
-	BackfillLookbackDays   int
-	SkipStartupBackfill    bool
+	SnapshotFile         string
+	MaxUploadSize        int64
+	MaxUploadRanges      int
+	EnrichOnIngest       bool
+	BackfillLookbackDays int
+	SkipStartupBackfill  bool
 }
 
 // ReputationConfig — offline lists and feed refresh.

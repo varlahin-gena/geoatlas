@@ -48,16 +48,16 @@ type Config struct {
 	InstallMetaPath     string
 	SyslogStatsURL      string // SYSLOG_STATS_URL; empty = do not scrape syslog-ng
 
-	ClickHouse  ClickHouseConfig
-	Backup      BackupConfig
-	TLS         TLSConfig
-	Auth        AuthConfig
-	Ingest      IngestConfig
-	HTTPThreat  HTTPThreatConfig
-	Geo         GeoConfig
-	Reputation  ReputationConfig
-	Anomaly     AnomalyConfig
-	Log         LogConfig
+	ClickHouse ClickHouseConfig
+	Backup     BackupConfig
+	TLS        TLSConfig
+	Auth       AuthConfig
+	Ingest     IngestConfig
+	HTTPThreat HTTPThreatConfig
+	Geo        GeoConfig
+	Reputation ReputationConfig
+	Anomaly    AnomalyConfig
+	Log        LogConfig
 }
 
 // ReputationFeed — URL-фид для фонового обновления.
