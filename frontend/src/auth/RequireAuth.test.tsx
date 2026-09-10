@@ -48,7 +48,7 @@ describe('RequireAuth', () => {
   it('shows loading state', () => {
     authState.loading = true;
     renderAt('/admin');
-    expect(screen.getByText('Загрузка…')).toBeInTheDocument();
+    expect(screen.getByTestId('page-skeleton')).toBeInTheDocument();
   });
 
   it('redirects anonymous users to login with next', () => {

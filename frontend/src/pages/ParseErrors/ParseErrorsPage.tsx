@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   deleteAllParseErrors,
   deleteParseErrors,
@@ -7,6 +8,7 @@ import {
 } from '@/api/parseErrors';
 import { AdminLayout } from '@/components/AdminLayout';
 import { DataSectionNav } from '@/components/DataSectionNav';
+import { EmptyState, TableSkeleton } from '@/components/Skeleton';
 import { useToast } from '@/components/Toast';
 import { fmtDate } from '@/lib/format';
 
@@ -16,7 +18,7 @@ export default function ParseErrorsPage() {
   const [limit, setLimit] = useState('100');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -124,10 +126,21 @@ export default function ParseErrorsPage() {
               </tr>
             </thead>
             <tbody>
-              {!rows.length ? (
+              {loading && !rows.length ? (
+                <TableSkeleton cols={6} rows={5} />
+              ) : !rows.length ? (
                 <tr>
                   <td colSpan={6} className="empty">
-                    {loading ? 'Загрузка…' : 'Нет нераспознанных строк'}
+                    <EmptyState
+                      compact
+                      title="Нет нераспознанных строк"
+                      description="Ошибки парсинга появятся здесь, если syslog не удалось разобрать. Можно проверить пресеты в тесте парсеров."
+                      action={
+                        <Link className="btn" to="/parser-test">
+                          Тест парсеров
+                        </Link>
+                      }
+                    />
                   </td>
                 </tr>
               ) : (

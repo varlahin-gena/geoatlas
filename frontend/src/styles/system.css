@@ -95,8 +95,7 @@ body.page-admin {
         align-items: center;
         gap: 8px;
         font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.8px;
+        letter-spacing: 0.02em;
         color: var(--text-muted);
     }
     .chrome-section-head .accent-dot {
@@ -150,8 +149,7 @@ body.page-admin {
     .status-metric:last-child { border-right: none; }
     .sm-label {
         font-size: 9px;
-        text-transform: uppercase;
-        letter-spacing: 0.6px;
+        letter-spacing: 0.02em;
         color: var(--text-muted);
     }
     .sm-value {
@@ -201,7 +199,7 @@ body.page-admin {
         display: inline-block;
         min-width: 16px;
         padding: 0 5px;
-        border-radius: 999px;
+        border-radius: 6px;
         background: rgba(248, 81, 73, 0.2);
         color: var(--red);
         font-size: 10px;
@@ -268,8 +266,7 @@ body.page-admin {
     }
     .card-title {
         font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.8px;
+        letter-spacing: 0.02em;
         color: var(--text-muted);
         margin: 0 0 8px 0;
         display: flex; align-items: center; gap: 8px;
@@ -300,8 +297,7 @@ body.page-admin {
     }
     .pipeline-stage .stage-name {
         font-size: 10px;
-        text-transform: uppercase;
-        letter-spacing: 0.6px;
+        letter-spacing: 0.02em;
         color: var(--text-muted);
     }
     .pipeline-stage .stage-value {
@@ -411,8 +407,7 @@ body.page-admin {
         cursor: pointer;
         font-size: 10px;
         color: var(--text-muted);
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.02em;
         user-select: none;
         list-style: none;
     }
@@ -459,7 +454,7 @@ body.page-admin {
     .alert-row.error { border-left-color: var(--red);    background: rgba(248, 81, 73, 0.06); }
     .alert-row.info  { border-left-color: var(--accent); background: rgba(88, 166, 255, 0.06); }
     .alert-row .level {
-        font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px;
+        font-size: 10px; letter-spacing: 0.02em;
         font-weight: 700; padding: 2px 6px; border-radius: 3px;
         flex-shrink: 0;
     }
@@ -474,7 +469,7 @@ body.page-admin {
         background: rgba(110, 118, 129, 0.2);
         color: var(--text-dim);
         font-size: 10px;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-family: var(--font-mono);
     }
     .alert-row .target { color: var(--text-muted); margin-right: 6px; }
     .alert-row .empty { color: var(--text-muted); padding: 6px; }
@@ -495,12 +490,11 @@ body.page-admin {
         color: var(--text-muted);
         font-weight: 600;
         font-size: 11px;
-        text-transform: uppercase;
         letter-spacing: 0.4px;
     }
     .auth-fails-table td { color: var(--text); }
     .auth-fails-table tr:last-child td { border-bottom: none; }
-    .auth-fails-table .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .auth-fails-table .mono { font-family: var(--font-mono); }
     .auth-fails-table .badge-locked {
         display: inline-block;
         margin-left: 6px;
@@ -508,7 +502,6 @@ body.page-admin {
         border-radius: 3px;
         font-size: 10px;
         font-weight: 700;
-        text-transform: uppercase;
         background: rgba(248, 81, 73, 0.18);
         color: var(--red);
     }
@@ -607,7 +600,7 @@ body.page-admin {
         display: flex; align-items: center; justify-content: center;
         color: var(--text-muted); font-size: 12px;
         pointer-events: none;
-        background: rgba(13,17,23,0.4);
+        background: rgba(19, 18, 9, 0.4);
         z-index: 10;
     }
 
@@ -631,8 +624,7 @@ body.page-admin {
         color: var(--accent);
         font-size: 11px;
         font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.02em;
     }
 
     .capacity-meter {
@@ -655,10 +647,10 @@ body.page-admin {
     .capacity-fill {
         height: 100%;
         border-radius: 3px;
-        background: linear-gradient(90deg, var(--green), var(--accent));
-        transition: width 0.4s ease;
+        background: var(--green);
+        transition: width var(--duration-panel) var(--ease-out);
     }
-    .capacity-fill.warn  { background: linear-gradient(90deg, var(--orange), var(--red)); }
+    .capacity-fill.warn  { background: var(--orange); }
     .capacity-fill.bad   { background: var(--red); }
     .capacity-hint {
         margin-top: 6px;
@@ -696,7 +688,6 @@ body.page-admin {
     .health-state {
         font-size: 11px;
         color: var(--text-dim);
-        text-transform: uppercase;
     }
     .health-meta {
         font-size: 11px;

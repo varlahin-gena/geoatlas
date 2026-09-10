@@ -161,7 +161,7 @@
 }
 
 .thresholds-code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-muted);
   background: color-mix(in srgb, var(--panel-3) 80%, transparent);
@@ -174,7 +174,7 @@
   font-size: 11px;
   color: var(--text-dim);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 6px;
   padding: 1px 8px;
 }
 
@@ -274,7 +274,7 @@
 }
 
 .anomalies-table .mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
 }
 
@@ -291,7 +291,7 @@
 .anomaly-sev-badge {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 6px;
   font-size: 11px;
   font-weight: 600;
   border: 1px solid var(--border);

@@ -7,6 +7,7 @@ import {
   type SearchTemplate as Template,
 } from '@/api/searchTemplates';
 import { useAuth } from '@/auth/AuthContext';
+import { EmptyState } from '@/components/Skeleton';
 import { useToast } from '@/components/Toast';
 import type { SearchField, SearchOp } from '@/lib/search';
 import { SEARCH_OP_DEFS } from '@/lib/search';
@@ -373,7 +374,11 @@ export function SearchBuilder({
           </div>
           <div className="search-templates-list">
             {!mine.length ? (
-              <div className="search-templates-empty">Пока нет шаблонов</div>
+              <EmptyState
+                compact
+                title="Нет личных шаблонов"
+                description="Сохраните текущий запрос в конструкторе — шаблон останется только у вашей учётной записи."
+              />
             ) : (
               mine.map((t) => (
                 <div key={t.id} className="search-template-card">
@@ -425,7 +430,11 @@ export function SearchBuilder({
           </div>
           <div className="search-templates-list">
             {!all.length ? (
-              <div className="search-templates-empty">Пусто</div>
+              <EmptyState
+                compact
+                title="Нет общих шаблонов"
+                description="Когда пользователи сохранят шаблоны, они появятся в этом списке."
+              />
             ) : (
               all.map((t) => (
                 <div key={t.id} className="search-template-card">

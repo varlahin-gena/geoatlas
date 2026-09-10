@@ -12,6 +12,7 @@ import { listUserDirectory, type UserDirectoryEntry } from '@/api/users';
 import { useAuth } from '@/auth/AuthContext';
 import { AdminLayout } from '@/components/AdminLayout';
 import { ObserveSectionNav } from '@/components/ObserveSectionNav';
+import { EmptyState, TableSkeleton } from '@/components/Skeleton';
 import { useToast } from '@/components/Toast';
 import { fmtDate, fmtNumber } from '@/lib/format';
 import {
@@ -93,7 +94,7 @@ export default function AnomaliesPage() {
   const [rows, setRows] = useState<AnomalyEvent[]>([]);
   const [summary, setSummary] = useState<AnomalySummary | null>(null);
   const [directory, setDirectory] = useState<UserDirectoryEntry[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [severity, setSeverity] = useState('');
   const [code, setCode] = useState('');
   const [sinceHours, setSinceHours] = useState('24');
@@ -146,6 +147,21 @@ export default function AnomaliesPage() {
       cancelled = true;
     };
   }, []);
+
+  const filtersActive =
+    Boolean(severity || code || search) ||
+    includeAcked ||
+    sinceHours !== '24' ||
+    limit !== '100';
+
+  function resetFilters() {
+    setSeverity('');
+    setCode('');
+    setSinceHours('24');
+    setIncludeAcked(false);
+    setLimit('100');
+    setSearch('');
+  }
 
   const filtered = useMemo(
     () => rows.filter((row) => matchesAnomalySearch(row, search)),
@@ -363,15 +379,30 @@ export default function AnomaliesPage() {
             </thead>
             <tbody>
               {loading && filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="empty">
-                    Загрузка…
-                  </td>
-                </tr>
+                <TableSkeleton cols={10} rows={6} />
               ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="empty">
-                    Нет алертов по текущим фильтрам
+                    <EmptyState
+                      compact
+                      title="Нет алертов по текущим фильтрам"
+                      description={
+                        filtersActive
+                          ? 'Сбросьте фильтры или расширьте период — возможно, события уже есть за другое окно.'
+                          : 'Когда движок зафиксирует аномалию, она появится здесь.'
+                      }
+                      action={
+                        filtersActive ? (
+                          <button type="button" className="btn" onClick={resetFilters}>
+                            Сбросить фильтры
+                          </button>
+                        ) : (
+                          <Link className="btn" to="/">
+                            Открыть карту
+                          </Link>
+                        )
+                      }
+                    />
                   </td>
                 </tr>
               ) : (

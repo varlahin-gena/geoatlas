@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from 'react';
 import { AdminSidebar, SystemHealthPill, UserMenu } from './Shell';
+import { PageSkeleton } from './Skeleton';
 
 export function AdminLayout({
   title,
@@ -39,20 +40,18 @@ export function AdminLayout({
             {subtitle ? <span className="sub">{subtitle}</span> : null}
           </div>
           <div className="topbar-spacer" />
-          <div className="topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="topbar-actions">
             {actions}
             <UserMenu />
             {showSystemHealth ? <SystemHealthPill /> : null}
           </div>
         </header>
-        <main className={mainClassName}>
-          {children}
-        </main>
+        <main className={mainClassName}>{children}</main>
       </div>
     </div>
   );
 }
 
 export function PageLoading({ label = 'Загрузка…' }: { label?: string }) {
-  return <div className="page-loading">{label}</div>;
+  return <PageSkeleton label={label} />;
 }

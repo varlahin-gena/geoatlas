@@ -579,7 +579,7 @@ export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
         outlineColor: [...outlineColor, 255] as [number, number, number, number],
         outlineWidth: 4,
         fontSettings: { sdf: true, fontSize: 64, buffer: 4 },
-        fontFamily: 'Arial, "Segoe UI", Roboto, sans-serif',
+        fontFamily: 'Geist, ui-sans-serif, system-ui, sans-serif',
         fontWeight: 700,
         getTextAnchor: 'middle',
         getAlignmentBaseline: 'center',

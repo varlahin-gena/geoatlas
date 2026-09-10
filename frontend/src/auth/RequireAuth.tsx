@@ -1,4 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom';
+import { PageSkeleton } from '@/components/Skeleton';
 import { useAuth } from './AuthContext';
 
 export function RequireAuth({
@@ -15,7 +16,7 @@ export function RequireAuth({
   const next = location.pathname + location.search;
 
   if (loading) {
-    return <div className="page-loading">Загрузка…</div>;
+    return <PageSkeleton />;
   }
 
   if (!user) {
