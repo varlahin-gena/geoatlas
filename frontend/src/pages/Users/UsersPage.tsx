@@ -13,6 +13,7 @@ import type { UserRole } from '@/api/types';
 import { ROLE_OPERATOR } from '@/api/types';
 import { USER_ROLE_OPTIONS } from '@/auth/roles';
 import { AdminLayout } from '@/components/AdminLayout';
+import { DataSectionNav } from '@/components/DataSectionNav';
 import { EmptyState, TableSkeleton } from '@/components/Skeleton';
 import { ReauthField, ReauthModal } from '@/components/ReauthModal';
 import { useToast } from '@/components/Toast';
@@ -99,6 +100,7 @@ export default function UsersPage() {
       }
     >
       <div className="page-content-inner narrow">
+        <DataSectionNav />
         <p className="page-lead">локальные учётные записи</p>
 
         <div className="card">

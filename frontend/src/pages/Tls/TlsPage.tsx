@@ -6,6 +6,7 @@ import {
   type TlsStatus,
 } from '@/api/system';
 import { AdminLayout } from '@/components/AdminLayout';
+import { DataSectionNav } from '@/components/DataSectionNav';
 import { ReauthField } from '@/components/ReauthModal';
 import { useToast } from '@/components/Toast';
 import { fmtDate } from '@/lib/format';
@@ -147,6 +148,7 @@ export default function TlsPage() {
       }
     >
       <div className="page-content-inner narrow">
+        <DataSectionNav />
         <p className="page-lead">
           Режим HTTPS задаётся в <code>.env</code> (<code>HTTPS_ENABLED</code>):{' '}
           <code>0</code> — только HTTP, <code>1</code> — всегда HTTPS, <code>auto</code> — HTTPS
