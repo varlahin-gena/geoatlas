@@ -8,12 +8,12 @@ import (
 
 	"geoatlas/internal/adapter/anomalyjob"
 	"geoatlas/internal/adapter/backupjob"
-	"geoatlas/internal/adapter/huntjob"
 	chadapter "geoatlas/internal/adapter/clickhouse"
 	"geoatlas/internal/adapter/datalock"
 	"geoatlas/internal/adapter/geojob"
 	"geoatlas/internal/adapter/heavytask"
 	httpapi "geoatlas/internal/adapter/httpapi"
+	"geoatlas/internal/adapter/huntjob"
 	"geoatlas/internal/adapter/ingestnet"
 	appmetrics "geoatlas/internal/adapter/metrics"
 	"geoatlas/internal/adapter/reputationjob"

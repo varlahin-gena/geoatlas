@@ -41,15 +41,15 @@ type CertInfo struct {
 }
 
 type Status struct {
-	Configured   bool     `json:"configured"`
-	Writable     bool     `json:"writable"`
-	CertPresent  bool     `json:"cert_present"`
-	KeyPresent   bool     `json:"key_present"`
-	HTTPSEnabled string   `json:"https_enabled"`
-	HTTPSPort    string   `json:"https_port"`
-	HTTPRedirect string   `json:"http_redirect"`
-	CertPath     string   `json:"cert_path,omitempty"`
-	KeyPath      string   `json:"key_path,omitempty"`
+	Configured   bool      `json:"configured"`
+	Writable     bool      `json:"writable"`
+	CertPresent  bool      `json:"cert_present"`
+	KeyPresent   bool      `json:"key_present"`
+	HTTPSEnabled string    `json:"https_enabled"`
+	HTTPSPort    string    `json:"https_port"`
+	HTTPRedirect string    `json:"http_redirect"`
+	CertPath     string    `json:"cert_path,omitempty"`
+	KeyPath      string    `json:"key_path,omitempty"`
 	Cert         *CertInfo `json:"cert,omitempty"`
 }
 
@@ -160,11 +160,11 @@ func (s *Service) Reload() ReloadResult {
 func validatePair(certPEM, keyPEM string) error {
 	cert, err := parseCertificateBlock(certPEM)
 	if err != nil {
-		return fmt.Errorf("%w: certificate: %v", ErrInvalidPEM, err)
+		return fmt.Errorf("%w: certificate: %w", ErrInvalidPEM, err)
 	}
 	key, err := parsePrivateKeyBlock(keyPEM)
 	if err != nil {
-		return fmt.Errorf("%w: private key: %v", ErrInvalidPEM, err)
+		return fmt.Errorf("%w: private key: %w", ErrInvalidPEM, err)
 	}
 	if err := keyMatchesCert(cert, key); err != nil {
 		return err
@@ -248,7 +248,7 @@ func keyMatchesCert(cert *x509.Certificate, key any) error {
 	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
 	keyDER, err := x509.MarshalPKCS8PrivateKey(key)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidPEM, err)
+		return fmt.Errorf("%w: %w", ErrInvalidPEM, err)
 	}
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER})
 	if _, err := tls.X509KeyPair(certPEM, keyPEM); err != nil {
@@ -289,7 +289,7 @@ func fileExists(path string) bool {
 }
 
 func dirWritable(dir string) bool {
- probe := filepath.Join(dir, ".write-probe")
+	probe := filepath.Join(dir, ".write-probe")
 	if err := os.WriteFile(probe, []byte("1"), 0o600); err != nil {
 		return false
 	}

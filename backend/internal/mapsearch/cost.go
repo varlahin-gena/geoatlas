@@ -13,9 +13,9 @@ const (
 	QueryCostMedium QueryCostTier = "medium"
 	QueryCostHeavy  QueryCostTier = "heavy"
 
-	mapLimitCapHeavy      = 3000
-	mapLimitCapHeavyFilt  = 8000
-	mapLimitCapMedium     = 10000
+	mapLimitCapHeavy     = 3000
+	mapLimitCapHeavyFilt = 8000
+	mapLimitCapMedium    = 10000
 )
 
 // MapQueryCostInput — параметры для оценки стоимости запроса карты.

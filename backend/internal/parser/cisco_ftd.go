@@ -62,6 +62,52 @@ func (p *CiscoFTD) ShouldSkip(line string) bool {
 	return len(ipv4RE.FindAllString(line, 2)) < 2
 }
 
+type ftdConnExt struct {
+	srcIP, dstIP, srcPort, dstPort               string
+	action, rule, proto                          string
+	ingressZone, ingressIf, egressZone, egressIf string
+	initiatorBytes, responderBytes               string
+	initiatorPackets, responderPackets           string
+	firstPacketSecond                            string
+}
+
+func (e *ftdConnExt) set(k, v string) {
+	switch k {
+	case "SrcIP":
+		e.srcIP = v
+	case "DstIP":
+		e.dstIP = v
+	case "SrcPort":
+		e.srcPort = v
+	case "DstPort":
+		e.dstPort = v
+	case "AccessControlRuleAction":
+		e.action = v
+	case "AccessControlRuleName":
+		e.rule = v
+	case "Protocol":
+		e.proto = v
+	case "IngressZone":
+		e.ingressZone = v
+	case "IngressInterface":
+		e.ingressIf = v
+	case "EgressZone":
+		e.egressZone = v
+	case "EgressInterface":
+		e.egressIf = v
+	case "InitiatorBytes":
+		e.initiatorBytes = v
+	case "ResponderBytes":
+		e.responderBytes = v
+	case "InitiatorPackets":
+		e.initiatorPackets = v
+	case "ResponderPackets":
+		e.responderPackets = v
+	case "FirstPacketSecond":
+		e.firstPacketSecond = v
+	}
+}
+
 func parseFTDConnection(line string) (model.TrafficLog, bool) {
 	// Реальные логи (Cisco / Rapid7) могут начинать KV с любого из этих ключей,
 	// без EventPriority/DeviceUUID.
@@ -76,49 +122,81 @@ func parseFTDConnection(line string) (model.TrafficLog, bool) {
 	if idx == -1 {
 		return model.TrafficLog{}, false
 	}
-	kv := parseFTDKV(line[idx:])
 
-	src := strings.TrimSpace(kv["SrcIP"])
-	dst := strings.TrimSpace(kv["DstIP"])
-	if src == "" || dst == "" {
+	var f ftdConnExt
+	walkFTDKV(line[idx:], f.set)
+
+	if f.srcIP == "" || f.dstIP == "" {
 		return model.TrafficLog{}, false
 	}
 
 	base := newCiscoBase(line, "cisco-ftd")
 
 	// Приоритет времени: FirstPacketSecond > syslog-префикс > время приёма.
-	if fps := strings.TrimSpace(kv["FirstPacketSecond"]); fps != "" {
-		if t, err := time.Parse(time.RFC3339, fps); err == nil {
+	if f.firstPacketSecond != "" {
+		if t, err := time.Parse(time.RFC3339, f.firstPacketSecond); err == nil {
 			base.Timestamp = t
 		}
 	}
 
-	base.SrcIP = src
-	base.DstIP = dst
-	base.SrcPort = parseUint32(kv["SrcPort"])
-	base.DstPort = parseUint32(kv["DstPort"])
-	base.Action = normalizeFTDAction(kv["AccessControlRuleAction"])
-	base.Rule = strings.TrimSpace(kv["AccessControlRuleName"])
-	base.Proto = strings.ToUpper(strings.TrimSpace(kv["Protocol"]))
+	srcZone := f.ingressZone
+	if srcZone == "" {
+		srcZone = f.ingressIf
+	}
+	dstZone := f.egressZone
+	if dstZone == "" {
+		dstZone = f.egressIf
+	}
+
+	proto := f.proto
+	if proto != "" {
+		proto = strings.ToUpper(proto)
+	}
+
+	base.SrcIP = f.srcIP
+	base.DstIP = f.dstIP
+	base.SrcPort = parseUint32(f.srcPort)
+	base.DstPort = parseUint32(f.dstPort)
+	base.Action = normalizeFTDAction(f.action)
+	base.Rule = f.rule
+	base.Proto = proto
 	// В логах встречаются и Zone, и Interface (docs Rapid7 / Cisco SFIMS).
-	base.SrcZone = firstNonEmpty(kv["IngressZone"], kv["IngressInterface"])
-	base.DstZone = firstNonEmpty(kv["EgressZone"], kv["EgressInterface"])
-	base.BytesSent = parseUint64(kv["InitiatorBytes"])
-	base.BytesRecv = parseUint64(kv["ResponderBytes"])
-	base.PacketsSent = parseUint64(kv["InitiatorPackets"])
-	base.PacketsRecv = parseUint64(kv["ResponderPackets"])
+	base.SrcZone = srcZone
+	base.DstZone = dstZone
+	base.BytesSent = parseUint64(f.initiatorBytes)
+	base.BytesRecv = parseUint64(f.responderBytes)
+	base.PacketsSent = parseUint64(f.initiatorPackets)
+	base.PacketsRecv = parseUint64(f.responderPackets)
 	return base, true
 }
 
-// parseFTDKV парсит формат "Key1: value1, Key2: value2, ...".
-func parseFTDKV(s string) map[string]string {
-	out := make(map[string]string, 32)
-	for _, p := range strings.Split(s, ", ") {
-		if kv := strings.SplitN(p, ":", 2); len(kv) == 2 {
-			out[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+// walkFTDKV вызывает fn для каждой пары "Key: value" в формате
+// "Key1: value1, Key2: value2, ..." — то же разбиение, что у прежнего
+// strings.Split(s, ", ") + SplitN(":", 2).
+func walkFTDKV(s string, fn func(key, val string)) {
+	start := 0
+	n := len(s)
+	for i := 0; i < n; i++ {
+		if s[i] != ',' || i+1 >= n || s[i+1] != ' ' {
+			continue
 		}
+		emitFTDKVPart(s[start:i], fn)
+		start = i + 2
+		i++ // skip the space; loop ++ moves past it
 	}
-	return out
+	emitFTDKVPart(s[start:], fn)
+}
+
+func emitFTDKVPart(p string, fn func(key, val string)) {
+	colon := strings.IndexByte(p, ':')
+	if colon < 0 {
+		return
+	}
+	key := strings.TrimSpace(p[:colon])
+	if key == "" {
+		return
+	}
+	fn(key, strings.TrimSpace(p[colon+1:]))
 }
 
 func normalizeFTDAction(action string) string {

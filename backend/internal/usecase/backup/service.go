@@ -61,18 +61,18 @@ type Status struct {
 
 // Catalog — список + настройки для UI.
 type Catalog struct {
-	OK           bool      `json:"ok"`
-	Enabled      bool      `json:"enabled"`
-	DirReady     bool      `json:"dir_ready"`
-	Keep         int       `json:"keep"`
-	IncludeEdges bool      `json:"include_edges"`
-	IncludeAuth  bool      `json:"include_auth"`
-	Attached     string    `json:"attached,omitempty"`
-	Schedule     Schedule  `json:"schedule"`
-	NextRunAt    string    `json:"next_run_at,omitempty"`
-	Backups      []Entry   `json:"backups"`
-	Status       Status    `json:"status"`
-	Hint         string    `json:"hint,omitempty"`
+	OK           bool     `json:"ok"`
+	Enabled      bool     `json:"enabled"`
+	DirReady     bool     `json:"dir_ready"`
+	Keep         int      `json:"keep"`
+	IncludeEdges bool     `json:"include_edges"`
+	IncludeAuth  bool     `json:"include_auth"`
+	Attached     string   `json:"attached,omitempty"`
+	Schedule     Schedule `json:"schedule"`
+	NextRunAt    string   `json:"next_run_at,omitempty"`
+	Backups      []Entry  `json:"backups"`
+	Status       Status   `json:"status"`
+	Hint         string   `json:"hint,omitempty"`
 }
 
 // Runner — native BACKUP / RESTORE / DROP в ClickHouse.
@@ -250,17 +250,17 @@ func (s *Service) GetSchedule() (Schedule, error) {
 		return Schedule{}, err
 	}
 	normalized, err := ValidateSchedule(out)
-	if err != nil {
-		seed := DefaultsSchedule(s.opts)
-		seed.LastRunAt = out.LastRunAt
-		seed.LastRunDate = out.LastRunDate
-		s.dropStaleScheduleLastRun(&seed)
-		return seed, nil
+	if err == nil {
+		normalized.LastRunAt = out.LastRunAt
+		normalized.LastRunDate = out.LastRunDate
+		s.dropStaleScheduleLastRun(&normalized)
+		return normalized, nil
 	}
-	normalized.LastRunAt = out.LastRunAt
-	normalized.LastRunDate = out.LastRunDate
-	s.dropStaleScheduleLastRun(&normalized)
-	return normalized, nil
+	seed := DefaultsSchedule(s.opts)
+	seed.LastRunAt = out.LastRunAt
+	seed.LastRunDate = out.LastRunDate
+	s.dropStaleScheduleLastRun(&seed)
+	return seed, nil
 }
 
 func (s *Service) UpdateSchedule(ctx context.Context, in Schedule, actor string) (Schedule, error) {
@@ -323,7 +323,7 @@ func (s *Service) TickAutoCreate(parent context.Context, now time.Time) {
 	s.lastFireDate = dateKey
 	s.mu.Unlock()
 
-		if err := s.ScheduleCreate(parent, SourceSchedule, "scheduler"); err != nil {
+	if err := s.ScheduleCreate(parent, SourceSchedule, "scheduler"); err != nil {
 		// ErrBusy / недоступность — снимем dedupe, чтобы тикер догнал позже сегодня.
 		s.clearLastFireDate()
 		return

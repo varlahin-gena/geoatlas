@@ -12,8 +12,8 @@ import (
 	usecaseaudit "geoatlas/internal/usecase/auditlog"
 	usecasebackup "geoatlas/internal/usecase/backup"
 	usecaseretention "geoatlas/internal/usecase/retention"
-	usecasetls "geoatlas/internal/usecase/tls"
 	"geoatlas/internal/usecase/system"
+	usecasetls "geoatlas/internal/usecase/tls"
 )
 
 type systemStatsPayload struct {
@@ -175,9 +175,9 @@ func (h *SystemHandler) PutRetention(w http.ResponseWriter, r *http.Request) {
 		Result:       "succeeded",
 		IP:           clientIPFromRequest(r),
 		Details: map[string]any{
-			"traffic_logs_days": out.TrafficLogsDays,
-			"edges_days":        out.EdgesDays,
-			"parse_errors_days": out.ParseErrorsDays,
+			"traffic_logs_days":   out.TrafficLogsDays,
+			"edges_days":          out.EdgesDays,
+			"parse_errors_days":   out.ParseErrorsDays,
 			"system_metrics_days": out.SystemMetricsDays,
 		},
 	})

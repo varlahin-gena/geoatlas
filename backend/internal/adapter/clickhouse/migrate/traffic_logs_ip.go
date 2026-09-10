@@ -9,6 +9,7 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
+	"geoatlas/internal/adapter/clickhouse/chexchange"
 	"geoatlas/internal/model"
 )
 
@@ -104,11 +105,10 @@ func EnsureTrafficLogsIPv4(ctx context.Context, ch clickhouse.Conn) error {
 		return fmt.Errorf("copy traffic_logs → layout: %w", err)
 	}
 
-	if err := execDDL(ctx, ch, fmt.Sprintf("EXCHANGE TABLES traffic_logs AND %s", trafficLogsIPv4Next)); err != nil {
-		dropNext()
+	ddl := func(ctx context.Context, q string) error { return execDDL(ctx, ch, q) }
+	if err := chexchange.SwapAndDrop(ctx, ddl, "traffic_logs", trafficLogsIPv4Next); err != nil {
 		return fmt.Errorf("exchange traffic_logs: %w", err)
 	}
-	dropNext()
 
 	if err := setSchemaVersion(ctx, ch, schemaComponentTrafficLogsIP, schemaVersionTrafficLogsIP); err != nil {
 		return fmt.Errorf("set traffic_logs_ip schema version: %w", err)

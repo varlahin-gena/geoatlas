@@ -10,6 +10,7 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2"
 
 	"geoatlas/internal/adapter/clickhouse/aggstate"
+	"geoatlas/internal/adapter/clickhouse/chexchange"
 	"geoatlas/internal/adapter/clickhouse/query"
 	"geoatlas/internal/adapter/clickhouse/sqlclause"
 )
@@ -95,15 +96,10 @@ func applyEdgesAggSchema(ctx context.Context, ch clickhouse.Conn) error {
 			return err
 		}
 		if needRebuild {
-			_ = execDDL(ctx, ch, "DROP TABLE IF EXISTS "+next)
-			if err := execDDL(ctx, ch, createTable(next)); err != nil {
-				return fmt.Errorf("create %s: %w", next, err)
+			ddl := func(ctx context.Context, q string) error { return execDDL(ctx, ch, q) }
+			if err := chexchange.RebuildViaNext(ctx, ddl, table, next, createTable(next)); err != nil {
+				return err
 			}
-			if err := execDDL(ctx, ch, fmt.Sprintf("EXCHANGE TABLES %s AND %s", table, next)); err != nil {
-				_ = execDDL(ctx, ch, "DROP TABLE IF EXISTS "+next)
-				return fmt.Errorf("exchange %s: %w", table, err)
-			}
-			_ = execDDL(ctx, ch, "DROP TABLE IF EXISTS "+next)
 			slog.Info("edges agg: traffic_edges_daily rebuilt", "reason", reason, "note", "backfill required")
 		} else if err := ensureTTLOnlyDropPartsSetting(ctx, ch, table); err != nil {
 			return err
@@ -268,7 +264,7 @@ func insertIPEdgesDays(ctx context.Context, ch clickhouse.Conn, table string, da
 		timeExpr, timeAlias = "toDate(traffic_logs.timestamp)", "day"
 		groupExtra = "day, src_ip, dst_ip"
 	}
-	fromSQL := fmt.Sprintf("FROM traffic_logs\n\t\tWHERE %s", sqlclause.HourTimestampRangeSQL("traffic_logs.timestamp"))
+	fromSQL := "FROM traffic_logs\n\t\tWHERE " + sqlclause.HourTimestampRangeSQL("traffic_logs.timestamp")
 	insertTpl := fmt.Sprintf(`
 		INSERT INTO %s
 		%s

@@ -2,6 +2,7 @@ package ingestnet
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"testing"
 )
@@ -20,7 +21,7 @@ func FuzzFrameReader(f *testing.F) {
 		for i := 0; i < 64; i++ {
 			_, err := fr.ReadLine()
 			if err != nil {
-				if err == io.EOF || err == io.ErrUnexpectedEOF {
+				if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 					return
 				}
 				return

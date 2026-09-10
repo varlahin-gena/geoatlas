@@ -8,25 +8,25 @@ import (
 
 // MapSearchColumns — выражения ClickHouse (не user input) для bind-предикатов mapsearch.
 type MapSearchColumns struct {
-	AllConcat   string
-	IP          []string
-	Port        []string
-	Country     []string
-	City        []string
-	Action      []string
-	Device      []string
-	SrcIP       []string
-	DstIP       []string
-	SrcPort     []string
-	DstPort     []string
-	SrcCountry  []string
-	DstCountry  []string
-	SrcCity     []string
-	DstCity     []string
-	Src         []string
-	Dst         []string
-	Proto       []string
-	Zone        []string
+	AllConcat  string
+	IP         []string
+	Port       []string
+	Country    []string
+	City       []string
+	Action     []string
+	Device     []string
+	SrcIP      []string
+	DstIP      []string
+	SrcPort    []string
+	DstPort    []string
+	SrcCountry []string
+	DstCountry []string
+	SrcCity    []string
+	DstCity    []string
+	Src        []string
+	Dst        []string
+	Proto      []string
+	Zone       []string
 }
 
 func (c MapSearchColumns) cols(f mapsearch.Field) []string {
@@ -73,69 +73,69 @@ func (c MapSearchColumns) cols(f mapsearch.Field) []string {
 }
 
 var LogsMapSearchColumns = MapSearchColumns{
-	AllConcat: "concat_ws(' ', toString(src_ip), toString(dst_ip), toString(src_port), toString(dst_port), src_country, dst_country, src_city, dst_city, action, device, proto, src_zone, dst_zone)",
-	IP:        []string{"toString(src_ip)", "toString(dst_ip)"},
-	Port:      []string{"toString(src_port)", "toString(dst_port)"},
-	Country:   []string{"src_country", "dst_country"},
-	City:      []string{"src_city", "dst_city"},
-	Action:    []string{"action"},
-	Device:    []string{"device"},
-	SrcIP:     []string{"toString(src_ip)"},
-	DstIP:     []string{"toString(dst_ip)"},
-	SrcPort:   []string{"toString(src_port)"},
-	DstPort:   []string{"toString(dst_port)"},
+	AllConcat:  "concat_ws(' ', toString(src_ip), toString(dst_ip), toString(src_port), toString(dst_port), src_country, dst_country, src_city, dst_city, action, device, proto, src_zone, dst_zone)",
+	IP:         []string{"toString(src_ip)", "toString(dst_ip)"},
+	Port:       []string{"toString(src_port)", "toString(dst_port)"},
+	Country:    []string{"src_country", "dst_country"},
+	City:       []string{"src_city", "dst_city"},
+	Action:     []string{"action"},
+	Device:     []string{"device"},
+	SrcIP:      []string{"toString(src_ip)"},
+	DstIP:      []string{"toString(dst_ip)"},
+	SrcPort:    []string{"toString(src_port)"},
+	DstPort:    []string{"toString(dst_port)"},
 	SrcCountry: []string{"src_country"},
 	DstCountry: []string{"dst_country"},
-	SrcCity:   []string{"src_city"},
-	DstCity:   []string{"dst_city"},
-	Src:       []string{"toString(src_ip)", "src_country"},
-	Dst:       []string{"toString(dst_ip)", "dst_country"},
-	Proto:     []string{"proto"},
-	Zone:      []string{"src_zone", "dst_zone"},
+	SrcCity:    []string{"src_city"},
+	DstCity:    []string{"dst_city"},
+	Src:        []string{"toString(src_ip)", "src_country"},
+	Dst:        []string{"toString(dst_ip)", "dst_country"},
+	Proto:      []string{"proto"},
+	Zone:       []string{"src_zone", "dst_zone"},
 }
 
 var GeoMapSearchColumns = MapSearchColumns{
-	AllConcat: "concat_ws(' ', src_key, dst_key, src_label, dst_label, toString(src_port), toString(dst_port), src_country, dst_country, src_city, dst_city, last_action, device, proto)",
-	IP:        []string{"src_key", "dst_key", "src_label", "dst_label"},
-	Port:      []string{"toString(src_port)", "toString(dst_port)"},
-	Country:   []string{"src_country", "dst_country", "src_key", "dst_key"},
-	City:      []string{"src_city", "dst_city", "src_label", "dst_label"},
-	Action:    []string{"last_action"},
-	Device:    []string{"device"},
-	SrcIP:     []string{"src_key", "src_label"},
-	DstIP:     []string{"dst_key", "dst_label"},
-	SrcPort:   []string{"toString(src_port)"},
-	DstPort:   []string{"toString(dst_port)"},
+	AllConcat:  "concat_ws(' ', src_key, dst_key, src_label, dst_label, toString(src_port), toString(dst_port), src_country, dst_country, src_city, dst_city, last_action, device, proto)",
+	IP:         []string{"src_key", "dst_key", "src_label", "dst_label"},
+	Port:       []string{"toString(src_port)", "toString(dst_port)"},
+	Country:    []string{"src_country", "dst_country", "src_key", "dst_key"},
+	City:       []string{"src_city", "dst_city", "src_label", "dst_label"},
+	Action:     []string{"last_action"},
+	Device:     []string{"device"},
+	SrcIP:      []string{"src_key", "src_label"},
+	DstIP:      []string{"dst_key", "dst_label"},
+	SrcPort:    []string{"toString(src_port)"},
+	DstPort:    []string{"toString(dst_port)"},
 	SrcCountry: []string{"src_country"},
 	DstCountry: []string{"dst_country"},
-	SrcCity:   []string{"src_city", "src_label"},
-	DstCity:   []string{"dst_city", "dst_label"},
-	Src:       []string{"src_key", "src_label", "src_country"},
-	Dst:       []string{"dst_key", "dst_label", "dst_country"},
-	Proto:     []string{"proto"},
-	Zone:      []string{"src_key", "dst_key"},
+	SrcCity:    []string{"src_city", "src_label"},
+	DstCity:    []string{"dst_city", "dst_label"},
+	Src:        []string{"src_key", "src_label", "src_country"},
+	Dst:        []string{"dst_key", "dst_label", "dst_country"},
+	Proto:      []string{"proto"},
+	Zone:       []string{"src_key", "dst_key"},
 }
 
 var IPAggMapSearchColumns = MapSearchColumns{
-	AllConcat: "concat_ws(' ', toString(src_ip), toString(dst_ip), toString(src_port), toString(dst_port), src_country, dst_country, src_city, dst_city, last_action, device, proto)",
-	IP:        []string{"toString(src_ip)", "toString(dst_ip)"},
-	Port:      []string{"toString(src_port)", "toString(dst_port)"},
-	Country:   []string{"src_country", "dst_country"},
-	City:      []string{"src_city", "dst_city"},
-	Action:    []string{"last_action"},
-	Device:    []string{"device"},
-	SrcIP:     []string{"toString(src_ip)"},
-	DstIP:     []string{"toString(dst_ip)"},
-	SrcPort:   []string{"toString(src_port)"},
-	DstPort:   []string{"toString(dst_port)"},
+	AllConcat:  "concat_ws(' ', toString(src_ip), toString(dst_ip), toString(src_port), toString(dst_port), src_country, dst_country, src_city, dst_city, last_action, device, proto)",
+	IP:         []string{"toString(src_ip)", "toString(dst_ip)"},
+	Port:       []string{"toString(src_port)", "toString(dst_port)"},
+	Country:    []string{"src_country", "dst_country"},
+	City:       []string{"src_city", "dst_city"},
+	Action:     []string{"last_action"},
+	Device:     []string{"device"},
+	SrcIP:      []string{"toString(src_ip)"},
+	DstIP:      []string{"toString(dst_ip)"},
+	SrcPort:    []string{"toString(src_port)"},
+	DstPort:    []string{"toString(dst_port)"},
 	SrcCountry: []string{"src_country"},
 	DstCountry: []string{"dst_country"},
-	SrcCity:   []string{"src_city"},
-	DstCity:   []string{"dst_city"},
-	Src:       []string{"toString(src_ip)", "src_country"},
-	Dst:       []string{"toString(dst_ip)", "dst_country"},
-	Proto:     []string{"proto"},
-	Zone:      []string{"toString(src_ip)", "toString(dst_ip)"},
+	SrcCity:    []string{"src_city"},
+	DstCity:    []string{"dst_city"},
+	Src:        []string{"toString(src_ip)", "src_country"},
+	Dst:        []string{"toString(dst_ip)", "dst_country"},
+	Proto:      []string{"proto"},
+	Zone:       []string{"toString(src_ip)", "toString(dst_ip)"},
 }
 
 var countryNeedles = map[string][]string{

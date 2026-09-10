@@ -15,11 +15,11 @@ import (
 
 	"geoatlas/internal/adapter/geoipcodec"
 	"geoatlas/internal/adapter/httpapi"
+	"geoatlas/internal/adapter/ingestnet"
 	"geoatlas/internal/adapter/parseradapter"
 	"geoatlas/internal/auth"
 	"geoatlas/internal/config"
 	"geoatlas/internal/geoip"
-	"geoatlas/internal/adapter/ingestnet"
 	"geoatlas/internal/model"
 	"geoatlas/internal/parser"
 	usecaseauth "geoatlas/internal/usecase/auth"

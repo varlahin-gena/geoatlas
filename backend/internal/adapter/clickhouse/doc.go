@@ -11,12 +11,13 @@
 //	clickhouse/aggstate      — EdgesAggStatus, PreferDailyEdgesAgg, PreferGeoEdgesAgg, PreferHourlyEdgesAgg
 //	clickhouse/sqlclause     — actionWhere / sumBlocked / geo key exprs
 //	clickhouse/migrate       — schema_version, Ensure*, DDL, backfill edges/geo/hourly
+//	clickhouse/chexchange    — EXCHANGE TABLES helpers (staging replace / rebuild via next)
 //	clickhouse/query         — ScanRawAggsForTimeRange, ScanGeoEdges*, TimeRange, ConfigureQuerySettings
 //
 // Правила импорта:
-//   - siblings may import parent (Conn/Pools), sqlclause, query, migrate, aggstate
+//   - siblings may import parent (Conn/Pools), sqlclause, query, migrate, aggstate, chexchange
 //   - siblings must NOT import each other if avoidable
-//   - migrate и query могут импортировать aggstate и sqlclause;
+//   - migrate и query могут импортировать aggstate, sqlclause и chexchange;
 //     migrate может импортировать query (AggSettings);
 //     migrate/query не импортируют parent clickhouse и не импортируют siblings
 //

@@ -37,16 +37,16 @@ func (c ClickHouseConfig) Addr() string {
 type Config struct {
 	parseErrors []string
 
-	ListenAddr           string
-	QueryTimeout         time.Duration
-	AllowMultiInstance   bool
-	MaxLogUploadSize     int64
-	RetentionFile        string
-	SearchTemplatesFile  string
-	HuntsFile            string
-	InstallProfilePath   string
-	InstallMetaPath      string
-	SyslogStatsURL       string // SYSLOG_STATS_URL; empty = do not scrape syslog-ng
+	ListenAddr          string
+	QueryTimeout        time.Duration
+	AllowMultiInstance  bool
+	MaxLogUploadSize    int64
+	RetentionFile       string
+	SearchTemplatesFile string
+	HuntsFile           string
+	InstallProfilePath  string
+	InstallMetaPath     string
+	SyslogStatsURL      string // SYSLOG_STATS_URL; empty = do not scrape syslog-ng
 
 	ClickHouse  ClickHouseConfig
 	Backup      BackupConfig

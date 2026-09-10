@@ -1,13 +1,10 @@
 package parser
 
 import (
-	"regexp"
 	"strings"
 )
 
-var cefKeyValueRE = regexp.MustCompile(`(?:^|\s)([A-Za-z0-9_.-]+)=`)
-
-// CEFHeader — поля заголовка CEF
+// CEFHeader — поля заголовка CEF.
 type CEFHeader struct {
 	Version     string
 	Vendor      string
@@ -18,50 +15,141 @@ type CEFHeader struct {
 	Severity    string
 }
 
-// ParseCEF разбирает CEF-строку.
-// Возвращает header, extension map и часть до CEF: (syslog header).
-func ParseCEF(line string) (CEFHeader, map[string]string, string, bool) {
+// cefVendor возвращает поле Vendor (между первым и вторым '|') без аллокаций.
+func cefVendor(line string) (string, bool) {
 	pos := strings.Index(line, "CEF:")
-	if pos == -1 {
-		return CEFHeader{}, nil, "", false
+	if pos < 0 {
+		return "", false
 	}
-	parts := strings.SplitN(line[pos:], "|", 8)
-	if len(parts) < 8 {
-		return CEFHeader{}, nil, "", false
+	i := pos + 4
+	n := len(line)
+	for i < n && (line[i] == ' ' || line[i] == '\t') {
+		i++
 	}
-	h := CEFHeader{
-		Version:     strings.TrimPrefix(parts[0], "CEF:"),
-		Vendor:      parts[1],
-		Product:     parts[2],
-		ProductVer:  parts[3],
-		SignatureID: parts[4],
-		Name:        parts[5],
-		Severity:    parts[6],
+	for i < n && line[i] != '|' {
+		i++
 	}
-	return h, parseCEFExtension(parts[7]), line[:pos], true
+	if i >= n {
+		return "", false
+	}
+	i++
+	start := i
+	for i < n && line[i] != '|' {
+		i++
+	}
+	if i >= n {
+		return "", false
+	}
+	return line[start:i], true
 }
 
-func parseCEFExtension(ext string) map[string]string {
-	matches := cefKeyValueRE.FindAllStringSubmatchIndex(ext, -1)
-	out := make(map[string]string, len(matches))
-	for i, m := range matches {
-		key := ext[m[2]:m[3]]
-		valStart := m[1]
-		valEnd := len(ext)
-		if i+1 < len(matches) {
-			valEnd = matches[i+1][0]
-		}
-		out[key] = strings.TrimSpace(ext[valStart:valEnd])
+// parseCEF разбирает CEF-строку: header, сырой extension и syslog-префикс до "CEF:".
+// Поля header и ext — срезы исходной строки, без копирования.
+func parseCEF(line string) (CEFHeader, string, string, bool) {
+	pos := strings.Index(line, "CEF:")
+	if pos < 0 {
+		return CEFHeader{}, "", "", false
 	}
-	return out
+	i := pos + 4
+	n := len(line)
+	for i < n && (line[i] == ' ' || line[i] == '\t') {
+		i++
+	}
+	var fields [7]string
+	start := i
+	fi := 0
+	for i < n && fi < 7 {
+		if line[i] == '|' {
+			fields[fi] = line[start:i]
+			fi++
+			i++
+			start = i
+			continue
+		}
+		i++
+	}
+	if fi < 7 {
+		return CEFHeader{}, "", "", false
+	}
+	h := CEFHeader{
+		Version:     fields[0],
+		Vendor:      fields[1],
+		Product:     fields[2],
+		ProductVer:  fields[3],
+		SignatureID: fields[4],
+		Name:        fields[5],
+		Severity:    fields[6],
+	}
+	return h, line[start:], line[:pos], true
+}
+
+func isCEFKeyByte(c byte) bool {
+	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+		(c >= '0' && c <= '9') || c == '_' || c == '.' || c == '-'
+}
+
+func isCEFSpace(c byte) bool {
+	return c == ' ' || c == '\t'
+}
+
+// walkCEFExt вызывает fn для каждой пары key=value в CEF extension.
+// Граница значения — следующий пробел (или таб) перед токеном key=, как у
+// прежнего regexp `(?:^|\s)([A-Za-z0-9_.-]+)=`. Unescape CEF не делается.
+func walkCEFExt(ext string, fn func(key, val string)) {
+	n := len(ext)
+	i := 0
+	for i < n {
+		for i < n && isCEFSpace(ext[i]) {
+			i++
+		}
+		if i >= n {
+			return
+		}
+		keyStart := i
+		for i < n && isCEFKeyByte(ext[i]) {
+			i++
+		}
+		if i == keyStart || i >= n || ext[i] != '=' {
+			for i < n && !isCEFSpace(ext[i]) {
+				i++
+			}
+			continue
+		}
+		key := ext[keyStart:i]
+		i++
+		valStart := i
+		valEnd := n
+		for j := i; j < n; j++ {
+			if !isCEFSpace(ext[j]) {
+				continue
+			}
+			k := j + 1
+			for k < n && isCEFSpace(ext[k]) {
+				k++
+			}
+			ks := k
+			for k < n && isCEFKeyByte(ext[k]) {
+				k++
+			}
+			if k > ks && k < n && ext[k] == '=' {
+				valEnd = j
+				break
+			}
+		}
+		fn(key, strings.TrimSpace(ext[valStart:valEnd]))
+		i = valEnd
+	}
 }
 
 // extractDeviceFromCEF извлекает имя устройства из syslog header или CEF extension.
-func extractDeviceFromCEF(syslogPrefix string, ext map[string]string) string {
-	for _, k := range []string{"deviceExternalId", "dvchost", "dvc"} {
-		if v := strings.TrimSpace(ext[k]); v != "" && v != "-" {
-			return v
-		}
+func extractDeviceFromCEF(syslogPrefix, deviceExternalId, dvchost, dvc string) string {
+	switch {
+	case deviceExternalId != "" && deviceExternalId != "-":
+		return deviceExternalId
+	case dvchost != "" && dvchost != "-":
+		return dvchost
+	case dvc != "" && dvc != "-":
+		return dvc
 	}
 	fields := strings.Fields(syslogPrefix)
 	if len(fields) > 0 {

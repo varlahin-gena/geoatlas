@@ -9,6 +9,7 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2"
 
 	"geoatlas/internal/adapter/clickhouse/aggstate"
+	"geoatlas/internal/adapter/clickhouse/chexchange"
 	"geoatlas/internal/adapter/clickhouse/query"
 	"geoatlas/internal/adapter/clickhouse/sqlclause"
 )
@@ -238,15 +239,10 @@ func ensureGeoEdgesTable(ctx context.Context, ch clickhouse.Conn, groupBy string
 			return err
 		}
 		if !isDayPartitionKey(pk) {
-			_ = execDDL(ctx, ch, "DROP TABLE IF EXISTS "+next)
-			if err := execDDL(ctx, ch, createTable(next)); err != nil {
-				return fmt.Errorf("create %s: %w", next, err)
+			ddl := func(ctx context.Context, q string) error { return execDDL(ctx, ch, q) }
+			if err := chexchange.RebuildViaNext(ctx, ddl, table, next, createTable(next)); err != nil {
+				return err
 			}
-			if err := execDDL(ctx, ch, fmt.Sprintf("EXCHANGE TABLES %s AND %s", table, next)); err != nil {
-				_ = execDDL(ctx, ch, "DROP TABLE IF EXISTS "+next)
-				return fmt.Errorf("exchange %s: %w", table, err)
-			}
-			_ = execDDL(ctx, ch, "DROP TABLE IF EXISTS "+next)
 			slog.Info("geo edges agg: table rebuilt", "table", table, "reason", "partition_key "+pk, "note", "backfill required")
 		} else if err := ensureTTLOnlyDropPartsSetting(ctx, ch, table); err != nil {
 			return err
@@ -343,7 +339,7 @@ func insertGeoEdgesDays(ctx context.Context, ch clickhouse.Conn, groupBy string,
 	srcKey, dstKey, srcLabel, dstLabel := sqlclause.GeoGroupExprsPrefixed("traffic_logs", groupBy)
 	selectBody := geoEdgesAggSelectBody(srcKey, dstKey, srcLabel, dstLabel, sqlclause.GeoCoordOK)
 	// Plain traffic_logs: enrich JOIN OOMs on small CH hosts; map overlays ga_geo_enrich_ip on read.
-	fromSQL := fmt.Sprintf("FROM traffic_logs\n\t\tWHERE %s", sqlclause.HourTimestampRangeSQL("traffic_logs.timestamp"))
+	fromSQL := "FROM traffic_logs\n\t\tWHERE " + sqlclause.HourTimestampRangeSQL("traffic_logs.timestamp")
 
 	insertTpl := fmt.Sprintf(`
 		INSERT INTO %s
