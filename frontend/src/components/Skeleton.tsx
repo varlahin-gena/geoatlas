@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 /** Shimmer line block. */
-export function SkeletonLine({
+function SkeletonLine({
   width = '100%',
   height = 12,
   className = '',
