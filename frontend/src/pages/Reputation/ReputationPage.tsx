@@ -14,7 +14,6 @@ import {
 import { useAuth } from '@/auth/AuthContext';
 import { AdminLayout } from '@/components/AdminLayout';
 import { EmptyState, TableSkeleton } from '@/components/Skeleton';
-import { ObserveSectionNav } from '@/components/ObserveSectionNav';
 import { useToast } from '@/components/Toast';
 import { fmtDate, fmtNumber } from '@/lib/format';
 
@@ -194,7 +193,6 @@ export default function ReputationPage() {
         </>
       }
     >
-      <ObserveSectionNav />
       <div className="page-content-inner">
         <p className="page-lead">
           URL-фиды хранятся в <code>reputation_feeds.json</code> и обновляются по расписанию. Форматы:{' '}

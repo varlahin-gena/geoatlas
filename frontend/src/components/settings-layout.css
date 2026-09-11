@@ -1,0 +1,88 @@
+.settings-shell {
+  display: grid;
+  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr);
+  gap: 0;
+  min-height: 0;
+  flex: 1;
+  height: 100%;
+}
+
+.settings-panes {
+  border-right: 1px solid var(--border);
+  padding: 12px 8px;
+  overflow: auto;
+  background: var(--panel);
+}
+
+.settings-pane-group {
+  margin-bottom: 12px;
+}
+
+.settings-pane-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  padding: 6px 10px 4px;
+}
+
+.settings-pane-link {
+  display: block;
+  padding: 7px 10px;
+  border-radius: 6px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.settings-pane-link:hover {
+  background: var(--panel-3);
+}
+
+.settings-pane-link.active {
+  background: var(--panel-3);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.settings-content {
+  min-width: 0;
+  overflow: auto;
+  padding: 20px 24px;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 860px) {
+  .settings-shell {
+    grid-template-columns: 1fr;
+  }
+  .settings-panes {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    padding: 10px 12px;
+  }
+  .settings-pane-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    margin: 0;
+  }
+  .settings-pane-label {
+    width: 100%;
+    padding: 4px 6px 2px;
+  }
+  .settings-content {
+    padding: 16px;
+  }
+}
+
+/* When SettingsLayout owns the scroll, AdminLayout page-content should not double-pad. */
+body.page-admin .admin-main > .page-content:has(.settings-shell) {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}

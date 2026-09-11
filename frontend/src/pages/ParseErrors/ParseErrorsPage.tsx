@@ -6,8 +6,7 @@ import {
   listParseErrors,
   type ParseErrorRow,
 } from '@/api/parseErrors';
-import { AdminLayout } from '@/components/AdminLayout';
-import { DataSectionNav } from '@/components/DataSectionNav';
+import { SettingsLayout } from '@/components/SettingsLayout';
 import { EmptyState, TableSkeleton } from '@/components/Skeleton';
 import { useToast } from '@/components/Toast';
 import { fmtDate } from '@/lib/format';
@@ -55,9 +54,8 @@ export default function ParseErrorsPage() {
   }
 
   return (
-    <AdminLayout title="Ошибки парсинга">
+    <SettingsLayout title="Ошибки парсинга">
       <div className="page-content-inner">
-        <DataSectionNav />
         <h1>Строки, которые не удалось нормализовать</h1>
         <p className="page-lead">
           Сюда попадают строки логов, которые ingest не смог разобрать. TTL — 7 дней; записи можно
@@ -191,6 +189,6 @@ export default function ParseErrorsPage() {
           </table>
         </div>
       </div>
-    </AdminLayout>
+    </SettingsLayout>
   );
 }

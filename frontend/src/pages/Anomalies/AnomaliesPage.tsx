@@ -11,9 +11,10 @@ import {
 import { listUserDirectory, type UserDirectoryEntry } from '@/api/users';
 import { useAuth } from '@/auth/AuthContext';
 import { AdminLayout } from '@/components/AdminLayout';
-import { ObserveSectionNav } from '@/components/ObserveSectionNav';
+import { TriageSectionNav } from '@/components/ObserveSectionNav';
 import { EmptyState, TableSkeleton } from '@/components/Skeleton';
 import { useToast } from '@/components/Toast';
+import { COPY } from '@/lib/glossary';
 import { fmtDate, fmtNumber } from '@/lib/format';
 import {
   ANOMALY_CODE_OPTIONS,
@@ -53,7 +54,7 @@ function EpisodesPanel({
         if (!cancelled) setEpisodes(data.episodes || []);
       })
       .catch((e) => {
-        if (!cancelled) toast(e instanceof Error ? e.message : 'Episodes failed', 'error');
+        if (!cancelled) toast(e instanceof Error ? e.message : COPY.episodesLoadFailed, 'error');
       });
     return () => {
       cancelled = true;
@@ -268,7 +269,7 @@ export default function AnomaliesPage() {
   return (
     <AdminLayout title="Аномалии">
       <div className="page-content-inner wide">
-        <ObserveSectionNav />
+        <TriageSectionNav />
 
         <p className="page-lead">
           Алерты, которые сканер обнаружил в трафике за выбранный период. Закрытие скрывает алерт и

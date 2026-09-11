@@ -67,9 +67,9 @@ export function MapLayersPanel({ open, viewMode, viz, data, globe }: MapLayersPa
   if (!open) return null;
 
   return (
-    <div className="map-chrome-panel map-layers-panel" role="dialog" aria-label="Слои карты">
+    <div className="map-chrome-panel map-layers-panel" role="dialog" aria-label="Вид карты">
       <div className="map-chrome-panel-head">
-        <span>Слои</span>
+        <span>Вид</span>
       </div>
 
       <div className="map-chrome-panel-section">

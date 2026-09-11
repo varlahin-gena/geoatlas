@@ -69,8 +69,10 @@ describe('classifyEmptyMap', () => {
       skippedNoGeo: 12,
       filterActive: false,
       searchError: '',
+      isAdmin: true,
     });
     expect(noGeo?.reason).toBe('no_geo');
+    expect(noGeo?.action?.kind).toBe('open-geo-wizard');
 
     const noEvents = classifyEmptyMap({
       loading: false,
@@ -83,6 +85,22 @@ describe('classifyEmptyMap', () => {
       searchError: '',
     });
     expect(noEvents?.reason).toBe('no_events');
+    expect(noEvents?.action?.kind).toBe('set-period-7d');
+  });
+
+  it('gives operator a geo-missing CTA without upload', () => {
+    const noGeo = classifyEmptyMap({
+      loading: false,
+      fetchError: null,
+      linesCount: 0,
+      visibleCount: 0,
+      rawPairs: 4,
+      skippedNoGeo: 4,
+      filterActive: false,
+      searchError: '',
+      isAdmin: false,
+    });
+    expect(noGeo?.action?.kind).toBe('open-geo-missing');
   });
 
   it('reports filtered when lines exist but none visible', () => {
@@ -97,6 +115,7 @@ describe('classifyEmptyMap', () => {
       searchError: '',
     });
     expect(filtered?.reason).toBe('filtered');
+    expect(filtered?.action?.kind).toBe('reset-filters');
   });
 });
 

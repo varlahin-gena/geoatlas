@@ -11,7 +11,7 @@ import type { MapLine } from '@/api/eventsTypes';
 import { listUserDirectory, type UserDirectoryEntry } from '@/api/users';
 import { useAuth } from '@/auth/AuthContext';
 import { AdminLayout } from '@/components/AdminLayout';
-import { ObserveSectionNav } from '@/components/ObserveSectionNav';
+import { TriageSectionNav } from '@/components/ObserveSectionNav';
 import { useToast } from '@/components/Toast';
 import { fmtDate, fmtNumber } from '@/lib/format';
 import { AnomalyPeersPanel } from '@/pages/Anomalies/AnomalyPeersPanel';
@@ -237,7 +237,7 @@ export default function InvestigatePage() {
   return (
     <AdminLayout title="Разбор">
       <div className="page-content-inner wide">
-        <ObserveSectionNav />
+        <TriageSectionNav />
 
         <p className="page-lead">
           Рабочее место расследования по одному алерту: контекст, связи из карты, ack/assign и

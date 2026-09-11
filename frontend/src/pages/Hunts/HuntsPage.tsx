@@ -9,8 +9,10 @@ import {
 } from '@/api/hunts';
 import { huntMapHref } from '@/pages/Hunts/huntMapState';
 import { AdminLayout } from '@/components/AdminLayout';
+import { TriageSectionNav } from '@/components/ObserveSectionNav';
 import { EmptyState, ContentSkeleton } from '@/components/Skeleton';
 import { useToast } from '@/components/Toast';
+import { COPY } from '@/lib/glossary';
 import { fmtDate, fmtNumber } from '@/lib/format';
 import './hunts.css';
 
@@ -34,14 +36,14 @@ export default function HuntsPage() {
       const data = await listMyHunts();
       setRows(data.hunts || []);
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Не удалось загрузить hunts', 'error');
+      toast(e instanceof Error ? e.message : COPY.huntsLoadFailed, 'error');
     } finally {
       setLoading(false);
     }
   }, [toast]);
 
   useEffect(() => {
-    document.title = 'ГеоАтлас — Saved hunts';
+    document.title = 'ГеоАтлас — Охоты';
   }, []);
 
   useEffect(() => {
@@ -71,7 +73,7 @@ export default function HuntsPage() {
   }
 
   async function onDelete(id: string) {
-    if (!confirm('Удалить hunt?')) return;
+    if (!confirm(COPY.huntDeleteConfirm)) return;
     try {
       await deleteHunt(id);
       setRows((prev) => prev.filter((h) => h.id !== id));
@@ -97,8 +99,9 @@ export default function HuntsPage() {
   }
 
   return (
-    <AdminLayout title="Saved hunts">
+    <AdminLayout title="Охоты">
       <div className="page-content-inner wide">
+        <TriageSectionNav />
         <p className="page-lead">
           Сохранённые запросы карты с полным контекстом (период, группировка, фильтры). Расписание
           запускает snapshot-прогон; при превышении порога создаётся алерт{' '}
@@ -109,7 +112,7 @@ export default function HuntsPage() {
           <Link to="/">вернуться на карту</Link>.
         </p>
 
-        {loading ? <ContentSkeleton label="Загрузка hunts…" /> : null}
+        {loading ? <ContentSkeleton label={COPY.huntsLoading} /> : null}
 
         {!loading ? (
         <div className="hunts-grid">
@@ -165,8 +168,8 @@ export default function HuntsPage() {
 
         {!loading && !rows.length ? (
           <EmptyState
-            title="Нет saved hunts"
-            description="Сохраните текущий вид карты кнопкой «Охота» — период, группировка и фильтры останутся в одном месте."
+            title={COPY.huntsEmptyTitle}
+            description={COPY.huntsEmptyDesc}
             action={
               <Link className="btn primary" to="/">
                 Открыть карту

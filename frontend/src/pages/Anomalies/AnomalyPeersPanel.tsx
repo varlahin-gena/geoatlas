@@ -3,6 +3,7 @@ import type { AnomalyEvent } from '@/api/anomalies';
 import { fetchMapEvents } from '@/api/events';
 import type { MapLine } from '@/api/eventsTypes';
 import { fmtNumber } from '@/lib/format';
+import { COPY, TERM } from '@/lib/glossary';
 import { anomalyEventsHours, anomalyEventsQuery } from './anomalyDisplay';
 
 export function AnomalyPeersPanel({
@@ -66,26 +67,26 @@ export function AnomalyPeersPanel({
   return (
     <div className="anomaly-peers-panel">
       <div className="anomaly-peers-head">
-        <strong>Связи источника</strong>
+        <strong title={TERM.peerHint}>{COPY.peersHead}</strong>
         <span className="hint">
           /api/events · {hours}ч · q={q}
         </span>
         {toolbar ? <div className="anomaly-peers-toolbar">{toolbar}</div> : null}
       </div>
-      {loading ? <p className="hint">Загрузка связей…</p> : null}
+      {loading ? <p className="hint">{COPY.peersLoading}</p> : null}
       {error ? <p className="hint warn-banner">{error}</p> : null}
       {!loading && !error && lines.length === 0 ? (
-        <p className="hint">Нет рёбер за выбранное окно (часто для private IP без гео).</p>
+        <p className="hint">{COPY.peersEmpty}</p>
       ) : null}
       {lines.length > 0 ? (
         <div className="table-wrap">
           <table className="anomalies-table anomaly-peers-table">
             <thead>
               <tr>
-                <th scope="col">Src</th>
-                <th scope="col">Dst</th>
+                <th scope="col">Источник</th>
+                <th scope="col">Назначение</th>
                 <th scope="col">Порт</th>
-                <th scope="col">Action</th>
+                <th scope="col">Действие</th>
                 <th scope="col">Событий</th>
               </tr>
             </thead>

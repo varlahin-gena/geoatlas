@@ -5,6 +5,7 @@ import { isAbortError } from '@/api/client';
 import { fetchSystemStatus, fetchSystemVersion } from '@/api/system';
 import { roleLabelRu } from '@/auth/roles';
 import { themeLabel } from '@/auth/theme';
+import { densityLabel, getDensity, toggleDensity, type UiDensity } from '@/auth/density';
 import { ReauthModal } from '@/components/ReauthModal';
 import { useToast } from '@/components/Toast';
 import { usePolling } from '@/lib/usePolling';
@@ -40,7 +41,7 @@ export function AdminSidebar() {
 }
 
 export function UserMenu() {
-  const { user, theme, toggleTheme, logout, logoutAll } = useAuth();
+  const { user, themePreference, toggleTheme, logout, logoutAll } = useAuth();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [logoutAllOpen, setLogoutAllOpen] = useState(false);
@@ -48,7 +49,14 @@ export function UserMenu() {
   const [logoutAllBusy, setLogoutAllBusy] = useState(false);
   const [versionText, setVersionText] = useState('');
   const [versionTitle, setVersionTitle] = useState('');
+  const [density, setDensity] = useState<UiDensity>(getDensity());
   const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onDensity = () => setDensity(getDensity());
+    document.addEventListener('ga-density-change', onDensity);
+    return () => document.removeEventListener('ga-density-change', onDensity);
+  }, []);
 
   useEffect(() => {
     if (!user || user.authDisabled) return;
@@ -138,7 +146,19 @@ export function UserMenu() {
           }}
         >
           <span>Тема</span>
-          <span className="ga-theme-value">{themeLabel(theme)}</span>
+          <span className="ga-theme-value">{themeLabel(themePreference)}</span>
+        </button>
+        <button
+          type="button"
+          className="ga-user-menu-item"
+          role="menuitem"
+          onClick={(e) => {
+            e.stopPropagation();
+            setDensity(toggleDensity());
+          }}
+        >
+          <span>Плотность</span>
+          <span className="ga-theme-value">{densityLabel(density)}</span>
         </button>
         <div className="ga-user-menu-sep" />
         <button
@@ -216,7 +236,7 @@ export function SystemHealthPill() {
           .join('\n');
         if (lvl === 'error') {
           setLevel('bad');
-          setText(`⚠ ${count} проблем`);
+          setText(`${count} проблем`);
           setTitle(alertTitle || 'Есть проблемы');
         } else if (lvl === 'warn') {
           setLevel('warn');
@@ -241,7 +261,7 @@ export function SystemHealthPill() {
   const cls = `status-pill${level === 'bad' ? ' bad' : level === 'warn' ? ' warn' : level === 'ok' ? ' ok' : ''}`;
   const content = (
     <>
-      <span className="dot" />
+      <span className="dot" aria-hidden="true" />
       <span>{text}</span>
       <svg className="status-pill-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
         <path d="M14 3h7v7M10 14L21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5" />
@@ -256,13 +276,16 @@ export function SystemHealthPill() {
         className={cls}
         style={{ textDecoration: 'none', cursor: 'pointer' }}
         title={title}
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
       >
         {content}
       </Link>
     );
   }
   return (
-    <span className={cls} title={title}>
+    <span className={cls} title={title} role="status" aria-live="polite" aria-atomic="true">
       {content}
     </span>
   );

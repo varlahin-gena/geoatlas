@@ -4,7 +4,12 @@ import { useToast } from '@/components/Toast';
 import { mapViewToHuntState } from '@/pages/Hunts/huntMapState';
 import { promptSaveHuntFromMap } from '@/pages/Hunts/saveHuntFromMap';
 import { SearchBuilder } from './SearchBuilder';
-import { countActiveMapFilters, MapFiltersPanel } from './MapFiltersPanel';
+import {
+  countActiveMapFilters,
+  describeActiveMapFilters,
+  MapFilterChipsBar,
+  MapFiltersPanel,
+} from './MapFiltersPanel';
 import { MapLayersPanel } from './MapLayersPanel';
 import { PERIODS } from './mapPeriods';
 import type { MapRefreshSec } from './mapRefreshInterval';
@@ -176,9 +181,28 @@ export function MapTopbar({
     setRepLists(new Set());
     setRepSide('any');
     setRepColorArcs(false);
+    setSearch('');
   }
 
+  const filterChips = describeActiveMapFilters({
+    groupBy,
+    filter,
+    repFilterCount,
+    repColorArcs,
+    hideIntraCountry,
+    search,
+    setGroupBy,
+    setFilter,
+    setHideIntraCountry,
+    setRepCategories,
+    setRepLists,
+    setRepSide,
+    setRepColorArcs,
+    setSearch,
+  });
+
   return (
+    <div className="map-chrome">
     <header className="topbar">
       <div className="search-box">
         <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -302,7 +326,7 @@ export function MapTopbar({
           aria-haspopup="dialog"
           onClick={() => openPanel('layers')}
         >
-          Слои
+          Вид
         </button>
         <MapLayersPanel
           open={panel === 'layers'}
@@ -317,5 +341,7 @@ export function MapTopbar({
       <UserMenu />
       <SystemHealthPill />
     </header>
+    <MapFilterChipsBar chips={filterChips} onResetAll={resetFilters} />
+    </div>
   );
 }

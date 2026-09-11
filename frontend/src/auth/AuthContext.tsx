@@ -12,7 +12,7 @@ import { SESSION_EXPIRED_EVENT } from '@/api/client';
 import * as authApi from '@/api/auth';
 import type { AuthUser } from '@/api/types';
 import { safeNext } from '@/lib/format';
-import { getTheme, toggleTheme, type Theme } from './theme';
+import { getTheme, getThemePreference, toggleTheme, type Theme, type ThemePreference } from './theme';
 import { deriveIsAdmin, deriveReputationEnabled, deriveUiAuthEnabled } from './roles';
 
 interface AuthContextValue {
@@ -21,12 +21,16 @@ interface AuthContextValue {
   isAdmin: boolean;
   reputationEnabled: boolean;
   uiAuthEnabled: boolean;
+  /** Resolved light/dark for map, charts, CSS. */
   theme: Theme;
+  /** Stored preference (may be system). */
+  themePreference: ThemePreference;
   refresh: () => Promise<AuthUser | null>;
   login: (username: string, password: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
   /** Завершить все сессии (все устройства) и перейти на /login. */
   logoutAll: (currentPassword: string) => Promise<void>;
+  /** Cycles system → light → dark → system. */
   toggleTheme: () => void;
 }
 
@@ -36,8 +40,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [theme, setThemeState] = useState<Theme>(getTheme());
+  const [themePreference, setThemePreferenceState] = useState<ThemePreference>(getThemePreference());
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    const onTheme = (e: Event) => {
+      const detail = (e as CustomEvent<{ theme?: string }>).detail;
+      if (detail?.theme === 'light' || detail?.theme === 'dark') {
+        setThemeState(detail.theme);
+      }
+      setThemePreferenceState(getThemePreference());
+    };
+    document.addEventListener('ga-theme-change', onTheme);
+    return () => document.removeEventListener('ga-theme-change', onTheme);
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -103,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const doToggleTheme = useCallback(() => {
     setThemeState(toggleTheme());
+    setThemePreferenceState(getThemePreference());
   }, []);
 
   const value = useMemo<AuthContextValue>(() => {
@@ -113,13 +131,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       reputationEnabled: deriveReputationEnabled(user),
       uiAuthEnabled: deriveUiAuthEnabled(user),
       theme,
+      themePreference,
       refresh,
       login,
       logout,
       logoutAll,
       toggleTheme: doToggleTheme,
     };
-  }, [user, loading, theme, refresh, login, logout, logoutAll, doToggleTheme]);
+  }, [user, loading, theme, themePreference, refresh, login, logout, logoutAll, doToggleTheme]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -1,7 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { putRetention } from '@/api/system';
 import { AdminLayout } from '@/components/AdminLayout';
-import { ObserveSectionNav } from '@/components/ObserveSectionNav';
 import { useToast } from '@/components/Toast';
 import { fmtNumber } from '@/lib/format';
 import 'uplot/dist/uPlot.min.css';
@@ -176,7 +175,6 @@ export default function SystemPage() {
         </>
       }
     >
-      <ObserveSectionNav />
       <div className="content-chrome">
         <section
           className={`chrome-section chrome-alerts${alerts.length ? '' : ' chrome-alerts--empty'}`}

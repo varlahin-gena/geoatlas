@@ -9,13 +9,12 @@ import {
 } from './nav';
 
 describe('filterNav role access', () => {
-  it('operator and dashboard share non-admin nav (map + anomalies, no system)', () => {
+  it('operator and dashboard share non-admin nav (map + triage, no system)', () => {
     const opts = { isAdmin: false, reputationEnabled: true, uiAuthEnabled: true };
     const operatorNav = filterNav(PAGE_NAV, opts);
     const dashboardNav = filterNav(PAGE_NAV, opts);
     expect(operatorNav.map((i) => i.href)).toEqual(dashboardNav.map((i) => i.href));
-    expect(operatorNav.some((i) => i.href === '/')).toBe(true);
-    expect(operatorNav.some((i) => i.href === '/anomalies')).toBe(true);
+    expect(operatorNav.map((i) => i.href)).toEqual(['/', '/anomalies', '/investigate', '/hunts']);
     expect(operatorNav.some((i) => i.href === '/system')).toBe(false);
     expect(operatorNav.some((i) => i.href === '/users')).toBe(false);
   });
@@ -31,16 +30,20 @@ describe('groupNav', () => {
     const sections = groupNav(items);
     expect(sections.map((s) => s.id)).toEqual([
       'workspace',
-      'observe',
+      'triage',
+      'system',
       'data',
       'access',
     ]);
-    expect(sections.find((s) => s.id === 'observe')?.items.map((i) => i.href)).toEqual([
+    expect(sections.find((s) => s.id === 'triage')?.items.map((i) => i.href)).toEqual([
+      '/anomalies',
+      '/investigate',
+      '/hunts',
+    ]);
+    expect(sections.find((s) => s.id === 'system')?.items.map((i) => i.href)).toEqual([
       '/system',
       '/dozzle/',
-      '/anomalies',
       '/anomalies/engine',
-      '/hunts',
       '/reputation',
     ]);
     expect(sections.find((s) => s.id === 'data')?.items.map((i) => i.href)).toEqual([
@@ -59,29 +62,26 @@ describe('groupNav', () => {
       adminLinksOnly: true,
     });
     const sections = groupNav(items);
-    expect(sections.map((s) => s.id)).toEqual(['observe', 'data', 'access']);
+    expect(sections.map((s) => s.id)).toEqual(['system', 'data', 'access']);
     expect(sections.every((s) => s.items.every((i: NavItem) => i.adminOnly))).toBe(true);
   });
 });
 
 describe('splitNavItems', () => {
-  it('separates workspace, observe, and settings groups', () => {
+  it('separates workspace and flat sidebar sections', () => {
     const items = filterNav(PAGE_NAV, {
       isAdmin: true,
       reputationEnabled: true,
       uiAuthEnabled: true,
     });
-    const { workspace, observe, settings } = splitNavItems(items);
+    const { workspace, sections } = splitNavItems(items);
     expect(workspace.map((i) => i.href)).toEqual(['/']);
-    expect(observe.map((i) => i.label)).toEqual([
-      'Мониторинг системы',
-      'Логи контейнеров',
+    expect(sections.map((s) => s.id)).toEqual(['triage', 'system', 'data', 'access']);
+    expect(sections.find((s) => s.id === 'triage')?.items.map((i) => i.label)).toEqual([
       'Аномалии',
-      'Движок аномалий',
-      'Saved hunts',
-      'Репутация IP',
+      'Разбор',
+      'Охоты',
     ]);
-    expect(settings.map((s) => s.id)).toEqual(['data', 'access']);
   });
 });
 

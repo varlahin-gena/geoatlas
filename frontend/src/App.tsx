@@ -4,6 +4,7 @@ import { AuthProvider } from '@/auth/AuthContext';
 import { RequireAuth } from '@/auth/RequireAuth';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ToastProvider } from '@/components/Toast';
+import { CommandPaletteHost } from '@/components/CommandPalette';
 import { PageLoading } from '@/components/AdminLayout';
 import LoginPage from '@/pages/Login/LoginPage';
 import ChangePasswordPage from '@/pages/ChangePassword/ChangePasswordPage';
@@ -38,6 +39,7 @@ export default function App() {
       <ErrorBoundary label="приложение">
         <AuthProvider>
           <ToastProvider>
+            <CommandPaletteHost />
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               <Route
@@ -162,7 +164,7 @@ export default function App() {
                 path="/hunts"
                 element={
                   <RequireAuth>
-                    <Lazy label="saved hunts">
+                    <Lazy label="охоты">
                       <HuntsPage />
                     </Lazy>
                   </RequireAuth>

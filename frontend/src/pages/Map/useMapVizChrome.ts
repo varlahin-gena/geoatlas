@@ -12,7 +12,12 @@ export function useMapVizChrome() {
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [showCountryLabels, setShowCountryLabels] = useState(false);
   const [monoArcs, setMonoArcs] = useState(false);
-  const [autoRotate, setAutoRotate] = useState(true);
+  const [autoRotate, setAutoRotate] = useState(() => {
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+      return !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
+    return true;
+  });
 
   useEffect(() => {
     if (infoDockTab === 'legend' && !showLegend) {

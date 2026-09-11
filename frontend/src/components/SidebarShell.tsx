@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useSidebarCollapsed } from './useSidebarCollapsed';
 
 function SidebarBrand() {
   return (
@@ -10,15 +11,20 @@ function SidebarBrand() {
 }
 
 export function SidebarCollapseButton({ onToggle }: { onToggle: () => void }) {
+  const { collapsed } = useSidebarCollapsed();
+  const label = collapsed ? 'Развернуть меню' : 'Свернуть меню';
+
   return (
     <div className="sidebar-collapse-btn">
       <button
         type="button"
         className="side-btn"
-        title="Развернуть / свернуть меню"
+        title={label}
+        aria-label={label}
+        aria-expanded={!collapsed}
         onClick={onToggle}
       >
-        <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
           <path d="M15 18l-6-6 6-6" />
         </svg>
         <span className="label">Свернуть меню</span>

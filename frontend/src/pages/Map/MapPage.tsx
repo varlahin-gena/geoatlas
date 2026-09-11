@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthContext';
 import { useToast } from '@/components/Toast';
 import { useSidebarCollapsed } from '@/components/useSidebarCollapsed';
 import { fmtNumber } from '@/lib/format';
+import { GA_MAP_COMMAND, isMapCommandDetail } from '@/lib/mapCommandBus';
 import { loadCountriesGeoJSON, type GeoFeatureCollection } from './mapHeatmap';
+import type { EmptyMapActionKind } from './geoWizard';
 import { MapDetailPanel } from './mapDetail';
 import { collectReputationMenuTree } from './mapReputation';
 import { MapChromeProvider, useMapChrome } from './MapChromeContext';
@@ -44,8 +47,8 @@ function MapChromeShell({
   activeAlert,
   returnToLiveMap,
   anomaliesSummary,
-  geoWizardOpen,
   displayEmptyOverlay,
+  onEmptyAction,
   monoArcs,
   repColorArcs,
   stats,
@@ -65,8 +68,8 @@ function MapChromeShell({
   activeAlert: ReturnType<typeof readMapAlert>;
   returnToLiveMap: () => void;
   anomaliesSummary: ReturnType<typeof useMapAnomalies>['summary'];
-  geoWizardOpen: () => void;
   displayEmptyOverlay: ReturnType<typeof useMapFilters>['emptyOverlay'];
+  onEmptyAction: (kind: EmptyMapActionKind) => void;
   monoArcs: boolean;
   repColorArcs: boolean;
   stats: ReturnType<typeof useMapFilters>['stats'];
@@ -105,15 +108,13 @@ function MapChromeShell({
 
           {showGeoEmptyBanner ? (
             <div className="geo-wizard-banner" role="status">
-              <p>База GeoIP пуста — карта не покажет дуги без координат.</p>
-              <button type="button" className="btn primary" onClick={geoWizardOpen}>
-                Мастер GeoIP
-              </button>
+              <p>База GeoIP пуста — загрузите координаты через карточку на карте.</p>
             </div>
           ) : null}
 
           <MapVizOverlays
             emptyOverlay={displayEmptyOverlay}
+            onEmptyAction={onEmptyAction}
             loading={loading}
             monoArcs={monoArcs}
             repColorArcs={repColorArcs}
@@ -136,6 +137,7 @@ function MapChromeShell({
 export default function MapPage() {
   const { isAdmin, reputationEnabled, uiAuthEnabled, theme, user, refresh } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const { collapsed: sidebarCollapsed, toggle: toggleSidebar } = useSidebarCollapsed();
   const view = useMapViewQuery();
   const {
@@ -182,6 +184,45 @@ export default function MapPage() {
     repCategoryList,
     repListList,
   } = useMapReputation(groupBy);
+
+  useEffect(() => {
+    function onCmd(e: Event) {
+      const detail = (e as CustomEvent).detail;
+      if (!isMapCommandDetail(detail)) return;
+      if (detail.type === 'set-period') {
+        setPeriod(detail.period);
+        return;
+      }
+      if (detail.type === 'reset-filters') {
+        setGroupBy('ip');
+        setFilter('all');
+        setHideIntraCountry(false);
+        setRepCategories(new Set());
+        setRepLists(new Set());
+        setRepSide('any');
+        setRepColorArcs(false);
+        setSearch('');
+        return;
+      }
+      if (detail.type === 'focus-search') {
+        const input = document.querySelector<HTMLInputElement>('.topbar .search-box input');
+        input?.focus();
+        input?.select();
+      }
+    }
+    document.addEventListener(GA_MAP_COMMAND, onCmd);
+    return () => document.removeEventListener(GA_MAP_COMMAND, onCmd);
+  }, [
+    setPeriod,
+    setGroupBy,
+    setFilter,
+    setHideIntraCountry,
+    setRepCategories,
+    setRepLists,
+    setRepSide,
+    setRepColorArcs,
+    setSearch,
+  ]);
 
   const {
     points,
@@ -246,6 +287,7 @@ export default function MapPage() {
     focusedCountry,
     groupBy,
     hideIntraCountry,
+    isAdmin,
   });
 
   const geoWizard = useGeoWizard({
@@ -374,10 +416,36 @@ export default function MapPage() {
   const showGeoEmptyBanner =
     isAdmin && !geoWizard.visible && geoWizard.geo != null && geoWizard.geo.count === 0;
 
-  const displayEmptyOverlay =
-    showGeoEmptyBanner && emptyOverlay?.title === 'Нет координат для карты'
-      ? null
-      : emptyOverlay;
+  const displayEmptyOverlay = emptyOverlay;
+
+  function onEmptyAction(kind: EmptyMapActionKind) {
+    if (kind === 'open-geo-wizard') {
+      geoWizard.open();
+      return;
+    }
+    if (kind === 'open-geo-missing') {
+      navigate('/geo-missing');
+      return;
+    }
+    if (kind === 'set-period-7d') {
+      setPeriod('7d');
+      return;
+    }
+    if (kind === 'reset-filters') {
+      setGroupBy('ip');
+      setFilter('all');
+      setHideIntraCountry(false);
+      setRepCategories(new Set());
+      setRepLists(new Set());
+      setRepSide('any');
+      setRepColorArcs(false);
+      setSearch('');
+      return;
+    }
+    if (kind === 'clear-search') {
+      setSearch('');
+    }
+  }
 
   const reloadGeoStatus = geoWizard.reloadStatus;
 
@@ -480,8 +548,8 @@ export default function MapPage() {
         activeAlert={activeAlert}
         returnToLiveMap={returnToLiveMap}
         anomaliesSummary={anomalies.summary}
-        geoWizardOpen={geoWizard.open}
         displayEmptyOverlay={displayEmptyOverlay}
+        onEmptyAction={onEmptyAction}
         monoArcs={viz.monoArcs}
         repColorArcs={repColorArcs}
         stats={stats}

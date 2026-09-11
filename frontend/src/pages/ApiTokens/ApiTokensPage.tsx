@@ -1,10 +1,10 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { createToken, deleteToken, listTokens, rotateToken, type TokenRow, type TokenScope } from '@/api/tokens';
-import { AdminLayout } from '@/components/AdminLayout';
-import { DataSectionNav } from '@/components/DataSectionNav';
+import { SettingsLayout } from '@/components/SettingsLayout';
 import { EmptyState, TableSkeleton } from '@/components/Skeleton';
 import { ReauthField, ReauthModal } from '@/components/ReauthModal';
 import { useToast } from '@/components/Toast';
+import { scopeLabel, scopeOptionLabel, TERM } from '@/lib/glossary';
 import { fmtDate } from '@/lib/format';
 
 type ExpiryPreset = 'never' | '30d' | '90d' | '365d';
@@ -88,7 +88,7 @@ export default function ApiTokensPage() {
   }
 
   return (
-    <AdminLayout
+    <SettingsLayout
       title="API-токены"
       actions={
         <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
@@ -97,7 +97,6 @@ export default function ApiTokensPage() {
       }
     >
       <div className="page-content-inner narrow">
-        <DataSectionNav />
         <div className="card">
           <h2>Токены</h2>
           <div className="table-wrap">
@@ -105,7 +104,7 @@ export default function ApiTokensPage() {
               <thead>
                 <tr>
                   <th scope="col">Имя</th>
-                  <th scope="col">Scope</th>
+                  <th scope="col">{TERM.scope}</th>
                   <th scope="col">Создан</th>
                   <th scope="col">Истекает</th>
                   <th scope="col">
@@ -142,7 +141,9 @@ export default function ApiTokensPage() {
                     <tr key={t.id}>
                       <td>{t.name}</td>
                       <td>
-                        <span className="scope-badge">{t.scope}</span>
+                        <span className="scope-badge" title={t.scope}>
+                          {scopeLabel(t.scope)}
+                        </span>
                       </td>
                       <td>{fmtDate(t.created_at)}</td>
                       <td>{t.expires_at ? fmtDate(t.expires_at) : '—'}</td>
@@ -225,8 +226,8 @@ export default function ApiTokensPage() {
             >
               <h3 id="create-token-title">Создать API-токен</h3>
               <p className="hint" style={{ marginTop: 0 }}>
-                Scope: <b>read</b> — карта; <b>ops</b> — ingest/upload; <b>admin</b> — как env Bearer
-                (полный API).
+                {TERM.scope}: <b>read</b> — карта; <b>ops</b> — ingest/upload; <b>admin</b> — как env
+                Bearer (полный API).
               </p>
               <div className="field">
                 <label htmlFor="cName">Имя</label>
@@ -240,15 +241,15 @@ export default function ApiTokensPage() {
                 />
               </div>
               <div className="field">
-                <label htmlFor="cScope">Scope</label>
+                <label htmlFor="cScope">{TERM.scope}</label>
                 <select
                   id="cScope"
                   value={scope}
                   onChange={(e) => setScope(e.target.value as TokenScope)}
                 >
-                  <option value="read">read</option>
-                  <option value="ops">ops</option>
-                  <option value="admin">admin</option>
+                  <option value="read">{scopeOptionLabel('read')}</option>
+                  <option value="ops">{scopeOptionLabel('ops')}</option>
+                  <option value="admin">{scopeOptionLabel('admin')}</option>
                 </select>
               </div>
               <div className="field">
@@ -326,6 +327,6 @@ export default function ApiTokensPage() {
         }}
       />
       <style>{`.actions { display: flex; flex-wrap: wrap; gap: 6px; }`}</style>
-    </AdminLayout>
+    </SettingsLayout>
   );
 }
