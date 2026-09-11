@@ -116,7 +116,7 @@ function uint32ToIPv4(n: number): string {
   return `${(x >>> 24) & 255}.${(x >>> 16) & 255}.${(x >>> 8) & 255}.${x & 255}`;
 }
 
-export type EmptyMapReason =
+type EmptyMapReason =
   | 'loading'
   | 'error'
   | 'no_events'
@@ -132,7 +132,7 @@ export type EmptyMapActionKind =
   | 'reset-filters'
   | 'clear-search';
 
-export type EmptyMapAction = {
+type EmptyMapAction = {
   label: string;
   kind: EmptyMapActionKind;
 };

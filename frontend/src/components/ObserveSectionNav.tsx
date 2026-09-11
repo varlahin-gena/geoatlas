@@ -36,6 +36,3 @@ export function TriageSectionNav() {
     </nav>
   );
 }
-
-/** @deprecated Use TriageSectionNav — kept as alias during migration. */
-export const ObserveSectionNav = TriageSectionNav;

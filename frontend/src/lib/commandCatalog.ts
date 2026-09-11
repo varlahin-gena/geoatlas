@@ -4,7 +4,7 @@ import { dispatchMapCommand } from '@/lib/mapCommandBus';
 import { cycleThemePreference } from '@/auth/theme';
 import { toggleDensity } from '@/auth/density';
 
-export type CommandGroup = 'navigate' | 'map' | 'triage' | 'prefs';
+type CommandGroup = 'navigate' | 'map' | 'triage' | 'prefs';
 
 export type AppCommand = {
   id: string;

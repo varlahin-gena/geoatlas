@@ -200,23 +200,6 @@ export function sectionBadgeTotal(
   return formatNavBadge(sum, 99);
 }
 
-/** @deprecated Use sectionBadgeTotal on each section; kept for call-site migration. */
-export function settingsBadgeTotal(
-  sections: NavGroupSection[],
-  badges: Record<string, string | null | undefined>,
-): string | null {
-  let sum = 0;
-  for (const section of sections) {
-    for (const item of section.items) {
-      const raw = badges[item.href];
-      if (!raw) continue;
-      const n = raw.endsWith('+') ? parseInt(raw, 10) : parseInt(raw, 10);
-      if (Number.isFinite(n)) sum += n;
-    }
-  }
-  return formatNavBadge(sum, 99);
-}
-
 function normalizePath(pathname: string): string {
   let p = pathname || '/';
   if (p.length > 1 && p.endsWith('/')) p = p.slice(0, -1);

@@ -6,7 +6,7 @@ export type Theme = 'light' | 'dark';
 /** Stored preference; `system` follows `prefers-color-scheme`. */
 export type ThemePreference = Theme | 'system';
 
-export function systemPrefersDark(): boolean {
+function systemPrefersDark(): boolean {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
     return true;
   }
@@ -63,7 +63,7 @@ function syncSystemListener(): void {
   mediaCleanup = () => mql.removeEventListener('change', onChange);
 }
 
-export function setThemePreference(pref: ThemePreference): Theme {
+function setThemePreference(pref: ThemePreference): Theme {
   try {
     localStorage.setItem(THEME_KEY, pref);
   } catch {

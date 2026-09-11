@@ -14,7 +14,7 @@ export function densityLabel(d: UiDensity): string {
   return d === 'compact' ? 'Компакт' : 'Комфорт';
 }
 
-export function applyDensity(d: UiDensity): UiDensity {
+function applyDensity(d: UiDensity): UiDensity {
   const next = d === 'compact' ? 'compact' : 'comfortable';
   document.documentElement.setAttribute('data-density', next);
   try {
