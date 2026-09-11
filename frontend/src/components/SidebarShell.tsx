@@ -33,12 +33,19 @@ export function SidebarCollapseButton({ onToggle }: { onToggle: () => void }) {
   );
 }
 
-/** Shared aside shell: brand + scrollable body + sticky collapse. */
-export function SidebarShell({ children }: { children: ReactNode }) {
+/** Shared aside shell: brand + scrollable body + fixed collapse footer. */
+export function SidebarShell({
+  children,
+  footer,
+}: {
+  children: ReactNode;
+  footer?: ReactNode;
+}) {
   return (
     <aside className="sidebar" aria-label="Навигация">
       <SidebarBrand />
-      {children}
+      <div className="sidebar-body">{children}</div>
+      {footer}
     </aside>
   );
 }

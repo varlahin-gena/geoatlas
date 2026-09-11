@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'react-router-dom';
 import {
   isNavActive,
@@ -68,17 +69,47 @@ function SectionFlyout({
   badges,
   pathname,
   onClose,
+  anchorRef,
 }: {
   section: NavGroupSection;
   badges: NavBadges;
   pathname: string;
   onClose: () => void;
+  anchorRef: RefObject<HTMLButtonElement | null>;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const anchor = anchorRef.current;
+    const panel = ref.current;
+    if (!anchor || !panel) return;
+
+    const place = () => {
+      const a = anchor.getBoundingClientRect();
+      const h = panel.offsetHeight;
+      const gap = 6;
+      let top = a.top;
+      if (top + h > window.innerHeight - 8) {
+        top = Math.max(8, window.innerHeight - h - 8);
+      }
+      setPos({ top, left: a.right + gap });
+    };
+
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [anchorRef]);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
-      if (ref.current?.contains(e.target as Node)) return;
+      const t = e.target as Node;
+      if (ref.current?.contains(t)) return;
+      if (anchorRef.current?.contains(t)) return;
       onClose();
     }
     function onKey(e: KeyboardEvent) {
@@ -90,10 +121,16 @@ function SectionFlyout({
       document.removeEventListener('mousedown', onDoc);
       document.removeEventListener('keydown', onKey);
     };
-  }, [onClose]);
+  }, [onClose, anchorRef]);
 
-  return (
-    <div className="nav-flyout" ref={ref} role="menu" aria-label={section.label}>
+  return createPortal(
+    <div
+      className="nav-flyout nav-flyout-portal"
+      ref={ref}
+      role="menu"
+      aria-label={section.label}
+      style={pos ? { top: pos.top, left: pos.left } : { visibility: 'hidden' }}
+    >
       <div className="nav-flyout-title">{section.label}</div>
       {section.items.map((item) => (
         <NavLinkItem
@@ -105,7 +142,8 @@ function SectionFlyout({
           onNavigate={onClose}
         />
       ))}
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -123,6 +161,7 @@ function NavSectionBlock({
   collapsed: boolean;
 }) {
   const [flyoutOpen, setFlyoutOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const badge = sectionBadgeTotal(section, badges);
   const hasActive = useMemo(
     () => section.items.some((item) => isNavActive(item, pathname)),
@@ -139,6 +178,7 @@ function NavSectionBlock({
     return (
       <div className={`${sectionClassName} nav-section-collapsed`}>
         <button
+          ref={triggerRef}
           type="button"
           className={`side-btn nav-section-trigger${hasActive ? ' active' : ''}${flyoutOpen ? ' open' : ''}`}
           aria-expanded={flyoutOpen}
@@ -156,6 +196,7 @@ function NavSectionBlock({
             badges={badges}
             pathname={pathname}
             onClose={() => setFlyoutOpen(false)}
+            anchorRef={triggerRef}
           />
         ) : null}
       </div>
