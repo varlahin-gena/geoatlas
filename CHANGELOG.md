@@ -5,6 +5,47 @@
 
 ## [Unreleased]
 
+## [2.5.0] — 2026-09-11
+
+Минор: redesign SPA (HIG), command palette, усиление edge/auth, пороги аномалий в UI и интервал обновления карты.
+
+### Added
+- **Command palette** (`Ctrl/⌘K` или `/`): быстрый переход по страницам, команды карты и параметры (тема, плотность).
+- **Интервал обновления карты**: пресеты 30 с / 1 мин / 5 мин (по умолчанию 5 мин), сохранение в `localStorage`.
+- **Живой счётчик сетей предприятия** на карте (из ClickHouse, без устаревшего scan-cache).
+- **Re-auth паролем** для чувствительных cookie-действий: logout-all, УЗ (reset password), API-токены (create / rotate / delete), загрузка TLS PEM.
+- **Ротация именованных API-токенов**: `POST /api/tokens/{id}/rotate` (новый secret один раз; id/name/scope/expires сохраняются).
+- **Proxy gate** (`GA_REQUIRE_PROXY`, в compose по умолчанию `1`): прямой доступ к backend `:8080` режется — только nginx / loopback / Bearer.
+- **API threat protection**: SpikeArrest (`GA_API_RATE_LIMIT_RPS` / `GA_API_RATE_BURST`), injection/path guard, жёсткие JSON-лимиты, security headers на API; HSTS и снятие `Server` на nginx.
+- **Настройки порогов детекторов** на `/anomalies/engine` с группированной справкой; overrides в `anomaly_settings.json`, сброс к профилю без рестарта.
+- Страница **404** в SPA; секции навигации **Рабочее место / Разбор / Система / Данные / Доступ**; ссылки Access в Settings nav.
+
+### Changed
+- SPA: токены Geist, иконки Phosphor, finish-states / skeleton, z-index токены карты, общий sidebar CSS, polish collapsed-sidebar.
+- Окно обучения аномалий: `beaconing` (как `new_country_dst`) **не** срабатывает, пока `learning=true`.
+- Beaconing-детектор ускорен, таймаут увеличен; фикс cast IP для beaconing / `horizontal_scan`.
+- Geo CSV export стримится; scan-запросы всегда с верхней границей.
+- Trusted proxies: DNS `frontend` резолвится заранее и с retry (proxy-gate не режет UI при позднем DNS).
+- Compose v5: совместимость `pids_limit` с `deploy.resources.limits`; proxy-gate health probes; syslog-ng read-only persist path.
+- Backend: разбиение httpapi routes / anomaly detectors, `jsonfile.Store`, `jobscheduler.Loop`, буферы колонок CH, парсеры FortiGate/UserGate/FTD без лишних map-аллокаций (perf).
+
+### Fixed
+- Дуги карты за пределами viewport; раскладка search bar на `/hunts`.
+- TLS cert upload UX; клики нижней навигации в свёрнутом sidebar.
+- Nil-receiver / batch leak / in-flight gauge leak в ingest path.
+- CI: flaky npm audit (retry + timeout); Image scan (Alpine/CH apt, Go toolchain, `golang.org/x/crypto`); Dependabot vitest/js-yaml.
+
+### Security
+- Re-auth + token rotate + proxy gate + rate limit + strict request schema (`additionalProperties: false`).
+- Nginx security headers (HSTS без `preload`, CSP/frame/referrer и снятие `Server`).
+- Runtime image upgrades и bump crypto для SSH DoS CVE в Image scan.
+
+### Notes
+- OpenAPI API doc version: **1.17.0** (reauth / rotate / строгие request schemas)
+- Продуктовая версия: **2.5.0**
+- Cookie-клиенты чувствительных мутаций обязаны передавать `current_password`; Bearer может опустить reauth.
+- Схема ClickHouse (`ga_schema_version`): без изменений Ensure*.
+
 ## [2.4.0] — 2026-09-01
 
 Минор: настройки движка аномалий, корреляция эпизодов, saved hunts и защита тяжёлых map-запросов.
@@ -512,6 +553,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.5.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.0
 [2.4.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.4.0
 [2.3.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.3.0
 [2.2.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.2.0

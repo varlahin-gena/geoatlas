@@ -4,7 +4,7 @@
 Принимает syslog с файрволов или из SIEM, парсит события, обогащает их геоданными
 (IP → страна/координаты) и строит карту сетевых связей в веб-интерфейсе.
 
-**Актуальный релиз:** [v2.4.0](https://github.com/varlahin-gena/geoatlas/releases/tag/v2.4.0) (`VERSION` = 2.4.0) · ОС: Ubuntu 20.04+, Oracle Linux 8+ / RHEL-совместимые · пакет: `geoatlas-X.Y.Z.tar.gz` в [Releases](https://github.com/varlahin-gena/geoatlas/releases).
+**Актуальный релиз:** [v2.5.0](https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.0) (`VERSION` = 2.5.0) · ОС: Ubuntu 20.04+, Oracle Linux 8+ / RHEL-совместимые · пакет: `geoatlas-X.Y.Z.tar.gz` в [Releases](https://github.com/varlahin-gena/geoatlas/releases).
 
 Appliance: **IPv4-only**, один хост / один процесс backend, доставка syslog **at-most-once** (при переполнении очереди возможны drops). Подробнее — [архитектура](docs/architecture.md).
 
@@ -26,15 +26,17 @@ Appliance: **IPv4-only**, один хост / один процесс backend, �
 - **Резервное копирование ClickHouse**
 - **Настраиваемый TTL (retention)**
 - **Построение связей** на 2D карте и 3D глобусе
-- **Движок аномалий**: port/horizontal scan, всплеск блокировок, **всплеск объёма** (`byte_surge`), **beaconing**, **lateral movement** (`lateral_fanout`), новая страна, репутационный peer; панель «Связи» на `/anomalies`
-- **Разбор алерта** (`/investigate?alert=<fingerprint>`): workspace с peers, ack/assign, CSV, шаблон поиска, deep-link на карту
-- **Аномалии на карте** (баннер со ссылкой на список)
+- **Движок аномалий**: port/horizontal scan, всплеск блокировок, **всплеск объёма** (`byte_surge`), **beaconing**, **lateral movement** (`lateral_fanout`), новая страна, репутационный peer; панель «Связи» на `/anomalies`; пороги на `/anomalies/engine`
+- **Saved hunts** (`/hunts`) и **разбор алерта** (`/investigate?alert=<fingerprint>`)
+- **Аномалии на карте** (баннер со ссылкой на список); автообновление дуг 30 с / 1 мин / 5 мин
+- **Command palette** (`Ctrl/⌘K`): быстрый переход и команды карты
 - **Конструктор поиска** на карте (гибридный query builder) и **личные шаблоны** запросов; у администратора — просмотр всех шаблонов
 - **Группировка узлов**: по IP / по подсети `/24` / **по городу (по умолчанию)** / по стране
 - **Тест парсеров** в браузере: статусы parsed / skipped / error, гео-обогащение, пресеты по вендорам
 - **Журнал ошибок парсинга**: поиск, выборочное и полное удаление, передача строк в «Тест парсеров»
 - **Страница системного мониторинга** (Обзор / Pipeline / Безопасность / Графики / Резервное копирование)
 - **Логи контейнеров**: realtime stdout стека в UI `/dozzle/` для administrator
+- **Edge hardening**: proxy gate, API rate limit, re-auth для чувствительных действий, ротация API-токенов, HSTS на HTTPS
 
 ## Быстрый старт
 
@@ -55,7 +57,7 @@ Appliance: **IPv4-only**, один хост / один процесс backend, �
 | [Конфигурация](docs/configuration.md) | `.env`, секреты, модули |
 | [Обслуживание](docs/operations.md) | Запуск, профили, retention, бэкапы, логи, обновление |
 | [GeoIP](docs/geoip.md) | CSV, загрузка с сервера, 502/OOM |
-| [UI и HTTP API](docs/ui.md) | Страницы SPA, роли, OpenAPI **1.16.0** |
+| [UI и HTTP API](docs/ui.md) | Страницы SPA, роли, OpenAPI **1.17.0** |
 | [Репутация](docs/reputation.md) | Фиды и offline-списки |
 | [Аномалии](docs/anomalies.md) | Типы (в т.ч. byte_surge / beaconing / lateral), ack/assign, разбор |
 | [Разработка](docs/development.md) | Локальный стек из git |
@@ -64,7 +66,7 @@ Appliance: **IPv4-only**, один хост / один процесс backend, �
 | [SECURITY.md](SECURITY.md) | Сообщение об уязвимостях |
 | [CHANGELOG.md](CHANGELOG.md) | История релизов |
 
-Контракт REST: [`openapi.yaml`](openapi.yaml) (документ OpenAPI **1.16.0**).
+Контракт REST: [`openapi.yaml`](openapi.yaml) (документ OpenAPI **1.17.0**).
 
 ## Лицензия
 
@@ -81,11 +83,13 @@ Appliance: **IPv4-only**, один хост / один процесс backend, �
 - Секреты только через `./start.sh` (`API_AUTH_TOKEN`, `SESSION_SECRET`, `INGEST_SHARED_SECRET`, `CLICKHOUSE_PASSWORD`)
 - Пароли УЗ: минимум 10 символов, буква и цифра, не из common-list
 - Одноразовый пароль admin: `.admin_password_once` (600), не stdout
-- UI за HTTPS при доступе из сети; не публиковать ClickHouse `8123`/`9000` и backend `1514`
+- UI за HTTPS при доступе из сети; не публиковать ClickHouse `8123`/`9000`, backend `8080`/`1514`
+- `GA_REQUIRE_PROXY=1` в compose (не открывать backend мимо nginx); rate limit API — `GA_API_RATE_LIMIT_*`
 - ClickHouse `default`: networks loopback+RFC1918 (не `::/0`)
 - Syslog `:514` **без TLS/auth** — ограничьте источником МСЭ (`GA_SYSLOG_ALLOW_FROM` / Security Group / firewall)
 - Ingest внутри docker: маркер с `INGEST_SHARED_SECRET` + `INGEST_ALLOW_FROM=syslog-ng` (HTTP upload API — без маркера)
 - Reputation URL-фиды: только публичные IPv4-хосты (private/metadata блокируются)
+- Ротация env Bearer: `API_AUTH_PREVIOUS_TOKEN` / `API_OPS_PREVIOUS_TOKEN`; именованные токены — rotate в UI
 - Установка и обновление: только `geoatlas-X.Y.Z.tar.gz` с GitHub Releases; проверяйте `.sha256` до `./update.sh`
 
 ## Структура репозитория
@@ -98,6 +102,6 @@ Appliance: **IPv4-only**, один хост / один процесс backend, �
 | `deploy/` | установщики Ubuntu / Oracle Linux |
 | `docs/` | документация оператора и разработчика |
 | `scripts/` | CI, pack-release, бэкапы |
-| `openapi.yaml` | контракт HTTP API (OpenAPI **1.16.0**) |
+| `openapi.yaml` | контракт HTTP API (OpenAPI **1.17.0**) |
 
 Полное дерево: [docs/repo-layout.md](docs/repo-layout.md).

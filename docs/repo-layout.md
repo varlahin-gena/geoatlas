@@ -85,7 +85,7 @@ geoatlas/
 │   └── internal/
 │       ├── config/
 │       └── collector/
-├── openapi.yaml                      # контракт HTTP API (OpenAPI 1.15.0)
+├── openapi.yaml                      # контракт HTTP API (OpenAPI 1.17.0)
 ├── LICENSE / NOTICE                  # Apache License 2.0
 ├── SECURITY.md                       # как сообщать об уязвимостях
 ├── VERSION / CHANGELOG.md / RELEASING.md
