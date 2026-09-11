@@ -28,7 +28,7 @@ export type MapFiltersPanelProps = {
   onReset: () => void;
 };
 
-/** Count of non-default filter dimensions for the topbar badge. */
+/** Count of non-default filter dimensions for the topbar badge (excludes search). */
 export function countActiveMapFilters(opts: {
   groupBy: string;
   filter: string;
@@ -36,13 +36,129 @@ export function countActiveMapFilters(opts: {
   repColorArcs: boolean;
   hideIntraCountry: boolean;
 }): number {
-  let n = 0;
-  if (opts.groupBy !== 'ip') n += 1;
-  if (opts.filter !== 'all') n += 1;
-  if (opts.repFilterCount > 0) n += 1;
-  if (opts.repColorArcs) n += 1;
-  if (opts.groupBy === 'city' && opts.hideIntraCountry) n += 1;
-  return n;
+  return describeActiveMapFilters({ ...opts, search: '' }).filter((c) => c.id !== 'search').length;
+}
+
+const GROUP_BY_LABELS: Record<string, string> = {
+  ip: 'IP',
+  subnet: '/24',
+  city: 'город',
+  country: 'страна',
+  continent: 'континент',
+};
+
+export type ActiveMapFilterChip = {
+  id: string;
+  label: string;
+  clear: () => void;
+};
+
+/** Human-readable chips for non-default map query dimensions. */
+export function describeActiveMapFilters(opts: {
+  groupBy: string;
+  filter: string;
+  repFilterCount: number;
+  repColorArcs: boolean;
+  hideIntraCountry: boolean;
+  search?: string;
+  setGroupBy?: (v: string) => void;
+  setFilter?: (v: 'all' | 'allowed' | 'blocked') => void;
+  setHideIntraCountry?: (v: boolean) => void;
+  setRepCategories?: Dispatch<SetStateAction<Set<string>>>;
+  setRepLists?: Dispatch<SetStateAction<Set<string>>>;
+  setRepSide?: (v: RepFilterSide) => void;
+  setRepColorArcs?: (v: boolean) => void;
+  setSearch?: (v: string) => void;
+}): ActiveMapFilterChip[] {
+  const chips: ActiveMapFilterChip[] = [];
+  const search = (opts.search || '').trim();
+
+  if (opts.groupBy !== 'ip') {
+    chips.push({
+      id: 'groupBy',
+      label: `Группа: ${GROUP_BY_LABELS[opts.groupBy] || opts.groupBy}`,
+      clear: () => opts.setGroupBy?.('ip'),
+    });
+  }
+  if (opts.filter === 'allowed') {
+    chips.push({
+      id: 'filter-allowed',
+      label: 'Только разрешения',
+      clear: () => opts.setFilter?.('all'),
+    });
+  } else if (opts.filter === 'blocked') {
+    chips.push({
+      id: 'filter-blocked',
+      label: 'Только блокировки',
+      clear: () => opts.setFilter?.('all'),
+    });
+  }
+  if (opts.repFilterCount > 0) {
+    chips.push({
+      id: 'rep',
+      label: `Репутация · ${opts.repFilterCount}`,
+      clear: () => {
+        opts.setRepCategories?.(new Set());
+        opts.setRepLists?.(new Set());
+        opts.setRepSide?.('any');
+      },
+    });
+  }
+  if (opts.repColorArcs) {
+    chips.push({
+      id: 'repColor',
+      label: 'Цвет по репутации',
+      clear: () => opts.setRepColorArcs?.(false),
+    });
+  }
+  if (opts.groupBy === 'city' && opts.hideIntraCountry) {
+    chips.push({
+      id: 'hideIntra',
+      label: 'Скрыть внутри страны',
+      clear: () => opts.setHideIntraCountry?.(false),
+    });
+  }
+  if (search) {
+    const short = search.length > 28 ? `${search.slice(0, 28)}…` : search;
+    chips.push({
+      id: 'search',
+      label: `Запрос: ${short}`,
+      clear: () => opts.setSearch?.(''),
+    });
+  }
+  return chips;
+}
+
+export function MapFilterChipsBar({
+  chips,
+  onResetAll,
+}: {
+  chips: ActiveMapFilterChip[];
+  onResetAll: () => void;
+}) {
+  if (!chips.length) return null;
+  return (
+    <div className="map-filter-chips" role="list" aria-label="Активные фильтры карты">
+      {chips.map((chip) => (
+        <button
+          key={chip.id}
+          type="button"
+          className="map-filter-chip"
+          role="listitem"
+          title={`Сбросить: ${chip.label}`}
+          onClick={chip.clear}
+        >
+          <span>{chip.label}</span>
+          <span className="map-filter-chip-x" aria-hidden>
+            ×
+          </span>
+        </button>
+      ))}
+      <button type="button" className="map-filter-chips-reset" onClick={onResetAll}>
+        Сбросить всё
+      </button>
+    </div>
+  );
 }
 
 export function MapFiltersPanel({ open, grouping, reputation, onReset }: MapFiltersPanelProps) {

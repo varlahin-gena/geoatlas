@@ -1,7 +1,7 @@
 .anomaly-summary-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--density-summary-gap, 12px);
   margin-bottom: 16px;
 }
 
@@ -10,7 +10,7 @@
   flex-direction: column;
   gap: 4px;
   min-width: 120px;
-  padding: 10px 14px;
+  padding: var(--density-summary-pad, 10px 14px);
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel-2);

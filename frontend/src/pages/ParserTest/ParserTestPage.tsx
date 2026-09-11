@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchParseSamples, runParseTest } from '@/api/parseTest';
-import { AdminLayout } from '@/components/AdminLayout';
-import { DataSectionNav } from '@/components/DataSectionNav';
+import { SettingsLayout } from '@/components/SettingsLayout';
 import { useToast } from '@/components/Toast';
 import { fmtNumber } from '@/lib/format';
 
@@ -74,9 +73,8 @@ export default function ParserTestPage() {
   const rows = result?.results || [];
 
   return (
-    <AdminLayout title="Тест парсеров">
+    <SettingsLayout title="Тест парсеров">
       <div className="page-content-inner">
-        <DataSectionNav />
         <p className="page-lead">
           Строки прогоняются через тот же реестр парсеров, что и боевой ingest (
           <code>/api/parse-test</code>).
@@ -187,6 +185,6 @@ export default function ParserTestPage() {
           )}
         </div>
       </div>
-    </AdminLayout>
+    </SettingsLayout>
   );
 }

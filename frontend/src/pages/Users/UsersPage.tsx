@@ -12,8 +12,7 @@ import { useAuth } from '@/auth/AuthContext';
 import type { UserRole } from '@/api/types';
 import { ROLE_OPERATOR } from '@/api/types';
 import { USER_ROLE_OPTIONS } from '@/auth/roles';
-import { AdminLayout } from '@/components/AdminLayout';
-import { DataSectionNav } from '@/components/DataSectionNav';
+import { SettingsLayout } from '@/components/SettingsLayout';
 import { EmptyState, TableSkeleton } from '@/components/Skeleton';
 import { ReauthField, ReauthModal } from '@/components/ReauthModal';
 import { useToast } from '@/components/Toast';
@@ -91,7 +90,7 @@ export default function UsersPage() {
   }
 
   return (
-    <AdminLayout
+    <SettingsLayout
       title="Пользователи"
       actions={
         <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
@@ -100,8 +99,7 @@ export default function UsersPage() {
       }
     >
       <div className="page-content-inner narrow">
-        <DataSectionNav />
-        <p className="page-lead">локальные учётные записи</p>
+        <p className="page-lead">Локальные учётные записи</p>
 
         <div className="card">
           <h2>Учётные записи</h2>
@@ -429,6 +427,6 @@ export default function UsersPage() {
         .fio-input { width: 100%; min-width: 180px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 6px 8px; }
         .actions { display: flex; flex-wrap: wrap; gap: 6px; }
       `}</style>
-    </AdminLayout>
+    </SettingsLayout>
   );
 }

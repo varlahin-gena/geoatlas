@@ -116,7 +116,33 @@ function uint32ToIPv4(n: number): string {
   return `${(x >>> 24) & 255}.${(x >>> 16) & 255}.${(x >>> 8) & 255}.${x & 255}`;
 }
 
-export type EmptyMapReason = 'loading' | 'error' | 'no_events' | 'no_geo' | 'filtered' | 'search_error' | null;
+export type EmptyMapReason =
+  | 'loading'
+  | 'error'
+  | 'no_events'
+  | 'no_geo'
+  | 'filtered'
+  | 'search_error'
+  | null;
+
+export type EmptyMapActionKind =
+  | 'open-geo-wizard'
+  | 'open-geo-missing'
+  | 'set-period-7d'
+  | 'reset-filters'
+  | 'clear-search';
+
+export type EmptyMapAction = {
+  label: string;
+  kind: EmptyMapActionKind;
+};
+
+export type EmptyMapOverlay = {
+  reason: EmptyMapReason;
+  title: string;
+  text: string;
+  action?: EmptyMapAction;
+};
 
 export function classifyEmptyMap(opts: {
   loading: boolean;
@@ -127,27 +153,43 @@ export function classifyEmptyMap(opts: {
   skippedNoGeo: number;
   filterActive: boolean;
   searchError: string;
-}): { reason: EmptyMapReason; title: string; text: string } | null {
+  isAdmin?: boolean;
+}): EmptyMapOverlay | null {
   if (opts.loading) return null;
   if (opts.fetchError) {
     return { reason: 'error', title: 'Ошибка загрузки', text: opts.fetchError };
   }
   if (opts.searchError) {
-    return { reason: 'search_error', title: 'Ошибка поиска', text: opts.searchError };
+    return {
+      reason: 'search_error',
+      title: 'Ошибка поиска',
+      text: opts.searchError,
+      action: { label: 'Очистить поиск', kind: 'clear-search' },
+    };
   }
   if (!opts.linesCount) {
     if (opts.rawPairs > 0 || opts.skippedNoGeo > 0) {
+      if (opts.isAdmin) {
+        return {
+          reason: 'no_geo',
+          title: 'Нет координат для карты',
+          text: 'События за период есть, но у узлов нет GeoIP-координат. Загрузите базу GeoIP.',
+          action: { label: 'Загрузить GeoIP', kind: 'open-geo-wizard' },
+        };
+      }
       return {
         reason: 'no_geo',
         title: 'Нет координат для карты',
         text:
-          'События за период есть, но у узлов нет GeoIP-координат. Загрузите базу GeoIP (мастер на карте или страница «База GeoIP»).',
+          'События за период есть, но у узлов нет GeoIP-координат. Обратитесь к администратору для загрузки базы или посмотрите IP без координат.',
+        action: { label: 'IP без координат', kind: 'open-geo-missing' },
       };
     }
     return {
       reason: 'no_events',
       title: 'Нет событий за период',
       text: 'Попробуйте расширить период, уменьшить порог minCount или проверить ingest / загрузку логов.',
+      action: { label: 'Период 7 дней', kind: 'set-period-7d' },
     };
   }
   if (!opts.visibleCount) {
@@ -157,6 +199,7 @@ export function classifyEmptyMap(opts: {
       text: opts.filterActive
         ? 'Активные фильтры скрыли все связи.'
         : 'Все связи отфильтрованы текущими настройками.',
+      action: { label: 'Сбросить фильтры', kind: 'reset-filters' },
     };
   }
   return null;

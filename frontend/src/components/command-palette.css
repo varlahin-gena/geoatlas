@@ -1,0 +1,99 @@
+.ga-cmd-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  background: var(--overlay-bg);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh 16px 16px;
+}
+
+.ga-cmd-dialog {
+  width: min(560px, 100%);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: min(70vh, 520px);
+}
+
+.ga-cmd-input {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+  padding: 14px 16px;
+  outline: none;
+}
+
+.ga-cmd-list {
+  overflow: auto;
+  padding: 6px;
+  flex: 1;
+  min-height: 0;
+}
+
+.ga-cmd-group {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  padding: 8px 10px 4px;
+}
+
+.ga-cmd-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ga-cmd-item:hover,
+.ga-cmd-item.active {
+  background: var(--panel-3);
+}
+
+.ga-cmd-item-label {
+  min-width: 0;
+}
+
+.ga-cmd-item-meta {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.ga-cmd-empty {
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.ga-cmd-hint {
+  border-top: 1px solid var(--border);
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.ga-cmd-hint span {
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+}

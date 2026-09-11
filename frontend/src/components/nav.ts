@@ -1,4 +1,4 @@
-type NavGroupId = 'workspace' | 'observe' | 'data' | 'threat' | 'access';
+type NavGroupId = 'workspace' | 'triage' | 'system' | 'data' | 'access';
 
 export interface NavItem {
   href: string;
@@ -14,20 +14,29 @@ export interface NavItem {
 
 const NAV_GROUP_ORDER: NavGroupId[] = [
   'workspace',
-  'observe',
+  'triage',
+  'system',
   'data',
-  'threat',
   'access',
 ];
 
-const SETTINGS_GROUP_ORDER: NavGroupId[] = ['data', 'access'];
+/** Sections rendered under the workspace link (flat headers, ≤2 levels). */
+const SIDEBAR_SECTION_ORDER: NavGroupId[] = ['triage', 'system', 'data', 'access'];
 
 const NAV_GROUP_LABELS: Record<NavGroupId, string> = {
   workspace: 'Рабочее место',
-  observe: 'Наблюдение',
-  data: 'Данные и GeoIP',
-  threat: 'Угрозы',
+  triage: 'Разбор',
+  system: 'Система',
+  data: 'Данные',
   access: 'Доступ',
+};
+
+/** Icon kind for collapsed section flyout triggers (navIcons). */
+export const NAV_SECTION_ICONS: Record<string, string> = {
+  triage: 'anomalies',
+  system: 'system',
+  data: 'geo',
+  access: 'settings',
 };
 
 export const PAGE_NAV: NavItem[] = [
@@ -39,40 +48,55 @@ export const PAGE_NAV: NavItem[] = [
     adminOnly: false,
   },
   {
+    href: '/anomalies',
+    label: 'Аномалии',
+    group: 'triage',
+    match: ['/anomalies', '/anomalies.html'],
+    adminOnly: false,
+  },
+  {
+    href: '/investigate',
+    label: 'Разбор',
+    group: 'triage',
+    match: ['/investigate', '/investigate.html'],
+    adminOnly: false,
+  },
+  {
+    href: '/hunts',
+    label: 'Охоты',
+    group: 'triage',
+    match: ['/hunts'],
+    adminOnly: false,
+  },
+  {
     href: '/system',
     label: 'Мониторинг системы',
-    group: 'observe',
+    group: 'system',
     match: ['/system', '/system.html'],
     adminOnly: true,
   },
   {
     href: '/dozzle/',
     label: 'Логи контейнеров',
-    group: 'observe',
+    group: 'system',
     match: ['/dozzle', '/dozzle/'],
     adminOnly: true,
     external: true,
   },
   {
-    href: '/anomalies',
-    label: 'Аномалии',
-    group: 'observe',
-    match: ['/anomalies', '/anomalies.html', '/anomalies/engine', '/investigate', '/investigate.html'],
-    adminOnly: false,
-  },
-  {
     href: '/anomalies/engine',
     label: 'Движок аномалий',
-    group: 'observe',
+    group: 'system',
     match: ['/anomalies/engine'],
     adminOnly: true,
   },
   {
-    href: '/hunts',
-    label: 'Saved hunts',
-    group: 'observe',
-    match: ['/hunts'],
-    adminOnly: false,
+    href: '/reputation',
+    label: 'Репутация IP',
+    group: 'system',
+    match: ['/reputation', '/reputation.html'],
+    adminOnly: true,
+    requiresReputation: true,
   },
   {
     href: '/parse-errors',
@@ -101,14 +125,6 @@ export const PAGE_NAV: NavItem[] = [
     group: 'data',
     match: ['/geo-ranges', '/geo-ranges.html'],
     adminOnly: true,
-  },
-  {
-    href: '/reputation',
-    label: 'Репутация IP',
-    group: 'observe',
-    match: ['/reputation', '/reputation.html'],
-    adminOnly: true,
-    requiresReputation: true,
   },
   {
     href: '/users',
@@ -160,32 +176,14 @@ export function groupNav(items: NavItem[]): NavGroupSection[] {
 
 export function splitNavItems(items: NavItem[]): {
   workspace: NavItem[];
-  observe: NavItem[];
-  settings: NavGroupSection[];
+  sections: NavGroupSection[];
 } {
   const workspace = items.filter((item) => item.group === 'workspace');
-  const observe = items.filter((item) => item.group === 'observe');
-  const settings = groupNavByOrder(
-    items.filter((item) => item.group !== 'workspace' && item.group !== 'observe'),
-    SETTINGS_GROUP_ORDER,
+  const sections = groupNavByOrder(
+    items.filter((item) => item.group !== 'workspace'),
+    SIDEBAR_SECTION_ORDER,
   );
-  return { workspace, observe, settings };
-}
-
-export function settingsBadgeTotal(
-  sections: NavGroupSection[],
-  badges: Record<string, string | null | undefined>,
-): string | null {
-  let sum = 0;
-  for (const section of sections) {
-    for (const item of section.items) {
-      const raw = badges[item.href];
-      if (!raw) continue;
-      const n = raw.endsWith('+') ? parseInt(raw, 10) : parseInt(raw, 10);
-      if (Number.isFinite(n)) sum += n;
-    }
-  }
-  return formatNavBadge(sum, 99);
+  return { workspace, sections };
 }
 
 export function sectionBadgeTotal(
@@ -198,6 +196,23 @@ export function sectionBadgeTotal(
     if (!raw) continue;
     const n = raw.endsWith('+') ? parseInt(raw, 10) : parseInt(raw, 10);
     if (Number.isFinite(n)) sum += n;
+  }
+  return formatNavBadge(sum, 99);
+}
+
+/** @deprecated Use sectionBadgeTotal on each section; kept for call-site migration. */
+export function settingsBadgeTotal(
+  sections: NavGroupSection[],
+  badges: Record<string, string | null | undefined>,
+): string | null {
+  let sum = 0;
+  for (const section of sections) {
+    for (const item of section.items) {
+      const raw = badges[item.href];
+      if (!raw) continue;
+      const n = raw.endsWith('+') ? parseInt(raw, 10) : parseInt(raw, 10);
+      if (Number.isFinite(n)) sum += n;
+    }
   }
   return formatNavBadge(sum, 99);
 }

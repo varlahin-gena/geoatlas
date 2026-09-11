@@ -8,8 +8,10 @@ const auth = vi.hoisted(() => ({
   reputationEnabled: false,
   uiAuthEnabled: true,
   theme: 'dark' as const,
+  themePreference: 'dark' as const,
   user: null as null,
   refresh: async () => null,
+  toggleTheme: () => {},
 }));
 
 vi.mock('@/auth/AuthContext', () => ({

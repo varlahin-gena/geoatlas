@@ -25,6 +25,7 @@ export function useMapFilters(opts: {
   focusedCountry: string | null;
   groupBy: string;
   hideIntraCountry: boolean;
+  isAdmin?: boolean;
 }) {
   const {
     lines,
@@ -43,6 +44,7 @@ export function useMapFilters(opts: {
     focusedCountry,
     groupBy,
     hideIntraCountry,
+    isAdmin = false,
   } = opts;
 
   const compiled = useMemo(() => compileSearchQuery(search), [search]);
@@ -171,15 +173,16 @@ export function useMapFilters(opts: {
       skippedNoGeo,
       filterActive: filterHints.length > 0,
       searchError: compiled.mode === 'error' ? compiled.error || 'Ошибка поискового запроса' : '',
+      isAdmin,
     });
     if (!classified) return null;
     if (classified.reason === 'filtered' && filterHints.length) {
       return {
-        title: classified.title,
+        ...classified,
         text: `Активные фильтры скрыли все связи: ${filterHints.join(', ')}.`,
       };
     }
-    return { title: classified.title, text: classified.text };
+    return classified;
   }, [
     loading,
     fetchError,
@@ -195,6 +198,7 @@ export function useMapFilters(opts: {
     groupBy,
     hideIntraCountry,
     compiled,
+    isAdmin,
   ]);
 
   return {

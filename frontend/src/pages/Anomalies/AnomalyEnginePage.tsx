@@ -9,7 +9,7 @@ import {
   type AnomalyThresholds,
 } from '@/api/anomalies';
 import { AdminLayout } from '@/components/AdminLayout';
-import { ObserveSectionNav } from '@/components/ObserveSectionNav';
+import { TriageSectionNav } from '@/components/ObserveSectionNav';
 import { useToast } from '@/components/Toast';
 import { fmtDate, fmtNumber } from '@/lib/format';
 import {
@@ -320,7 +320,7 @@ export default function AnomalyEnginePage() {
 
   return (
     <AdminLayout title="Движок аномалий">
-      <ObserveSectionNav />
+      <TriageSectionNav />
       <div className="page-intro">
         <p>
           Параметры сканера, пороги детекторов и подавление повторов. Журнал алертов — на странице{' '}

@@ -54,7 +54,8 @@
   --border-strong: #3d3d3d;
   --text: #e8e8e8;
   --text-dim: #9b9b9b;
-  --text-muted: #6e6e6e;
+  /* P0 a11y: ≥4.5:1 on --bg/#131209 and --panel/#181818 (was #6e6e6e ≈3.5:1). */
+  --text-muted: #858585;
   --accent: #58a6ff;
   --on-accent: #131209;
   --green: #3fb950;
@@ -70,6 +71,21 @@
   --map-base-rgb: 19, 18, 9;
   --map-land-rgb: 39, 39, 39;
   --map-outline-rgb: 19, 18, 9;
+
+  /* UI density (P2) — comfortable defaults. */
+  --density-row-pad-y: 8px;
+  --density-row-pad-x: 10px;
+  --density-font-table: 12px;
+  --density-summary-gap: 12px;
+  --density-summary-pad: 10px 14px;
+}
+
+html[data-density="compact"] {
+  --density-row-pad-y: 4px;
+  --density-row-pad-x: 8px;
+  --density-font-table: 12px;
+  --density-summary-gap: 8px;
+  --density-summary-pad: 6px 10px;
 }
 
 html[data-theme="light"] {
@@ -82,7 +98,8 @@ html[data-theme="light"] {
   --text: #111111;
   --text-dim: #555555;
   --text-muted: #6e6e6e;
-  --accent: #3b82f6;
+  /* P0 a11y: text/links on white ≥4.5:1 (was #3b82f6 ≈3.68:1). */
+  --accent: #2563eb;
   --on-accent: #ffffff;
   --green: #1a7f37;
   --red: #cf222e;
@@ -94,6 +111,35 @@ html[data-theme="light"] {
   --map-base-rgb: 244, 244, 244;
   --map-land-rgb: 228, 228, 228;
   --map-outline-rgb: 176, 176, 176;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-panel: 0ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --text-muted: #b0b0b0;
+    --border: #4a4a4a;
+    --border-strong: #6a6a6a;
+  }
+  html[data-theme="light"] {
+    --text-muted: #4a4a4a;
+    --border: #8a8a8a;
+    --border-strong: #5a5a5a;
+  }
 }
 
 /* --- Меню пользователя --- */

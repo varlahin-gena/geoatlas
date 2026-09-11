@@ -5,8 +5,7 @@ import {
   putTls,
   type TlsStatus,
 } from '@/api/system';
-import { AdminLayout } from '@/components/AdminLayout';
-import { DataSectionNav } from '@/components/DataSectionNav';
+import { SettingsLayout } from '@/components/SettingsLayout';
 import { ReauthField } from '@/components/ReauthModal';
 import { useToast } from '@/components/Toast';
 import { fmtDate } from '@/lib/format';
@@ -139,7 +138,7 @@ export default function TlsPage() {
     ['0', 'false', 'no', 'off'].includes(String(status.https_enabled || '').trim().toLowerCase());
 
   return (
-    <AdminLayout
+    <SettingsLayout
       title="HTTPS-сертификаты"
       actions={
         <button type="button" className="btn" onClick={() => void load()} disabled={loading}>
@@ -148,7 +147,6 @@ export default function TlsPage() {
       }
     >
       <div className="page-content-inner narrow">
-        <DataSectionNav />
         <p className="page-lead">
           Режим HTTPS задаётся в <code>.env</code> (<code>HTTPS_ENABLED</code>):{' '}
           <code>0</code> — только HTTP, <code>1</code> — всегда HTTPS, <code>auto</code> — HTTPS
@@ -312,6 +310,6 @@ export default function TlsPage() {
           </form>
         ) : null}
       </div>
-    </AdminLayout>
+    </SettingsLayout>
   );
 }

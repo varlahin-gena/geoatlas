@@ -6,9 +6,9 @@ import {
   type GeoMissingRow as MissingRow,
   type GeoMissingSummary as Summary,
 } from '@/api/geo';
-import { AdminLayout } from '@/components/AdminLayout';
-import { DataSectionNav } from '@/components/DataSectionNav';
+import { SettingsLayout } from '@/components/SettingsLayout';
 import { useToast } from '@/components/Toast';
+import { TERM } from '@/lib/glossary';
 import { fmtNumber } from '@/lib/format';
 import { buildPeriodQuery } from '@/pages/Map/mapConstants';
 
@@ -221,7 +221,7 @@ export default function GeoMissingPage() {
   const by = displaySummary.by_kind || {};
 
   return (
-    <AdminLayout title="IP без координат"
+    <SettingsLayout title="IP без координат"
       actions={
         <>
           <button type="button" className="btn" onClick={() => void copyPublic()}>
@@ -234,7 +234,6 @@ export default function GeoMissingPage() {
       }
     >
       <div className="page-content-inner">
-        <DataSectionNav />
         <h1>Адреса, которые не удалось поставить на карту</h1>
         <p className="page-lead">
           Уникальные IP из трафика без координат. Публичные можно добавить в базу GeoIP; приватные
@@ -260,7 +259,7 @@ export default function GeoMissingPage() {
         </div>
         <div className="toolbar" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
           <input
-            placeholder="Поиск по IP или peer…"
+            placeholder={`Поиск по IP или ${TERM.peer.toLowerCase()}…`}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -302,7 +301,9 @@ export default function GeoMissingPage() {
                 <th scope="col">Тип</th>
                 <th scope="col">Событий</th>
                 <th scope="col">as src/dst</th>
-                <th scope="col">Peer</th>
+                <th scope="col" title={TERM.peerHint}>
+                  {TERM.peer}
+                </th>
                 <th scope="col">Log geo</th>
                 <th scope="col">Подсказка</th>
                 <th scope="col"> </th>
@@ -410,6 +411,6 @@ export default function GeoMissingPage() {
           </form>
         </div>
       ) : null}
-    </AdminLayout>
+    </SettingsLayout>
   );
 }

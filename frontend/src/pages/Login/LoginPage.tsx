@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthContext';
 import { ApiError } from '@/api/client';
+import { COPY } from '@/lib/glossary';
 import { safeNext } from '@/lib/format';
 import '@/styles/auth-form.css';
 
@@ -65,10 +66,11 @@ export default function LoginPage() {
       </a>
       <form className="auth-card" id="loginForm" autoComplete="on" onSubmit={onSubmit}>
         <div className="auth-brand">
-          <img className="logo" src="/logo.png" alt="" width={40} height={40} />
+          <img className="logo" src="/logo.png" alt="" width={48} height={48} />
           <div>
             <h1>ГеоАтлас</h1>
-            <p>Локальный вход</p>
+            <p className="auth-lead">{COPY.loginLead}</p>
+            <p className="auth-sub">{COPY.loginLocal}</p>
           </div>
         </div>
         <div className={`auth-error${error ? ' show' : ''}`} role="alert">

@@ -1,14 +1,17 @@
+import type { EmptyMapActionKind, EmptyMapOverlay } from './geoWizard';
 import { MapInfoDock, type InfoDockTab } from './MapInfoDock';
 
 export function MapVizOverlays({
   emptyOverlay,
+  onEmptyAction,
   loading,
   infoDock,
   monoArcs,
   repColorArcs,
   stats,
 }: {
-  emptyOverlay: { title: string; text: string } | null;
+  emptyOverlay: EmptyMapOverlay | null;
+  onEmptyAction?: (kind: EmptyMapActionKind) => void;
   loading: boolean;
   infoDock: {
     tab: InfoDockTab;
@@ -31,9 +34,18 @@ export function MapVizOverlays({
   return (
     <>
       <div className={`viz-overlay${emptyOverlay ? ' visible' : ''}`}>
-        <div className="viz-overlay-card">
+        <div className={`viz-overlay-card${emptyOverlay?.action ? ' has-action' : ''}`}>
           <h4>{emptyOverlay?.title || 'Нет данных'}</h4>
           <p>{emptyOverlay?.text || ''}</p>
+          {emptyOverlay?.action && onEmptyAction ? (
+            <button
+              type="button"
+              className="btn primary viz-overlay-cta"
+              onClick={() => onEmptyAction(emptyOverlay.action!.kind)}
+            >
+              {emptyOverlay.action.label}
+            </button>
+          ) : null}
         </div>
       </div>
 
