@@ -1,33 +1,49 @@
 # Веб-интерфейс и HTTP API
 
+## Навигация SPA
+
+Боковая панель группирует страницы:
+
+| Секция | Содержимое |
+|--------|------------|
+| **Рабочее место** | Карта |
+| **Разбор** | Аномалии, разбор алерта, охоты |
+| **Система** | Мониторинг, Dozzle, движок аномалий, репутация |
+| **Данные** | Ошибки парсинга, тест парсеров, GeoIP |
+| **Доступ** | Пользователи, API-токены, HTTPS-сертификаты |
+
+**Command palette** — `Ctrl/⌘K` (или `/`, если фокус не в поле ввода): переход по страницам, команды карты (период), тема и плотность UI.
+
 ## Страницы UI
 
 | URL                    | Страница              | Кто                 | Основные возможности                                                                                                                                 |
 |------------------------|-----------------------|---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `/login`               | Вход                  | public              | Логин; смена пароля при `must_reset_password`                                                                                                        |
-| `/`                    | Карта / глобус        | login               | 2D/3D, группировка, фильтры status/репутации, конструктор поиска и шаблоны, порог событий, mono-дуги, экспорт PNG, загрузка логов/GeoIP (admin)      |
-| `/anomalies`           | Аномалии              | login               | Список срабатываний, ack / assign; кнопка «Разбор»; баннер на карте                                                                                  |
+| `/`                    | Карта / глобус        | login               | 2D/3D, группировка, фильтры, конструктор поиска и шаблоны, автообновление 30 с/1 м/5 м, порог событий, mono-дуги, экспорт PNG, загрузка логов/GeoIP (admin) |
+| `/anomalies`           | Аномалии              | login               | Список срабатываний, ack / assign; «Связи»; кнопка «Разбор»; баннер на карте                                                                       |
 | `/investigate`         | Разбор алерта         | login               | Workspace по `?alert=<fingerprint>`: шапка, peers, ack/assign, CSV, шаблон поиска, ссылка на карту                                                   |
+| `/hunts`               | Охоты                 | login               | Saved hunts: CRUD, ручной/плановый запуск; сохранение с карты и из разбора                                                                           |
+| `/anomalies/engine`    | Движок аномалий       | administrator       | Статус скана, learning, пороги детекторов (overrides → `anomaly_settings.json`)                                                                      |
 | `/reputation`          | Репутация IP          | administrator       | Списки и URL-фиды, каталог, refresh; модуль можно отключить                                                                                          |
 | `/parse-errors`        | Журнал ошибок парсинга| administrator       | Поиск, удаление, отправка в тест парсеров                                                                                                            |
 | `/geo-missing`         | IP без GeoIP          | administrator       | Адреса без координат; добавление в GeoIP; выгрузка CSV                                                                                               |
 | `/geo-ranges`          | База GeoIP            | administrator       | Просмотр/правка диапазонов, выгрузка CSV                                                                                                             |
 | `/parser-test`         | Тест парсеров         | administrator       | До 200 строк, пресеты вендоров, parsed/skipped/error                                                                                                 |
 | `/system`              | Системный мониторинг  | administrator       | Обзор / Pipeline / Безопасность / Графики / Резервное копирование                                                                                    |
-| `/tls`                 | TLS / сертификаты     | administrator       | Сведения о HTTPS/сертификатах UI                                                                                                                     |
+| `/tls`                 | TLS / сертификаты     | administrator       | Сведения о HTTPS/сертификатах UI; upload PEM с re-auth                                                                                               |
 | `/dozzle/`             | Логи контейнеров      | administrator       | Dozzle (профиль `dozzle`); вне React SPA                                                                                                             |
-| `/users`               | Учётные записи        | administrator       | УЗ: administrator, operator, dashboard                                                                                                               |
-| `/api-tokens`          | API-токены            | administrator       | Именованные Bearer: read / ops / admin; секрет один раз                                                                                              |
+| `/users`               | Учётные записи        | administrator       | УЗ: administrator, operator, dashboard; reset password с re-auth                                                                                     |
+| `/api-tokens`          | API-токены            | administrator       | Именованные Bearer: read / ops / admin; create / rotate / delete с re-auth; секрет один раз                                                          |
 | `/change-password`     | Смена пароля          | login               | Смена своего пароля                                                                                                                                  |
 
-SPA (React Router); nginx `auth_request` для `/api/*` и `/dozzle/`.
+SPA (React Router); nginx `auth_request` для `/api/*` и `/dozzle/`. Неизвестный путь — страница 404.
 
 ## Роли и доступ
 
 | Роль | Cookie-сессия | UI | API (кратко) |
 |------|---------------|-----|--------------|
 | **administrator** | обычный TTL (`SESSION_TTL_HOURS`, по умолчанию 12 ч) | все страницы + `/dozzle/` | полные права (admin middleware) |
-| **operator** | обычный TTL | карта, аномалии, разбор, смена пароля | login-tier: events, anomalies ack/assign, search templates; **без** uploads / system / geo / reputation / users / tokens |
+| **operator** | обычный TTL | карта, аномалии, разбор, охоты, смена пароля | login-tier: events, anomalies ack/assign, hunts, search templates; **без** uploads / system / geo / reputation / users / tokens |
 | **dashboard** | **длительная** (~видеостена) | как operator | как operator по login-tier |
 
 Загрузки логов/GeoIP, ingest-stats, system и прочие **ops**-маршруты: сессия **administrator** или Bearer ≥ **ops**. Одна cookie operator **не** открывает ops API.
@@ -38,14 +54,23 @@ SPA (React Router); nginx `auth_request` для `/api/*` и `/dozzle/`.
 - **Bearer** `Authorization: Bearer …`:
   - env `API_AUTH_TOKEN` → всегда scope **admin**;
   - env `API_OPS_TOKEN` → **ops** (sidecars);
-  - именованные токены UI `/api-tokens`: **read ⊂ ops ⊂ admin**.
+  - именованные токены UI `/api-tokens`: **read ⊂ ops ⊂ admin**; ротация — `POST /api/tokens/{id}/rotate`.
 
-Матрица маршрутов в коде: `backend/internal/adapter/httpapi/auth_matrix_test.go`. Env: [configuration.md](configuration.md#авторизация).
+### Re-auth (повторный пароль)
+
+Для cookie-сессии чувствительные мутации требуют поле `current_password` в JSON (схема `ReauthRequest` или поле в теле запроса):
+
+- `POST /api/auth/logout-all`
+- reset password УЗ, create / rotate / delete API-токена, upload TLS PEM
+
+Bearer (env или именованный) **может опустить** reauth. В UI — модалка / поле «текущий пароль».
+
+Матрица маршрутов в коде: `backend/internal/adapter/httpapi/auth_matrix_test.go`. Env: [configuration.md](configuration.md#авторизация). Edge (proxy gate, rate limit): [configuration.md — threat protection](configuration.md#api-threat-protection-edge).
 
 ## Репутация и аномалии
 
 - [Репутация IP](reputation.md) — фиды, SSRF-ограничения, как выключить.
-- [Аномалии](anomalies.md) — типы, интервал скана, ack/assign, workspace `/investigate`.
+- [Аномалии](anomalies.md) — типы, интервал скана, пороги UI, ack/assign, workspace `/investigate`, hunts.
 
 ### Разбор алерта (`/investigate`)
 
@@ -59,6 +84,6 @@ SPA (React Router); nginx `auth_request` для `/api/*` и `/dozzle/`.
 
 ## HTTP API
 
-Контракт REST API (в т.ч. auth, events, geo, reputation, retention, tokens, search-templates, backups, аномалии, `/metrics`): [`openapi.yaml`](../openapi.yaml), версия документа OpenAPI **1.15.0**. Пробы: `GET /api/live` (процесс), `GET /api/ready` (ClickHouse + ingest); `GET /api/health` — alias live. Остальные эндпоинты — cookie-сессия и/или Bearer (`API_AUTH_TOKEN` / именованный токен со scope). Prometheus scrape: `GET /metrics` (Bearer≥ops / administrator).
+Контракт REST API (в т.ч. auth, events, geo, reputation, retention, tokens, hunts, search-templates, backups, аномалии, `/metrics`): [`openapi.yaml`](../openapi.yaml), версия документа OpenAPI **1.17.0**. Пробы: `GET /api/live` (процесс), `GET /api/ready` (ClickHouse + ingest); `GET /api/health` — alias live. Остальные эндпоинты — cookie-сессия и/или Bearer (`API_AUTH_TOKEN` / именованный токен со scope). Prometheus scrape: `GET /metrics` (Bearer≥ops / administrator).
 
 При смене `info.version` в `openapi.yaml` обновите цитату `OpenAPI **N**` здесь и в [README](../README.md) (CI: `scripts/check-release-contract.sh`).

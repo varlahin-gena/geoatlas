@@ -10,9 +10,9 @@
 | [configuration.md](configuration.md) | Переменные `.env`, секреты, модули |
 | [operations.md](operations.md) | Запуск, профили, retention, бэкапы, логи, обновление |
 | [geoip.md](geoip.md) | CSV, загрузка с сервера, 502/OOM |
-| [ui.md](ui.md) | Страницы SPA (в т.ч. `/investigate`), роли, OpenAPI |
+| [ui.md](ui.md) | Страницы SPA (карта, hunts, investigate, command palette), роли, re-auth, OpenAPI |
 | [reputation.md](reputation.md) | Фиды и offline-списки |
-| [anomalies.md](anomalies.md) | Типы аномалий, пороги, ack/assign, разбор алерта |
+| [anomalies.md](anomalies.md) | Типы аномалий, пороги UI, learning, ack/assign, разбор алерта |
 | [development.md](development.md) | Локальная разработка из git |
 | [repo-layout.md](repo-layout.md) | Дерево каталогов репозитория |
 
