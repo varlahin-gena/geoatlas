@@ -33,9 +33,8 @@ export function AdminSidebar() {
   });
 
   return (
-    <SidebarShell>
+    <SidebarShell footer={<SidebarCollapseButton onToggle={toggle} />}>
       <NavSections items={items} badges={badges} />
-      <SidebarCollapseButton onToggle={toggle} />
     </SidebarShell>
   );
 }

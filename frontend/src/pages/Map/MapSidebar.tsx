@@ -48,7 +48,7 @@ export function MapSidebar({
   });
 
   return (
-    <SidebarShell>
+    <SidebarShell footer={<SidebarCollapseButton onToggle={toggleSidebar} />}>
       <NavSections
         items={navItems}
         badges={badges}
@@ -177,8 +177,6 @@ export function MapSidebar({
           </>
         }
       />
-
-      <SidebarCollapseButton onToggle={toggleSidebar} />
     </SidebarShell>
   );
 }
