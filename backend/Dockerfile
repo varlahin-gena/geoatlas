@@ -20,7 +20,7 @@ FROM alpine:3.23
 # uid/gid 101 = clickhouse/clickhouse-server — общий том clickhouse-backups
 # (иначе auth *.tgz и prune падают с permission denied).
 # libssl3/libcrypto3 и прочие пакеты: полный apk upgrade закрывает Trivy CRITICAL в Alpine.
-RUN apk add --no-cache ca-certificates=20260611-r0 tzdata=2026c-r0 && \
+RUN apk add --no-cache ca-certificates=20260909-r0 tzdata=2026d-r0 && \
     apk upgrade --no-cache && \
     addgroup -g 101 app && \
     adduser -D -u 101 -G app app && \
