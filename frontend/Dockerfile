@@ -8,7 +8,7 @@ COPY public ./public
 COPY src ./src
 RUN npm run build
 
-FROM nginx:1.30.4-alpine
+FROM nginx:1.30.5-alpine
 # apk upgrade: Trivy CRITICAL в alpine 3.24 (не только OpenSSL).
 RUN apk upgrade --no-cache && \
     mkdir -p /etc/nginx/includes
