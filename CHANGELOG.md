@@ -5,6 +5,9 @@
 
 ## [Unreleased]
 
+### Security
+- syslog-ng image: pin `oauthlib==4.0.0` (CVE-2026-49264, CVE-2026-49265) so Image scan Trivy gate passes.
+
 ## [2.5.0] — 2026-09-11
 
 Минор: redesign SPA (HIG), command palette, усиление edge/auth, пороги аномалий в UI и интервал обновления карты.
