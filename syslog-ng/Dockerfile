@@ -42,6 +42,7 @@ RUN set -eux; \
       'aiohttp==3.14.3' \
       'idna==3.15' \
       'msgpack==1.2.1' \
+      'oauthlib==4.0.0' \
       'setuptools==83.0.0'; \
     "${py}" -c "import importlib.metadata as m; \
 a=m.version; \
@@ -49,6 +50,7 @@ assert a('pyasn1')=='0.6.4', a('pyasn1'); \
 assert a('aiohttp')=='3.14.3', a('aiohttp'); \
 assert a('idna')=='3.15', a('idna'); \
 assert a('msgpack')=='1.2.1', a('msgpack'); \
+assert a('oauthlib')=='4.0.0', a('oauthlib'); \
 assert a('setuptools')=='83.0.0', a('setuptools')"; \
     "${py}" -m pip uninstall -y pip; \
     rm -rf /root/.cache/pip /tmp/pip-* "${venv}/bin/pip" "${venv}/bin/pip3" \
