@@ -4,6 +4,9 @@ on:
   push:
     tags: ["v*"]
 
+permissions:
+  contents: read
+
 jobs:
   release-contract:
     name: tag matches VERSION / CHANGELOG / OpenAPI
@@ -69,8 +72,14 @@ jobs:
       - name: install grype
         run: |
           set -euo pipefail
-          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh \
-            | sh -s -- -b /usr/local/bin v0.120.1
+          ver=0.120.1
+          archive="grype_${ver}_linux_amd64.tar.gz"
+          expected_sha256=0a9ee97ef5ae2ee953b0a80098105052e846cdbe319a57d808b519c33cd1343d
+          curl --proto '=https' --tlsv1.2 -sSfL -o "$archive" \
+            "https://github.com/anchore/grype/releases/download/v${ver}/${archive}"
+          echo "${expected_sha256}  ${archive}" | sha256sum -c -
+          tar -xzf "$archive" -C /usr/local/bin grype
+          grype version
 
       - name: grype (SBOM CRITICAL, only-fixed)
         run: bash scripts/ci-grype-release.sh

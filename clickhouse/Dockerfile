@@ -1,6 +1,6 @@
 # Hardened ClickHouse LTS: Ubuntu security upgrades for openssl/libssl3/perl-base/p11-kit.
 # Compose / image-scan / export-images must stay on the same base tag.
-FROM clickhouse/clickhouse-server:25.8.33.6
+FROM clickhouse/clickhouse-server:25.8.33.6@sha256:0152dd511befe6a2c2ef53e930726179669b08116da78500b37c51c96ff5ee77
 
 # Upstream image often lags jammy-updates (Trivy CRITICAL в util-linux, openssl, …).
 # hadolint ignore=DL3008

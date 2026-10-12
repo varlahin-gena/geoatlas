@@ -1,6 +1,6 @@
 # Hardened balabit/syslog-ng: Debian security upgrades + Python venv patches.
 # Compose / image-scan / ci-docker-build must stay on the same base tag.
-FROM balabit/syslog-ng:4.12.0
+FROM balabit/syslog-ng:4.12.0@sha256:ead5340a157ffd05d626b7a2560e0d09acfd8553c85cd17855a9388f63c368b4
 
 # Base image ships ose-repo.syslog-ng.com; it often returns 403 and fails
 # apt-get update. Debian upgrades do not need it — syslog-ng is already installed.

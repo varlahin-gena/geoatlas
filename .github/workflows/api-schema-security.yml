@@ -6,6 +6,7 @@ on:
     paths:
       - "openapi.yaml"
       - "scripts/schema_security_check.py"
+      - "scripts/requirements-api-schema.txt"
       - ".spectral-security.yaml"
       - "backend/internal/adapter/httpapi/decode_json.go"
       - "backend/internal/adapter/httpapi/openapi_security_test.go"
@@ -14,6 +15,7 @@ on:
     paths:
       - "openapi.yaml"
       - "scripts/schema_security_check.py"
+      - "scripts/requirements-api-schema.txt"
       - ".spectral-security.yaml"
       - "backend/internal/adapter/httpapi/decode_json.go"
       - "backend/internal/adapter/httpapi/openapi_security_test.go"
@@ -34,7 +36,7 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Install PyYAML
-        run: pip install pyyaml
+        run: pip install --require-hashes -r scripts/requirements-api-schema.txt
 
       - name: Run schema security script
         run: python3 scripts/schema_security_check.py
