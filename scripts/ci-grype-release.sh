@@ -4,7 +4,7 @@
 #   bash scripts/ci-sbom.sh
 #   bash scripts/ci-grype-release.sh [dist/geoatlas-X.Y.Z.cdx.json]
 #
-# Нужен grype (в CI: install.sh с пином). Локально:
+# Нужен grype (в CI: release tarball + sha256). Локально:
 #   https://github.com/anchore/grype/releases  (пин: v0.120.1)
 set -euo pipefail
 

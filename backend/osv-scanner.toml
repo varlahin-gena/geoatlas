@@ -1,0 +1,6 @@
+# Scorecard / OSV-Scanner: GO-2026-5932 flags the whole golang.org/x/crypto module,
+# but the advisory applies only to the unmaintained openpgp subpackages.
+# This module imports golang.org/x/crypto/bcrypt only (see internal/auth/users.go).
+[[IgnoredVulns]]
+id = "GO-2026-5932"
+reason = "Advisory scoped to golang.org/x/crypto/openpgp; backend uses bcrypt only."
