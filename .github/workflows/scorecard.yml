@@ -1,0 +1,62 @@
+# OpenSSF Scorecard — supply-chain posture (advisory, not in ci-ok).
+# Results: Security → Code scanning + OpenSSF API (badge-ready via publish_results).
+
+name: Scorecard
+
+on:
+  branch_protection_rule:
+  schedule:
+    - cron: "40 4 * * 1"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+      # Upload SARIF to code scanning
+      security-events: write
+      # OIDC for publish_results → api.scorecard.dev / badge
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Run analysis
+        uses: ossf/scorecard-action@fa7117db83c52d787ae5a89f350999701505d78e # v2.5.0
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          # Public repo: publish to OpenSSF API (enables Scorecard badge).
+          publish_results: true
+          # Optional fine-grained PAT for a fuller Branch-Protection check on
+          # public repos: https://github.com/ossf/scorecard-action#authentication-with-fine-grained-pat-optional
+          # repo_token: ${{ secrets.SCORECARD_TOKEN }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: scorecard-sarif
+          path: results.sarif
+          retention-days: 5
+
+      - name: Upload to code scanning
+        uses: github/codeql-action/upload-sarif@1190a975f95ce23525efb6a3fc21ea29567c1b52 # v3
+        with:
+          sarif_file: results.sarif
+          category: scorecard

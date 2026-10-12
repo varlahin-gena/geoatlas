@@ -55,6 +55,11 @@ geoatlas/
 │   ├── ci-docker-build.sh            # CI: docker build backend / frontend / stats
 │   ├── ci-govulncheck.sh             # CI: govulncheck по Go-модулям
 │   ├── ci-sbom.sh                    # релиз: CycloneDX + SPDX из geoatlas-*.tar.gz
+│   ├── ci-grype-release.sh           # релиз: Grype CRITICAL (only-fixed) по SBOM
+│   ├── ci-cosign-sign.sh             # релиз: cosign keyless sign-blob → .cosign.bundle
+│   ├── ci-fuzz-nightly.sh            # nightly: длинный go fuzz (parser / ingest)
+│   ├── ci-compose-smoke.sh           # nightly: compose up + /health|/api/ready + down
+│   ├── ci-license-check.sh           # CI: toxic licenses (Go + npm production)
 │   ├── pack-release.sh               # dist/geoatlas-X.Y.Z.tar.gz (+ sha256); --with-images
 │   ├── export-images.sh              # docker build/pull + save → images/ для офлайн-пакета
 │   ├── test-apply-package.sh         # CI: pack + наложение пакета
@@ -89,8 +94,12 @@ geoatlas/
 ├── LICENSE / NOTICE                  # Apache License 2.0
 ├── SECURITY.md                       # как сообщать об уязвимостях
 ├── VERSION / CHANGELOG.md / RELEASING.md
-├── .github/workflows/ci.yml          # тесты + docker build образов compose
-├── .github/workflows/release-tag.yml # тег v*: Release + tar.gz + SBOM
+├── .github/workflows/ci.yml          # тесты + docker; security/license/docs gates → ci-ok
+├── .github/workflows/scorecard.yml   # OpenSSF Scorecard (advisory SARIF + publish_results)
+├── .github/workflows/nightly.yml     # daily: long fuzz + compose smoke (не ci-ok)
+├── .github/workflows/release-tag.yml # тег v*: Release + tar.gz + SBOM + Grype + cosign
+├── .gitleaks.toml                    # secret scan config (extend default)
+├── .lychee.toml                      # offline markdown link check config
 ├── start.sh / stop.sh / update.sh    # update.sh — наложение geoatlas-*.tar.gz
 ├── syslog-ng/Dockerfile              # 4.12.0 + apt upgrade + Python venv patches
 ├── syslog-ng.conf

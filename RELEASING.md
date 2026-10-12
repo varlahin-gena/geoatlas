@@ -51,12 +51,15 @@ git push origin "v$(tr -d '[:space:]' < VERSION)"
 
 1. проверяет контракт (`VERSION` / CHANGELOG / OpenAPI);
 2. создаёт GitHub Release из секции CHANGELOG (если релиза ещё нет);
-3. собирает **`geoatlas-X.Y.Z.tar.gz`** (+ `.sha256`) и прикрепляет к релизу;
-4. сканирует архив Syft и прикрепляет **`geoatlas-X.Y.Z.cdx.json`** (CycloneDX) и **`.spdx.json`** (SPDX).
+3. собирает **`geoatlas-X.Y.Z.tar.gz`** (+ `.sha256`);
+4. сканирует архив Syft → **`.cdx.json`** (CycloneDX) и **`.spdx.json`** (SPDX);
+5. **Grype** по SBOM — fail на **CRITICAL** с доступным фиксом (`--only-fixed`); иначе upload не выполняется;
+6. **cosign** keyless (`sign-blob`) → **`.tar.gz.cosign.bundle`** (Sigstore / GitHub OIDC);
+7. прикрепляет все артефакты к релизу.
 
 Ручной `gh release create` не нужен, пока job **github-release** зелёный. Один tar.gz — и для Ubuntu, и для Oracle Linux; операторы на сервере **только** скачивают пакет и ставят/обновляют через install-скрипт или `./update.sh` (README, «Установка» / «Обновление системы»; без `git pull` на сервере).
 
-Проверьте Assets релиза: `geoatlas-X.Y.Z.tar.gz`, `.sha256`, `.cdx.json`, `.spdx.json`.
+Проверьте Assets релиза: `geoatlas-X.Y.Z.tar.gz`, `.sha256`, `.cdx.json`, `.spdx.json`, `.tar.gz.cosign.bundle`.
 
 ## После релиза
 

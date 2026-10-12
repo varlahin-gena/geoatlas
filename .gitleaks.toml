@@ -1,0 +1,6 @@
+# GeoAtlas — extend default rules; add path/regex allowlists here if CI hits false positives
+# (parser fixtures, docs examples). Keep allowlists narrow.
+title = "gitleaks"
+
+[extend]
+useDefault = true
