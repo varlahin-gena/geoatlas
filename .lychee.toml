@@ -1,0 +1,9 @@
+# Offline markdown link check (local/relative only). Used by CI docs-links job.
+offline = true
+include_fragments = "full"
+fallback_extensions = ["md", "html"]
+max_redirects = 5
+accept = ["200", "204", "206"]
+exclude = [
+  '^https://github\.com/.*/(issues|discussions|security/advisories)',
+]

@@ -24,6 +24,12 @@ fail=0
 gate release-contract true "${RELEASE_CONTRACT_RESULT:-}" || fail=1
 gate frontend-smoke true "${FRONTEND_SMOKE_RESULT:-}" || fail=1
 gate trivy true "${TRIVY_RESULT:-}" || fail=1
+gate gitleaks true "${GITLEAKS_RESULT:-}" || fail=1
+gate workflows-lint true "${WORKFLOWS_LINT_RESULT:-}" || fail=1
+gate license-check true "${LICENSE_CHECK_RESULT:-}" || fail=1
+gate docs-links true "${DOCS_LINKS_RESULT:-}" || fail=1
+# dependency-review runs only on pull_request; on push the job is skipped.
+gate dependency-review "${DEPENDENCY_REVIEW_GATE:-false}" "${DEPENDENCY_REVIEW_RESULT:-}" || fail=1
 gate shellcheck "${SHELL_GATE:-false}" "${SHELLCHECK_RESULT:-}" || fail=1
 gate backend "${BACKEND_GATE:-false}" "${BACKEND_RESULT:-}" || fail=1
 gate chconn "${CHCONN_GATE:-false}" "${CHCONN_RESULT:-}" || fail=1

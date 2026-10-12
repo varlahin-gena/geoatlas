@@ -90,7 +90,7 @@ Appliance: **IPv4-only**, один хост / один процесс backend, �
 - Ingest внутри docker: маркер с `INGEST_SHARED_SECRET` + `INGEST_ALLOW_FROM=syslog-ng` (HTTP upload API — без маркера)
 - Reputation URL-фиды: только публичные IPv4-хосты (private/metadata блокируются)
 - Ротация env Bearer: `API_AUTH_PREVIOUS_TOKEN` / `API_OPS_PREVIOUS_TOKEN`; именованные токены — rotate в UI
-- Установка и обновление: только `geoatlas-X.Y.Z.tar.gz` с GitHub Releases; проверяйте `.sha256` до `./update.sh`
+- Установка и обновление: только `geoatlas-X.Y.Z.tar.gz` с GitHub Releases; проверяйте `.sha256` до `./update.sh` (опционально online: `.cosign.bundle` + `cosign verify-blob`, см. [install.md](docs/install.md))
 
 ## Структура репозитория
 

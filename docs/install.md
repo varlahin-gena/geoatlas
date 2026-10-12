@@ -47,7 +47,7 @@
 
 ## Установочный пакет
 
-Один архив **`geoatlas-X.Y.Z.tar.gz`** (плюс `.sha256`; SBOM `.cdx.json` / `.spdx.json` — для аудита, не для установки) с [GitHub Releases](https://github.com/varlahin-gena/geoatlas/releases) — исходники стека, **оба** установщика (`deploy/ubuntu/…`, `deploy/oracle_linux/…`), `update.sh` и (для прод-пакета) каталог **`images/`** с готовыми Docker-образами. Это не `.deb`/`.rpm`: Docker и файрвол хоста ставит OS-скрипт из пакета.
+Один архив **`geoatlas-X.Y.Z.tar.gz`** (плюс `.sha256`; SBOM `.cdx.json` / `.spdx.json` — для аудита; `.tar.gz.cosign.bundle` — подпись Sigstore) с [GitHub Releases](https://github.com/varlahin-gena/geoatlas/releases) — исходники стека, **оба** установщика (`deploy/ubuntu/…`, `deploy/oracle_linux/…`), `update.sh` и (для прод-пакета) каталог **`images/`** с готовыми Docker-образами. Это не `.deb`/`.rpm`: Docker и файрвол хоста ставит OS-скрипт из пакета.
 
 | Задача                                | Что запускать                                              |
 |---------------------------------------|------------------------------------------------------------|
@@ -65,6 +65,17 @@ curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/g
 sha256sum -c "geoatlas-${VER}.tar.gz.sha256"
 tar -xzf "geoatlas-${VER}.tar.gz"
 cd "geoatlas-${VER}"
+```
+
+Офлайн достаточно `.sha256`. Опционально (нужен [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) и сеть к Rekor) проверить, что пакет собран workflow релиза:
+
+```bash
+curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz.cosign.bundle"
+cosign verify-blob \
+  --bundle "geoatlas-${VER}.tar.gz.cosign.bundle" \
+  --certificate-identity-regexp 'https://github.com/varlahin-gena/geoatlas/.github/workflows/release-tag.yml@refs/tags/v.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  "geoatlas-${VER}.tar.gz"
 ```
 
 Дальше — установщик вашей ОС (см. ниже) или `./update.sh` для уже стоящей системы ([обновление](operations.md#обновление-системы)).

@@ -563,6 +563,120 @@ jobs:
           sarif_file: trivy-fs.sarif
           category: trivy-fs
 
+  # PR-only: GitHub Dependency Review API needs base/head. Push → skipped; ci-ok treats skip as ok.
+  dependency-review:
+    name: dependency review (high / runtime)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          fail-on-scopes: runtime
+
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Workflow YAML + Actions security. zizmor min-severity=high: current tree is clean at
+  # high; medium has artipacked/cooldown noise — tighten later without blocking CI now.
+  workflows-lint:
+    name: workflows (actionlint + zizmor)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: actionlint
+        run: |
+          set -euo pipefail
+          bash <(curl --proto '=https' --tlsv1.2 -sSf \
+            https://raw.githubusercontent.com/rhysd/actionlint/v1.7.12/scripts/download-actionlint.bash) 1.7.12
+          ./actionlint -color -shellcheck= -pyflakes=
+
+      - uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482 # v0.6.4
+        with:
+          advanced-security: false
+          min-severity: high
+          version: v1.30.1
+          inputs: .github
+
+  # Toxic licenses in Go modules + frontend production npm (Apache-2.0 appliance).
+  license-check:
+    name: license check (Go + npm prod)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: "1.26.x"
+          check-latest: true
+          cache-dependency-path: |
+            backend/go.sum
+            backend/go.mod
+            stats-collector/go.sum
+            stats-collector/go.mod
+            pkg/chconn/go.sum
+            pkg/chconn/go.mod
+            pkg/syslogngstats/go.mod
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: install go-licenses
+        run: go install github.com/google/go-licenses/v2@v2.0.1
+
+      - name: npm ci (for license-checker resolution)
+        working-directory: frontend
+        run: npm ci
+
+      - name: license check
+        run: bash scripts/ci-license-check.sh
+
+  # Local/relative markdown links only (--offline). Remotes not checked.
+  docs-links:
+    name: docs links (lychee offline)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          args: >-
+            --config .lychee.toml
+            --verbose
+            --no-progress
+            README.md CHANGELOG.md SECURITY.md RELEASING.md NOTICE docs
+          fail: true
+          lycheeVersion: v0.24.2
+
   frontend:
     name: frontend (build + test)
     needs: changes
@@ -651,6 +765,11 @@ jobs:
       - docker-images
       - frontend-smoke
       - trivy
+      - dependency-review
+      - gitleaks
+      - workflows-lint
+      - license-check
+      - docs-links
       - frontend
     runs-on: ubuntu-latest
     steps:
@@ -660,6 +779,12 @@ jobs:
           RELEASE_CONTRACT_RESULT: ${{ needs.release-contract.result }}
           FRONTEND_SMOKE_RESULT: ${{ needs.frontend-smoke.result }}
           TRIVY_RESULT: ${{ needs.trivy.result }}
+          GITLEAKS_RESULT: ${{ needs.gitleaks.result }}
+          WORKFLOWS_LINT_RESULT: ${{ needs.workflows-lint.result }}
+          LICENSE_CHECK_RESULT: ${{ needs.license-check.result }}
+          DOCS_LINKS_RESULT: ${{ needs.docs-links.result }}
+          DEPENDENCY_REVIEW_GATE: ${{ github.event_name == 'pull_request' }}
+          DEPENDENCY_REVIEW_RESULT: ${{ needs.dependency-review.result }}
           SHELL_GATE: ${{ needs.changes.outputs.shell }}
           SHELLCHECK_RESULT: ${{ needs.shellcheck.result }}
           BACKEND_GATE: ${{ needs.changes.outputs.backend }}

@@ -250,6 +250,7 @@ cd /tmp
 curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz"
 curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz.sha256"
 sha256sum -c "geoatlas-${VER}.tar.gz.sha256"
+# опционально online: скачать .tar.gz.cosign.bundle и cosign verify-blob (см. docs/install.md)
 
 tar -xzf "geoatlas-${VER}.tar.gz"
 sudo ./geoatlas-${VER}/update.sh --package "$PWD/geoatlas-${VER}.tar.gz" --project-dir /opt/geoatlas
