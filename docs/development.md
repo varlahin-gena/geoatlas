@@ -76,4 +76,6 @@ bash scripts/shellcheck.sh          # если установлен shellcheck
 bash scripts/check-module-identity.sh
 ```
 
+Процесс PR и политика тестов: [CONTRIBUTING.md](../CONTRIBUTING.md).
+
 Дерево каталогов: [repo-layout.md](repo-layout.md). Архитектура рантайма: [architecture.md](architecture.md).

@@ -61,10 +61,12 @@ Appliance: **IPv4-only**, один хост / один процесс backend, �
 | [Репутация](docs/reputation.md) | Фиды и offline-списки |
 | [Аномалии](docs/anomalies.md) | Типы (в т.ч. byte_surge / beaconing / lateral), ack/assign, разбор |
 | [Разработка](docs/development.md) | Локальный стек из git |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | PR, review, политика тестов |
 | [Структура репо](docs/repo-layout.md) | Дерево каталогов |
 | [RELEASING.md](RELEASING.md) | Версии продукта / OpenAPI / схемы CH |
 | [SECURITY.md](SECURITY.md) | Сообщение об уязвимостях |
 | [CHANGELOG.md](CHANGELOG.md) | История релизов |
+| [OpenSSF Best Practices](docs/openssf-best-practices.md) | Шпаргалка критериев badge |
 
 Контракт REST: [`openapi.yaml`](openapi.yaml) (документ OpenAPI **1.17.0**).
 
@@ -72,7 +74,7 @@ Appliance: **IPv4-only**, один хост / один процесс backend, �
 
 ГеоАтлас распространяется под [Apache License 2.0](LICENSE). Продукт бесплатный и общедоступный; релизы публикуются на GitHub.
 
-Баги, вопросы и заказ доработок — через [Issues](https://github.com/varlahin-gena/geoatlas/issues).
+Баги, вопросы и заказ доработок — через [Issues](https://github.com/varlahin-gena/geoatlas/issues). Как прислать патч — [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Безопасность
 
