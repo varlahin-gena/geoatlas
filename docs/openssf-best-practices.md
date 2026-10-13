@@ -4,7 +4,14 @@
 [varlahin-gena/geoatlas](https://github.com/varlahin-gena/geoatlas).
 
 Критерии Passing: https://www.bestpractices.dev/en/criteria/0  
-После создания проекта подставьте ID в бейдж README.
+
+Проект: **15404** — https://www.bestpractices.dev/projects/15404  
+Редактирование Passing: https://www.bestpractices.dev/en/projects/15404/passing/edit  
+
+Заполнение формы (нужна сессия bestpractices.dev):
+
+1. Консоль браузера на странице edit — `scripts/openssf-passing-fill-console.js`
+2. Или cookie в `~/.badge-cookie.txt` и `python scripts/submit-openssf-passing.py`
 
 Ниже — рекомендуемые ответы **Met** / **N/A** и URL обоснований (пути от корня репо на `main`).
 
