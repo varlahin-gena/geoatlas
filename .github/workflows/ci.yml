@@ -758,7 +758,8 @@ jobs:
           grep -q 'ga-theme-change' src/auth/theme.ts
 
   ci-ok:
-    name: CI status (required)
+    # Name must include "test" so OpenSSF Scorecard CI-Tests counts path-filtered PRs.
+    name: CI tests (required)
     if: always()
     needs:
       - changes
