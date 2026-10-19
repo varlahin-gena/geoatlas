@@ -76,8 +76,26 @@ echo "::group::docker compose config"
 echo "::endgroup::"
 ok "compose config"
 
+dump_syslog_diag() {
+  echo "::group::syslog-ng diagnostics"
+  docker ps -a --filter name=^/syslog-ng$ --no-trunc || true
+  docker inspect syslog-ng --format 'status={{.State.Status}} exit={{.State.ExitCode}} error={{.State.Error}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' 2>/dev/null || true
+  if docker inspect syslog-ng >/dev/null 2>&1; then
+    echo "--- health log ---"
+    docker inspect syslog-ng --format '{{range .State.Health.Log}}exit={{.ExitCode}} out={{.Output}}{{println}}{{end}}' 2>/dev/null || true
+    echo "--- container logs ---"
+    docker logs --tail 200 syslog-ng 2>&1 || true
+    echo "--- syslog-ng-ctl stats ---"
+    docker exec syslog-ng syslog-ng-ctl stats 2>&1 || true
+  fi
+  echo "::endgroup::"
+}
+
 echo "::group::docker compose up"
-"${compose[@]}" up -d --build --wait --wait-timeout 300
+if ! "${compose[@]}" up -d --build --wait --wait-timeout 300; then
+  dump_syslog_diag
+  fail "compose up --wait failed"
+fi
 echo "::endgroup::"
 ok "compose up --wait"
 
