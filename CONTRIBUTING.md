@@ -10,7 +10,7 @@
 2. Сделайте fork (или branch в своём клоне) от актуального `main`.
 3. Внесите изменения в отдельной ветке с понятным именем.
 4. Откройте **Pull Request** в `main`.
-5. Дождитесь зелёного CI (обязательный check **CI status (required)**) и code owner review.
+5. Дождитесь зелёного CI (обязательный check **CI tests (required)**) и code owner review.
 
 Правила ветки `main` / `develop`: merge только через PR; прямой push запрещён ruleset’ом.
 
