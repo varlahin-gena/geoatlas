@@ -14,6 +14,11 @@
 | [reputation.md](reputation.md) | Фиды и offline-списки |
 | [anomalies.md](anomalies.md) | Типы аномалий, пороги UI, learning, ack/assign, разбор алерта |
 | [development.md](development.md) | Локальная разработка из git |
+| [roadmap.md](roadmap.md) | Намерения на 12 месяцев |
+| [security-requirements.md](security-requirements.md) | Чего ждать / не ждать от продукта |
+| [assurance-case.md](assurance-case.md) | Threat model и аргумент защищённости |
+| [openssf-best-practices.md](openssf-best-practices.md) | OpenSSF Passing |
+| [openssf-silver.md](openssf-silver.md) | OpenSSF Silver |
 | [repo-layout.md](repo-layout.md) | Дерево каталогов репозитория |
 
-Смежные файлы в корне: [SECURITY.md](../SECURITY.md), [RELEASING.md](../RELEASING.md), [CHANGELOG.md](../CHANGELOG.md), [`openapi.yaml`](../openapi.yaml).
+Смежные файлы в корне: [SECURITY.md](../SECURITY.md), [RELEASING.md](../RELEASING.md), [CHANGELOG.md](../CHANGELOG.md), [CONTRIBUTING.md](../CONTRIBUTING.md), [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md), [GOVERNANCE.md](../GOVERNANCE.md), [`openapi.yaml`](../openapi.yaml).

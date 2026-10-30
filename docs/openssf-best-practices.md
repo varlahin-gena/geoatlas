@@ -4,6 +4,7 @@
 [varlahin-gena/geoatlas](https://github.com/varlahin-gena/geoatlas).
 
 Критерии Passing: https://www.bestpractices.dev/en/criteria/0  
+Следующий уровень: [openssf-silver.md](openssf-silver.md).
 
 Проект: **15404** — https://www.bestpractices.dev/projects/15404  
 Редактирование Passing: https://www.bestpractices.dev/en/projects/15404/passing/edit  

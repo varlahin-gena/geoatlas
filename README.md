@@ -69,12 +69,18 @@ Appliance: **IPv4-only**, один хост / один процесс backend, �
 | [Репутация](docs/reputation.md) | Фиды и offline-списки |
 | [Аномалии](docs/anomalies.md) | Типы (в т.ч. byte_surge / beaconing / lateral), ack/assign, разбор |
 | [Разработка](docs/development.md) | Локальный стек из git |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | PR, review, политика тестов |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | PR, DCO, coding standards, тесты |
+| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | Кодекс поведения |
+| [GOVERNANCE.md](GOVERNANCE.md) | Роли, решения, access continuity |
+| [Roadmap](docs/roadmap.md) | Намерения на 12 месяцев |
+| [Требования безопасности](docs/security-requirements.md) | Чего ждать / не ждать от продукта |
+| [Assurance case](docs/assurance-case.md) | Threat model и аргумент защищённости |
 | [Структура репо](docs/repo-layout.md) | Дерево каталогов |
 | [RELEASING.md](RELEASING.md) | Версии продукта / OpenAPI / схемы CH |
 | [SECURITY.md](SECURITY.md) | Сообщение об уязвимостях |
 | [CHANGELOG.md](CHANGELOG.md) | История релизов |
-| [OpenSSF Best Practices](docs/openssf-best-practices.md) | Шпаргалка критериев badge |
+| [OpenSSF Passing](docs/openssf-best-practices.md) | Шпаргалка Passing |
+| [OpenSSF Silver](docs/openssf-silver.md) | Шпаргалка Silver |
 
 Контракт REST: [`openapi.yaml`](openapi.yaml) (документ OpenAPI **1.17.0**).
 
