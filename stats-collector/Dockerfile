@@ -14,7 +14,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/stats-c
 
 FROM alpine:3.23@sha256:85fe1e81d6758c208f3e1eed4338a1997e19d4be002d4dd32d3100c9a8c010a0
 # libssl3/libcrypto3 и прочие пакеты: полный apk upgrade закрывает Trivy CRITICAL в Alpine.
-RUN apk add --no-cache ca-certificates=20260909-r0 tzdata=2026e-r0 && \
+RUN apk add --no-cache ca-certificates=20261020-r0 tzdata=2026e-r0 && \
     apk upgrade --no-cache && \
     addgroup -g 10001 app && \
     adduser -D -u 10001 -G app app
