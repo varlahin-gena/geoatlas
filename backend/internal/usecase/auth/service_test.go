@@ -234,11 +234,10 @@ func TestChangePasswordErrors(t *testing.T) {
 	if _, err := svc.ChangePassword("admin", "a", "b"); !errors.Is(err, ErrSession) {
 		t.Fatalf("session: %v", err)
 	}
-	users = &fakeUsers{user: &domain.User{Username: "admin", Role: domain.RoleAdministrator}}
-	// SessionVersion lookup fails after change — force by clearing user mid-way via broken Get/SessionVersion
+	// Clear user after wire so ChangePassword hits ErrUserNotFound on Get.
 	broken := &fakeUsers{user: &domain.User{Username: "admin", Role: domain.RoleAdministrator}}
 	svc = New(broken, &fakeSessions{})
-	broken.user = nil // ChangePassword succeeds on empty? ChangePassword checks f.user — will ErrUserNotFound
+	broken.user = nil
 	if _, err := svc.ChangePassword("admin", "a", "b"); !errors.Is(err, domain.ErrUserNotFound) {
 		t.Fatalf("no user: %v", err)
 	}

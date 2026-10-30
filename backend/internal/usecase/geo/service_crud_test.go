@@ -119,9 +119,7 @@ func TestIndexReadyAndFormatNetwork(t *testing.T) {
 	idx := geoip.New()
 	s := New(&crudStore{}, nil, idx, nil, &crudCodec{parseOK: true}, 0)
 	s.SetHeavySlot(&crudHeavy{})
-	if !s.IndexReady() {
-		// empty index may still be ready
-	}
+	_ = s.IndexReady() // non-nil index path; empty DB may be ready or not
 	if s.FormatNetwork(0x0a000001, 0x0a000001) == "" {
 		t.Fatal("format")
 	}
