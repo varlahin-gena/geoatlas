@@ -21,7 +21,6 @@ type stubConn struct {
 	queryQueue    []stubQuery
 	queryRowQueue []stubRow
 
-	batchErr    error
 	appendErr   error
 	sendErr     error
 	prepareErr  error
