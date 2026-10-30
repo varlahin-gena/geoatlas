@@ -45,7 +45,7 @@ Passing уже получен (проект [15404](https://www.bestpractices.de
 | interfaces_current | Met | без опоры на заведомо obsolete API в нашем коде |
 | automated_integration_testing | Met | CI на PR/push |
 | regression_tests_added50 | Met | политика в CONTRIBUTING |
-| **test_statement_coverage80** | **Unmet** | **фаза B** — поднять total coverage Go до ≥80% |
+| **test_statement_coverage80** | **Met** | total Go statement coverage ≥80%; gate в CI (`coverage overall (≥80%)`) |
 | test_policy_mandated / tests_documented_added | Met | CONTRIBUTING |
 | warnings_strict | Met | lint падает в CI |
 | implement_secure_design | Met | [assurance-case.md](assurance-case.md) |
@@ -58,9 +58,10 @@ Passing уже получен (проект [15404](https://www.bestpractices.de
 | static_analysis_common_vulnerabilities | Met | CodeQL / govulncheck |
 | dynamic_analysis_unsafe | N/A | нет C/C++ |
 
-## После фазы A
+## После фазы A / B
 
 1. Смержить PR с docs + DCO.
 2. В GitHub → Settings → Branches: добавить required check **DCO sign-off** (имя job из `dco.yml`).
-3. Заполнить форму Silver (кроме coverage — Unmet).
-4. Перейти к **фазе B** (coverage), затем переключить `test_statement_coverage80` → Met.
+3. Фаза B: total Go coverage ≥80% + CI step `coverage overall (≥80%)` в [ci.yml](../.github/workflows/ci.yml).
+4. В форме Silver переключить `test_statement_coverage80` → Met (см. `scripts/openssf-silver-fill.json`).
+5. `bus_factor` остаётся Unmet (SHOULD) при одном Maintainer.

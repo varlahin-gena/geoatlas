@@ -293,6 +293,21 @@ jobs:
           done
           exit "$fail"
 
+      # OpenSSF Silver: test_statement_coverage80 — overall Go statement coverage ≥80%.
+      - name: coverage overall (≥80%)
+        run: |
+          set -euo pipefail
+          go test -count=1 -coverprofile=coverage.out ./...
+          total=$(go tool cover -func=coverage.out | awk '/^total:/ { gsub(/%/,"",$NF); print $NF }')
+          if [[ -z "$total" ]]; then
+            echo "ERROR: could not parse overall coverage from go tool cover" >&2
+            exit 1
+          fi
+          awk -v p="$total" 'BEGIN {
+            if (p+0 < 80.0) { printf "ERROR: overall coverage %.1f%% < 80.0%%\n", p; exit 1 }
+            printf "overall coverage %.1f%% (gate ≥ 80.0%%)\n", p
+          }'
+
       - name: go fuzz (smoke)
         # Count-based budget: wall-clock -fuzztime=Ns can FAIL with
         # "context deadline exceeded" when the coordinator timer fires
