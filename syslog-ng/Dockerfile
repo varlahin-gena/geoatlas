@@ -39,19 +39,23 @@ RUN set -eux; \
     fi; \
     "${py}" -m pip install --no-cache-dir --upgrade \
       'pyasn1==0.6.4' \
-      'aiohttp==3.14.3' \
+      'aiohttp==3.14.4' \
+      'certifi==2026.10.18' \
       'idna==3.15' \
-      'msgpack==1.2.1' \
+      'msgpack==1.2.3' \
       'oauthlib==4.0.0' \
-      'setuptools==83.0.0'; \
+      'setuptools==84.1.0' \
+      'tornado==6.6'; \
     "${py}" -c "import importlib.metadata as m; \
 a=m.version; \
 assert a('pyasn1')=='0.6.4', a('pyasn1'); \
-assert a('aiohttp')=='3.14.3', a('aiohttp'); \
+assert a('aiohttp')=='3.14.4', a('aiohttp'); \
+assert a('certifi')=='2026.10.18', a('certifi'); \
 assert a('idna')=='3.15', a('idna'); \
-assert a('msgpack')=='1.2.1', a('msgpack'); \
+assert a('msgpack')=='1.2.3', a('msgpack'); \
 assert a('oauthlib')=='4.0.0', a('oauthlib'); \
-assert a('setuptools')=='83.0.0', a('setuptools')"; \
+assert a('setuptools')=='84.1.0', a('setuptools'); \
+assert a('tornado')=='6.6', a('tornado')"; \
     "${py}" -m pip uninstall -y pip; \
     rm -rf /root/.cache/pip /tmp/pip-* "${venv}/bin/pip" "${venv}/bin/pip3" \
       "${venv}"/lib/python*/site-packages/pip \
@@ -64,7 +68,7 @@ assert a('setuptools')=='83.0.0', a('setuptools')"; \
     fi; \
     leftovers="$(find /var/lib/syslog-ng /usr /root -type d \
       \( -name 'setuptools-*.dist-info' -o -name 'setuptools-*.egg-info' \) \
-      ! -name 'setuptools-83.0.0.dist-info' 2>/dev/null || true)"; \
+      ! -name 'setuptools-84.1.0.dist-info' 2>/dev/null || true)"; \
     [ -z "$leftovers" ] || { printf 'leftover setuptools:\n%s\n' "$leftovers" >&2; exit 1; }
 LABEL org.opencontainers.image.title="geoatlas-syslog-ng" \
       org.opencontainers.image.source="https://github.com/varlahin-gena/geoatlas"

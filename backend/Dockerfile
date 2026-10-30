@@ -1,6 +1,6 @@
 # ---------- build stage ----------
 # context: репозиторий (.) — нужен pkg/chconn и pkg/syslogngstats
-FROM golang:1.26.9-alpine@sha256:3082400e369fa24d5fc60bca20edab3f6d604e0c5a690ec66b295eff4dd87ade AS build
+FROM golang:1.26.10-alpine@sha256:a2012b4a1d1f9f7e9f44e0d39b805a901e856b1dd80b4e6ee4338db547050308 AS build
 
 WORKDIR /src
 
@@ -20,7 +20,7 @@ FROM alpine:3.23@sha256:85fe1e81d6758c208f3e1eed4338a1997e19d4be002d4dd32d3100c9
 # uid/gid 101 = clickhouse/clickhouse-server — общий том clickhouse-backups
 # (иначе auth *.tgz и prune падают с permission denied).
 # libssl3/libcrypto3 и прочие пакеты: полный apk upgrade закрывает Trivy CRITICAL в Alpine.
-RUN apk add --no-cache ca-certificates=20260909-r0 tzdata=2026e-r0 && \
+RUN apk add --no-cache ca-certificates=20261020-r0 tzdata=2026e-r0 && \
     apk upgrade --no-cache && \
     addgroup -g 101 app && \
     adduser -D -u 101 -G app app && \
