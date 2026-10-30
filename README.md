@@ -3,6 +3,8 @@
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15404/badge)](https://www.bestpractices.dev/projects/15404)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/varlahin-gena/geoatlas/badge)](https://securityscorecards.dev/viewer/?uri=github.com/varlahin-gena/geoatlas)
 [![CI](https://github.com/varlahin-gena/geoatlas/actions/workflows/ci.yml/badge.svg)](https://github.com/varlahin-gena/geoatlas/actions/workflows/ci.yml)
+[![Go](https://img.shields.io/github/go-mod/go-version/varlahin-gena/geoatlas?filename=backend/go.mod&logo=go&logoColor=white&label=Go)](backend/go.mod)
+[![Node](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fvarlahin-gena%2Fgeoatlas%2Fmain%2Ffrontend%2Fpackage.json&query=%24.engines.node&label=Node&logo=nodedotjs&logoColor=white&color=339933)](frontend/package.json)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/varlahin-gena/geoatlas)](https://github.com/varlahin-gena/geoatlas/releases)
 
