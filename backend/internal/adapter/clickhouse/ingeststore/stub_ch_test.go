@@ -2,7 +2,6 @@ package ingeststore
 
 import (
 	"context"
-	"sync"
 
 	"github.com/ClickHouse/clickhouse-go/v2/lib/column"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
@@ -10,7 +9,6 @@ import (
 
 type stubConn struct {
 	driver.Conn
-	mu          sync.Mutex
 	prepareErr  error
 	appendErr   error
 	colAppendEr error

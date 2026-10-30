@@ -83,7 +83,9 @@ func TestRequireOpsPaths(t *testing.T) {
 		t.Fatalf("live miss: %d", rec.Code)
 	}
 
-	_, okSess := SessionFromContext(nil)
+	//nolint:staticcheck // SA1012: explicit nil-context path for SessionFromContext
+	nilCtx := (context.Context)(nil)
+	_, okSess := SessionFromContext(nilCtx)
 	if okSess {
 		t.Fatal("nil ctx")
 	}
