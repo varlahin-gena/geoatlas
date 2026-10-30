@@ -93,6 +93,13 @@ geoatlas/
 ├── openapi.yaml                      # контракт HTTP API (OpenAPI 1.17.0)
 ├── LICENSE / NOTICE                  # Apache License 2.0
 ├── SECURITY.md                       # как сообщать об уязвимостях
+├── CODE_OF_CONDUCT.md                # кодекс поведения
+├── GOVERNANCE.md                     # роли, access continuity
+├── docs/roadmap.md                   # roadmap 12 мес.
+├── docs/security-requirements.md     # security requirements (Silver)
+├── docs/assurance-case.md            # assurance case (Silver)
+├── docs/openssf-silver.md            # шпаргалка OpenSSF Silver
+├── .github/workflows/dco.yml         # DCO Signed-off-by на PR
 ├── VERSION / CHANGELOG.md / RELEASING.md
 ├── .github/workflows/ci.yml          # тесты + docker; security/license/docs gates → ci-ok
 ├── .github/workflows/scorecard.yml   # OpenSSF Scorecard (advisory SARIF + publish_results)
