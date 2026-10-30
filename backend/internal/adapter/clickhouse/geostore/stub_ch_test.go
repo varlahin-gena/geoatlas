@@ -38,10 +38,6 @@ func (c *stubConn) pushQuery(rows ...[]any) {
 	c.queryQueue = append(c.queryQueue, stubQuery{rows: rows})
 }
 
-func (c *stubConn) pushQueryErr(err error) {
-	c.queryQueue = append(c.queryQueue, stubQuery{err: err})
-}
-
 func (c *stubConn) pushRow(vals ...any) {
 	c.rowQueue = append(c.rowQueue, stubRow{vals: vals})
 }
