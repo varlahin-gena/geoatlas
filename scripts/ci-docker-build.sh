@@ -208,10 +208,12 @@ build_syslog_ng() {
   docker run --rm --entrypoint /var/lib/syslog-ng/python-venv/bin/python "$tag" \
     -c "import importlib.metadata as m; a=m.version; \
 assert a('pyasn1')=='0.6.4', a('pyasn1'); \
-assert a('aiohttp')=='3.14.3', a('aiohttp'); \
+assert a('aiohttp')=='3.14.4', a('aiohttp'); \
+assert a('certifi')=='2026.10.18', a('certifi'); \
 assert a('idna')=='3.15', a('idna'); \
-assert a('msgpack')=='1.2.1', a('msgpack'); \
-assert a('setuptools')=='83.0.0', a('setuptools')"
+assert a('msgpack')=='1.2.3', a('msgpack'); \
+assert a('setuptools')=='84.1.0', a('setuptools'); \
+assert a('tornado')=='6.6', a('tornado')"
   if docker run --rm --entrypoint sh "$tag" -c \
       'test -e /var/lib/syslog-ng/python-venv/lib/python3.13/site-packages/pip'; then
     fail "syslog-ng image must not ship pip (Trivy setuptools FP)"
