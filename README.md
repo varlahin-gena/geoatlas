@@ -1,6 +1,10 @@
 # ГеоАтлас
 
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15404/badge)](https://www.bestpractices.dev/projects/15404)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/varlahin-gena/geoatlas/badge)](https://securityscorecards.dev/viewer/?uri=github.com/varlahin-gena/geoatlas)
+[![CI](https://github.com/varlahin-gena/geoatlas/actions/workflows/ci.yml/badge.svg)](https://github.com/varlahin-gena/geoatlas/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/varlahin-gena/geoatlas)](https://github.com/varlahin-gena/geoatlas/releases)
 
 Визуализатор сетевых взаимодействий на базе логов межсетевых экранов (МСЭ).
 Принимает syslog с файрволов или из SIEM, парсит события, обогащает их геоданными
