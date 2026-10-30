@@ -212,15 +212,15 @@ func (m *repMemStore) ListMeta(ctx context.Context) ([]model.ReputationListMeta,
 
 type repMemIndex struct{ n int }
 
-func (repMemIndex) Lookup(string) []model.ReputationHit         { return nil }
-func (i *repMemIndex) RangeCount() int                          { return i.n }
-func (i *repMemIndex) ReplaceAll(r []model.ReputationRange)     { i.n = len(r) }
+func (repMemIndex) Lookup(string) []model.ReputationHit     { return nil }
+func (i *repMemIndex) RangeCount() int                      { return i.n }
+func (i *repMemIndex) ReplaceAll(r []model.ReputationRange) { i.n = len(r) }
 func (i *repMemIndex) ReplaceList(_ string, r []model.ReputationRange) {
 	i.n = len(r)
 }
-func (i *repMemIndex) DeleteList(string)                    { i.n = 0 }
-func (repMemIndex) ListMeta() []model.ReputationListMeta    { return nil }
-func (repMemIndex) Snapshot() []model.ReputationRange       { return nil }
+func (i *repMemIndex) DeleteList(string)                 { i.n = 0 }
+func (repMemIndex) ListMeta() []model.ReputationListMeta { return nil }
+func (repMemIndex) Snapshot() []model.ReputationRange    { return nil }
 
 type repStubRef struct{}
 
@@ -487,9 +487,9 @@ func (m *pathRetStore) Save(s usecaseretention.Settings) error { m.s = s; return
 
 type pathRetApply struct{}
 
-func (pathRetApply) ApplyTrafficLogs(context.Context, int) error  { return nil }
-func (pathRetApply) ApplyEdges(context.Context, int) error        { return nil }
-func (pathRetApply) ApplyParseErrors(context.Context, int) error  { return nil }
+func (pathRetApply) ApplyTrafficLogs(context.Context, int) error   { return nil }
+func (pathRetApply) ApplyEdges(context.Context, int) error         { return nil }
+func (pathRetApply) ApplyParseErrors(context.Context, int) error   { return nil }
 func (pathRetApply) ApplySystemMetrics(context.Context, int) error { return nil }
 
 type pathBakStore struct {
@@ -1199,7 +1199,7 @@ func (s *pathParseRepo) List(context.Context, int, string) ([]model.ParseErrorRo
 	return s.items, nil
 }
 func (s *pathParseRepo) Delete(context.Context, []string) error { return nil }
-func (s *pathParseRepo) DeleteAll(context.Context) error       { return nil }
+func (s *pathParseRepo) DeleteAll(context.Context) error        { return nil }
 
 func TestParseErrorsServiceHappy(t *testing.T) {
 	uc := parseerrors.New(&pathParseRepo{items: []model.ParseErrorRow{{ID: "1", Reason: "boom"}}})

@@ -81,9 +81,9 @@ func TestRunParsedSkippedErrorAndGeo(t *testing.T) {
 				SrcPort: 1, DstPort: 443, Action: "allow", Proto: "tcp",
 			},
 		},
-		"skip": {Skipped: true, Vendor: "v", Reason: "drop"},
+		"skip":  {Skipped: true, Vendor: "v", Reason: "drop"},
 		"skip2": {Skipped: true, Vendor: "fw"},
-		"bad":  {Reason: "parse fail"},
+		"bad":   {Reason: "parse fail"},
 	}}
 	geo := fakeGeo{
 		"1.1.1.1": {Found: true, Country: "AU", Lat: 1, Lon: 2},
