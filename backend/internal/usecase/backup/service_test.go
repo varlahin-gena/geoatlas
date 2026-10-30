@@ -36,17 +36,17 @@ func (m *memSchedule) Save(s Schedule) error {
 }
 
 type memStore struct {
-	mu       sync.Mutex
-	ready    bool
-	entries  []Entry
-	attached string
-	exists   map[string]bool
-	failList error
-	failAtt  error
-	failDel  error
-	failAuth error
+	mu        sync.Mutex
+	ready     bool
+	entries   []Entry
+	attached  string
+	exists    map[string]bool
+	failList  error
+	failAtt   error
+	failDel   error
+	failAuth  error
 	failPrune error
-	sources  map[string]string
+	sources   map[string]string
 }
 
 func newMemStore() *memStore {
