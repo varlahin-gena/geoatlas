@@ -26,6 +26,11 @@ func withSession(ctx context.Context, s auth.Session) context.Context {
 	return context.WithValue(ctx, sessionCtxKey, s)
 }
 
+// ContextWithSession attaches a session for handler unit tests.
+func ContextWithSession(ctx context.Context, s auth.Session) context.Context {
+	return withSession(ctx, s)
+}
+
 // SessionLoader loads a cookie session (httpapi.SessionFromRequest).
 type SessionLoader func(r *http.Request) (auth.Session, error)
 
