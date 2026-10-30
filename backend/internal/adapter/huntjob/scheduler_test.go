@@ -18,7 +18,10 @@ func TestSchedulerStartNilReceiver(t *testing.T) {
 
 // Без сервиса Start закрывает done, чтобы Shutdown не ждал таймаут.
 func TestSchedulerStartWithoutServiceClosesDone(t *testing.T) {
-	s := New(nil, time.Minute)
+	s := New(nil, time.Millisecond) // clamps interval
+	if s.interval < 15*time.Second {
+		t.Fatal(s.interval)
+	}
 	s.Start(context.Background())
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
