@@ -41,27 +41,55 @@ func (f *fakeUsers) BumpSessionVersion(username string) error {
 	return nil
 }
 func (f *fakeUsers) List() []domain.UserPublic { return f.list }
-func (f *fakeUsers) Create(string, string, string, string, bool) (domain.UserPublic, error) {
-	return domain.UserPublic{}, f.err
-}
-func (f *fakeUsers) SetRole(string, string) (domain.UserPublic, error) {
-	return domain.UserPublic{}, f.err
-}
-func (f *fakeUsers) SetFullName(string, string) (domain.UserPublic, error) {
-	return domain.UserPublic{}, f.err
-}
-func (f *fakeUsers) SetGeoWizardDismissed(string, bool) (domain.UserPublic, error) {
+func (f *fakeUsers) Create(username, _, role, fullName string, mustReset bool) (domain.UserPublic, error) {
 	if f.err != nil {
 		return domain.UserPublic{}, f.err
 	}
-	if f.user == nil {
+	u := &domain.User{Username: username, Role: role, FullName: fullName, MustResetPassword: mustReset}
+	f.user = u
+	f.list = append(f.list, u.Public())
+	return u.Public(), nil
+}
+func (f *fakeUsers) SetRole(username, role string) (domain.UserPublic, error) {
+	if f.err != nil {
+		return domain.UserPublic{}, f.err
+	}
+	if f.user == nil || f.user.Username != username {
 		return domain.UserPublic{}, domain.ErrUserNotFound
 	}
-	f.user.GeoWizardDismissed = true
+	f.user.Role = role
 	return f.user.Public(), nil
 }
-func (f *fakeUsers) ResetPassword(string, string, bool) (domain.UserPublic, error) {
-	return domain.UserPublic{}, f.err
+func (f *fakeUsers) SetFullName(username, fullName string) (domain.UserPublic, error) {
+	if f.err != nil {
+		return domain.UserPublic{}, f.err
+	}
+	if f.user == nil || f.user.Username != username {
+		return domain.UserPublic{}, domain.ErrUserNotFound
+	}
+	f.user.FullName = fullName
+	return f.user.Public(), nil
+}
+func (f *fakeUsers) SetGeoWizardDismissed(username string, dismissed bool) (domain.UserPublic, error) {
+	if f.err != nil {
+		return domain.UserPublic{}, f.err
+	}
+	if f.user == nil || f.user.Username != username {
+		return domain.UserPublic{}, domain.ErrUserNotFound
+	}
+	f.user.GeoWizardDismissed = dismissed
+	return f.user.Public(), nil
+}
+func (f *fakeUsers) ResetPassword(username, _ string, mustReset bool) (domain.UserPublic, error) {
+	if f.err != nil {
+		return domain.UserPublic{}, f.err
+	}
+	if f.user == nil || f.user.Username != username {
+		return domain.UserPublic{}, domain.ErrUserNotFound
+	}
+	f.user.MustResetPassword = mustReset
+	f.user.SessionVersion++
+	return f.user.Public(), nil
 }
 func (f *fakeUsers) ChangePassword(string, string, string) (domain.UserPublic, error) {
 	if f.err != nil {
@@ -74,7 +102,16 @@ func (f *fakeUsers) ChangePassword(string, string, string) (domain.UserPublic, e
 	f.user.SessionVersion++
 	return f.user.Public(), nil
 }
-func (f *fakeUsers) Delete(string, string) error { return f.err }
+func (f *fakeUsers) Delete(username, _ string) error {
+	if f.err != nil {
+		return f.err
+	}
+	if f.user == nil || f.user.Username != username {
+		return domain.ErrUserNotFound
+	}
+	f.user = nil
+	return nil
+}
 
 type fakeSessions struct {
 	fail bool
@@ -156,5 +193,121 @@ func TestVerifyPassword(t *testing.T) {
 	}
 	if svc.VerifyPassword("u1", "bad") {
 		t.Fatal("expected invalid password")
+	}
+	var nilSvc *Service
+	if nilSvc.VerifyPassword("u", "ok") {
+		t.Fatal("nil service")
+	}
+}
+
+func TestSessionTTLAndMeOK(t *testing.T) {
+	var nilSvc *Service
+	if nilSvc.SessionTTL() != 0 {
+		t.Fatal("nil ttl")
+	}
+	svc := New(&fakeUsers{user: &domain.User{Username: "a", Role: domain.RoleOperator}}, &fakeSessions{})
+	if svc.SessionTTL() != time.Hour {
+		t.Fatalf("ttl=%v", svc.SessionTTL())
+	}
+	pub, err := svc.Me("a")
+	if err != nil || pub.Username != "a" {
+		t.Fatalf("me: %+v %v", pub, err)
+	}
+}
+
+func TestLoginSessionFail(t *testing.T) {
+	svc := New(&fakeUsers{user: &domain.User{Username: "admin", Role: domain.RoleAdministrator}}, &fakeSessions{fail: true})
+	_, err := svc.Login("admin", "ok")
+	if !errors.Is(err, ErrSession) {
+		t.Fatalf("want ErrSession, got %v", err)
+	}
+}
+
+func TestChangePasswordErrors(t *testing.T) {
+	users := &fakeUsers{err: domain.ErrUserNotFound}
+	svc := New(users, &fakeSessions{})
+	if _, err := svc.ChangePassword("x", "a", "b"); !errors.Is(err, domain.ErrUserNotFound) {
+		t.Fatalf("propagate: %v", err)
+	}
+	users = &fakeUsers{user: &domain.User{Username: "admin", Role: domain.RoleAdministrator}}
+	svc = New(users, &fakeSessions{fail: true})
+	if _, err := svc.ChangePassword("admin", "a", "b"); !errors.Is(err, ErrSession) {
+		t.Fatalf("session: %v", err)
+	}
+	users = &fakeUsers{user: &domain.User{Username: "admin", Role: domain.RoleAdministrator}}
+	// SessionVersion lookup fails after change — force by clearing user mid-way via broken Get/SessionVersion
+	broken := &fakeUsers{user: &domain.User{Username: "admin", Role: domain.RoleAdministrator}}
+	svc = New(broken, &fakeSessions{})
+	broken.user = nil // ChangePassword succeeds on empty? ChangePassword checks f.user — will ErrUserNotFound
+	if _, err := svc.ChangePassword("admin", "a", "b"); !errors.Is(err, domain.ErrUserNotFound) {
+		t.Fatalf("no user: %v", err)
+	}
+}
+
+func TestListCreateRoleNameWizardResetDelete(t *testing.T) {
+	users := &fakeUsers{list: nil}
+	svc := New(users, &fakeSessions{})
+	list, err := svc.ListUsers()
+	if err != nil || list == nil || len(list) != 0 {
+		t.Fatalf("empty list: %+v %v", list, err)
+	}
+	pub, err := svc.CreateUser(CreateUserInput{
+		Username: "bob", Password: "p", Role: domain.RoleOperator, FullName: "Bob", MustResetPassword: true,
+	})
+	if err != nil || pub.Username != "bob" {
+		t.Fatalf("create: %+v %v", pub, err)
+	}
+	pub, err = svc.SetRole("bob", domain.RoleAdministrator)
+	if err != nil || pub.Role != domain.RoleAdministrator {
+		t.Fatalf("role: %+v %v", pub, err)
+	}
+	pub, err = svc.SetFullName("bob", "Robert")
+	if err != nil || pub.FullName != "Robert" {
+		t.Fatalf("name: %+v %v", pub, err)
+	}
+	pub, err = svc.SetGeoWizardDismissed("bob", true)
+	if err != nil || !pub.GeoWizardDismissed {
+		t.Fatalf("wizard: %+v %v", pub, err)
+	}
+	pub, err = svc.ResetPassword(ResetPasswordInput{Username: "bob", Password: "n", MustResetPassword: false})
+	if err != nil || pub.MustResetPassword {
+		t.Fatalf("reset: %+v %v", pub, err)
+	}
+	if err := svc.DeleteUser("bob", "admin"); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+}
+
+func TestAdminCRUDNotConfigured(t *testing.T) {
+	svc := New(nil, nil)
+	if _, err := svc.ListUsers(); !errors.Is(err, ErrNotConfigured) {
+		t.Fatalf("list: %v", err)
+	}
+	if _, err := svc.CreateUser(CreateUserInput{}); !errors.Is(err, ErrNotConfigured) {
+		t.Fatalf("create: %v", err)
+	}
+	if _, err := svc.SetRole("u", "r"); !errors.Is(err, ErrNotConfigured) {
+		t.Fatalf("role: %v", err)
+	}
+	if _, err := svc.SetFullName("u", "n"); !errors.Is(err, ErrNotConfigured) {
+		t.Fatalf("name: %v", err)
+	}
+	if _, err := svc.SetGeoWizardDismissed("u", true); !errors.Is(err, ErrNotConfigured) {
+		t.Fatalf("wizard: %v", err)
+	}
+	if _, err := svc.ResetPassword(ResetPasswordInput{}); !errors.Is(err, ErrNotConfigured) {
+		t.Fatalf("reset: %v", err)
+	}
+	if err := svc.DeleteUser("u", "a"); !errors.Is(err, ErrNotConfigured) {
+		t.Fatalf("delete: %v", err)
+	}
+	if err := svc.LogoutAll("u"); !errors.Is(err, ErrNotConfigured) {
+		t.Fatalf("logout: %v", err)
+	}
+	if _, err := svc.Me("u"); !errors.Is(err, ErrNotConfigured) {
+		t.Fatalf("me: %v", err)
+	}
+	if _, err := svc.ChangePassword("u", "a", "b"); !errors.Is(err, ErrNotConfigured) {
+		t.Fatalf("chpwd: %v", err)
 	}
 }
