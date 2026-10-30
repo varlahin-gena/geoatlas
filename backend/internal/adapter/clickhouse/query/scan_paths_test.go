@@ -29,7 +29,8 @@ func TestTablesHelpers(t *testing.T) {
 	if TablesOf(ctx).Logs != bak.Logs {
 		t.Fatal("TablesOf")
 	}
-	if TablesOf(nil).Logs != live.Logs {
+	var nilCtx context.Context
+	if TablesOf(nilCtx).Logs != live.Logs { //nolint:staticcheck // TablesOf documents nil → LiveTables
 		t.Fatal("nil ctx")
 	}
 	if TablesOf(context.Background()).Logs != live.Logs {
