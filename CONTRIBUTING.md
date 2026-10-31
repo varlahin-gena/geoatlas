@@ -33,6 +33,8 @@ git commit -s -m "Кратко: зачем изменение"
 
 Проверка на каждом PR: workflow **DCO** (`.github/workflows/dco.yml`). Без валидного `Signed-off-by` merge блокируется.
 
+**Dependabot:** коммиты бота подписаны как `Signed-off-by: dependabot[bot] <support@github.com>`, при том что author email — `users.noreply.github.com`; CI принимает эту пару как валидный DCO.
+
 Исправляя историю в своей ветке:
 
 ```bash
