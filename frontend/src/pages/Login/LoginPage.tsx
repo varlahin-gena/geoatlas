@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthContext';
 import { ApiError } from '@/api/client';
@@ -7,6 +8,7 @@ import { safeNext } from '@/lib/format';
 import '@/styles/auth-form.css';
 
 export default function LoginPage() {
+  const { t } = useTranslation();
   const { user, loading, login } = useAuth();
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -18,9 +20,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     document.body.classList.add('page-auth');
-    document.title = 'ГеоАтлас — Вход';
+    document.title = t('login.title');
     return () => document.body.classList.remove('page-auth');
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (loading || !user) return;
@@ -62,13 +64,13 @@ export default function LoginPage() {
   return (
     <>
       <a className="skip-link" href="#loginForm">
-        К форме входа
+        {t('a11y.skipToLogin')}
       </a>
       <form className="auth-card" id="loginForm" autoComplete="on" onSubmit={onSubmit}>
         <div className="auth-brand">
-          <img className="logo" src="/logo.png" alt="" width={48} height={48} />
+          <img className="logo" src="/logo.png" alt={t('app.logoAlt')} width={48} height={48} />
           <div>
-            <h1>ГеоАтлас</h1>
+            <h1>{t('login.heading')}</h1>
             <p className="auth-lead">{COPY.loginLead}</p>
             <p className="auth-sub">{COPY.loginLocal}</p>
           </div>

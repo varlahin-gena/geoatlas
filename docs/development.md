@@ -52,7 +52,7 @@ npm run build
 npm run typecheck
 ```
 
-Подробнее: [`frontend/README.md`](../frontend/README.md).
+Подробнее: [`frontend/README.md`](../frontend/README.md). Локализация UI: [i18n.md](i18n.md).
 
 ## OpenAPI и типы
 

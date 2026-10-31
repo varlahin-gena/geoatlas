@@ -25,9 +25,11 @@
     "@deck.gl/core": "9.1.15",
     "@deck.gl/layers": "9.1.15",
     "@deck.gl/mapbox": "9.1.15",
+    "i18next": "^26.5.12",
     "maplibre-gl": "6.8.0",
     "react": "^19.2.9",
     "react-dom": "^19.2.9",
+    "react-i18next": "^17.1.9",
     "react-router-dom": "^7.18.4",
     "uplot": "1.6.32"
   },

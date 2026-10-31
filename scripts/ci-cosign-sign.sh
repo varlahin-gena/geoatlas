@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-# Cosign keyless sign-blob for the release tarball (Sigstore / GitHub OIDC).
+# Cosign keyless sign-blob for the release tarball and git tag attestation (Sigstore / GitHub OIDC).
 #   bash scripts/ci-cosign-sign.sh [dist/geoatlas-X.Y.Z.tar.gz]
+#
+# Also writes/signs dist/geoatlas-X.Y.Z.gittag (+ .cosign.bundle) when GITHUB_REF_NAME
+# and GITHUB_SHA are set (release-tag workflow). Same verify story as the tarball.
 #
 # В GitHub Actions нужен permissions.id-token: write.
 # Локально keyless обычно недоступен — скрипт для CI / отладки в GHA.
@@ -43,4 +46,27 @@ echo "::endgroup::"
 
 [[ -s "$bundle" ]] || fail "empty bundle ${bundle}"
 ok "$bundle"
+
+# Git tag attestation (OpenSSF version_tags_signed): same cosign keyless as signed_releases.
+tag_name="${GITHUB_REF_NAME:-}"
+commit_sha="${GITHUB_SHA:-}"
+if [[ -n "$tag_name" && -n "$commit_sha" ]]; then
+  gittag_path="$(dirname -- "$tarball")/${base}.gittag"
+  {
+    echo "tag=${tag_name}"
+    echo "commit=${commit_sha}"
+    echo "product=${base#geoatlas-}"
+  } >"$gittag_path"
+  gittag_bundle="${gittag_path}.cosign.bundle"
+  echo "::group::cosign sign-blob ${base}.gittag"
+  "$COSIGN" sign-blob --yes \
+    --bundle "$gittag_bundle" \
+    "$gittag_path"
+  echo "::endgroup::"
+  [[ -s "$gittag_bundle" ]] || fail "empty bundle ${gittag_bundle}"
+  ok "$gittag_bundle"
+else
+  echo "skip gittag cosign (GITHUB_REF_NAME / GITHUB_SHA unset)"
+fi
+
 echo "ci-cosign-sign: all checks passed"

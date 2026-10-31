@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AdminSidebar, SystemHealthPill, UserMenu } from './Shell';
 import { PageSkeleton } from './Skeleton';
 
@@ -21,6 +22,7 @@ export function AdminLayout({
   /** Extra class on #adminApp (e.g. ga-system for scoped system.css). */
   className?: string;
 }) {
+  const { t } = useTranslation();
   useEffect(() => {
     document.body.classList.add('page-admin');
     return () => {
@@ -32,6 +34,9 @@ export function AdminLayout({
 
   return (
     <div id="adminApp" className={appClass}>
+      <a className="skip-link" href="#main-content">
+        {t('a11y.skipToContent')}
+      </a>
       <AdminSidebar />
       <div className="admin-main">
         <header className="topbar">
@@ -46,7 +51,9 @@ export function AdminLayout({
             {showSystemHealth ? <SystemHealthPill /> : null}
           </div>
         </header>
-        <main className={mainClassName}>{children}</main>
+        <main id="main-content" className={mainClassName} tabIndex={-1}>
+          {children}
+        </main>
       </div>
     </div>
   );

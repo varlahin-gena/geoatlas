@@ -30,7 +30,7 @@ Code owners: [`.github/CODEOWNERS`](.github/CODEOWNERS).
 Как это обеспечивается:
 
 1. **GitHub admin** — у Maintainer; инструкция передачи прав и запасной контакт — в **приватном lockbox** Maintainer’а (не в git). Преемник с admin может восстановить CI secrets и branch rules.
-2. **Подпись релизов** — cosign keyless (Sigstore / GitHub OIDC) в `.github/workflows/release-tag.yml`: локальный GPG-ключ Maintainer’а не нужен; достаточно прав тегировать и зелёного workflow.
+2. **Подпись релизов и тегов** — cosign keyless (Sigstore / GitHub OIDC) в `.github/workflows/release-tag.yml` для tarball и attestation `vX.Y.Z` (`.gittag`); локальный GPG-ключ Maintainer’а не нужен; достаточно прав тегировать и зелёного workflow.
 3. **Дистрибуция** — GitHub Releases (`geoatlas-X.Y.Z.tar.gz`); отдельный продуктовый DNS для продолжения поставок не требуется.
 4. **Преемник** — Maintainer может добавить второго admin и обновить этот файл. До этого bus factor = 1 (см. ниже).
 
@@ -38,7 +38,7 @@ Code owners: [`.github/CODEOWNERS`](.github/CODEOWNERS).
 
 Целевой bus factor ≥ 2. Пока один Maintainer делает релизы и обязательный review, **фактический bus factor = 1**.
 
-- OpenSSF Silver `bus_factor` (SHOULD) — пока **Unmet** (честно).
+- OpenSSF Silver `bus_factor` (SHOULD) — **Unmet** (честно); это **единственный** блокер выдачи Silver-бейджа при закрытых остальных SHOULD.
 - MUST `access_continuity` — **Met** за счёт плана выше.
 
 ## Изменение этого документа
