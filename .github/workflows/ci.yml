@@ -704,7 +704,8 @@ jobs:
     name: frontend (build + test)
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
-    runs-on: ubuntu-latest
+    # Playwright 1.55.x has no ubuntu26.04 browser deps yet (ubuntu-latest moved).
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: frontend
