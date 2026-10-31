@@ -22,8 +22,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Policy script from base (main), not the PR tip — so Dependabot/open PRs
+      # pick up allowlists without a rebase, and PRs cannot weaken the check.
       - name: Check Signed-off-by
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: bash scripts/ci-dco-check.sh
+        run: |
+          set -euo pipefail
+          git show "${BASE_SHA}:scripts/ci-dco-check.sh" > /tmp/ci-dco-check.sh
+          bash /tmp/ci-dco-check.sh
