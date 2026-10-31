@@ -17,6 +17,8 @@
 | [roadmap.md](roadmap.md) | Намерения на 12 месяцев |
 | [security-requirements.md](security-requirements.md) | Чего ждать / не ждать от продукта |
 | [assurance-case.md](assurance-case.md) | Threat model и аргумент защищённости |
+| [accessibility.md](accessibility.md) | WCAG / a11y operator UI |
+| [i18n.md](i18n.md) | Каркас локализации UI |
 | [openssf-best-practices.md](openssf-best-practices.md) | OpenSSF Passing |
 | [openssf-silver.md](openssf-silver.md) | OpenSSF Silver |
 | [repo-layout.md](repo-layout.md) | Дерево каталогов репозитория |

@@ -56,7 +56,7 @@ geoatlas/
 │   ├── ci-govulncheck.sh             # CI: govulncheck по Go-модулям
 │   ├── ci-sbom.sh                    # релиз: CycloneDX + SPDX из geoatlas-*.tar.gz
 │   ├── ci-grype-release.sh           # релиз: Grype CRITICAL (only-fixed) по SBOM
-│   ├── ci-cosign-sign.sh             # релиз: cosign keyless sign-blob → .cosign.bundle
+│   ├── ci-cosign-sign.sh             # релиз: cosign keyless tarball + .gittag attestation
 │   ├── ci-fuzz-nightly.sh            # nightly: длинный go fuzz (parser / ingest)
 │   ├── ci-compose-smoke.sh           # nightly: compose up + /health|/api/ready + down
 │   ├── ci-license-check.sh           # CI: toxic licenses (Go + npm production)

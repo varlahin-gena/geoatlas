@@ -19,7 +19,7 @@ export default function NotFoundPage() {
     <div className="not-found">
       <div className="not-found-card">
         <div className="auth-brand">
-          <img className="logo" src="/logo.png" alt="" width={40} height={40} />
+          <img className="logo" src="/logo.png" alt="ГеоАтлас" width={40} height={40} />
           <div>
             <h1>ГеоАтлас</h1>
             <p>Страница не найдена</p>

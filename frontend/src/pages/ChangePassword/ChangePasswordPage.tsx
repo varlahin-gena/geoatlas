@@ -71,7 +71,7 @@ export default function ChangePasswordPage() {
       </a>
       <form className="auth-card" id="changeForm" onSubmit={onSubmit}>
         <div className="auth-brand">
-          <img className="logo" src="/logo.png" alt="" width={40} height={40} />
+          <img className="logo" src="/logo.png" alt="ГеоАтлас" width={40} height={40} />
           <div>
             <h1>Смена пароля</h1>
             <p>

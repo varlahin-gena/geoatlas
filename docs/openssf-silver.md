@@ -22,15 +22,15 @@ Passing уже получен (проект [15404](https://www.bestpractices.de
 | code_of_conduct | Met | [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md) |
 | roles_responsibilities | Met | GOVERNANCE |
 | access_continuity | Met | GOVERNANCE § непрерывность |
-| bus_factor | **Unmet** (SHOULD) | один Maintainer; план преемника в GOVERNANCE |
+| bus_factor | **Unmet** (SHOULD) | один Maintainer — **единственный блокер** Silver-бейджа; план преемника в GOVERNANCE |
 | documentation_roadmap | Met | [roadmap.md](roadmap.md) |
 | documentation_architecture | Met | [architecture.md](architecture.md) |
 | documentation_security | Met | [security-requirements.md](security-requirements.md) |
 | documentation_quick_start | Met | README «Быстрый старт» + [install.md](install.md) |
 | documentation_current | Met | docs обновляются с релизами |
 | documentation_achievements | Met | бейдж в README |
-| accessibility_best_practices | Unmet (SHOULD) | нет отдельной a11y-программы; улучшаем по Issues |
-| internationalization | Unmet (SHOULD) | UI на русском, без i18n-фреймворка |
+| accessibility_best_practices | **Met** (SHOULD) | [accessibility.md](accessibility.md) |
+| internationalization | **Met** (SHOULD) | [i18n.md](i18n.md) — i18next + ru/en |
 | sites_password_security | N/A | пароли пользователей сайта проекта не храним (GitHub) |
 | maintenance_or_update | Met | [operations.md](operations.md) обновление; SECURITY — последний релиз |
 | report_tracker | Met | GitHub Issues |
@@ -51,7 +51,7 @@ Passing уже получен (проект [15404](https://www.bestpractices.de
 | implement_secure_design | Met | [assurance-case.md](assurance-case.md) |
 | crypto_* (silver) | Met / N/A | bcrypt, TLS на nginx, секреты в файлах `.env` |
 | **signed_releases** | Met | cosign keyless + verify в [install.md](install.md) |
-| version_tags_signed | Unmet (SUGGESTED) | артефакты подписываем cosign; git tags — annotated, не GPG |
+| version_tags_signed | **Met** (SUGGESTED) | cosign keyless на `.gittag` (tag+commit) в release Assets; verify в [install.md](install.md) |
 | input_validation | Met | threatprot, лимиты upload, safeurl |
 | hardening | Met | proxy gate, rate limit, headers — configuration.md |
 | assurance_case | Met | [assurance-case.md](assurance-case.md) |
@@ -60,8 +60,6 @@ Passing уже получен (проект [15404](https://www.bestpractices.de
 
 ## После фазы A / B
 
-1. Смержить PR с docs + DCO.
-2. В GitHub → Settings → Branches: добавить required check **DCO sign-off** (имя job из `dco.yml`).
-3. Фаза B: total Go coverage ≥80% + CI step `coverage overall (≥80%)` в [ci.yml](../.github/workflows/ci.yml).
-4. В форме Silver переключить `test_statement_coverage80` → Met (см. `scripts/openssf-silver-fill.json`).
-5. `bus_factor` остаётся Unmet (SHOULD) при одном Maintainer.
+1. Coverage gate и `test_statement_coverage80` → Met — сделано.
+2. a11y / i18n / `version_tags_signed` → Met в форме после merge (см. `scripts/openssf-silver-fill.json`).
+3. `bus_factor` остаётся Unmet при одном Maintainer — Silver-бейдж не выдаётся, пока не будет co-maintainer (≥2).
