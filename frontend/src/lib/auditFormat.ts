@@ -1,5 +1,32 @@
 import type { AuditEvent, DREvent } from '@/api/systemTypes';
 
+/** Short RU labels for common audit action codes (title keeps the raw code). */
+const AUDIT_ACTION_LABELS: Record<string, string> = {
+  'auth.login.success': 'Вход',
+  'auth.login.failed': 'Неверный вход',
+  'auth.logout': 'Выход',
+  'auth.session.revoke_all': 'Сброс сессий',
+  'auth.password.change': 'Смена пароля',
+  'users.create': 'Создание пользователя',
+  'users.update': 'Изменение пользователя',
+  'users.delete': 'Удаление пользователя',
+  'users.password.reset': 'Сброс пароля',
+  'tokens.create': 'Создание токена',
+  'tokens.revoke': 'Отзыв токена',
+  'tokens.rotate': 'Ротация токена',
+  'backup.create': 'Создание бэкапа',
+  'backup.attach': 'Подключение бэкапа',
+  'backup.detach': 'Отключение бэкапа',
+  'backup.delete': 'Удаление бэкапа',
+  'backup.schedule.update': 'Расписание бэкапа',
+  'system.retention.update': 'TTL хранения',
+};
+
+export function auditActionLabel(action?: string): string {
+  if (!action) return '—';
+  return AUDIT_ACTION_LABELS[action] || action;
+}
+
 function pad2(n: number): string {
   return String(n).padStart(2, '0');
 }

@@ -1,4 +1,4 @@
-import { fmtNumber } from '@/lib/format';
+import { fmtBytes, fmtNumber } from '@/lib/format';
 import { mapRuCountry } from './mapConstants';
 import { countryAliases } from './mapHeatmap';
 import { reputationDetailRows } from './mapReputation';
@@ -105,8 +105,8 @@ export function buildLineDetail(
         { key: 'Событий', value: fmtNumber(line.count) },
         { key: 'Разрешено', value: fmtNumber(line.allowed_count), color: 'green' },
         { key: 'Заблокировано', value: fmtNumber(line.blocked_count), color: 'red' },
-        { key: 'Исходящие байты', value: fmtNumber(line.bytes_sent) },
-        { key: 'Входящие байты', value: fmtNumber(line.bytes_recv) },
+        { key: 'Исходящие байты', value: fmtBytes(line.bytes_sent) },
+        { key: 'Входящие байты', value: fmtBytes(line.bytes_recv) },
       ],
     },
     {
@@ -162,8 +162,8 @@ export function buildLineDetail(
       statusColor,
       metrics: [
         { label: 'События', value: fmtNumber(line.count) },
-        { label: 'Исх.', value: fmtNumber(line.bytes_sent) },
-        { label: 'Вх.', value: fmtNumber(line.bytes_recv) },
+        { label: 'Исх. байты', value: fmtBytes(line.bytes_sent) },
+        { label: 'Вх. байты', value: fmtBytes(line.bytes_recv) },
       ],
     },
     sections,

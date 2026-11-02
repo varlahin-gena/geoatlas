@@ -492,14 +492,6 @@ export default function GeoRangesPage() {
           />
           <button
             type="button"
-            className="btn danger"
-            disabled={busy}
-            onClick={() => void clearDatabase()}
-          >
-            Очистить базу
-          </button>
-          <button
-            type="button"
             className="btn"
             disabled={busy}
             onClick={() => geoFileRef.current?.click()}
@@ -537,8 +529,7 @@ export default function GeoRangesPage() {
     >
       <div className="page-content-inner">
         <p className="page-lead">
-          Текущие диапазоны в таблице geo_ranges. Точечные правки — через «изменить». Полная замена
-          базы: «Очистить базу» (снимает early 409), затем «Загрузить CSV». Рестарт backend не нужен.
+          Диапазоны в geo_ranges. Точечные правки — «изменить»; полная замена — очистка ниже, затем CSV.
         </p>
         <nav className="toolbar" role="tablist" aria-label="Разделы базы GeoIP" style={{ gap: 8, marginBottom: 16 }}>
           <button
@@ -904,6 +895,21 @@ export default function GeoRangesPage() {
             </tbody>
           </table>
         </div>
+            <section className="card card-compact geo-danger-zone" aria-label="Опасная зона">
+              <h3 className="card-title">Опасная зона</h3>
+              <p className="hint">
+                Полная очистка снимает early 409 перед большой заливкой CSV. Карта останется без
+                координат, пока не загрузите базу снова. Рестарт backend не нужен.
+              </p>
+              <button
+                type="button"
+                className="btn danger"
+                disabled={busy}
+                onClick={() => void clearDatabase()}
+              >
+                Очистить базу
+              </button>
+            </section>
           </>
         )}
       </div>

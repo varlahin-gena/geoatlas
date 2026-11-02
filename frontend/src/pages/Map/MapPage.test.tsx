@@ -90,14 +90,6 @@ vi.mock('./useMapReputation', () => ({
   }),
 }));
 
-vi.mock('./useMapUploads', () => ({
-  useMapUploads: () => ({
-    logFileRef: { current: null },
-    geoFileRef: { current: null },
-    uploadFile: vi.fn(),
-  }),
-}));
-
 vi.mock('./useGeoWizard', () => ({
   useGeoWizard: () => ({
     visible: false,

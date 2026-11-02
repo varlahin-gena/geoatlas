@@ -1,4 +1,3 @@
-import type { RefObject } from 'react';
 import { fmtNumber } from '@/lib/format';
 import {
   MAP_REFRESH_DEFAULT_SEC,
@@ -11,21 +10,11 @@ export type MapLayersPanelProps = {
   open: boolean;
   viewMode: 'map' | 'globe';
   setViewMode: (mode: 'map' | 'globe') => void;
-  isAdmin: boolean;
   tools: {
     fetchData: () => void | Promise<void>;
     resetView: () => void;
     exportPng: () => void | Promise<void>;
     saveHunt?: () => void;
-  };
-  uploads: {
-    logFileRef: RefObject<HTMLInputElement | null>;
-    geoFileRef: RefObject<HTMLInputElement | null>;
-    uploadFile: (kind: 'logs' | 'geo', file: File) => void | Promise<void>;
-    geoWizard?: {
-      open: () => void;
-      empty: boolean | null;
-    };
   };
   viz: {
     minCount: number;
@@ -63,9 +52,7 @@ export function MapLayersPanel({
   open,
   viewMode,
   setViewMode,
-  isAdmin,
   tools,
-  uploads,
   viz,
   data,
   globe,
@@ -90,7 +77,6 @@ export function MapLayersPanel({
   const { autoRefresh, setAutoRefresh, refreshIntervalSec, setRefreshIntervalSec, dataSource, selectDataSource, backupAttached } =
     data;
   const { autoRotate, setAutoRotate } = globe;
-  const { logFileRef, geoFileRef, uploadFile, geoWizard } = uploads;
   const refreshEnabled = autoRefresh && dataSource === 'live';
 
   if (!open) return null;
@@ -101,252 +87,204 @@ export function MapLayersPanel({
         <span>Отображение</span>
       </div>
 
-      <div className="map-chrome-panel-section">
-        <div className="map-chrome-panel-label">Режим</div>
-        <div className="mode-switch mode-switch-data">
-          <button
-            type="button"
-            className={viewMode === 'map' ? 'active' : ''}
-            onClick={() => setViewMode('map')}
-          >
-            Карта
-          </button>
-          <button
-            type="button"
-            className={viewMode === 'globe' ? 'active' : ''}
-            onClick={() => setViewMode('globe')}
-          >
-            Глобус
-          </button>
-        </div>
-      </div>
-
-      <div className="map-chrome-panel-section">
-        <div className="map-chrome-panel-label">Действия</div>
-        <div className="map-layers-actions">
-          <button type="button" className="map-chrome-action-btn" onClick={() => void tools.fetchData()}>
-            Обновить
-          </button>
-          <button type="button" className="map-chrome-action-btn" onClick={tools.resetView}>
-            Сбросить вид
-          </button>
-          <button type="button" className="map-chrome-action-btn" onClick={() => void tools.exportPng()}>
-            Экспорт PNG
-          </button>
-          {tools.saveHunt ? (
-            <button type="button" className="map-chrome-action-btn" onClick={tools.saveHunt}>
-              Сохранить охоту
-            </button>
-          ) : null}
-        </div>
-      </div>
-
-      {isAdmin ? (
+      <div className="map-layers-grid">
         <div className="map-chrome-panel-section">
-          <div className="map-chrome-panel-label">Загрузка</div>
-          <input
-            ref={logFileRef}
-            type="file"
-            accept=".log,.txt,.cef,.syslog"
-            style={{ display: 'none' }}
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void uploadFile('logs', f);
-              e.target.value = '';
-            }}
-          />
-          <input
-            ref={geoFileRef}
-            type="file"
-            accept=".csv"
-            style={{ display: 'none' }}
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void uploadFile('geo', f);
-              e.target.value = '';
-            }}
-          />
-          <div className="map-layers-actions">
+          <div className="map-chrome-panel-label">Режим</div>
+          <div className="mode-switch mode-switch-data">
             <button
               type="button"
-              className="map-chrome-action-btn"
-              onClick={() => logFileRef.current?.click()}
+              className={viewMode === 'map' ? 'active' : ''}
+              onClick={() => setViewMode('map')}
             >
-              Загрузить логи
+              Карта
             </button>
-            {geoWizard?.empty === true ? (
-              <button type="button" className="map-chrome-action-btn" onClick={geoWizard.open}>
-                Мастер GeoIP
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="map-chrome-action-btn"
-                onClick={() => geoFileRef.current?.click()}
-              >
-                Обновить GeoIP
-              </button>
-            )}
+            <button
+              type="button"
+              className={viewMode === 'globe' ? 'active' : ''}
+              onClick={() => setViewMode('globe')}
+            >
+              Глобус
+            </button>
           </div>
         </div>
-      ) : null}
 
-      <div className="map-chrome-panel-section">
-        <div className="map-chrome-panel-label">Порог событий на связь</div>
-        <input
-          type="range"
-          className="side-range"
-          min={1}
-          max={50}
-          value={minCount}
-          onChange={(e) => setMinCount(Number(e.target.value))}
-        />
-        <div className="side-range-label">
-          <span>
-            от <b>{minCount}</b> соб.
-          </span>
-          <span
-            style={{
-              color: arcCountInfo.total > arcCountInfo.shown ? 'var(--orange)' : 'var(--text-muted)',
-            }}
-          >
-            {arcCountInfo.total > arcCountInfo.shown
-              ? `${fmtNumber(arcCountInfo.shown)} из ${fmtNumber(arcCountInfo.total)}`
-              : `${fmtNumber(arcCountInfo.shown)} связей`}
-          </span>
+        <div className="map-chrome-panel-section">
+          <div className="map-chrome-panel-label">Действия</div>
+          <div className="map-layers-actions">
+            <button type="button" className="map-chrome-action-btn" onClick={() => void tools.fetchData()}>
+              Обновить
+            </button>
+            <button type="button" className="map-chrome-action-btn" onClick={tools.resetView}>
+              Сбросить вид
+            </button>
+            <button type="button" className="map-chrome-action-btn" onClick={() => void tools.exportPng()}>
+              Экспорт PNG
+            </button>
+            {tools.saveHunt ? (
+              <button type="button" className="map-chrome-action-btn" onClick={tools.saveHunt}>
+                Сохранить охоту
+              </button>
+            ) : null}
+          </div>
         </div>
-      </div>
 
-      <div className="map-chrome-panel-section">
-        <div className="map-chrome-panel-label">Лимит дуг</div>
-        <input
-          type="range"
-          className="side-range"
-          min={100}
-          max={20000}
-          step={100}
-          value={maxArcs}
-          onChange={(e) => setMaxArcs(Number(e.target.value))}
-        />
-        <div className="side-range-label">
-          <span>
-            до <b>{fmtNumber(maxArcs)}</b> дуг
-          </span>
+        <div className="map-chrome-panel-section">
+          <div className="map-chrome-panel-label">Порог событий на связь</div>
+          <input
+            type="range"
+            className="side-range"
+            min={1}
+            max={50}
+            value={minCount}
+            onChange={(e) => setMinCount(Number(e.target.value))}
+          />
+          <div className="side-range-label">
+            <span>
+              от <b>{minCount}</b> соб.
+            </span>
+            <span
+              style={{
+                color: arcCountInfo.total > arcCountInfo.shown ? 'var(--orange)' : 'var(--text-muted)',
+              }}
+            >
+              {arcCountInfo.total > arcCountInfo.shown
+                ? `${fmtNumber(arcCountInfo.shown)} из ${fmtNumber(arcCountInfo.total)}`
+                : `${fmtNumber(arcCountInfo.shown)} связей`}
+            </span>
+          </div>
         </div>
-      </div>
 
-      <div className="map-chrome-panel-section">
-        <div className="map-chrome-panel-label">Оверлеи</div>
-        <label className="side-toggle">
-          <input type="checkbox" checked={showLegend} onChange={(e) => setShowLegend(e.target.checked)} />
-          <span>Легенда (инфо-панель)</span>
-        </label>
-        <label className="side-toggle">
-          <input type="checkbox" checked={showStats} onChange={(e) => setShowStats(e.target.checked)} />
-          <span>Статистика (инфо-панель)</span>
-        </label>
-        <label
-          className="side-toggle"
-          title="2D: заливка стран (на глобусе heatmap отключён)"
-          style={{ display: viewMode === 'globe' ? 'none' : undefined }}
-        >
+        <div className="map-chrome-panel-section">
+          <div className="map-chrome-panel-label">Лимит дуг</div>
           <input
-            type="checkbox"
-            checked={showHeatmap}
-            onChange={(e) => setShowHeatmap(e.target.checked)}
+            type="range"
+            className="side-range"
+            min={100}
+            max={20000}
+            step={100}
+            value={maxArcs}
+            onChange={(e) => setMaxArcs(Number(e.target.value))}
           />
-          <span>Heatmap стран</span>
-        </label>
-        <label className="side-toggle">
-          <input
-            type="checkbox"
-            checked={showCountryLabels}
-            onChange={(e) => setShowCountryLabels(e.target.checked)}
-          />
-          <span>Названия стран</span>
-        </label>
-        <label className="side-toggle" title="Все дуги одним цветом">
-          <input type="checkbox" checked={monoArcs} onChange={(e) => setMonoArcs(e.target.checked)} />
-          <span>Один цвет линий</span>
-        </label>
-      </div>
-
-      <div className="map-chrome-panel-section">
-        <div className="map-chrome-panel-label">Данные</div>
-        <label className="side-toggle">
-          <input
-            type="checkbox"
-            checked={autoRefresh}
-            disabled={dataSource === 'backup'}
-            onChange={(e) => setAutoRefresh(e.target.checked)}
-          />
-          <span>Авто-обновление</span>
-        </label>
-        <label className="side-field" style={{ marginTop: 8 }}>
-          <span className="map-chrome-panel-label" style={{ marginBottom: 0 }}>
-            Интервал обновления
-          </span>
-          <select
-            className="map-chrome-select"
-            value={parseMapRefreshSec(refreshIntervalSec)}
-            disabled={!refreshEnabled}
-            aria-label="Интервал авто-обновления линий"
-            onChange={(e) => setRefreshIntervalSec(parseMapRefreshSec(e.target.value))}
-          >
-            {MAP_REFRESH_PRESETS_SEC.map((sec) => (
-              <option key={sec} value={sec}>
-                {sec === 30 ? '30 секунд' : sec === 60 ? '1 минута' : '5 минут'}
-                {sec === MAP_REFRESH_DEFAULT_SEC ? ' (по умолчанию)' : ''}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div
-          className="mode-switch mode-switch-data"
-          title={
-            backupAttached
-              ? `Резервная копия: ${backupAttached}`
-              : 'Сначала подключите резервную копию в Мониторинге системы'
-          }
-        >
-          <button
-            type="button"
-            className={dataSource === 'live' ? 'active' : ''}
-            title="Прямой эфир"
-            onClick={() => selectDataSource('live')}
-          >
-            Прямой эфир
-          </button>
-          <button
-            type="button"
-            className={dataSource === 'backup' ? 'active' : ''}
-            disabled={!backupAttached && dataSource !== 'backup'}
-            title="Резервная копия"
-            onClick={() => selectDataSource('backup')}
-          >
-            Резервная копия
-          </button>
+          <div className="side-range-label">
+            <span>
+              до <b>{fmtNumber(maxArcs)}</b> дуг
+            </span>
+          </div>
         </div>
-        {backupAttached ? (
-          <p className="hint" style={{ marginTop: 6, fontSize: 12 }}>
-            Подключена <code>{backupAttached}</code>
-          </p>
-        ) : (
-          <p className="hint" style={{ marginTop: 6, fontSize: 12 }}>
-            Нет подключённой резервной копии
-          </p>
-        )}
-        <label
-          className="side-toggle"
-          style={{ display: viewMode === 'globe' ? undefined : 'none' }}
-        >
-          <input
-            type="checkbox"
-            checked={autoRotate}
-            onChange={(e) => setAutoRotate(e.target.checked)}
-          />
-          <span>Авто-вращение глобуса</span>
-        </label>
+
+        <div className="map-chrome-panel-section">
+          <div className="map-chrome-panel-label">Оверлеи</div>
+          <label className="side-toggle">
+            <input type="checkbox" checked={showLegend} onChange={(e) => setShowLegend(e.target.checked)} />
+            <span>Легенда (инфо-панель)</span>
+          </label>
+          <label className="side-toggle">
+            <input type="checkbox" checked={showStats} onChange={(e) => setShowStats(e.target.checked)} />
+            <span>Статистика (инфо-панель)</span>
+          </label>
+          <label
+            className="side-toggle"
+            title="2D: заливка стран (на глобусе heatmap отключён)"
+            style={{ display: viewMode === 'globe' ? 'none' : undefined }}
+          >
+            <input
+              type="checkbox"
+              checked={showHeatmap}
+              onChange={(e) => setShowHeatmap(e.target.checked)}
+            />
+            <span>Heatmap стран</span>
+          </label>
+          <label className="side-toggle">
+            <input
+              type="checkbox"
+              checked={showCountryLabels}
+              onChange={(e) => setShowCountryLabels(e.target.checked)}
+            />
+            <span>Названия стран</span>
+          </label>
+          <label className="side-toggle" title="Все дуги одним цветом">
+            <input type="checkbox" checked={monoArcs} onChange={(e) => setMonoArcs(e.target.checked)} />
+            <span>Один цвет линий</span>
+          </label>
+        </div>
+
+        <div className="map-chrome-panel-section">
+          <div className="map-chrome-panel-label">Данные</div>
+          <label className="side-toggle">
+            <input
+              type="checkbox"
+              checked={autoRefresh}
+              disabled={dataSource === 'backup'}
+              onChange={(e) => setAutoRefresh(e.target.checked)}
+            />
+            <span>Авто-обновление</span>
+          </label>
+          <label className="side-field" style={{ marginTop: 8 }}>
+            <span className="map-chrome-panel-label" style={{ marginBottom: 0 }}>
+              Интервал обновления
+            </span>
+            <select
+              className="map-chrome-select"
+              value={parseMapRefreshSec(refreshIntervalSec)}
+              disabled={!refreshEnabled}
+              aria-label="Интервал авто-обновления линий"
+              onChange={(e) => setRefreshIntervalSec(parseMapRefreshSec(e.target.value))}
+            >
+              {MAP_REFRESH_PRESETS_SEC.map((sec) => (
+                <option key={sec} value={sec}>
+                  {sec === 30 ? '30 секунд' : sec === 60 ? '1 минута' : '5 минут'}
+                  {sec === MAP_REFRESH_DEFAULT_SEC ? ' (по умолчанию)' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div
+            className="mode-switch mode-switch-data"
+            title={
+              backupAttached
+                ? `Резервная копия: ${backupAttached}`
+                : 'Сначала подключите резервную копию в Мониторинге системы'
+            }
+          >
+            <button
+              type="button"
+              className={dataSource === 'live' ? 'active' : ''}
+              title="Прямой эфир"
+              onClick={() => selectDataSource('live')}
+            >
+              Прямой эфир
+            </button>
+            <button
+              type="button"
+              className={dataSource === 'backup' ? 'active' : ''}
+              disabled={!backupAttached && dataSource !== 'backup'}
+              title="Резервная копия"
+              onClick={() => selectDataSource('backup')}
+            >
+              Резервная копия
+            </button>
+          </div>
+          {backupAttached ? (
+            <p className="hint" style={{ marginTop: 6, fontSize: 12 }}>
+              Подключена <code>{backupAttached}</code>
+            </p>
+          ) : (
+            <p className="hint" style={{ marginTop: 6, fontSize: 12 }}>
+              Нет подключённой резервной копии
+            </p>
+          )}
+          <label
+            className="side-toggle"
+            style={{ display: viewMode === 'globe' ? undefined : 'none' }}
+          >
+            <input
+              type="checkbox"
+              checked={autoRotate}
+              onChange={(e) => setAutoRotate(e.target.checked)}
+            />
+            <span>Авто-вращение глобуса</span>
+          </label>
+        </div>
       </div>
     </div>
   );

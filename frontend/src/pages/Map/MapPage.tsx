@@ -30,7 +30,6 @@ import { useMapViewQuery } from './mapQuery';
 import { mapQueryWarning } from './mapQueryCost';
 import { useMapLibreController } from './useMapLibreController';
 import { useMapReputation } from './useMapReputation';
-import { useMapUploads } from './useMapUploads';
 import { useMapVizChrome } from './useMapVizChrome';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import '@/styles/index.css';
@@ -321,12 +320,6 @@ export default function MapPage() {
     toast,
   });
 
-  const { logFileRef, geoFileRef, uploadFile } = useMapUploads({
-    isAdmin,
-    toast,
-    fetchData,
-  });
-
   const anomalies = useMapAnomalies();
   const activeAlert = useMemo(
     () => (alertFingerprint ? readMapAlert(alertFingerprint) : null),
@@ -500,14 +493,8 @@ export default function MapPage() {
         fetchData,
         viewMode: viz.viewMode,
         setViewMode: viz.setViewMode,
-        isAdmin,
-        logFileRef,
-        geoFileRef,
-        uploadFile,
         resetView,
         exportPng,
-        geoWizardOpen: geoWizard.open,
-        geoWizardEmpty: geoWizard.geo == null ? null : geoWizard.geo.count === 0,
         learningNote:
           anomalies.summary?.enabled && anomalies.summary.learning && !anomalies.summary.total
             ? 'Базовая линия аномалий: обучение (первые дни после появления логов)'

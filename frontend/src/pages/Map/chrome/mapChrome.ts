@@ -1,4 +1,4 @@
-import type { Dispatch, RefObject, SetStateAction } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import type { MapRefreshSec } from '../mapRefreshInterval';
 import type { MapSidebarProps } from '../MapSidebar';
 import type { MapTopbarProps } from '../MapTopbar';
@@ -50,14 +50,8 @@ export type MapChromeTopbarInput = {
   fetchData: () => void | Promise<void>;
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
-  isAdmin: boolean;
-  logFileRef: RefObject<HTMLInputElement | null>;
-  geoFileRef: RefObject<HTMLInputElement | null>;
-  uploadFile: (kind: 'logs' | 'geo', file: File) => void | Promise<void>;
   resetView: () => void;
   exportPng: () => void | Promise<void>;
-  geoWizardOpen: () => void;
-  geoWizardEmpty: boolean | null;
   learningNote: string | null;
   minCount: number;
   setMinCount: (n: number) => void;
@@ -139,20 +133,10 @@ export function buildMapTopbarProps(input: MapChromeTopbarInput): MapTopbarProps
     layers: {
       viewMode: input.viewMode,
       setViewMode: input.setViewMode,
-      isAdmin: input.isAdmin,
       tools: {
         fetchData: input.fetchData,
         resetView: input.resetView,
         exportPng: input.exportPng,
-      },
-      uploads: {
-        logFileRef: input.logFileRef,
-        geoFileRef: input.geoFileRef,
-        uploadFile: input.uploadFile,
-        geoWizard: {
-          open: input.geoWizardOpen,
-          empty: input.geoWizardEmpty,
-        },
       },
       viz: {
         minCount: input.minCount,

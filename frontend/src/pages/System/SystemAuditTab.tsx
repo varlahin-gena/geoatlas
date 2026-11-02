@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { fetchAuditLog } from '@/api/system';
 import { ContentSkeleton, EmptyState } from '@/components/Skeleton';
 import { useToast } from '@/components/Toast';
-import { formatAuditRow } from '@/lib/auditFormat';
+import { auditActionLabel, formatAuditRow } from '@/lib/auditFormat';
 import { fmtDate } from '@/lib/format';
 import type { AuditEvent } from './systemTypes';
 
@@ -49,7 +49,7 @@ export function SystemAuditTab() {
           </button>
         </div>
         <p className="hint">
-          Append-only журнал admin/security действий: входы, пользователи, токены, backup и system settings.
+          Журнал действий admin: входы, пользователи, токены, backup и настройки системы.
         </p>
         <div className="history-filters">
           <input
@@ -66,8 +66,8 @@ export function SystemAuditTab() {
           />
           <select className="input" value={result} onChange={(e) => setResult(e.target.value)}>
             <option value="">Любой результат</option>
-            <option value="succeeded">succeeded</option>
-            <option value="failed">failed</option>
+            <option value="succeeded">успех</option>
+            <option value="failed">ошибка</option>
           </select>
           <button type="button" className="btn" onClick={() => void load()}>
             Применить
@@ -87,10 +87,10 @@ export function SystemAuditTab() {
               <thead>
                 <tr>
                   <th scope="col">Время</th>
-                  <th scope="col">Actor</th>
-                  <th scope="col">Action</th>
-                  <th scope="col">Resource</th>
-                  <th scope="col">Result</th>
+                  <th scope="col">Кто</th>
+                  <th scope="col">Действие</th>
+                  <th scope="col">Ресурс</th>
+                  <th scope="col">Результат</th>
                   <th scope="col">Детали</th>
                   <th scope="col">IP</th>
                 </tr>
@@ -100,12 +100,18 @@ export function SystemAuditTab() {
                   <tr key={`${item.timestamp || 't'}-${item.action || 'a'}-${idx}`}>
                     <td>{fmtDate(item.timestamp)}</td>
                     <td>{item.actor || 'system'}</td>
-                    <td className="mono">{item.action || '—'}</td>
+                    <td title={item.action || undefined}>{auditActionLabel(item.action)}</td>
                     <td>
                       {item.resource_type || '—'}
                       {item.resource_id ? ` · ${item.resource_id}` : ''}
                     </td>
-                    <td>{item.result || '—'}</td>
+                    <td>
+                      {item.result === 'succeeded'
+                        ? 'успех'
+                        : item.result === 'failed'
+                          ? 'ошибка'
+                          : item.result || '—'}
+                    </td>
                     <td>{formatAuditRow(item)}</td>
                     <td>{item.ip || '—'}</td>
                   </tr>

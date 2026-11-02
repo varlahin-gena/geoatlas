@@ -2,6 +2,16 @@ export function fmtNumber(n: unknown): string {
   return (Number(n) || 0).toLocaleString('ru-RU');
 }
 
+/** Bytes → Б / КБ / МБ / ГБ (binary 1024). */
+export function fmtBytes(bytes: unknown): string {
+  const b = Number(bytes);
+  const n = Number.isFinite(b) ? Math.max(0, b) : 0;
+  if (n < 1024) return `${fmtNumber(n)} Б`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} КБ`;
+  if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} МБ`;
+  return `${(n / (1024 * 1024 * 1024)).toFixed(2)} ГБ`;
+}
+
 /** ISO → локаль ru-RU. timeZone — IANA (напр. Europe/Moscow); иначе пояс браузера. */
 export function fmtDate(iso: unknown, timeZone?: string): string {
   if (!iso) return '—';

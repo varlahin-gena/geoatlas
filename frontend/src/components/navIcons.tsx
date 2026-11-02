@@ -29,6 +29,13 @@ export function NavIcon({ kind }: { kind: string }) {
           <path d="M69.12,94.15,28.5,128l40.62,33.85a8,8,0,1,1-10.24,12.29l-48-40a8,8,0,0,1,0-12.29l48-40a8,8,0,0,1,10.24,12.3Zm176,27.7-48-40a8,8,0,1,0-10.24,12.3L227.5,128l-40.62,33.85a8,8,0,1,0,10.24,12.29l48-40a8,8,0,0,0,0-12.29ZM162.73,32.48a8,8,0,0,0-10.25,4.79l-64,176a8,8,0,0,0,4.79,10.26A8.14,8.14,0,0,0,96,224a8,8,0,0,0,7.52-5.27l64-176A8,8,0,0,0,162.73,32.48Z" />
         </svg>
       );
+    case 'hunt':
+      // Phosphor Crosshair Regular
+      return (
+        <svg {...common}>
+          <path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm16-88a16,16,0,1,1-16-16A16,16,0,0,1,144,128ZM120,72V48a8,8,0,0,1,16,0V72a8,8,0,0,1-16,0Zm0,136v-24a8,8,0,0,1,16,0v24a8,8,0,0,1-16,0Zm-64-64H32a8,8,0,0,1,0-16H56a8,8,0,0,1,0,16Zm168,0H200a8,8,0,0,1,0-16h24a8,8,0,0,1,0,16Z" />
+        </svg>
+      );
     case 'errors':
       return (
         <svg {...common}>
@@ -106,7 +113,7 @@ export const NAV_ICONS: Record<string, string> = {
   '/dozzle/': 'logs',
   '/anomalies': 'anomalies',
   '/investigate': 'observe',
-  '/hunts': 'parser',
+  '/hunts': 'hunt',
   '/anomalies/engine': 'settings',
   '/parser-test': 'parser',
   '/parse-errors': 'errors',

@@ -9,6 +9,8 @@ export type ThresholdFieldMeta = {
   min?: number;
   max?: number;
   step?: number;
+  /** Show human-readable byte size next to the raw value. */
+  unit?: 'bytes';
 };
 
 export type DetectorThresholdMeta = {
@@ -157,12 +159,14 @@ export const DETECTOR_THRESHOLD_GROUPS: DetectorGroupMeta[] = [
           {
             key: 'byte_surge_abs_min',
             label: 'Мин. байт',
-            hint: 'например 80000000 ≈ 80 МБ',
+            hint: 'абсолютный порог срабатывания',
+            unit: 'bytes',
           },
           {
             key: 'byte_surge_floor',
             label: 'Floor прошлого часа',
-            hint: 'байт; ниже — src пропускаем',
+            hint: 'ниже — src пропускаем',
+            unit: 'bytes',
           },
         ],
       },
@@ -193,6 +197,7 @@ export const DETECTOR_THRESHOLD_GROUPS: DetectorGroupMeta[] = [
             key: 'beacon_max_avg_bytes',
             label: 'Макс. ср. байт/час',
             hint: 'выше — не считаем low-volume',
+            unit: 'bytes',
           },
           {
             key: 'beacon_min_regularity',

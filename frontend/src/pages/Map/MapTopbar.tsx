@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction, type RefObject } from 'react';
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { SystemHealthPill, UserMenu } from '@/components/Shell';
 import type { HuntMapState } from '@/api/hunts';
 import { mapViewToHuntState } from '@/pages/Hunts/huntMapState';
@@ -67,20 +67,10 @@ export type MapTopbarProps = {
   layers: {
     viewMode: 'map' | 'globe';
     setViewMode: (mode: 'map' | 'globe') => void;
-    isAdmin: boolean;
     tools: {
       fetchData: () => void | Promise<void>;
       resetView: () => void;
       exportPng: () => void | Promise<void>;
-    };
-    uploads: {
-      logFileRef: RefObject<HTMLInputElement | null>;
-      geoFileRef: RefObject<HTMLInputElement | null>;
-      uploadFile: (kind: 'logs' | 'geo', file: File) => void | Promise<void>;
-      geoWizard?: {
-        open: () => void;
-        empty: boolean | null;
-      };
     };
     viz: {
       minCount: number;
@@ -348,12 +338,10 @@ export function MapTopbar({
             open={panel === 'layers'}
             viewMode={layers.viewMode}
             setViewMode={layers.setViewMode}
-            isAdmin={layers.isAdmin}
             tools={{
               ...layers.tools,
               saveHunt: huntSave ? openSaveHunt : undefined,
             }}
-            uploads={layers.uploads}
             viz={layers.viz}
             data={layers.data}
             globe={layers.globe}

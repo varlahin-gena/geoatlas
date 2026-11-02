@@ -3,6 +3,7 @@ import {
   filterNav,
   formatNavBadge,
   groupNav,
+  sectionBadgeTitle,
   splitNavItems,
   PAGE_NAV,
   type NavItem,
@@ -79,7 +80,7 @@ describe('splitNavItems', () => {
     expect(sections.map((s) => s.id)).toEqual(['triage', 'system', 'data', 'access']);
     expect(sections.find((s) => s.id === 'triage')?.items.map((i) => i.label)).toEqual([
       'Аномалии',
-      'Разбор',
+      'Разбор инцидента',
       'Охоты',
     ]);
   });
@@ -91,5 +92,21 @@ describe('formatNavBadge', () => {
     expect(formatNavBadge(-1)).toBeNull();
     expect(formatNavBadge(12)).toBe('12');
     expect(formatNavBadge(100, 99)).toBe('99+');
+  });
+});
+
+describe('sectionBadgeTitle', () => {
+  it('lists full item titles with badge counts', () => {
+    const items = filterNav(PAGE_NAV, {
+      isAdmin: true,
+      reputationEnabled: true,
+      uiAuthEnabled: true,
+    });
+    const { sections } = splitNavItems(items);
+    const data = sections.find((s) => s.id === 'data')!;
+    expect(sectionBadgeTitle(data, {})).toBe('Данные');
+    expect(sectionBadgeTitle(data, { '/geo-missing': '41' })).toBe(
+      'Данные — IP без координат: 41',
+    );
   });
 });

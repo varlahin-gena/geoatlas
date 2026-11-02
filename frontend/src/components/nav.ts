@@ -3,6 +3,8 @@ type NavGroupId = 'workspace' | 'triage' | 'system' | 'data' | 'access';
 export interface NavItem {
   href: string;
   label: string;
+  /** Full name for tooltip / aria when `label` is abbreviated. */
+  title?: string;
   group: NavGroupId;
   match?: string[];
   adminOnly?: boolean;
@@ -56,7 +58,7 @@ export const PAGE_NAV: NavItem[] = [
   },
   {
     href: '/investigate',
-    label: 'Разбор',
+    label: 'Разбор инцидента',
     group: 'triage',
     match: ['/investigate', '/investigate.html'],
     adminOnly: false,
@@ -70,14 +72,16 @@ export const PAGE_NAV: NavItem[] = [
   },
   {
     href: '/system',
-    label: 'Мониторинг системы',
+    label: 'Мониторинг',
+    title: 'Мониторинг системы',
     group: 'system',
     match: ['/system', '/system.html'],
     adminOnly: true,
   },
   {
     href: '/dozzle/',
-    label: 'Логи контейнеров',
+    label: 'Логи',
+    title: 'Логи контейнеров',
     group: 'system',
     match: ['/dozzle', '/dozzle/'],
     adminOnly: true,
@@ -85,14 +89,16 @@ export const PAGE_NAV: NavItem[] = [
   },
   {
     href: '/anomalies/engine',
-    label: 'Движок аномалий',
+    label: 'Движок',
+    title: 'Движок аномалий',
     group: 'system',
     match: ['/anomalies/engine'],
     adminOnly: true,
   },
   {
     href: '/reputation',
-    label: 'Репутация IP',
+    label: 'Репутация',
+    title: 'Репутация IP',
     group: 'system',
     match: ['/reputation', '/reputation.html'],
     adminOnly: true,
@@ -100,7 +106,8 @@ export const PAGE_NAV: NavItem[] = [
   },
   {
     href: '/parse-errors',
-    label: 'Ошибки парсинга',
+    label: 'Ошибки',
+    title: 'Ошибки парсинга',
     group: 'data',
     match: ['/parse-errors', '/parse-errors.html'],
     adminOnly: true,
@@ -114,7 +121,8 @@ export const PAGE_NAV: NavItem[] = [
   },
   {
     href: '/geo-missing',
-    label: 'IP без координат',
+    label: 'Без гео',
+    title: 'IP без координат',
     group: 'data',
     match: ['/geo-missing', '/geo-missing.html'],
     adminOnly: true,
@@ -143,12 +151,18 @@ export const PAGE_NAV: NavItem[] = [
   },
   {
     href: '/tls',
-    label: 'HTTPS-сертификаты',
+    label: 'HTTPS',
+    title: 'HTTPS-сертификаты',
     group: 'access',
     match: ['/tls', '/tls.html'],
     adminOnly: true,
   },
 ];
+
+/** Display name for tooltips / aria (full title when label is short). */
+export function navItemTitle(item: Pick<NavItem, 'label' | 'title'>): string {
+  return item.title || item.label;
+}
 
 export type NavGroupSection = {
   id: string;
@@ -198,6 +212,21 @@ export function sectionBadgeTotal(
     if (Number.isFinite(n)) sum += n;
   }
   return formatNavBadge(sum, 99);
+}
+
+/** Collapsed section trigger title with per-item badge detail. */
+export function sectionBadgeTitle(
+  section: NavGroupSection,
+  badges: Record<string, string | null | undefined>,
+): string {
+  const parts: string[] = [];
+  for (const item of section.items) {
+    const raw = badges[item.href];
+    if (!raw) continue;
+    parts.push(`${navItemTitle(item)}: ${raw}`);
+  }
+  if (!parts.length) return section.label;
+  return `${section.label} — ${parts.join(', ')}`;
 }
 
 function normalizePath(pathname: string): string {

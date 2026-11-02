@@ -11,7 +11,6 @@ import {
 import { listUserDirectory, type UserDirectoryEntry } from '@/api/users';
 import { useAuth } from '@/auth/AuthContext';
 import { AdminLayout } from '@/components/AdminLayout';
-import { TriageSectionNav } from '@/components/ObserveSectionNav';
 import { EmptyState, TableSkeleton } from '@/components/Skeleton';
 import { useToast } from '@/components/Toast';
 import { COPY } from '@/lib/glossary';
@@ -169,6 +168,14 @@ export default function AnomaliesPage() {
     [rows, search],
   );
 
+  const showSummary =
+    (summary?.high || 0) > 0 ||
+    (summary?.warn || 0) > 0 ||
+    (summary?.total || 0) > 0 ||
+    filtered.length > 0;
+
+  const showEpisodes = (summary?.total || 0) > 0 || filtered.length > 0 || includeAcked;
+
   const fioByUsername = useMemo(() => {
     const map = new Map<string, string>();
     for (const u of directory) {
@@ -269,12 +276,8 @@ export default function AnomaliesPage() {
   return (
     <AdminLayout title="Аномалии">
       <div className="page-content-inner wide">
-        <TriageSectionNav />
-
         <p className="page-lead">
-          Алерты, которые сканер обнаружил в трафике за выбранный период. Закрытие скрывает алерт и
-          подавляет повтор на 24 часа; ФИО закрывшего проставляется автоматически, если исполнитель
-          ещё не выбран. «На карте» открывает контекст события с фильтрами.
+          Алерты сканера за период. Закрытие скрывает алерт на 24 часа.
         </p>
 
         {moduleOff ? (
@@ -286,32 +289,37 @@ export default function AnomaliesPage() {
             <Link to="/anomalies/engine">настройках движка</Link> — журнал показывает ранее найденные алерты.
           </p>
         ) : null}
-        {summary?.learning ? (
-          <p className="hint warn-banner">
-            Режим обучения — алерты «новая страна» и «периодическая связь» не ищутся первые дни.
+        {!moduleOff && !scanPaused && summary?.learning ? (
+          <p className="anomaly-learning-note" role="status">
+            Режим обучения — «новая страна» и «периодическая связь» пока не ищутся. Параметры — в{' '}
+            <Link to="/anomalies/engine">движке</Link>.
           </p>
         ) : null}
 
-        <EpisodesPanel sinceHours={sinceHours} includeAcked={includeAcked} />
+        {showEpisodes ? (
+          <EpisodesPanel sinceHours={sinceHours} includeAcked={includeAcked} />
+        ) : null}
 
-        <div className="anomaly-summary-row">
-          <div className="anomaly-summary-card">
-            <span className="hint">Критично</span>
-            <strong className="sev-high">{fmtNumber(summary?.high || 0)}</strong>
+        {showSummary ? (
+          <div className="anomaly-summary-row">
+            <div className="anomaly-summary-card">
+              <span className="hint">Критично</span>
+              <strong className="sev-high">{fmtNumber(summary?.high || 0)}</strong>
+            </div>
+            <div className="anomaly-summary-card">
+              <span className="hint">Предупреждения</span>
+              <strong className="sev-warn">{fmtNumber(summary?.warn || 0)}</strong>
+            </div>
+            <div className="anomaly-summary-card">
+              <span className="hint">Всего открытых</span>
+              <strong>{fmtNumber(summary?.total || 0)}</strong>
+            </div>
+            <div className="anomaly-summary-card">
+              <span className="hint">Показано в таблице</span>
+              <strong>{fmtNumber(filtered.length)}</strong>
+            </div>
           </div>
-          <div className="anomaly-summary-card">
-            <span className="hint">Предупреждения</span>
-            <strong className="sev-warn">{fmtNumber(summary?.warn || 0)}</strong>
-          </div>
-          <div className="anomaly-summary-card">
-            <span className="hint">Всего открытых</span>
-            <strong>{fmtNumber(summary?.total || 0)}</strong>
-          </div>
-          <div className="anomaly-summary-card">
-            <span className="hint">Показано в таблице</span>
-            <strong>{fmtNumber(filtered.length)}</strong>
-          </div>
-        </div>
+        ) : null}
 
         <div className="toolbar anomaly-toolbar">
           <input

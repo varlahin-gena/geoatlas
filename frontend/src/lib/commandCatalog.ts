@@ -41,10 +41,10 @@ export type CommandCatalogContext = {
 function navCommands(items: NavItem[]): AppCommand[] {
   return items.map((item) => ({
     id: `nav:${item.href}`,
-    label: item.label,
+    label: item.title || item.label,
     group: 'navigate' as const,
     groupLabel: NAV_GROUP_SUBTITLE[item.group] || GROUP_LABELS.navigate,
-    keywords: `${item.href} ${item.group}`,
+    keywords: `${item.href} ${item.group} ${item.label} ${item.title || ''}`,
     href: item.external ? undefined : item.href,
     run: item.external
       ? () => {

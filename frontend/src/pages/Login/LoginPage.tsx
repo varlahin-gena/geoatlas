@@ -1,8 +1,9 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthContext';
 import { ApiError } from '@/api/client';
+import { AuthPasswordField } from '@/components/AuthPasswordField';
 import { COPY } from '@/lib/glossary';
 import { safeNext } from '@/lib/format';
 import '@/styles/auth-form.css';
@@ -17,6 +18,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const passwordRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     document.body.classList.add('page-auth');
@@ -56,6 +58,11 @@ export default function LoginPage() {
       } else {
         setError('Сервер недоступен');
       }
+      // After a failed attempt, land on password for a quick retry.
+      requestAnimationFrame(() => {
+        passwordRef.current?.focus();
+        passwordRef.current?.select();
+      });
     } finally {
       setBusy(false);
     }
@@ -88,15 +95,15 @@ export default function LoginPage() {
           value={username}
           onChange={(e) => setUsername(e.target.value)}
         />
-        <label htmlFor="password">Пароль</label>
-        <input
+        <AuthPasswordField
           id="password"
           name="password"
-          type="password"
+          label="Пароль"
           autoComplete="current-password"
           required
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={setPassword}
+          inputRef={passwordRef}
         />
         <button
           type="submit"

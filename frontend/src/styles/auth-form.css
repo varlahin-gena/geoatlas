@@ -158,6 +158,52 @@ html[data-theme='light'] .auth-card input {
   outline: none;
 }
 
+.auth-password-wrap {
+  position: relative;
+  margin-bottom: 14px;
+}
+.auth-password-wrap input {
+  margin-bottom: 0;
+  padding-right: 44px;
+}
+.auth-password-toggle {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.auth-password-toggle:hover {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.auth-password-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.auth-password-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+.auth-caps-hint {
+  margin: -6px 0 14px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--orange);
+}
+
 .auth-card button[type='submit'] {
   width: 100%;
   margin-top: 6px;

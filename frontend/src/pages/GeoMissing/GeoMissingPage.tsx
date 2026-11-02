@@ -234,12 +234,10 @@ export default function GeoMissingPage() {
       }
     >
       <div className="page-content-inner">
-        <h1>Адреса, которые не удалось поставить на карту</h1>
         <p className="page-lead">
-          Уникальные IP из трафика без координат. Публичные можно добавить в базу GeoIP; приватные
-          обычно на карте не нужны.
+          Уникальные IP без координат. Публичные — в базу GeoIP; приватные на карте обычно не нужны.
         </p>
-        <div className="summary" style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 12 }}>
+        <div className="geo-missing-summary">
           <div>
             <div className="hint">Уникальных IP</div>
             <b>{fmtNumber(displaySummary.unique_ips)}</b>
@@ -346,7 +344,9 @@ export default function GeoMissingPage() {
                     </td>
                     <td className="mono">{r.sample_peer || '—'}</td>
                     <td>{[r.log_city, r.log_country].filter(Boolean).join(', ') || '—'}</td>
-                    <td className="hint">{r.action_hint || ''}</td>
+                    <td className="hint geo-missing-hint" title={r.action_hint || undefined}>
+                      {r.action_hint || '—'}
+                    </td>
                     <td>
                       <button
                         type="button"

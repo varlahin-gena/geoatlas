@@ -148,9 +148,8 @@ export default function TlsPage() {
     >
       <div className="page-content-inner narrow">
         <p className="page-lead">
-          Режим HTTPS задаётся в <code>.env</code> (<code>HTTPS_ENABLED</code>):{' '}
-          <code>0</code> — только HTTP, <code>1</code> — всегда HTTPS, <code>auto</code> — HTTPS
-          если на диске есть оба PEM. Загрузка через UI нужна том <code>./certs</code> в backend.
+          Режим — <code>HTTPS_ENABLED</code> в <code>.env</code> (<code>0</code> / <code>1</code> /{' '}
+          <code>auto</code>). PEM пишутся в том <code>./certs</code>.
         </p>
 
         {!status?.configured ? (

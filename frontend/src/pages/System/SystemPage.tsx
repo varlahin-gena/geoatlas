@@ -18,7 +18,7 @@ import {
   toneClass,
   fmtLag,
 } from './systemFormat';
-import { PERIODS, type Tab } from './systemTypes';
+import { type Tab } from './systemTypes';
 import { SystemBackupTab } from './SystemBackupTab';
 import { SystemAuditTab } from './SystemAuditTab';
 import { SystemChartsTab } from './SystemChartsTab';
@@ -133,33 +133,30 @@ export default function SystemPage() {
       ? `${alerts.length} проблем`
       : healthLevel === 'warn'
         ? `${alerts.length} предупр.`
-        : 'Всё ОК';
+        : 'Система OK';
 
   const backendHealth = stats?.health?.backend || {};
   const ingestHealth = stats?.health?.ingest || {};
+
+  const tabLabels: Record<Tab, string> = {
+    overview: 'Обзор',
+    pipeline: 'Конвейер',
+    backup: 'Резерв',
+    security: 'Безопасность',
+    audit: 'Журнал аудита',
+    charts: 'Графики',
+  };
+  const showKpiStrip = tab === 'overview' || tab === 'pipeline' || tab === 'charts';
 
   return (
     <AdminLayout
       className="ga-system"
       title="Мониторинг системы"
-      subtitle="pipeline / containers / storage"
+      subtitle={tabLabels[tab]}
       mainClassName="content"
       showSystemHealth={false}
       actions={
         <>
-          <div className="period-tabs" hidden={tab !== 'charts'}>
-            {PERIODS.map(([v, label]) => (
-              <button
-                key={v}
-                type="button"
-                data-period={v}
-                className={period === v ? 'active' : ''}
-                onClick={() => setPeriod(v)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
           <label className="toggle">
             <input
               type="checkbox"
@@ -178,76 +175,72 @@ export default function SystemPage() {
       <div className="content-chrome">
         <section
           className={`chrome-section chrome-alerts${alerts.length ? '' : ' chrome-alerts--empty'}`}
+          aria-label="Алерты мониторинга"
         >
-          <div className="chrome-section-head">
-            <span className="accent-dot" style={{ background: 'var(--orange)' }} />
-            <span>Алёрты</span>
-            <span className="chrome-section-meta">{alerts.length ? alerts.length : ''}</span>
-          </div>
-          <div className="alerts">
-            {!alerts.length ? (
-              <div className="alert-row info">
-                <span className="empty">Активных алертов нет</span>
+          {alerts.length ? (
+            <>
+              <div className="chrome-section-head">
+                <span className="accent-dot" style={{ background: 'var(--orange)' }} />
+                <span>Алерты</span>
+                <span className="chrome-section-meta">{alerts.length}</span>
               </div>
-            ) : (
-              alerts.map((a, i) => (
-                <div key={`${a.code}-${i}`} className={`alert-row ${a.level || ''}`}>
-                  <span className="level">{a.level}</span>
-                  {a.code ? <span className="code">{a.code}</span> : null}
-                  {a.target ? <span className="target">{a.target}</span> : null}
-                  <span>{a.message}</span>
-                </div>
-              ))
-            )}
-          </div>
+              <div className="alerts">
+                {alerts.map((a, i) => (
+                  <div key={`${a.code}-${i}`} className={`alert-row ${a.level || ''}`}>
+                    <span className="level">{a.level}</span>
+                    {a.code ? <span className="code">{a.code}</span> : null}
+                    {a.target ? <span className="target">{a.target}</span> : null}
+                    <span>{a.message}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="chrome-alerts-quiet" role="status">
+              Активных алертов нет
+            </p>
+          )}
         </section>
 
-        <div className="status-strip" aria-label="Ключевые метрики">
-          <div className="status-metric">
-            <span className="sm-label">EPS</span>
-            <span className="sm-value">{fmtNumber(eps)}</span>
+        {showKpiStrip ? (
+          <div className="status-strip" aria-label="Ключевые метрики">
+            <div className="status-metric">
+              <span className="sm-label">EPS</span>
+              <span className="sm-value">{fmtNumber(eps)}</span>
+            </div>
+            <div className="status-metric">
+              <span className="sm-label">Лаг</span>
+              <span className={`sm-value ${toneClass(lagTone(lag))}`}>{fmtLag(ingest.lag_sec)}</span>
+            </div>
+            <div className="status-metric">
+              <span className="sm-label">Очередь</span>
+              <span className={`sm-value ${toneClass(queueTone(qDepth, qCap))}`}>
+                {qCap > 0 ? `${fmtNumber(qDepth)}/${fmtNumber(qCap)}` : fmtNumber(qDepth)}
+              </span>
+            </div>
+            <div className="status-metric">
+              <span className="sm-label">Буфер</span>
+              <span className={`sm-value ${toneClass(bufferTone(buffered))}`}>{fmtNumber(buffered)}</span>
+            </div>
+            <div className="status-metric">
+              <span className="sm-label">Drops</span>
+              <span
+                className={`sm-value ${toneClass(dropsTone(dropsPerSec + syslogngDropsPerSec, bufferDropsPerSec))}`}
+                id="statusDrops"
+                title={`admission ${fmtNumber(dropsPerSec)}/s · buffer ${fmtNumber(bufferDropsPerSec)}/s · syslog-ng ${fmtNumber(syslogngDropsPerSec)}/s`}
+              >
+                {fmtNumber(dropsPerSec + bufferDropsPerSec + syslogngDropsPerSec)}/s
+              </span>
+            </div>
+            <div className="status-metric" hidden={!epsMax}>
+              <span className="sm-label">Ёмкость</span>
+              <span className={`sm-value ${toneClass(capacityTone(capPct))}`}>{capPct}%</span>
+            </div>
           </div>
-          <div className="status-metric">
-            <span className="sm-label">Лаг</span>
-            <span className={`sm-value ${toneClass(lagTone(lag))}`}>{fmtLag(ingest.lag_sec)}</span>
-          </div>
-          <div className="status-metric">
-            <span className="sm-label">Очередь</span>
-            <span className={`sm-value ${toneClass(queueTone(qDepth, qCap))}`}>
-              {qCap > 0 ? `${fmtNumber(qDepth)}/${fmtNumber(qCap)}` : fmtNumber(qDepth)}
-            </span>
-          </div>
-          <div className="status-metric">
-            <span className="sm-label">Буфер</span>
-            <span className={`sm-value ${toneClass(bufferTone(buffered))}`}>{fmtNumber(buffered)}</span>
-          </div>
-          <div className="status-metric">
-            <span className="sm-label">Drops</span>
-            <span
-              className={`sm-value ${toneClass(dropsTone(dropsPerSec + syslogngDropsPerSec, bufferDropsPerSec))}`}
-              id="statusDrops"
-              title={`admission ${fmtNumber(dropsPerSec)}/s · buffer ${fmtNumber(bufferDropsPerSec)}/s · syslog-ng ${fmtNumber(syslogngDropsPerSec)}/s`}
-            >
-              {fmtNumber(dropsPerSec + bufferDropsPerSec + syslogngDropsPerSec)}/s
-            </span>
-          </div>
-          <div className="status-metric" hidden={!epsMax}>
-            <span className="sm-label">Ёмкость</span>
-            <span className={`sm-value ${toneClass(capacityTone(capPct))}`}>{capPct}%</span>
-          </div>
-        </div>
+        ) : null}
 
         <nav className="view-tabs" role="tablist" aria-label="Разделы мониторинга">
-          {(
-            [
-              ['overview', 'Обзор'],
-              ['pipeline', 'Конвейер'],
-              ['backup', 'Резервное копирование'],
-              ['security', 'Безопасность'],
-              ['audit', 'Журнал аудита'],
-              ['charts', 'Графики'],
-            ] as const
-          ).map(([id, label]) => (
+          {(['overview', 'pipeline', 'backup', 'security', 'audit', 'charts'] as const).map((id) => (
             <button
               key={id}
               type="button"
@@ -255,9 +248,10 @@ export default function SystemPage() {
               data-tab={id}
               className={tab === id ? 'active' : ''}
               aria-selected={tab === id}
+              title={id === 'backup' ? 'Резервное копирование' : undefined}
               onClick={() => setTab(id)}
             >
-              {label}
+              {tabLabels[id]}
               {id === 'security' && failed.length ? (
                 <span className="tab-badge">{failed.length}</span>
               ) : null}
@@ -320,6 +314,8 @@ export default function SystemPage() {
 
         {tab === 'charts' ? (
           <SystemChartsTab
+            period={period}
+            onPeriodChange={setPeriod}
             chartEvents={charts.chartEvents}
             chartLag={charts.chartLag}
             chartCpu={charts.chartCpu}

@@ -42,6 +42,33 @@
   margin-top: 12px;
 }
 
+.anomaly-engine-sticky-actions {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: -4px -4px 14px;
+  padding: 10px 4px;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(8px);
+}
+
+.anomaly-learning-note {
+  margin: 0 0 12px;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+
+.anomaly-learning-note a {
+  color: var(--accent);
+}
+
 .anomaly-engine-dl {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -198,6 +225,14 @@
   border-radius: 6px;
   border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
   background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+}
+
+.thresholds-detector-advice p {
+  margin: 0 0 8px;
+}
+
+.thresholds-detector-advice p:last-child {
+  margin-bottom: 0;
 }
 
 .thresholds-detector-advice strong {

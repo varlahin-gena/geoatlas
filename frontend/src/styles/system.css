@@ -120,15 +120,21 @@ body.page-admin {
         padding: 6px 8px;
         font-size: 11px;
     }
-    .chrome-alerts--empty .alert-row {
-        padding: 0;
-        background: transparent;
-        border-left: none;
-        border-radius: 0;
+    .chrome-alerts--empty {
+        padding-top: 0;
+        padding-bottom: 0;
     }
-    .chrome-alerts--empty .alert-row .empty {
-        padding: 0;
-        font-size: 11px;
+    .chrome-alerts-quiet {
+        margin: 0;
+        padding: 2px 0;
+        font-size: 12px;
+        line-height: 1.35;
+        color: var(--text-dim);
+    }
+    .charts-period-bar {
+        display: flex;
+        align-items: center;
+        margin-bottom: 12px;
     }
 
     .status-strip {

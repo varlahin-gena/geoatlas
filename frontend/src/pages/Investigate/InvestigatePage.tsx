@@ -11,7 +11,6 @@ import type { MapLine } from '@/api/eventsTypes';
 import { listUserDirectory, type UserDirectoryEntry } from '@/api/users';
 import { useAuth } from '@/auth/AuthContext';
 import { AdminLayout } from '@/components/AdminLayout';
-import { TriageSectionNav } from '@/components/ObserveSectionNav';
 import { useToast } from '@/components/Toast';
 import { fmtDate, fmtNumber } from '@/lib/format';
 import { AnomalyPeersPanel } from '@/pages/Anomalies/AnomalyPeersPanel';
@@ -92,7 +91,7 @@ export default function InvestigatePage() {
   }, [toast]);
 
   useEffect(() => {
-    document.title = 'ГеоАтлас — Разбор';
+    document.title = 'ГеоАтлас — Разбор инцидента';
   }, []);
 
   useEffect(() => {
@@ -237,10 +236,8 @@ export default function InvestigatePage() {
   const workspaceHref = alertFp ? investigateHref(alertFp) : '/investigate';
 
   return (
-    <AdminLayout title="Разбор">
+    <AdminLayout title="Разбор инцидента">
       <div className="page-content-inner wide">
-        <TriageSectionNav />
-
         <p className="page-lead">
           Рабочее место расследования по одному алерту: контекст, связи из карты, ack/assign и
           выгрузка. Карта открывается deep-link’ом без встраивания.
