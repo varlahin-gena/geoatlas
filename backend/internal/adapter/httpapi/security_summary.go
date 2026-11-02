@@ -165,7 +165,9 @@ func (h *SystemHandler) buildSecurityPosture() securityPosture {
 	if h.tlsUC != nil {
 		st, err := h.tlsUC.Status()
 		if err == nil {
-			p.TLS.Configured = st.Configured || st.CertPresent
+			// tls.Status.Configured = каталог TLS_CERT_DIR доступен, НЕ «сертификат установлен».
+			// В posture для UI — только реальные PEM на диске.
+			p.TLS.Configured = st.CertPresent && st.KeyPresent
 			if st.Cert != nil {
 				p.TLS.DaysLeft = st.Cert.DaysLeft
 				p.TLS.SelfSigned = st.Cert.SelfSigned

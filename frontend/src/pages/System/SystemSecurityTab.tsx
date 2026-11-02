@@ -147,7 +147,7 @@ export function SystemSecurityTab() {
       ]
         .filter(Boolean)
         .join(' · ')
-    : 'ещё не настроен';
+    : 'не установлен';
 
   return (
     <div className="tab-panel active security-tab" role="tabpanel">

@@ -537,7 +537,17 @@ body.page-admin {
         padding: 8px 2px;
     }
     .perimeter-table {
-        max-width: 420px;
+        width: 100%;
+        max-width: 36rem;
+        table-layout: fixed;
+    }
+    .perimeter-table th:first-child,
+    .perimeter-table td:first-child {
+        width: auto;
+    }
+    .perimeter-table .num {
+        width: 7rem;
+        text-align: right;
     }
     .history-filters {
         display: flex;
