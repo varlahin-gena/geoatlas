@@ -1,3 +1,4 @@
+import type { RefObject } from 'react';
 import { fmtNumber } from '@/lib/format';
 import {
   MAP_REFRESH_DEFAULT_SEC,
@@ -9,6 +10,23 @@ import {
 export type MapLayersPanelProps = {
   open: boolean;
   viewMode: 'map' | 'globe';
+  setViewMode: (mode: 'map' | 'globe') => void;
+  isAdmin: boolean;
+  tools: {
+    fetchData: () => void | Promise<void>;
+    resetView: () => void;
+    exportPng: () => void | Promise<void>;
+    saveHunt?: () => void;
+  };
+  uploads: {
+    logFileRef: RefObject<HTMLInputElement | null>;
+    geoFileRef: RefObject<HTMLInputElement | null>;
+    uploadFile: (kind: 'logs' | 'geo', file: File) => void | Promise<void>;
+    geoWizard?: {
+      open: () => void;
+      empty: boolean | null;
+    };
+  };
   viz: {
     minCount: number;
     setMinCount: (n: number) => void;
@@ -41,7 +59,17 @@ export type MapLayersPanelProps = {
   };
 };
 
-export function MapLayersPanel({ open, viewMode, viz, data, globe }: MapLayersPanelProps) {
+export function MapLayersPanel({
+  open,
+  viewMode,
+  setViewMode,
+  isAdmin,
+  tools,
+  uploads,
+  viz,
+  data,
+  globe,
+}: MapLayersPanelProps) {
   const {
     minCount,
     setMinCount,
@@ -62,15 +90,106 @@ export function MapLayersPanel({ open, viewMode, viz, data, globe }: MapLayersPa
   const { autoRefresh, setAutoRefresh, refreshIntervalSec, setRefreshIntervalSec, dataSource, selectDataSource, backupAttached } =
     data;
   const { autoRotate, setAutoRotate } = globe;
+  const { logFileRef, geoFileRef, uploadFile, geoWizard } = uploads;
   const refreshEnabled = autoRefresh && dataSource === 'live';
 
   if (!open) return null;
 
   return (
-    <div className="map-chrome-panel map-layers-panel" role="dialog" aria-label="Вид карты">
+    <div className="map-chrome-panel map-layers-panel" role="dialog" aria-label="Отображение карты">
       <div className="map-chrome-panel-head">
-        <span>Вид</span>
+        <span>Отображение</span>
       </div>
+
+      <div className="map-chrome-panel-section">
+        <div className="map-chrome-panel-label">Режим</div>
+        <div className="mode-switch mode-switch-data">
+          <button
+            type="button"
+            className={viewMode === 'map' ? 'active' : ''}
+            onClick={() => setViewMode('map')}
+          >
+            Карта
+          </button>
+          <button
+            type="button"
+            className={viewMode === 'globe' ? 'active' : ''}
+            onClick={() => setViewMode('globe')}
+          >
+            Глобус
+          </button>
+        </div>
+      </div>
+
+      <div className="map-chrome-panel-section">
+        <div className="map-chrome-panel-label">Действия</div>
+        <div className="map-layers-actions">
+          <button type="button" className="map-chrome-action-btn" onClick={() => void tools.fetchData()}>
+            Обновить
+          </button>
+          <button type="button" className="map-chrome-action-btn" onClick={tools.resetView}>
+            Сбросить вид
+          </button>
+          <button type="button" className="map-chrome-action-btn" onClick={() => void tools.exportPng()}>
+            Экспорт PNG
+          </button>
+          {tools.saveHunt ? (
+            <button type="button" className="map-chrome-action-btn" onClick={tools.saveHunt}>
+              Сохранить охоту
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      {isAdmin ? (
+        <div className="map-chrome-panel-section">
+          <div className="map-chrome-panel-label">Загрузка</div>
+          <input
+            ref={logFileRef}
+            type="file"
+            accept=".log,.txt,.cef,.syslog"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void uploadFile('logs', f);
+              e.target.value = '';
+            }}
+          />
+          <input
+            ref={geoFileRef}
+            type="file"
+            accept=".csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void uploadFile('geo', f);
+              e.target.value = '';
+            }}
+          />
+          <div className="map-layers-actions">
+            <button
+              type="button"
+              className="map-chrome-action-btn"
+              onClick={() => logFileRef.current?.click()}
+            >
+              Загрузить логи
+            </button>
+            {geoWizard?.empty === true ? (
+              <button type="button" className="map-chrome-action-btn" onClick={geoWizard.open}>
+                Мастер GeoIP
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="map-chrome-action-btn"
+                onClick={() => geoFileRef.current?.click()}
+              >
+                Обновить GeoIP
+              </button>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       <div className="map-chrome-panel-section">
         <div className="map-chrome-panel-label">Порог событий на связь</div>

@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction, type RefObject } from 'react';
 import { SystemHealthPill, UserMenu } from '@/components/Shell';
-import { useToast } from '@/components/Toast';
+import type { HuntMapState } from '@/api/hunts';
 import { mapViewToHuntState } from '@/pages/Hunts/huntMapState';
-import { promptSaveHuntFromMap } from '@/pages/Hunts/saveHuntFromMap';
+import { SaveHuntModal } from '@/pages/Hunts/SaveHuntModal';
 import { SearchBuilder } from './SearchBuilder';
 import {
   countActiveMapFilters,
@@ -62,8 +62,26 @@ export type MapTopbarProps = {
     setPeriodTo: (v: string) => void;
     fetchData: () => void | Promise<void>;
   };
+  /** Quiet status under chips (e.g. anomaly baseline learning). */
+  learningNote?: string | null;
   layers: {
     viewMode: 'map' | 'globe';
+    setViewMode: (mode: 'map' | 'globe') => void;
+    isAdmin: boolean;
+    tools: {
+      fetchData: () => void | Promise<void>;
+      resetView: () => void;
+      exportPng: () => void | Promise<void>;
+    };
+    uploads: {
+      logFileRef: RefObject<HTMLInputElement | null>;
+      geoFileRef: RefObject<HTMLInputElement | null>;
+      uploadFile: (kind: 'logs' | 'geo', file: File) => void | Promise<void>;
+      geoWizard?: {
+        open: () => void;
+        empty: boolean | null;
+      };
+    };
     viz: {
       minCount: number;
       setMinCount: (n: number) => void;
@@ -105,9 +123,10 @@ export function MapTopbar({
   reputation,
   period: periodCtl,
   layers,
+  learningNote,
 }: MapTopbarProps) {
-  const { toast } = useToast();
   const { search, setSearch, builderOpen, setBuilderOpen, huntSave } = searchCtl;
+  const [huntDraft, setHuntDraft] = useState<HuntMapState | null>(null);
   const { groupBy, setGroupBy, filter, setFilter, hideIntraCountry, setHideIntraCountry } = grouping;
   const {
     reputationEnabled,
@@ -201,147 +220,156 @@ export function MapTopbar({
     setSearch,
   });
 
+  function openSaveHunt() {
+    if (!huntSave) return;
+    setHuntDraft(mapViewToHuntState({ ...huntSave, search }));
+    setPanel(null);
+  }
+
   return (
     <div className="map-chrome">
-    <header className="topbar">
-      <div className="search-box">
-        <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="11" cy="11" r="8" />
-          <path d="M21 21l-4.35-4.35" />
-        </svg>
-        <input
-          type="text"
-          placeholder="Поиск: IP, страна, action=allow, src_ip=10.0.0.1…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <button
-          type="button"
-          className={`search-builder-toggle${builderOpen ? ' active' : ''}`}
-          aria-label="Открыть расширенный поиск"
-          aria-expanded={builderOpen}
-          aria-controls="searchBuilderPanel"
-          title="Расширенный поиск"
-          onClick={openBuilder}
-        >
-          <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M3 5h18" />
-            <path d="M6 12h12" />
-            <path d="M10 19h4" />
+      <header className="topbar">
+        <div className="search-box">
+          <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <circle cx="11" cy="11" r="8" />
+            <path d="M21 21l-4.35-4.35" />
           </svg>
-        </button>
-        <SearchBuilder
-          open={builderOpen}
-          onOpenChange={setBuilderOpen}
-          search={search}
-          onApply={setSearch}
-        />
-      </div>
-      {huntSave ? (
-        <button
-          type="button"
-          className="btn sm map-save-hunt-btn"
-          title="Сохранить текущий вид карты как охоту"
-          onClick={() =>
-            void promptSaveHuntFromMap(
-              mapViewToHuntState({ ...huntSave, search }),
-              toast,
-            )
-          }
-        >
-          Охота
-        </button>
-      ) : null}
-
-      <div className="period-control">
-        <span>Период:</span>
-        <select
-          title="Период данных"
-          value={period}
-          onChange={(e) => setPeriod(e.target.value)}
-        >
-          {PERIODS.map(([v, label]) => (
-            <option key={v} value={v}>
-              {label}
-            </option>
-          ))}
-        </select>
-        <div className={`period-custom${period === 'custom' ? ' visible' : ''}`}>
-          <label htmlFor="periodFrom">От</label>
           <input
-            type="datetime-local"
-            id="periodFrom"
-            value={periodFrom}
-            onChange={(e) => setPeriodFrom(e.target.value)}
+            type="text"
+            aria-label="Поиск по карте"
+            placeholder="IP, страна, action=…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
           />
-          <label htmlFor="periodTo">До</label>
-          <input
-            type="datetime-local"
-            id="periodTo"
-            value={periodTo}
-            onChange={(e) => setPeriodTo(e.target.value)}
-          />
-          <button type="button" className="period-apply-btn" onClick={() => void fetchData()}>
-            Применить
+          <button
+            type="button"
+            className={`search-builder-toggle${builderOpen ? ' active' : ''}`}
+            aria-label="Открыть расширенный поиск"
+            aria-expanded={builderOpen}
+            aria-controls="searchBuilderPanel"
+            title="Расширенный поиск"
+            onClick={openBuilder}
+          >
+            <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path d="M3 5h18" />
+              <path d="M6 12h12" />
+              <path d="M10 19h4" />
+            </svg>
           </button>
+          <SearchBuilder
+            open={builderOpen}
+            onOpenChange={setBuilderOpen}
+            search={search}
+            onApply={setSearch}
+          />
         </div>
-      </div>
 
-      <div className="map-chrome-trigger" ref={filtersWrapRef}>
-        <button
-          type="button"
-          className={`map-chrome-btn${panel === 'filters' || filtersActive > 0 ? ' active' : ''}`}
-          aria-expanded={panel === 'filters'}
-          aria-haspopup="dialog"
-          onClick={() => openPanel('filters')}
-        >
-          Фильтры
-          {filtersActive > 0 ? <span className="map-chrome-badge">{filtersActive}</span> : null}
-        </button>
-        <MapFiltersPanel
-          open={panel === 'filters'}
-          grouping={grouping}
-          reputation={{
-            reputationEnabled,
-            ipMode,
-            repCategories,
-            setRepCategories,
-            repLists,
-            setRepLists,
-            repSide,
-            setRepSide,
-            repColorArcs,
-            setRepColorArcs,
-            repTree,
-          }}
-          onReset={resetFilters}
-        />
-      </div>
+        {huntDraft ? (
+          <SaveHuntModal mapState={huntDraft} onClose={() => setHuntDraft(null)} />
+        ) : null}
 
-      <div className="map-chrome-trigger" ref={layersWrapRef}>
-        <button
-          type="button"
-          className={`map-chrome-btn${panel === 'layers' ? ' active' : ''}`}
-          aria-expanded={panel === 'layers'}
-          aria-haspopup="dialog"
-          onClick={() => openPanel('layers')}
-        >
-          Вид
-        </button>
-        <MapLayersPanel
-          open={panel === 'layers'}
-          viewMode={layers.viewMode}
-          viz={layers.viz}
-          data={layers.data}
-          globe={layers.globe}
-        />
-      </div>
+        <div className="period-control">
+          <span>Период:</span>
+          <select
+            title="Период данных"
+            aria-label="Период данных"
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
+          >
+            {PERIODS.map(([v, label]) => (
+              <option key={v} value={v}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <div className={`period-custom${period === 'custom' ? ' visible' : ''}`}>
+            <label htmlFor="periodFrom">От</label>
+            <input
+              type="datetime-local"
+              id="periodFrom"
+              value={periodFrom}
+              onChange={(e) => setPeriodFrom(e.target.value)}
+            />
+            <label htmlFor="periodTo">До</label>
+            <input
+              type="datetime-local"
+              id="periodTo"
+              value={periodTo}
+              onChange={(e) => setPeriodTo(e.target.value)}
+            />
+            <button type="button" className="period-apply-btn" onClick={() => void fetchData()}>
+              Применить
+            </button>
+          </div>
+        </div>
 
-      <div className="topbar-spacer" />
-      <UserMenu />
-      <SystemHealthPill />
-    </header>
-    <MapFilterChipsBar chips={filterChips} onResetAll={resetFilters} />
+        <div className="map-chrome-trigger" ref={filtersWrapRef}>
+          <button
+            type="button"
+            className={`map-chrome-btn${panel === 'filters' || filtersActive > 0 ? ' active' : ''}`}
+            aria-expanded={panel === 'filters'}
+            aria-haspopup="dialog"
+            onClick={() => openPanel('filters')}
+          >
+            Фильтры
+            {filtersActive > 0 ? <span className="map-chrome-badge">{filtersActive}</span> : null}
+          </button>
+          <MapFiltersPanel
+            open={panel === 'filters'}
+            grouping={grouping}
+            reputation={{
+              reputationEnabled,
+              ipMode,
+              repCategories,
+              setRepCategories,
+              repLists,
+              setRepLists,
+              repSide,
+              setRepSide,
+              repColorArcs,
+              setRepColorArcs,
+              repTree,
+            }}
+            onReset={resetFilters}
+          />
+        </div>
+
+        <div className="map-chrome-trigger" ref={layersWrapRef}>
+          <button
+            type="button"
+            className={`map-chrome-btn${panel === 'layers' ? ' active' : ''}`}
+            aria-expanded={panel === 'layers'}
+            aria-haspopup="dialog"
+            onClick={() => openPanel('layers')}
+          >
+            Отображение
+          </button>
+          <MapLayersPanel
+            open={panel === 'layers'}
+            viewMode={layers.viewMode}
+            setViewMode={layers.setViewMode}
+            isAdmin={layers.isAdmin}
+            tools={{
+              ...layers.tools,
+              saveHunt: huntSave ? openSaveHunt : undefined,
+            }}
+            uploads={layers.uploads}
+            viz={layers.viz}
+            data={layers.data}
+            globe={layers.globe}
+          />
+        </div>
+
+        <div className="topbar-spacer" />
+        <UserMenu />
+        <SystemHealthPill />
+      </header>
+      <MapFilterChipsBar chips={filterChips} onResetAll={resetFilters} />
+      {learningNote ? (
+        <p className="map-learning-note" role="status">
+          {learningNote}
+        </p>
+      ) : null}
     </div>
   );
 }

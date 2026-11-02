@@ -42,19 +42,27 @@ describe('theme preference', () => {
     vi.unstubAllGlobals();
   });
 
-  it('defaults to system when storage is empty and resolves dark OS', async () => {
+  it('defaults to dark when storage is empty', async () => {
     const theme = await import('./theme');
-    expect(theme.getThemePreference()).toBe('system');
-    expect(theme.resolveTheme('system')).toBe('dark');
+    expect(theme.getThemePreference()).toBe('dark');
     expect(theme.getTheme()).toBe('dark');
     expect(store.has('nm.theme')).toBe(false);
   });
 
-  it('resolves system to light when OS prefers light', async () => {
+  it('migrates legacy system to OS preference and writes storage', async () => {
+    store.set('nm.theme', 'system');
     stubScheme(false);
     const theme = await import('./theme');
-    expect(theme.getThemePreference()).toBe('system');
-    expect(theme.resolveTheme('system')).toBe('light');
+    expect(theme.getThemePreference()).toBe('light');
+    expect(store.get('nm.theme')).toBe('light');
+  });
+
+  it('migrates legacy system to dark when OS prefers dark', async () => {
+    store.set('nm.theme', 'system');
+    stubScheme(true);
+    const theme = await import('./theme');
+    expect(theme.getThemePreference()).toBe('dark');
+    expect(store.get('nm.theme')).toBe('dark');
   });
 
   it('keeps explicit light/dark from storage', async () => {
@@ -64,9 +72,10 @@ describe('theme preference', () => {
     expect(theme.getTheme()).toBe('light');
   });
 
-  it('cycles system → light → dark → system', async () => {
+  it('cycles light ↔ dark', async () => {
+    store.set('nm.theme', 'dark');
     const theme = await import('./theme');
-    expect(theme.getThemePreference()).toBe('system');
+    expect(theme.getThemePreference()).toBe('dark');
 
     let step = theme.cycleThemePreference();
     expect(step.preference).toBe('light');
@@ -76,15 +85,10 @@ describe('theme preference', () => {
     step = theme.cycleThemePreference();
     expect(step.preference).toBe('dark');
     expect(step.theme).toBe('dark');
-
-    step = theme.cycleThemePreference();
-    expect(step.preference).toBe('system');
-    expect(step.theme).toBe('dark');
   });
 
-  it('themeLabel covers all preferences', async () => {
+  it('themeLabel covers light and dark', async () => {
     const theme = await import('./theme');
-    expect(theme.themeLabel('system')).toBe('Системная');
     expect(theme.themeLabel('light')).toBe('Светлая');
     expect(theme.themeLabel('dark')).toBe('Тёмная');
   });

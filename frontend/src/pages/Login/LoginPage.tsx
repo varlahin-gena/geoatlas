@@ -71,7 +71,6 @@ export default function LoginPage() {
           <img className="logo" src="/logo.png" alt={t('app.logoAlt')} width={48} height={48} />
           <div>
             <h1>{t('login.heading')}</h1>
-            <p className="auth-lead">{COPY.loginLead}</p>
             <p className="auth-sub">{COPY.loginLocal}</p>
           </div>
         </div>
@@ -99,8 +98,13 @@ export default function LoginPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <button type="submit" id="submitBtn" disabled={busy}>
-          Войти
+        <button
+          type="submit"
+          id="submitBtn"
+          disabled={busy || !username.trim() || !password}
+          aria-busy={busy}
+        >
+          {busy ? 'Вход…' : 'Войти'}
         </button>
       </form>
     </>

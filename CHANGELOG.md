@@ -5,6 +5,27 @@
 
 ## [Unreleased]
 
+## [2.5.2] — 2026-11-02
+
+Патч (тестовый): UX карты / глобуса и тема light↔dark.
+
+### Changed
+- Карта: действия (режим, загрузка, обновление, PNG, охота) перенесены из сайдбара в панель **Отображение**; сайдбар — только навигация.
+- Topbar карты упрощён (поиск · период · фильтры · отображение); обучение baseline — тихая строка под чипами.
+- Конструктор запроса: **Применить** — единственный primary.
+- Панель детали дуги: статус/метрики сверху, RU-подписи, без пустой «Репутации».
+- Тема: только **Светлая** / **Тёмная** (без «Системная»); убрана плотность UI из меню.
+- Light: лёгкое отделение chrome от карты.
+
+### Fixed
+- Глобус: длинные дуги (например RU↔AU) больше не отфильтровываются по угловому порогу ~99°.
+
+### Notes
+- OpenAPI API doc version: **1.17.0** (без изменений)
+- Продуктовая версия: **2.5.2**
+- Схема ClickHouse (`ga_schema_version`): без изменений Ensure*.
+- Тестовый pre-release для проверки на сервере.
+
 ## [2.5.1] — 2026-11-02
 
 Патч: security/image pins, hardening supply chain (Scorecard / OpenSSF), CI coverage.
@@ -572,6 +593,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.5.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.2
 [2.5.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.1
 [2.5.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.0
 [2.4.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.4.0

@@ -2,7 +2,6 @@ import { filterNav, PAGE_NAV, type NavItem } from '@/components/nav';
 import { PERIODS } from '@/pages/Map/mapPeriods';
 import { dispatchMapCommand } from '@/lib/mapCommandBus';
 import { cycleThemePreference } from '@/auth/theme';
-import { toggleDensity } from '@/auth/density';
 
 type CommandGroup = 'navigate' | 'map' | 'triage' | 'prefs';
 
@@ -126,19 +125,9 @@ export function buildCommandCatalog(ctx: CommandCatalogContext): AppCommand[] {
     label: 'Сменить тему',
     group: 'prefs',
     groupLabel: GROUP_LABELS.prefs,
-    keywords: 'theme dark light system',
+    keywords: 'theme dark light тема светлая тёмная',
     run: () => {
       cycleThemePreference();
-    },
-  });
-  cmds.push({
-    id: 'prefs:density',
-    label: 'Сменить плотность UI',
-    group: 'prefs',
-    groupLabel: GROUP_LABELS.prefs,
-    keywords: 'density compact comfortable',
-    run: () => {
-      toggleDensity();
     },
   });
 

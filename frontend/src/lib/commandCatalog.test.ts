@@ -50,7 +50,7 @@ describe('filterCommands', () => {
 
   it('ranks prefix matches higher', () => {
     const cmds: AppCommand[] = [
-      { id: '1', label: 'Тема системная', group: 'prefs', groupLabel: 'Параметры' },
+      { id: '1', label: 'Тема светлая', group: 'prefs', groupLabel: 'Параметры' },
       { id: '2', label: 'Тема', group: 'prefs', groupLabel: 'Параметры' },
     ];
     expect(filterCommands(cmds, 'тема').map((c) => c.id)).toEqual(['2', '1']);
@@ -62,7 +62,6 @@ describe('buildCommandCatalog', () => {
     const cmds = buildCommandCatalog(baseCtx);
     expect(cmds.some((c) => c.id === 'nav:/anomalies')).toBe(true);
     expect(cmds.some((c) => c.id === 'prefs:theme')).toBe(true);
-    expect(cmds.some((c) => c.id === 'prefs:density')).toBe(true);
     expect(cmds.some((c) => c.id.startsWith('map:'))).toBe(false);
   });
 

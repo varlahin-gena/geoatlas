@@ -512,7 +512,7 @@ body.page-admin .search-box svg {
 table { width: 100%; border-collapse: collapse; font-size: var(--density-font-table, 12px); }
 th, td {
   text-align: left;
-  padding: var(--density-row-pad-y, 8px) var(--density-row-pad-x, 10px);
+  padding: var(--density-row-pad-y, 4px) var(--density-row-pad-x, 8px);
   border-bottom: 1px solid var(--border);
   vertical-align: top;
 }

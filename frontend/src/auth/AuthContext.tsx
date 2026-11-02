@@ -23,14 +23,14 @@ interface AuthContextValue {
   uiAuthEnabled: boolean;
   /** Resolved light/dark for map, charts, CSS. */
   theme: Theme;
-  /** Stored preference (may be system). */
+  /** Stored preference (light | dark). */
   themePreference: ThemePreference;
   refresh: () => Promise<AuthUser | null>;
   login: (username: string, password: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
   /** Завершить все сессии (все устройства) и перейти на /login. */
   logoutAll: (currentPassword: string) => Promise<void>;
-  /** Cycles system → light → dark → system. */
+  /** Toggles light ↔ dark. */
   toggleTheme: () => void;
 }
 

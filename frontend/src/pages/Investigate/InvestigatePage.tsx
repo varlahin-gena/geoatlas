@@ -29,7 +29,8 @@ import {
 } from '@/pages/Anomalies/anomalyDisplay';
 import { rememberMapAlert } from '@/pages/Map/AnomalyActiveBanner';
 import { mapViewToHuntState } from '@/pages/Hunts/huntMapState';
-import { promptSaveHuntFromMap } from '@/pages/Hunts/saveHuntFromMap';
+import type { HuntMapState } from '@/api/hunts';
+import { SaveHuntModal } from '@/pages/Hunts/SaveHuntModal';
 import './investigate.css';
 
 async function findAnomalyByFingerprint(
@@ -68,6 +69,7 @@ export default function InvestigatePage() {
   const [assigning, setAssigning] = useState(false);
   const [savingTpl, setSavingTpl] = useState(false);
   const [peerLines, setPeerLines] = useState<MapLine[]>([]);
+  const [huntDraft, setHuntDraft] = useState<HuntMapState | null>(null);
 
   const load = useCallback(async (fp: string, signal?: AbortSignal) => {
     setLoading(true);
@@ -370,7 +372,7 @@ export default function InvestigatePage() {
                 className="btn"
                 onClick={() => {
                   const m = item.map;
-                  void promptSaveHuntFromMap(
+                  setHuntDraft(
                     mapViewToHuntState({
                       period: m?.period || '1d',
                       periodFrom: '',
@@ -380,7 +382,6 @@ export default function InvestigatePage() {
                       search: m?.q || anomalyEventsQuery(item) || '',
                       focusedCountry: m?.country || null,
                     }),
-                    toast,
                   );
                 }}
               >
@@ -429,6 +430,9 @@ export default function InvestigatePage() {
           </section>
         ) : null}
       </div>
+      {huntDraft ? (
+        <SaveHuntModal mapState={huntDraft} onClose={() => setHuntDraft(null)} />
+      ) : null}
     </AdminLayout>
   );
 }

@@ -72,15 +72,7 @@
   --map-land-rgb: 39, 39, 39;
   --map-outline-rgb: 19, 18, 9;
 
-  /* UI density (P2) — comfortable defaults. */
-  --density-row-pad-y: 8px;
-  --density-row-pad-x: 10px;
-  --density-font-table: 12px;
-  --density-summary-gap: 12px;
-  --density-summary-pad: 10px 14px;
-}
-
-html[data-density="compact"] {
+  /* UI density — compact. */
   --density-row-pad-y: 4px;
   --density-row-pad-x: 8px;
   --density-font-table: 12px;

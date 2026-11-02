@@ -7,38 +7,13 @@ import type { RepFilterSide } from '../mapTypes';
 type ViewMode = 'map' | 'globe';
 
 export type MapChromeSidebarInput = {
-  viewMode: ViewMode;
-  setViewMode: (mode: ViewMode) => void;
-  isAdmin: boolean;
-  logFileRef: RefObject<HTMLInputElement | null>;
-  geoFileRef: RefObject<HTMLInputElement | null>;
-  uploadFile: (kind: 'logs' | 'geo', file: File) => void | Promise<void>;
-  fetchData: () => void | Promise<void>;
-  resetView: () => void;
-  exportPng: () => void | Promise<void>;
   toggleSidebar: () => void;
-  geoWizardOpen: () => void;
-  geoWizardEmpty: boolean | null;
 };
 
 export function buildMapSidebarProps(input: MapChromeSidebarInput): MapSidebarProps {
   return {
-    view: { viewMode: input.viewMode, setViewMode: input.setViewMode },
-    isAdmin: input.isAdmin,
-    uploads: {
-      logFileRef: input.logFileRef,
-      geoFileRef: input.geoFileRef,
-      uploadFile: input.uploadFile,
-    },
     actions: {
-      fetchData: input.fetchData,
-      resetView: input.resetView,
-      exportPng: input.exportPng,
       toggleSidebar: input.toggleSidebar,
-    },
-    geoWizard: {
-      open: input.geoWizardOpen,
-      empty: input.geoWizardEmpty,
     },
   };
 }
@@ -74,6 +49,16 @@ export type MapChromeTopbarInput = {
   setPeriodTo: (v: string) => void;
   fetchData: () => void | Promise<void>;
   viewMode: ViewMode;
+  setViewMode: (mode: ViewMode) => void;
+  isAdmin: boolean;
+  logFileRef: RefObject<HTMLInputElement | null>;
+  geoFileRef: RefObject<HTMLInputElement | null>;
+  uploadFile: (kind: 'logs' | 'geo', file: File) => void | Promise<void>;
+  resetView: () => void;
+  exportPng: () => void | Promise<void>;
+  geoWizardOpen: () => void;
+  geoWizardEmpty: boolean | null;
+  learningNote: string | null;
   minCount: number;
   setMinCount: (n: number) => void;
   arcCountInfo: { shown: number; total: number };
@@ -150,8 +135,25 @@ export function buildMapTopbarProps(input: MapChromeTopbarInput): MapTopbarProps
       setPeriodTo: input.setPeriodTo,
       fetchData: input.fetchData,
     },
+    learningNote: input.learningNote,
     layers: {
       viewMode: input.viewMode,
+      setViewMode: input.setViewMode,
+      isAdmin: input.isAdmin,
+      tools: {
+        fetchData: input.fetchData,
+        resetView: input.resetView,
+        exportPng: input.exportPng,
+      },
+      uploads: {
+        logFileRef: input.logFileRef,
+        geoFileRef: input.geoFileRef,
+        uploadFile: input.uploadFile,
+        geoWizard: {
+          open: input.geoWizardOpen,
+          empty: input.geoWizardEmpty,
+        },
+      },
       viz: {
         minCount: input.minCount,
         setMinCount: input.setMinCount,

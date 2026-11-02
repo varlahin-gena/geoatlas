@@ -466,18 +466,7 @@ export default function MapPage() {
   return (
     <MapChromeProvider
       sidebarInput={{
-        viewMode: viz.viewMode,
-        setViewMode: viz.setViewMode,
-        isAdmin,
-        logFileRef,
-        geoFileRef,
-        uploadFile,
-        fetchData,
-        resetView,
-        exportPng,
         toggleSidebar,
-        geoWizardOpen: geoWizard.open,
-        geoWizardEmpty: geoWizard.geo == null ? null : geoWizard.geo.count === 0,
       }}
       topbarInput={{
         search,
@@ -510,6 +499,19 @@ export default function MapPage() {
         setPeriodTo,
         fetchData,
         viewMode: viz.viewMode,
+        setViewMode: viz.setViewMode,
+        isAdmin,
+        logFileRef,
+        geoFileRef,
+        uploadFile,
+        resetView,
+        exportPng,
+        geoWizardOpen: geoWizard.open,
+        geoWizardEmpty: geoWizard.geo == null ? null : geoWizard.geo.count === 0,
+        learningNote:
+          anomalies.summary?.enabled && anomalies.summary.learning && !anomalies.summary.total
+            ? 'Базовая линия аномалий: обучение (первые дни после появления логов)'
+            : null,
         minCount,
         setMinCount,
         arcCountInfo,
