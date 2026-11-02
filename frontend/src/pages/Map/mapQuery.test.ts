@@ -59,6 +59,20 @@ describe('map view query string', () => {
     });
   });
 
+  it('accepts city_country group', () => {
+    const sp = serializeMapViewSearch({
+      period: '1d',
+      periodFrom: '',
+      periodTo: '',
+      groupBy: 'city_country',
+      filter: 'all',
+      search: '',
+      focusedCountry: null,
+    });
+    expect(sp.get('group')).toBe('city_country');
+    expect(parseMapViewSearch(sp).groupBy).toBe('city_country');
+  });
+
   it('keeps custom from/to only for custom period', () => {
     const sp = serializeMapViewSearch({
       period: 'custom',

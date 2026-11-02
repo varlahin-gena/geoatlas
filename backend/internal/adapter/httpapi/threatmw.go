@@ -6,11 +6,12 @@ import (
 	"geoatlas/internal/adapter/httpapi/loginthrottle"
 	"geoatlas/internal/adapter/httpapi/threatprot"
 	"geoatlas/internal/config"
+	usecaseaudit "geoatlas/internal/usecase/auditlog"
 )
 
 // apiThreatMW applies Apigee-equivalent edge controls: injection guard, SpikeArrest,
 // and API security response headers.
-func apiThreatMW(cfg config.Config) middleware {
+func apiThreatMW(cfg config.Config, logs *usecaseaudit.Service) middleware {
 	limiter := threatprot.NewRateLimiter(cfg.HTTPThreat.APIRateLimitRPS, cfg.HTTPThreat.APIRateLimitBurst)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -24,6 +25,8 @@ func apiThreatMW(cfg config.Config) middleware {
 			if !rateLimitExempt(r.URL.Path) {
 				key := threatprot.RateLimitKey(r, loginthrottle.ClientIP)
 				if !limiter.Allow(key) {
+					ip := loginthrottle.ClientIP(r)
+					auditAPIRateLimit(r.Context(), logs, ip, r.URL.Path)
 					w.Header().Set("Retry-After", "1")
 					writeJSON(w, http.StatusTooManyRequests, map[string]any{
 						"error":   "rate limit exceeded",

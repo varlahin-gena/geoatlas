@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
@@ -109,6 +110,19 @@ func (r *Repository) ListAudit(ctx context.Context, q usecaseaudit.AuditQuery) (
 	if v := strings.TrimSpace(q.Action); v != "" {
 		sb.WriteString(` AND action = ?`)
 		args = append(args, v)
+	} else if len(q.Actions) > 0 {
+		sb.WriteString(` AND action IN (`)
+		for i, a := range q.Actions {
+			if i > 0 {
+				sb.WriteString(`,`)
+			}
+			sb.WriteString(`?`)
+			args = append(args, a)
+		}
+		sb.WriteString(`)`)
+	} else if p := strings.TrimSpace(q.ActionPrefix); p != "" {
+		sb.WriteString(` AND startsWith(action, ?)`)
+		args = append(args, p)
 	}
 	if v := strings.TrimSpace(q.Result); v != "" {
 		sb.WriteString(` AND result = ?`)
@@ -136,6 +150,33 @@ func (r *Repository) ListAudit(ctx context.Context, q usecaseaudit.AuditQuery) (
 			_ = json.Unmarshal([]byte(details), &e.Details)
 		}
 		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) CountAuditByAction(ctx context.Context, since time.Time, prefix string) ([]usecaseaudit.ActionCount, error) {
+	if r == nil || r.ch == nil {
+		return nil, fmt.Errorf("clickhouse not configured")
+	}
+	args := []any{since}
+	q := `SELECT action, count() AS c FROM audit_events WHERE timestamp >= ?`
+	if p := strings.TrimSpace(prefix); p != "" {
+		q += ` AND startsWith(action, ?)`
+		args = append(args, p)
+	}
+	q += ` GROUP BY action ORDER BY c DESC`
+	rows, err := r.ch.Query(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]usecaseaudit.ActionCount, 0, 16)
+	for rows.Next() {
+		var ac usecaseaudit.ActionCount
+		if err := rows.Scan(&ac.Action, &ac.Count); err != nil {
+			return nil, err
+		}
+		out = append(out, ac)
 	}
 	return out, rows.Err()
 }

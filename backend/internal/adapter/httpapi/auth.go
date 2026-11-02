@@ -162,6 +162,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	lim.RecordSuccess(ip, out.User.Username)
+	h.registerSession(r, out.Session, out.User.Username, out.User.Role, ip)
 	writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
 		Actor:        out.User.Username,
 		Action:       "auth.login.success",
@@ -169,7 +170,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		ResourceID:   out.User.Username,
 		Result:       "succeeded",
 		IP:           ip,
-		Details:      map[string]any{"role": out.User.Role},
+		Details:      map[string]any{"role": out.User.Role, "sid": out.Session.SID},
 	})
 
 	if h.sessions != nil {
@@ -180,6 +181,26 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 // Logout — POST /api/auth/logout
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	ip := clientIPFromRequest(r)
+	actor := ""
+	sid := ""
+	if sess, err := SessionFromRequest(r, h.sessions); err == nil {
+		actor = sess.Username
+		sid = sess.SID
+		if h.sessionRegistry != nil && sid != "" {
+			_, _ = h.sessionRegistry.Revoke(sid)
+		}
+	}
+	if actor != "" {
+		writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
+			Actor:        actor,
+			Action:       "auth.logout",
+			ResourceType: "session",
+			ResourceID:   sid,
+			Result:       "succeeded",
+			IP:           ip,
+		})
+	}
 	ClearCookie(w, r)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
@@ -203,7 +224,7 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if live, ok := auth.LiveSession(h.users, sess); ok {
+	if live, ok := auth.LiveSessionChecked(h.users, h.sessionRegistry, sess); ok {
 		sess = live
 	} else {
 		ClearCookie(w, r)
@@ -240,7 +261,7 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
 		return
 	}
-	if _, ok := auth.LiveSession(h.users, sess); !ok {
+	if _, ok := auth.LiveSessionChecked(h.users, h.sessionRegistry, sess); !ok {
 		ClearCookie(w, r)
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
 		return
@@ -267,6 +288,11 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		writeUserStoreError(w, err)
 		return
 	}
+	ip := clientIPFromRequest(r)
+	if h.sessionRegistry != nil {
+		_, _ = h.sessionRegistry.RevokeUser(sess.Username)
+	}
+	h.registerSession(r, out.Session, out.User.Username, out.User.Role, ip)
 	if h.sessions != nil {
 		SetCookie(w, r, out.Token, auth.CookieTTLForRole(out.User.Role, h.sessions.TTL()))
 	}
@@ -276,7 +302,7 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		ResourceType: "user",
 		ResourceID:   sess.Username,
 		Result:       "succeeded",
-		IP:           clientIPFromRequest(r),
+		IP:           ip,
 	})
 	writeJSON(w, http.StatusOK, userPublicResponse(out.User))
 }
@@ -300,7 +326,7 @@ func (h *AuthHandler) LogoutAll(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
 		return
 	}
-	live, ok := auth.LiveSession(h.users, sess)
+	live, ok := auth.LiveSessionChecked(h.users, h.sessionRegistry, sess)
 	if !ok {
 		ClearCookie(w, r)
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
@@ -313,6 +339,9 @@ func (h *AuthHandler) LogoutAll(w http.ResponseWriter, r *http.Request) {
 	if err := h.authUC.LogoutAll(live.Username); err != nil {
 		writeUserStoreError(w, err)
 		return
+	}
+	if h.sessionRegistry != nil {
+		_, _ = h.sessionRegistry.RevokeUser(live.Username)
 	}
 	writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
 		Actor:        live.Username,
@@ -377,7 +406,7 @@ func (h *AuthHandler) Check(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	if _, ok := auth.LiveSession(h.users, sess); !ok {
+	if _, ok := auth.LiveSessionChecked(h.users, h.sessionRegistry, sess); !ok {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -403,7 +432,7 @@ func (h *AuthHandler) CheckOps(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	live, ok := auth.LiveSession(h.users, sess)
+	live, ok := auth.LiveSessionChecked(h.users, h.sessionRegistry, sess)
 	if !ok {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
@@ -436,7 +465,7 @@ func (h *AuthHandler) CheckAdmin(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	live, ok := auth.LiveSession(h.users, sess)
+	live, ok := auth.LiveSessionChecked(h.users, h.sessionRegistry, sess)
 	if !ok {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
@@ -722,6 +751,9 @@ func (h *UsersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		writeUserStoreError(w, err)
 		return
 	}
+	if h.sessionRegistry != nil {
+		_, _ = h.sessionRegistry.RevokeUser(username)
+	}
 	writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
 		Actor:        actorFromRequest(r),
 		Action:       "auth.user.delete",
@@ -758,4 +790,118 @@ func writeUserStoreError(w http.ResponseWriter, err error) {
 	default:
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal error"})
 	}
+}
+
+func (h *AuthHandler) registerSession(r *http.Request, sess auth.Session, username, role, ip string) {
+	if h == nil || h.sessionRegistry == nil || strings.TrimSpace(sess.SID) == "" {
+		return
+	}
+	ua := ""
+	if r != nil {
+		ua = r.UserAgent()
+	}
+	_ = h.sessionRegistry.Register(auth.SessionRecord{
+		ID:        sess.SID,
+		Username:  username,
+		Role:      role,
+		IP:        ip,
+		UserAgent: ua,
+		ExpiresAt: auth.ExpiresFromSession(sess),
+	})
+}
+
+// ListSessions — GET /api/auth/sessions (administrator).
+func (h *AuthHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
+	if h.authDisabled() {
+		writeJSON(w, http.StatusOK, map[string]any{"items": []any{}})
+		return
+	}
+	items := []auth.SessionRecord{}
+	if h.sessionRegistry != nil {
+		items = h.sessionRegistry.List()
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+// RevokeSession — DELETE /api/auth/sessions/{id} (administrator).
+func (h *AuthHandler) RevokeSession(w http.ResponseWriter, r *http.Request) {
+	if h.authDisabled() {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+		return
+	}
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		writeBadRequest(w, "session id required")
+		return
+	}
+	ok := false
+	if h.sessionRegistry != nil {
+		var err error
+		ok, err = h.sessionRegistry.Revoke(id)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "session revoke failed"})
+			return
+		}
+	}
+	if !ok {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "session not found"})
+		return
+	}
+	writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
+		Actor:        actorFromRequest(r),
+		Action:       "auth.session.revoke",
+		ResourceType: "session",
+		ResourceID:   id,
+		Result:       "succeeded",
+		IP:           clientIPFromRequest(r),
+	})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+type revokeUserSessionsRequest struct {
+	Username string `json:"username"`
+}
+
+// RevokeUserSessions — POST /api/auth/sessions/revoke-user (administrator): bump stamp + drop registry rows.
+func (h *AuthHandler) RevokeUserSessions(w http.ResponseWriter, r *http.Request) {
+	if h.authDisabled() {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+		return
+	}
+	var req revokeUserSessionsRequest
+	if !decodeJSONBody(w, r, &req, defaultJSONBodyLimit) {
+		return
+	}
+	username := strings.TrimSpace(req.Username)
+	if username == "" {
+		writeBadRequest(w, "username required")
+		return
+	}
+	if h.authUC == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "auth not configured"})
+		return
+	}
+	if err := h.authUC.LogoutAll(username); err != nil {
+		writeUserStoreError(w, err)
+		return
+	}
+	n := 0
+	if h.sessionRegistry != nil {
+		var err error
+		n, err = h.sessionRegistry.RevokeUser(username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "session revoke failed"})
+			return
+		}
+	}
+	writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
+		Actor:        actorFromRequest(r),
+		Action:       "auth.session.revoke_all",
+		ResourceType: "user",
+		ResourceID:   username,
+		Result:       "succeeded",
+		IP:           clientIPFromRequest(r),
+		Details:      map[string]any{"revoked": n},
+	})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "revoked": n})
 }

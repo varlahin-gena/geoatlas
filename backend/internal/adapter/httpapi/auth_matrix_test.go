@@ -30,6 +30,9 @@ func expectedAuthMatrix() map[string]authTier {
 		"POST /api/auth/login":                            tierPublic,
 		"POST /api/auth/logout":                           tierPublic,
 		"POST /api/auth/logout-all":                       tierPublic, // handler checks session; CSRF
+		"GET /api/auth/sessions":                          tierAdmin,
+		"DELETE /api/auth/sessions/{id}":                  tierAdmin,
+		"POST /api/auth/sessions/revoke-user":             tierAdmin,
 		"GET /api/auth/me":                                tierPublic, // handler returns 401 itself
 		"POST /api/auth/change-password":                  tierPublic, // handler checks session
 		"POST /api/auth/geo-wizard-dismiss":               tierLogin,
@@ -71,6 +74,9 @@ func expectedAuthMatrix() map[string]authTier {
 		"POST /api/reputation/refresh":                    tierOps,
 		"GET /api/reputation/lookup":                      tierLogin,
 		"GET /api/system/stats":                           tierAdmin,
+		"GET /api/system/security":                        tierAdmin,
+		"GET /api/system/login-policy":                    tierAdmin,
+		"PUT /api/system/login-policy":                    tierAdmin,
 		"GET /api/system/history":                         tierAdmin,
 		"GET /api/system/edges-agg":                       tierAdmin,
 		"POST /api/system/maintenance/backfill":           tierAdmin,

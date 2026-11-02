@@ -59,6 +59,9 @@ func TestParseTimeAndHelpers(t *testing.T) {
 	if normalizeGroupBy("IP") != "ip" || normalizeGroupBy("x") != "city" {
 		t.Fatal("groupby")
 	}
+	if normalizeGroupBy("city_country") != "city_country" {
+		t.Fatal("city_country")
+	}
 	if normalizeFilter("Blocked") != "blocked" || normalizeFilter("") != "all" {
 		t.Fatal("filter")
 	}

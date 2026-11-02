@@ -13,6 +13,7 @@ import (
 	"geoatlas/internal/adapter/httpapi/authmw"
 	"geoatlas/internal/adapter/httpapi/loginthrottle"
 	"geoatlas/internal/auth"
+	usecaseaudit "geoatlas/internal/usecase/auditlog"
 )
 
 type ctxKey int
@@ -230,16 +231,16 @@ func sessionLoader(sessions SessionParser) authmw.SessionLoader {
 	}
 }
 
-func requireLoginMW(ba authmw.BearerAuth, sessions SessionParser, users UserDirectory, authDisabled bool) middleware {
-	return middleware(authmw.RequireLogin(ba, sessionLoader(sessions), users, authDisabled))
+func requireLoginMW(ba authmw.BearerAuth, sessions SessionParser, users UserDirectory, registry *auth.SessionRegistry, authDisabled bool) middleware {
+	return middleware(authmw.RequireLogin(ba, sessionLoader(sessions), users, registry, authDisabled))
 }
 
-func requireAdminMW(ba authmw.BearerAuth, sessions SessionParser, users UserDirectory, authDisabled bool) middleware {
-	return middleware(authmw.RequireAdmin(ba, sessionLoader(sessions), users, authDisabled))
+func requireAdminMW(ba authmw.BearerAuth, sessions SessionParser, users UserDirectory, registry *auth.SessionRegistry, authDisabled bool) middleware {
+	return middleware(authmw.RequireAdmin(ba, sessionLoader(sessions), users, registry, authDisabled))
 }
 
-func requireOpsMW(ba authmw.BearerAuth, sessions SessionParser, users UserDirectory, apiAuthDisabled, authDisabled bool) middleware {
-	return middleware(authmw.RequireOps(ba, sessionLoader(sessions), users, apiAuthDisabled, authDisabled))
+func requireOpsMW(ba authmw.BearerAuth, sessions SessionParser, users UserDirectory, registry *auth.SessionRegistry, apiAuthDisabled, authDisabled bool) middleware {
+	return middleware(authmw.RequireOps(ba, sessionLoader(sessions), users, registry, apiAuthDisabled, authDisabled))
 }
 
 // proxyGateMW — браузерный доступ только через nginx (GA_TRUSTED_PROXIES / loopback).
@@ -247,13 +248,14 @@ func requireOpsMW(ba authmw.BearerAuth, sessions SessionParser, users UserDirect
 // Health probes (/live, /ready, /health) открыты: docker healthcheck (loopback) и
 // stats-collector (http://backend:8080/live) не несут Bearer и не идут через nginx.
 // Включается GA_REQUIRE_PROXY=1; также выкл. при AUTH_DISABLED / API_AUTH_DISABLED.
-func proxyGateMW(ba authmw.BearerAuth, enabled bool) middleware {
+func proxyGateMW(ba authmw.BearerAuth, enabled bool, logs *usecaseaudit.Service) middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if !enabled || proxyGateExempt(r.URL.Path) || loginthrottle.RequestFromTrustedHop(r) || ba.Any(r) {
 				next.ServeHTTP(w, r)
 				return
 			}
+			auditSecurityReject(r.Context(), logs, "security.proxy_gate.reject", loginthrottle.ClientIP(r), r.URL.Path, "direct_access", nil)
 			writeJSON(w, http.StatusForbidden, map[string]any{
 				"error": "direct backend access denied; use reverse proxy",
 			})

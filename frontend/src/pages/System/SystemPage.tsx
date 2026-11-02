@@ -308,7 +308,7 @@ export default function SystemPage() {
 
         {tab === 'backup' ? <SystemBackupTab /> : null}
 
-        {tab === 'security' ? <SystemSecurityTab failed={failed} /> : null}
+        {tab === 'security' ? <SystemSecurityTab /> : null}
 
         {tab === 'audit' ? <SystemAuditTab /> : null}
 

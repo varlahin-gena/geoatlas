@@ -79,6 +79,7 @@ export type MapChromeTopbarInput = {
   setAutoRotate: (v: boolean) => void;
   setInfoDockTab: (tab: 'legend' | 'stats') => void;
   focusedCountry: string | null;
+  clearFocusedCountry: () => void;
 };
 
 export function buildMapTopbarProps(input: MapChromeTopbarInput): MapTopbarProps {
@@ -105,6 +106,8 @@ export function buildMapTopbarProps(input: MapChromeTopbarInput): MapTopbarProps
       setFilter: input.setFilter,
       hideIntraCountry: input.hideIntraCountry,
       setHideIntraCountry: input.setHideIntraCountry,
+      focusedCountry: input.focusedCountry,
+      clearFocusedCountry: input.clearFocusedCountry,
     },
     reputation: {
       reputationEnabled: input.reputationEnabled,

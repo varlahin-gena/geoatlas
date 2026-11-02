@@ -38,6 +38,8 @@ export type MapTopbarProps = {
     setFilter: (v: 'all' | 'allowed' | 'blocked') => void;
     hideIntraCountry: boolean;
     setHideIntraCountry: (v: boolean) => void;
+    focusedCountry: string | null;
+    clearFocusedCountry: () => void;
   };
   reputation: {
     reputationEnabled: boolean;
@@ -117,7 +119,16 @@ export function MapTopbar({
 }: MapTopbarProps) {
   const { search, setSearch, builderOpen, setBuilderOpen, huntSave } = searchCtl;
   const [huntDraft, setHuntDraft] = useState<HuntMapState | null>(null);
-  const { groupBy, setGroupBy, filter, setFilter, hideIntraCountry, setHideIntraCountry } = grouping;
+  const {
+    groupBy,
+    setGroupBy,
+    filter,
+    setFilter,
+    hideIntraCountry,
+    setHideIntraCountry,
+    focusedCountry,
+    clearFocusedCountry,
+  } = grouping;
   const {
     reputationEnabled,
     ipMode,
@@ -144,6 +155,7 @@ export function MapTopbar({
     repFilterCount,
     repColorArcs,
     hideIntraCountry,
+    focusedCountry,
   });
 
   function openPanel(next: ChromePanel) {
@@ -191,6 +203,7 @@ export function MapTopbar({
     setRepSide('any');
     setRepColorArcs(false);
     setSearch('');
+    clearFocusedCountry();
   }
 
   const filterChips = describeActiveMapFilters({
@@ -200,6 +213,7 @@ export function MapTopbar({
     repColorArcs,
     hideIntraCountry,
     search,
+    focusedCountry,
     setGroupBy,
     setFilter,
     setHideIntraCountry,
@@ -208,6 +222,7 @@ export function MapTopbar({
     setRepSide,
     setRepColorArcs,
     setSearch,
+    clearFocusedCountry,
   });
 
   function openSaveHunt() {

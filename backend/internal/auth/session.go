@@ -2,8 +2,10 @@ package auth
 
 import (
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -34,6 +36,7 @@ type Session struct {
 	Role           string `json:"r"`
 	Expires        int64  `json:"e"`  // unix seconds
 	SessionVersion int64  `json:"sv"` // must match User.SessionVersion (revoke stamp)
+	SID            string `json:"sid,omitempty"` // registry id for per-device revoke
 }
 
 // SessionManager подписывает и проверяет cookie сессии.
@@ -76,6 +79,7 @@ func (m *SessionManager) Issue(username, role string, sessionVersion int64) (str
 		Role:           role,
 		Expires:        expires,
 		SessionVersion: sessionVersion,
+		SID:            newSessionID(),
 	}
 	raw, err := json.Marshal(sess)
 	if err != nil {
@@ -121,6 +125,12 @@ type UserLookup interface {
 	SessionVersion(username string) (version int64, ok bool)
 }
 
+// SessionPresence — реестр активных cookie-сессий (per-device revoke).
+type SessionPresence interface {
+	Has(sid string) bool
+	Touch(sid string)
+}
+
 // LiveSession подставляет актуальную роль и проверяет session_version.
 // Пользователь удалён / stamp не совпал → ok=false (stolen cookie после revoke).
 // users == nil — оставляет cookie как есть (тесты / AUTH_DISABLED path).
@@ -142,6 +152,31 @@ func LiveSession(users UserLookup, sess Session) (Session, bool) {
 		return Session{}, false
 	}
 	return sess, true
+}
+
+// LiveSessionChecked = LiveSession + активный sid в реестре.
+// registry == nil (typed) — проверка sid пропускается (unit-тесты / smoke без store).
+func LiveSessionChecked(users UserLookup, registry *SessionRegistry, sess Session) (Session, bool) {
+	live, ok := LiveSession(users, sess)
+	if !ok {
+		return Session{}, false
+	}
+	if registry == nil {
+		return live, true
+	}
+	if strings.TrimSpace(sess.SID) == "" || !registry.Has(sess.SID) {
+		return Session{}, false
+	}
+	registry.Touch(sess.SID)
+	return live, true
+}
+
+func newSessionID() string {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return hex.EncodeToString([]byte(fmt.Sprintf("%d", time.Now().UnixNano())))
+	}
+	return hex.EncodeToString(b[:])
 }
 
 func (m *SessionManager) sign(payload string) string {

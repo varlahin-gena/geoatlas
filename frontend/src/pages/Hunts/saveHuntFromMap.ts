@@ -11,6 +11,9 @@ const DEFAULT_SCHEDULE = {
 const GROUP_LABELS: Record<string, string> = {
   city: 'город',
   country: 'страна',
+  continent: 'континент',
+  subnet: '/24',
+  city_country: 'город — страна',
   asn: 'ASN',
   org: 'организация',
   ip: 'IP',

@@ -21,7 +21,7 @@ export const MAP_VIEW_DEFAULTS = {
 export type MapViewState = typeof MAP_VIEW_DEFAULTS;
 
 const PERIOD_KEYS = new Set<string>(PERIODS.map(([id]) => id));
-const GROUP_KEYS = new Set(['ip', 'subnet', 'city', 'country', 'continent']);
+const GROUP_KEYS = new Set(['ip', 'subnet', 'city', 'country', 'continent', 'city_country']);
 const FILTER_KEYS = new Set<MapActionFilter>(['all', 'allowed', 'blocked']);
 
 /** CH LIMIT: draw cap. Search/reputation apply on the server before LIMIT. */

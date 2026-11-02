@@ -38,6 +38,8 @@ function lineEndpointKeyLabel(groupBy: string): string {
       return 'Страна';
     case 'continent':
       return 'Континент';
+    case 'city_country':
+      return 'Город / страна';
     default:
       return 'Узел';
   }
@@ -88,7 +90,12 @@ export function buildLineDetail(
   actions: DetailAction[],
   points?: Record<string, MapPoint>,
 ): DetailState {
-  const coarse = groupBy === 'subnet' || groupBy === 'city' || groupBy === 'country' || groupBy === 'continent';
+  const coarse =
+    groupBy === 'subnet' ||
+    groupBy === 'city' ||
+    groupBy === 'country' ||
+    groupBy === 'continent' ||
+    groupBy === 'city_country';
   const srcPoint = points?.[line.src];
   const dstPoint = points?.[line.dst];
   const status = line.status || '';

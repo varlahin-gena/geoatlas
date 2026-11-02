@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
+import { mapRuCountry } from './mapConstants';
 import { categoryLabel } from './mapReputation';
 import type { RepFilterSide } from './mapTypes';
 
@@ -35,6 +36,7 @@ export function countActiveMapFilters(opts: {
   repFilterCount: number;
   repColorArcs: boolean;
   hideIntraCountry: boolean;
+  focusedCountry?: string | null;
 }): number {
   return describeActiveMapFilters({ ...opts, search: '' }).filter((c) => c.id !== 'search').length;
 }
@@ -45,6 +47,7 @@ const GROUP_BY_LABELS: Record<string, string> = {
   city: 'город',
   country: 'страна',
   continent: 'континент',
+  city_country: 'город — страна',
 };
 
 export type ActiveMapFilterChip = {
@@ -61,6 +64,7 @@ export function describeActiveMapFilters(opts: {
   repColorArcs: boolean;
   hideIntraCountry: boolean;
   search?: string;
+  focusedCountry?: string | null;
   setGroupBy?: (v: string) => void;
   setFilter?: (v: 'all' | 'allowed' | 'blocked') => void;
   setHideIntraCountry?: (v: boolean) => void;
@@ -69,9 +73,20 @@ export function describeActiveMapFilters(opts: {
   setRepSide?: (v: RepFilterSide) => void;
   setRepColorArcs?: (v: boolean) => void;
   setSearch?: (v: string) => void;
+  clearFocusedCountry?: () => void;
 }): ActiveMapFilterChip[] {
   const chips: ActiveMapFilterChip[] = [];
   const search = (opts.search || '').trim();
+  const focused = (opts.focusedCountry || '').trim();
+
+  // Country click-focus first — most often missed when the detail panel is closed.
+  if (focused) {
+    chips.push({
+      id: 'focus',
+      label: `Фокус: ${mapRuCountry(focused)}`,
+      clear: () => opts.clearFocusedCountry?.(),
+    });
+  }
 
   if (opts.groupBy !== 'ip') {
     chips.push({
@@ -111,13 +126,13 @@ export function describeActiveMapFilters(opts: {
       clear: () => opts.setRepColorArcs?.(false),
     });
   }
-  if (opts.groupBy === 'city' && opts.hideIntraCountry) {
+  if ((opts.groupBy === 'city' || opts.groupBy === 'city_country') && opts.hideIntraCountry) {
     chips.push({
       id: 'hideIntra',
       label: 'Скрыть внутри страны',
       clear: () => opts.setHideIntraCountry?.(false),
     });
-  }
+ }
   if (search) {
     const short = search.length > 28 ? `${search.slice(0, 28)}…` : search;
     chips.push({
@@ -201,10 +216,16 @@ export function MapFiltersPanel({ open, grouping, reputation, onReset }: MapFilt
           <option value="city">Город</option>
           <option value="country">Страна</option>
           <option value="continent">Континент</option>
+          <option value="city_country">Город — страна</option>
         </select>
+        {groupBy === 'city_country' ? (
+          <p className="map-chrome-hint">
+            Свои сети → города (Сети предприятия); остальные → страны
+          </p>
+        ) : null}
       </div>
 
-      {groupBy === 'city' ? (
+      {groupBy === 'city' || groupBy === 'city_country' ? (
         <div className="map-chrome-panel-section">
           <label className="side-toggle">
             <input

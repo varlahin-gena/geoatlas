@@ -201,6 +201,7 @@ export default function MapPage() {
         setRepSide('any');
         setRepColorArcs(false);
         setSearch('');
+        clearFocusedCountry();
         return;
       }
       if (detail.type === 'focus-search') {
@@ -221,6 +222,7 @@ export default function MapPage() {
     setRepSide,
     setRepColorArcs,
     setSearch,
+    clearFocusedCountry,
   ]);
 
   const {
@@ -433,6 +435,7 @@ export default function MapPage() {
       setRepSide('any');
       setRepColorArcs(false);
       setSearch('');
+      clearFocusedCountry();
       return;
     }
     if (kind === 'clear-search') {
@@ -525,6 +528,7 @@ export default function MapPage() {
         setAutoRotate: viz.setAutoRotate,
         setInfoDockTab: viz.setInfoDockTab,
         focusedCountry,
+        clearFocusedCountry,
       }}
     >
       <MapChromeShell

@@ -39,7 +39,7 @@ type MapQueryCost struct {
 
 func isIPGroup(groupBy string) bool {
 	switch strings.ToLower(strings.TrimSpace(groupBy)) {
-	case "ip", "subnet":
+	case "ip", "subnet", "city_country":
 		return true
 	default:
 		return false

@@ -5,6 +5,28 @@
 
 ## [Unreleased]
 
+
+## [2.5.4] — 2026-11-02
+
+Патч (тестовый): безопасность сессий + группировка карты «Город — страна».
+
+### Added
+- Карта: режим группировки **Город — страна** (group_by=city_country) — IP из «Сети предприятия» → города, остальные → страны; «Скрыть связи внутри страны» доступен в этом режиме.
+- Session registry: активные UI-сессии, отзыв одной / всех сессий пользователя (/api/auth/sessions*).
+- Политика lockout логина (/api/system/login-policy, login_policy.json).
+- Сводка безопасности для администратора (GET /api/system/security) и расширенная вкладка **Безопасность** в мониторинге.
+- Audit: фильтр по списку actions / prefix и CountAuditByAction для threat counters.
+
+### Changed
+- Карта: скрыты EN-подписи basemap (place/road/water/POI), чтобы не конфликтовать с RU-слоем стран; сброс фокуса страны при смене фильтров.
+- Auth middleware учитывает registry / live session; threat middleware пишет audit по CSRF / proxy-gate / rate-limit.
+
+### Notes
+- OpenAPI API doc version: **1.18.0** (city_country, sessions, security summary, login-policy)
+- Продуктовая версия: **2.5.4**
+- Схема ClickHouse (ga_schema_version): без изменений Ensure*.
+- Тестовый pre-release для проверки на сервере.
+
 ## [2.5.3] — 2026-11-02
 
 Патч (тестовый): HIG-полировка навигации, аномалий, настроек, логина и мониторинга системы.
@@ -613,6 +635,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.5.4]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.4
 [2.5.3]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.3
 [2.5.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.2
 [2.5.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.1

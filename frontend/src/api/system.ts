@@ -6,6 +6,7 @@ import type {
   BackupCatalog,
   BackupSchedule,
   DREvent,
+  FailedLogin,
   HistoryPayload,
   Retention,
   SystemStats,
@@ -73,6 +74,77 @@ export function fetchAuditLog(query?: {
   actor?: string;
 }): Promise<{ items?: AuditEvent[] }> {
   return apiGetQuery('/api/audit', query || {});
+}
+
+export type LoginPolicy = {
+  max_fails: number;
+  window_sec: number;
+  lockout_sec: number;
+};
+
+export type AuthSessionRecord = {
+  id: string;
+  username: string;
+  role: string;
+  ip: string;
+  user_agent?: string;
+  created_at?: string;
+  expires_at?: string;
+  last_seen_at?: string;
+};
+
+export type SecurityThreatWindow = {
+  csrf_reject?: number;
+  proxy_gate?: number;
+  api_rate_limit?: number;
+};
+
+export type SystemSecuritySummary = {
+  failed_logins?: FailedLogin[];
+  login_policy?: LoginPolicy;
+  sessions?: AuthSessionRecord[];
+  auth_recent?: AuditEvent[];
+  threat_counts?: {
+    last_24h?: SecurityThreatWindow;
+    last_7d?: SecurityThreatWindow;
+  };
+  posture?: {
+    users?: {
+      total?: number;
+      by_role?: Record<string, number>;
+      must_reset_password?: number;
+    };
+    tokens?: { total?: number; expiring_soon?: number };
+    tls?: {
+      configured?: boolean;
+      days_left?: number;
+      self_signed?: boolean;
+      not_after?: string;
+    };
+  };
+};
+
+export function fetchSecuritySummary(init?: RequestInit): Promise<SystemSecuritySummary> {
+  return apiGet('/api/system/security', init) as Promise<SystemSecuritySummary>;
+}
+
+export function fetchLoginPolicy(): Promise<LoginPolicy> {
+  return apiGet('/api/system/login-policy') as Promise<LoginPolicy>;
+}
+
+export function putLoginPolicy(body: LoginPolicy): Promise<LoginPolicy> {
+  return apiPut('/api/system/login-policy', body) as Promise<LoginPolicy>;
+}
+
+export function revokeSession(id: string): Promise<{ ok?: boolean }> {
+  return apiDelete(apiPath('/api/auth/sessions/{id}', { id })) as Promise<{ ok?: boolean }>;
+}
+
+export function revokeUserSessions(username: string): Promise<{ ok?: boolean; revoked?: number }> {
+  return apiPost('/api/auth/sessions/revoke-user', { username }) as Promise<{
+    ok?: boolean;
+    revoked?: number;
+  }>;
 }
 
 export function createBackup(): Promise<unknown> {

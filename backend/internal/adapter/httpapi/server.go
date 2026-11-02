@@ -69,11 +69,11 @@ func NewServer(p Params, opts ...ServerOption) *Server {
 	uiAuthOff := cfg.Auth.Disabled
 	apiAuthOff := cfg.Auth.APIAuthDisabled
 
-	loginMW := requireLoginMW(ba, p.Sessions, p.Users, uiAuthOff)
-	adminMW := requireAdminMW(ba, p.Sessions, p.Users, uiAuthOff)
+	loginMW := requireLoginMW(ba, p.Sessions, p.Users, p.SessionRegistry, uiAuthOff)
+	adminMW := requireAdminMW(ba, p.Sessions, p.Users, p.SessionRegistry, uiAuthOff)
 	// Pipeline ops: Bearer≥ops / administrator; open if AUTH_DISABLED или API_AUTH_DISABLED.
-	opsMW := requireOpsMW(ba, p.Sessions, p.Users, apiAuthOff, uiAuthOff)
-	csrf := csrfMW(ba, uiAuthOff)
+	opsMW := requireOpsMW(ba, p.Sessions, p.Users, p.SessionRegistry, apiAuthOff, uiAuthOff)
+	csrf := csrfMW(ba, uiAuthOff, p.Logs)
 
 	rr := newRouteRegistrar()
 	wiring := &routeWiring{
@@ -107,9 +107,9 @@ func NewServer(p Params, opts ...ServerOption) *Server {
 	if deps.prom != nil {
 		h = metricsMW(deps.prom)(h)
 	}
-	h = apiThreatMW(cfg)(h)
+	h = apiThreatMW(cfg, p.Logs)(h)
 	proxyGateOn := cfg.HTTPThreat.RequireProxy && !uiAuthOff && !apiAuthOff
-	h = proxyGateMW(ba, proxyGateOn)(h)
+	h = proxyGateMW(ba, proxyGateOn, p.Logs)(h)
 	h = recoverMW(h)
 	h = requestIDMW(h) // outermost
 

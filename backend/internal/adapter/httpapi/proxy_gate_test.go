@@ -16,8 +16,8 @@ func TestProxyGateMW(t *testing.T) {
 	okH := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	})
-	gated := proxyGateMW(ba, true)(okH)
-	open := proxyGateMW(ba, false)(okH)
+	gated := proxyGateMW(ba, true, nil)(okH)
+	open := proxyGateMW(ba, false, nil)(okH)
 
 	t.Run("disabled allows external", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/live", nil)

@@ -189,6 +189,9 @@ func (a *auditSink) ListDR(context.Context, usecaseaudit.DRQuery) ([]usecaseaudi
 func (a *auditSink) ListAudit(context.Context, usecaseaudit.AuditQuery) ([]usecaseaudit.AuditEvent, error) {
 	return nil, nil
 }
+func (a *auditSink) CountAuditByAction(context.Context, time.Time, string) ([]usecaseaudit.ActionCount, error) {
+	return nil, nil
+}
 
 func waitJobIdle(t *testing.T, s *Service, timeout time.Duration) Status {
 	t.Helper()

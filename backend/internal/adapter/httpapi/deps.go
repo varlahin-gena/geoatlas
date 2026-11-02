@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"geoatlas/internal/adapter/httpapi/loginthrottle"
+	"geoatlas/internal/auth"
 	"geoatlas/internal/config"
 	usecaseanomaly "geoatlas/internal/usecase/anomaly"
 	usecaseaudit "geoatlas/internal/usecase/auditlog"
@@ -37,19 +38,24 @@ type AuthDeps struct {
 	apiTokens         APITokenStore
 	reauth            ReauthChecker
 	loginLimiter      *loginthrottle.Limiter
+	sessionRegistry   *auth.SessionRegistry
 	logs              *usecaseaudit.Service
 }
 
 // SystemDeps — зависимости SystemHandler (system/retention/backup + shared loginLimiter).
 type SystemDeps struct {
-	queryTimeout time.Duration
-	systemUC     *usecasesystem.Service
-	retentionUC  *usecaseretention.Service
-	backupUC     *usecasebackup.Service
-	tlsUC        *usecasetls.Service
-	reauth       ReauthChecker
-	loginLimiter *loginthrottle.Limiter
-	logs         *usecaseaudit.Service
+	queryTimeout      time.Duration
+	systemUC          *usecasesystem.Service
+	retentionUC       *usecaseretention.Service
+	backupUC          *usecasebackup.Service
+	tlsUC             *usecasetls.Service
+	reauth            ReauthChecker
+	loginLimiter      *loginthrottle.Limiter
+	sessionRegistry   *auth.SessionRegistry
+	users             UserDirectory
+	apiTokens         APITokenStore
+	loginPolicyFile   string
+	logs              *usecaseaudit.Service
 }
 
 // HealthDeps — зависимости HealthHandler (Ready: systemUC + CH pinger).
@@ -123,12 +129,14 @@ type Params struct {
 	AuthUC            *usecaseauth.Service
 	Users             UserDirectory
 	Sessions          SessionParser
+	SessionRegistry   *auth.SessionRegistry
 	APITokens         APITokenStore
 	SearchTemplatesUC *searchtemplates.Service
 	AnomalyUC         *usecaseanomaly.Service
 	AnomalySettingsUC *usecaseanomaly.SettingsService
 	HuntsUC           *usecasehunts.Service
 	Logs              *usecaseaudit.Service
+	LoginPolicyPath   string
 }
 
 // Deps — композитор HTTP-слоя: domain bags без плоских UC-полей.
@@ -159,6 +167,9 @@ type MetricsRecorder interface {
 
 func NewDeps(p Params) *Deps {
 	lim := loginthrottle.New(10, time.Minute, 5*time.Minute)
+	if pol, err := LoadLoginPolicy(p.LoginPolicyPath); err == nil {
+		lim.SetPolicy(pol.MaxFails, time.Duration(pol.WindowSec)*time.Second, time.Duration(pol.LockoutSec)*time.Second)
+	}
 	reauth := NewReauthChecker(p.Cfg, p.AuthUC, p.Sessions, p.APITokens)
 	envTokens := p.Cfg.APIAuthTokens()
 	opsTokens := p.Cfg.APIOpsTokens()
@@ -179,17 +190,22 @@ func NewDeps(p Params) *Deps {
 			apiTokens:         p.APITokens,
 			reauth:            reauth,
 			loginLimiter:      lim,
+			sessionRegistry:   p.SessionRegistry,
 			logs:              p.Logs,
 		},
 		system: &SystemDeps{
-			queryTimeout: p.Cfg.QueryTimeout,
-			systemUC:     p.SystemUC,
-			retentionUC:  p.RetentionUC,
-			backupUC:     p.BackupUC,
-			reauth:       reauth,
-			tlsUC:        usecasetls.New(usecasetls.Config(p.Cfg.TLS)),
-			loginLimiter: lim,
-			logs:         p.Logs,
+			queryTimeout:    p.Cfg.QueryTimeout,
+			systemUC:        p.SystemUC,
+			retentionUC:     p.RetentionUC,
+			backupUC:        p.BackupUC,
+			reauth:          reauth,
+			tlsUC:           usecasetls.New(usecasetls.Config(p.Cfg.TLS)),
+			loginLimiter:    lim,
+			sessionRegistry: p.SessionRegistry,
+			users:           p.Users,
+			apiTokens:       p.APITokens,
+			loginPolicyFile: p.LoginPolicyPath,
+			logs:            p.Logs,
 		},
 		health: &HealthDeps{systemUC: p.SystemUC, systemPinger: p.SystemPinger},
 		events: &EventsDeps{queryTimeout: p.Cfg.QueryTimeout, eventsUC: p.EventsUC, backupUC: p.BackupUC},
