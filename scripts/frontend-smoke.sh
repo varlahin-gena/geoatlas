@@ -68,6 +68,8 @@ grep -q 'scripts/ci-dco-check.sh' .github/workflows/dco.yml || fail "dco: workfl
 [[ -f docs/security-requirements.md ]] || fail "missing docs/security-requirements.md"
 [[ -f docs/assurance-case.md ]] || fail "missing docs/assurance-case.md"
 grep -q 'gittag' scripts/ci-cosign-sign.sh || fail "cosign: gittag attestation"
+grep -q 'tar.gz.sigstore' scripts/ci-cosign-sign.sh || fail "cosign: sigstore bundle"
+grep -q 'geoatlas-\*\.tar.gz.sigstore' .github/workflows/release-tag.yml || fail "release: sigstore upload"
 grep -q 'geoatlas-\*\.gittag' .github/workflows/release-tag.yml || fail "release: gittag upload"
 grep -q 'id-token: write' .github/workflows/release-tag.yml || fail "release: cosign id-token"
 grep -q 'actionlint' .github/workflows/ci.yml || fail "ci: actionlint"

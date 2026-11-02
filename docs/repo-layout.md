@@ -56,7 +56,8 @@ geoatlas/
 │   ├── ci-govulncheck.sh             # CI: govulncheck по Go-модулям
 │   ├── ci-sbom.sh                    # релиз: CycloneDX + SPDX из geoatlas-*.tar.gz
 │   ├── ci-grype-release.sh           # релиз: Grype CRITICAL (only-fixed) по SBOM
-│   ├── ci-cosign-sign.sh             # релиз: cosign keyless tarball + .gittag attestation
+│   ├── ci-cosign-sign.sh             # релиз: cosign keyless tarball + .sigstore + .gittag
+│   ├── ci-sign-existing-releases.sh  # дописать .sigstore к уже выложенным релизам
 │   ├── ci-fuzz-nightly.sh            # nightly: длинный go fuzz (parser / ingest)
 │   ├── ci-compose-smoke.sh           # nightly: compose up + /health|/api/ready + down
 │   ├── ci-license-check.sh           # CI: toxic licenses (Go + npm production)
@@ -105,6 +106,7 @@ geoatlas/
 ├── .github/workflows/scorecard.yml   # OpenSSF Scorecard (advisory SARIF + publish_results)
 ├── .github/workflows/nightly.yml     # daily: long fuzz + compose smoke (не ci-ok)
 ├── .github/workflows/release-tag.yml # тег v*: Release + tar.gz + SBOM + Grype + cosign
+├── .github/workflows/sign-release-assets.yml # workflow_dispatch: .sigstore на старых релизах
 ├── .gitleaks.toml                    # secret scan config (extend default)
 ├── .lychee.toml                      # offline markdown link check config
 ├── start.sh / stop.sh / update.sh    # update.sh — наложение geoatlas-*.tar.gz
