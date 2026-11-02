@@ -12,7 +12,7 @@
 Принимает syslog с файрволов или из SIEM, парсит события, обогащает их геоданными
 (IP → страна/координаты) и строит карту сетевых связей в веб-интерфейсе.
 
-**Актуальный релиз (stable):** [v2.5.0](https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.0) · **тестовый:** [v2.5.4](https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.4) (`VERSION` = 2.5.4) · ОС: Ubuntu 20.04+, Oracle Linux 8+ / RHEL-совместимые · пакет: `geoatlas-X.Y.Z.tar.gz` в [Releases](https://github.com/varlahin-gena/geoatlas/releases).
+**Актуальный релиз (stable):** [v2.5.0](https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.0) · **тестовый:** [v2.5.5](https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.5) (`VERSION` = 2.5.5) · ОС: Ubuntu 20.04+, Oracle Linux 8+ / RHEL-совместимые · пакет: `geoatlas-X.Y.Z.tar.gz` в [Releases](https://github.com/varlahin-gena/geoatlas/releases).
 
 Appliance: **IPv4-only**, один хост / один процесс backend, доставка syslog **at-most-once** (при переполнении очереди возможны drops). Подробнее — [архитектура](docs/architecture.md).
 

@@ -6,6 +6,21 @@
 ## [Unreleased]
 
 
+## [2.5.5] — 2026-11-02
+
+Патч (тестовый): полировка вкладки «Безопасность», pyasn1 0.6.5, Dozzle v11.4.0.
+
+### Changed
+- Мониторинг → Безопасность: понятные RU-лейблы аудита/ролей/результатов, компактнее таблицы и posture.
+- syslog-ng image: `pyasn1` **0.6.5** (CVE-2026-119194…119197 DoS).
+- Compose / offline export: Dozzle **v11.4.0** (было v10.7.4).
+
+### Notes
+- OpenAPI API doc version: **1.18.0** (без изменений)
+- Продуктовая версия: **2.5.5**
+- Схема ClickHouse (ga_schema_version): без изменений Ensure*.
+- Тестовый pre-release для проверки на сервере.
+
 ## [2.5.4] — 2026-11-02
 
 Патч (тестовый): безопасность сессий + группировка карты «Город — страна».
@@ -635,6 +650,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.5.5]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.5
 [2.5.4]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.4
 [2.5.3]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.3
 [2.5.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.2
