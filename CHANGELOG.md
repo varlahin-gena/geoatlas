@@ -5,8 +5,24 @@
 
 ## [Unreleased]
 
+## [2.5.1] — 2026-11-02
+
+Патч: security/image pins, hardening supply chain (Scorecard / OpenSSF), CI coverage.
+
 ### Security
-- syslog-ng image: pin `oauthlib==4.0.0` (CVE-2026-49264, CVE-2026-49265) so Image scan Trivy gate passes.
+- syslog-ng image: pin `oauthlib==4.0.0` (CVE-2026-49264, CVE-2026-49265) для Trivy Image scan.
+- frontend: override `minimatch` 11.0.1 (GHSA-g3hv-75wg-m249); pins для undici / zod / vite и других transitive npm CVE.
+- Runtime images: digests Alpine/Node, pins tzdata / ca-certificates, nginx 1.30.6, Go build image 1.26.9.
+
+### Changed
+- OpenSSF Best Practices / Scorecard: pin action digests, DCO, CODEOWNERS, signed release tags, nightly compose smoke.
+- CI: gate ≥80% overall Go coverage; frontend Playwright на `ubuntu-24.04`.
+- Dependabot: bumps GitHub Actions и base-образов (Alpine / Node).
+
+### Notes
+- OpenAPI API doc version: **1.17.0** (без изменений)
+- Продуктовая версия: **2.5.1**
+- Схема ClickHouse (`ga_schema_version`): без изменений Ensure*.
 
 ## [2.5.0] — 2026-09-11
 
@@ -556,6 +572,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.5.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.1
 [2.5.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.0
 [2.4.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.4.0
 [2.3.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.3.0
