@@ -102,8 +102,9 @@ jobs:
             dist/geoatlas-*.cdx.json
             dist/geoatlas-*.spdx.json
             dist/geoatlas-*.tar.gz.cosign.bundle
+            dist/geoatlas-*.tar.gz.sigstore
             dist/geoatlas-*.gittag
             dist/geoatlas-*.gittag.cosign.bundle
           )
-          [[ ${#files[@]} -ge 7 ]] || { echo "missing dist/geoatlas-* artifacts" >&2; ls -la dist/ >&2; exit 1; }
+          [[ ${#files[@]} -ge 8 ]] || { echo "missing dist/geoatlas-* artifacts" >&2; ls -la dist/ >&2; exit 1; }
           gh release upload "$TAG" "${files[@]}" --clobber

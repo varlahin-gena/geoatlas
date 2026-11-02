@@ -5,6 +5,10 @@
 # Also writes/signs dist/geoatlas-X.Y.Z.gittag (+ .cosign.bundle) when GITHUB_REF_NAME
 # and GITHUB_SHA are set (release-tag workflow). Same verify story as the tarball.
 #
+# The tarball bundle is copied to dist/geoatlas-X.Y.Z.tar.gz.sigstore (same bytes).
+# OpenSSF Scorecard Signed-Releases recognizes .sigstore, not .cosign.bundle.
+# verify-blob --bundle accepts either name.
+#
 # В GitHub Actions нужен permissions.id-token: write.
 # Локально keyless обычно недоступен — скрипт для CI / отладки в GHA.
 #
@@ -45,7 +49,11 @@ echo "::group::cosign sign-blob ${base}.tar.gz"
 echo "::endgroup::"
 
 [[ -s "$bundle" ]] || fail "empty bundle ${bundle}"
+sigstore="${tarball}.sigstore"
+cp -f "$bundle" "$sigstore"
+[[ -s "$sigstore" ]] || fail "empty bundle ${sigstore}"
 ok "$bundle"
+ok "$sigstore"
 
 # Git tag attestation (OpenSSF version_tags_signed): same cosign keyless as signed_releases.
 tag_name="${GITHUB_REF_NAME:-}"
