@@ -3,23 +3,23 @@ import type { AuditEvent, DREvent } from '@/api/systemTypes';
 /** Short RU labels for common audit action codes (title keeps the raw code). */
 const AUDIT_ACTION_LABELS: Record<string, string> = {
   'auth.login.success': 'Вход',
-  'auth.login.failed': 'Неверный вход',
+  'auth.login.failed': 'Неверный пароль',
   'auth.logout': 'Выход',
-  'auth.session.revoke': 'Отзыв сессии',
-  'auth.session.revoke_all': 'Сброс сессий',
+  'auth.session.revoke': 'Завершение входа',
+  'auth.session.revoke_all': 'Завершение всех входов',
   'auth.password.change': 'Смена пароля',
   'auth.password.reset': 'Сброс пароля',
-  'auth.login_policy.update': 'Политика lockout',
-  'auth.user.create': 'Создание пользователя',
+  'auth.login_policy.update': 'Защита от подбора пароля',
+  'auth.user.create': 'Новый пользователь',
   'auth.user.update': 'Изменение пользователя',
   'auth.user.delete': 'Удаление пользователя',
   'auth.user.role_change': 'Смена роли',
-  'auth.token.create': 'Создание токена',
-  'auth.token.revoke': 'Отзыв токена',
-  'auth.token.rotate': 'Ротация токена',
-  'security.csrf.reject': 'CSRF отказ',
-  'security.proxy_gate.reject': 'Proxy-gate отказ',
-  'security.api_rate_limit': 'API rate-limit',
+  'auth.token.create': 'Новый ключ API',
+  'auth.token.revoke': 'Отзыв ключа API',
+  'auth.token.rotate': 'Замена ключа API',
+  'security.csrf.reject': 'Поддельный запрос',
+  'security.proxy_gate.reject': 'Доступ через прокси',
+  'security.api_rate_limit': 'Слишком частые запросы',
   'users.create': 'Создание пользователя',
   'users.update': 'Изменение пользователя',
   'users.delete': 'Удаление пользователя',
@@ -77,6 +77,35 @@ function formatScheduleChangeDetails(d: Record<string, unknown>): string {
   return parts.length ? parts.join('; ') : '—';
 }
 
+const DETAIL_KEY_LABELS: Record<string, string> = {
+  role: 'роль',
+  sid: 'сессия',
+  reason: 'причина',
+  username: 'учётная запись',
+  user: 'пользователь',
+  ip: 'адрес',
+  count: 'попыток',
+  token_id: 'ключ',
+  error: 'ошибка',
+};
+
+const DETAIL_VALUE_LABELS: Record<string, string> = {
+  invalid_credentials: 'неверный пароль',
+  locked: 'учётная запись заблокирована',
+  lockout: 'слишком много попыток',
+  administrator: 'администратор',
+  admin: 'администратор',
+  operator: 'оператор',
+  viewer: 'просмотр',
+  readonly: 'только чтение',
+};
+
+function formatDetailValue(v: unknown): string {
+  if (typeof v === 'boolean') return formatBool(v);
+  const s = String(v ?? '—');
+  return DETAIL_VALUE_LABELS[s] || s;
+}
+
 function formatAuditDetails(action?: string, details?: Record<string, unknown>): string {
   if (!details || !Object.keys(details).length) return '—';
   if (details.error) return String(details.error);
@@ -86,7 +115,14 @@ function formatAuditDetails(action?: string, details?: Record<string, unknown>):
   }
 
   return Object.entries(details)
-    .map(([k, v]) => `${k}: ${typeof v === 'boolean' ? formatBool(v) : String(v)}`)
+    .map(([k, v]) => {
+      const key = DETAIL_KEY_LABELS[k] || k;
+      // Long opaque ids: keep short for scanning
+      if ((k === 'sid' || k === 'token_id') && typeof v === 'string' && v.length > 12) {
+        return `${key}: ${v.slice(0, 8)}…`;
+      }
+      return `${key}: ${formatDetailValue(v)}`;
+    })
     .join('; ');
 }
 

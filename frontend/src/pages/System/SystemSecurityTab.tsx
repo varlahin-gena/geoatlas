@@ -14,18 +14,45 @@ import { useToast } from '@/components/Toast';
 import { auditActionLabel, formatAuditRow } from '@/lib/auditFormat';
 import { fmtDate, fmtNumber } from '@/lib/format';
 
+const ROLE_LABELS: Record<string, string> = {
+  administrator: 'администратор',
+  admin: 'администратор',
+  operator: 'оператор',
+  viewer: 'просмотр',
+  readonly: 'только чтение',
+};
+
 function truncUA(ua?: string): string {
   const s = (ua || '').trim();
   if (!s) return '—';
   return s.length > 48 ? `${s.slice(0, 45)}…` : s;
 }
 
+function roleLabel(role: string): string {
+  return ROLE_LABELS[role] || role;
+}
+
 function roleLine(byRole?: Record<string, number>): string {
   if (!byRole) return '—';
   const parts = Object.entries(byRole)
     .filter(([, n]) => n > 0)
-    .map(([role, n]) => `${role}: ${n}`);
+    .map(([role, n]) => `${roleLabel(role)}: ${n}`);
   return parts.length ? parts.join(' · ') : '—';
+}
+
+function resultClass(result?: string): string {
+  const r = (result || '').toLowerCase();
+  if (r === 'succeeded' || r === 'success' || r === 'ok') return 'result-ok';
+  if (r === 'failed' || r === 'error' || r === 'denied') return 'result-bad';
+  return '';
+}
+
+function resultLabel(result?: string): string {
+  const r = (result || '').toLowerCase();
+  if (r === 'succeeded' || r === 'success' || r === 'ok') return 'Успех';
+  if (r === 'failed' || r === 'error') return 'Ошибка';
+  if (r === 'denied') return 'Отклонён';
+  return result || '—';
 }
 
 export function SystemSecurityTab() {
@@ -43,7 +70,7 @@ export function SystemSecurityTab() {
       setData(res);
       if (res.login_policy) setPolicy(res.login_policy);
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Не удалось загрузить безопасность', 'error');
+      toast(e instanceof Error ? e.message : 'Не удалось загрузить раздел', 'error');
     } finally {
       setLoading(false);
     }
@@ -59,38 +86,39 @@ export function SystemSecurityTab() {
     try {
       const next = await putLoginPolicy(policy);
       setPolicy(next);
-      toast('Политика сохранена', 'success');
+      toast('Настройки сохранены', 'success');
       void load();
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Не удалось сохранить политику', 'error');
+      toast(err instanceof Error ? err.message : 'Не удалось сохранить настройки', 'error');
     } finally {
       setSavingPolicy(false);
     }
   }
 
   async function onRevoke(sess: AuthSessionRecord) {
-    if (!window.confirm(`Отозвать сессию ${sess.username} (${sess.ip || 'без IP'})?`)) return;
+    const where = sess.ip ? ` с адреса ${sess.ip}` : '';
+    if (!window.confirm(`Завершить вход «${sess.username}»${where}?`)) return;
     setBusyId(sess.id);
     try {
       await revokeSession(sess.id);
-      toast('Сессия отозвана', 'success');
+      toast('Вход завершён', 'success');
       void load();
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Не удалось отозвать сессию', 'error');
+      toast(err instanceof Error ? err.message : 'Не удалось завершить вход', 'error');
     } finally {
       setBusyId(null);
     }
   }
 
   async function onRevokeUser(username: string) {
-    if (!window.confirm(`Выйти везде для «${username}»? Все сессии будут отозваны.`)) return;
+    if (!window.confirm(`Завершить все входы для «${username}»?`)) return;
     setBusyId(`user:${username}`);
     try {
       await revokeUserSessions(username);
-      toast('Все сессии отозваны', 'success');
+      toast('Все входы завершены', 'success');
       void load();
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Не удалось отозвать сессии', 'error');
+      toast(err instanceof Error ? err.message : 'Не удалось завершить входы', 'error');
     } finally {
       setBusyId(null);
     }
@@ -106,48 +134,65 @@ export function SystemSecurityTab() {
   if (loading && !data) {
     return (
       <div className="tab-panel active" role="tabpanel">
-        <ContentSkeleton label="Загрузка безопасности…" />
+        <ContentSkeleton label="Загрузка…" />
       </div>
     );
   }
 
+  const tlsValue = posture?.tls?.configured
+    ? [
+        posture.tls.self_signed ? 'свой сертификат' : 'сертификат установлен',
+        posture.tls.days_left != null ? `осталось ${posture.tls.days_left} дн.` : null,
+        posture.tls.not_after ? `действует до ${posture.tls.not_after}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : 'ещё не настроен';
+
   return (
-    <div className="tab-panel active" role="tabpanel">
+    <div className="tab-panel active security-tab" role="tabpanel">
       <section className="card">
         <details className="section-details" open>
-          <summary className="card-title" style={{ color: 'var(--red)' }}>
-            ■ Блокировки входа <span>({failed.length ? failed.length : 'нет'})</span>
+          <summary className={`card-title${failed.length ? ' is-alert' : ''}`}>
+            Кто сейчас заблокирован
+            <span className="card-title-count">
+              {failed.length ? failed.length : '0'}
+            </span>
           </summary>
-          <div>
+          <div className="section-body">
             {!failed.length ? (
               <EmptyState
                 compact
-                title="Нет неуспешных попыток"
-                description="Неудачные логины и блокировки появятся в этом списке."
+                title="Блокировок нет"
+                description="Если кто-то много раз ошибётся с паролем, запись появится здесь."
               />
             ) : (
               <div className="table-wrap">
                 <table className="auth-fails-table">
                   <thead>
                     <tr>
-                      <th scope="col">Логин</th>
-                      <th scope="col">IP</th>
-                      <th scope="col">Попыток</th>
-                      <th scope="col">Первая</th>
+                      <th scope="col">Учётная запись</th>
+                      <th scope="col">Адрес</th>
+                      <th scope="col" className="num">
+                        Попыток
+                      </th>
+                      <th scope="col">Первая попытка</th>
                       <th scope="col">Последняя</th>
-                      <th scope="col">Блок</th>
-                      <th scope="col">До</th>
+                      <th scope="col">Статус</th>
+                      <th scope="col">До разблокировки</th>
                     </tr>
                   </thead>
                   <tbody>
                     {failed.map((f, i) => (
                       <tr key={`${f.username}-${f.ip}-${i}`}>
                         <td>{f.username}</td>
-                        <td>{f.ip}</td>
-                        <td>{fmtNumber(f.count)}</td>
+                        <td className="mono">{f.ip}</td>
+                        <td className="num">{fmtNumber(f.count)}</td>
                         <td>{fmtDate(f.first_at)}</td>
                         <td>{fmtDate(f.last_at)}</td>
-                        <td>{f.locked ? <span className="badge-locked">locked</span> : '—'}</td>
+                        <td>
+                          {f.locked ? <span className="badge-locked">Заблокирован</span> : 'Открыт'}
+                        </td>
                         <td>{f.locked && f.locked_until ? fmtDate(f.locked_until) : '—'}</td>
                       </tr>
                     ))}
@@ -160,100 +205,113 @@ export function SystemSecurityTab() {
       </section>
 
       <section className="card">
-        <h3 className="card-title">Политика lockout</h3>
-        <p className="hint">Порог неудачных попыток, окно подсчёта и длительность блокировки.</p>
-        <form className="history-filters" onSubmit={onSavePolicy}>
-          <label>
-            Макс. попыток
+        <h3 className="card-title">Защита от подбора пароля</h3>
+        <p className="hint">Сколько раз можно ошибиться с паролем и на сколько потом блокировать вход.</p>
+        <form className="form-row policy-form" onSubmit={onSavePolicy}>
+          <div className="field">
+            <label htmlFor="lockMaxFails">Попыток до блокировки</label>
             <input
-              className="input"
+              id="lockMaxFails"
               type="number"
               min={3}
               max={100}
               value={policy.max_fails}
               onChange={(e) => setPolicy((p) => ({ ...p, max_fails: Number(e.target.value) || 0 }))}
             />
-          </label>
-          <label>
-            Окно, сек
+          </div>
+          <div className="field">
+            <label htmlFor="lockWindow">За сколько секунд</label>
             <input
-              className="input"
+              id="lockWindow"
               type="number"
               min={30}
               max={86400}
               value={policy.window_sec}
               onChange={(e) => setPolicy((p) => ({ ...p, window_sec: Number(e.target.value) || 0 }))}
             />
-          </label>
-          <label>
-            Блокировка, сек
+          </div>
+          <div className="field">
+            <label htmlFor="lockDuration">Блокировать на, сек</label>
             <input
-              className="input"
+              id="lockDuration"
               type="number"
               min={30}
               max={86400}
               value={policy.lockout_sec}
               onChange={(e) => setPolicy((p) => ({ ...p, lockout_sec: Number(e.target.value) || 0 }))}
             />
-          </label>
+          </div>
           <button type="submit" className="btn primary" disabled={savingPolicy}>
-            Сохранить политику
+            Сохранить
           </button>
         </form>
       </section>
 
       <section className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-          <h3 className="card-title" style={{ margin: 0 }}>
-            Активные сессии <span>({sessions.length})</span>
+        <div className="card-head">
+          <h3 className="card-title">
+            Кто сейчас в системе
+            <span className="card-title-count">{sessions.length}</span>
           </h3>
           <button type="button" className="btn" onClick={() => void load()} disabled={loading}>
             Обновить
           </button>
         </div>
         {!sessions.length ? (
-          <EmptyState compact title="Нет активных сессий" description="Сессии появятся после входа пользователей." />
+          <EmptyState
+            compact
+            title="Никто не вошёл"
+            description="Список появится, когда кто-то войдёт в систему."
+          />
         ) : (
           <div className="table-wrap">
             <table className="auth-fails-table">
               <thead>
                 <tr>
                   <th scope="col">Пользователь</th>
-                  <th scope="col">IP</th>
-                  <th scope="col">Клиент</th>
-                  <th scope="col">Создана</th>
-                  <th scope="col">Активность</th>
-                  <th scope="col">Действия</th>
+                  <th scope="col">Адрес</th>
+                  <th scope="col">Устройство</th>
+                  <th scope="col">Вошёл</th>
+                  <th scope="col">Был активен</th>
+                  <th scope="col" className="actions">
+                    Действия
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {sessions.map((s) => (
                   <tr key={s.id}>
                     <td>
-                      {s.username}
-                      <div className="hint">{s.role}</div>
+                      <div className="cell-stack">
+                        <span className="cell-primary">{s.username}</span>
+                        <span className="cell-secondary">{roleLabel(s.role)}</span>
+                      </div>
                     </td>
-                    <td>{s.ip || '—'}</td>
-                    <td title={s.user_agent || ''}>{truncUA(s.user_agent)}</td>
+                    <td className="mono">{s.ip || '—'}</td>
+                    <td className="ua" title={s.user_agent || ''}>
+                      {truncUA(s.user_agent)}
+                    </td>
                     <td>{fmtDate(s.created_at)}</td>
                     <td>{fmtDate(s.last_seen_at)}</td>
-                    <td style={{ whiteSpace: 'nowrap' }}>
-                      <button
-                        type="button"
-                        className="btn"
-                        disabled={busyId === s.id}
-                        onClick={() => void onRevoke(s)}
-                      >
-                        Отозвать
-                      </button>{' '}
-                      <button
-                        type="button"
-                        className="btn"
-                        disabled={busyId === `user:${s.username}`}
-                        onClick={() => void onRevokeUser(s.username)}
-                      >
-                        Выйти везде
-                      </button>
+                    <td className="actions">
+                      <div className="row-actions">
+                        <button
+                          type="button"
+                          className="btn"
+                          disabled={busyId === s.id}
+                          onClick={() => void onRevoke(s)}
+                        >
+                          Завершить
+                        </button>
+                        <button
+                          type="button"
+                          className="btn"
+                          disabled={busyId === `user:${s.username}`}
+                          onClick={() => void onRevokeUser(s.username)}
+                        >
+                          Завершить все
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -264,20 +322,24 @@ export function SystemSecurityTab() {
       </section>
 
       <section className="card">
-        <h3 className="card-title">Недавние входы</h3>
+        <h3 className="card-title">Последние входы</h3>
         {!recent.length ? (
-          <EmptyState compact title="Событий пока нет" description="Успешные и неудачные входы появятся здесь." />
+          <EmptyState
+            compact
+            title="Пока пусто"
+            description="Здесь будут удачные и неудачные попытки входа."
+          />
         ) : (
           <div className="table-wrap">
             <table className="auth-fails-table">
               <thead>
                 <tr>
-                  <th scope="col">Время</th>
+                  <th scope="col">Когда</th>
                   <th scope="col">Кто</th>
-                  <th scope="col">Действие</th>
-                  <th scope="col">Результат</th>
-                  <th scope="col">IP</th>
-                  <th scope="col">Детали</th>
+                  <th scope="col">Что сделал</th>
+                  <th scope="col">Итог</th>
+                  <th scope="col">Адрес</th>
+                  <th scope="col">Подробности</th>
                 </tr>
               </thead>
               <tbody>
@@ -286,9 +348,13 @@ export function SystemSecurityTab() {
                     <td>{fmtDate(item.timestamp)}</td>
                     <td>{item.actor || '—'}</td>
                     <td title={item.action}>{auditActionLabel(item.action)}</td>
-                    <td>{item.result || '—'}</td>
-                    <td>{item.ip || '—'}</td>
-                    <td>{formatAuditRow(item)}</td>
+                    <td>
+                      <span className={`result-chip ${resultClass(item.result)}`}>
+                        {resultLabel(item.result)}
+                      </span>
+                    </td>
+                    <td className="mono">{item.ip || '—'}</td>
+                    <td className="details">{formatAuditRow(item)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -298,67 +364,92 @@ export function SystemSecurityTab() {
       </section>
 
       <section className="card">
-        <h3 className="card-title">Поза</h3>
-        <div className="hint" style={{ display: 'grid', gap: 8 }}>
-          <div>
-            <Link to="/users">Пользователи</Link>
-            {' — '}
-            {fmtNumber(posture?.users?.total)} ({roleLine(posture?.users?.by_role)})
-            {posture?.users?.must_reset_password
-              ? ` · сброс пароля: ${posture.users.must_reset_password}`
-              : null}
+        <h3 className="card-title">Доступ и сертификат</h3>
+        <div className="kv-list posture-list">
+          <div className="kv-row">
+            <span className="k">
+              <Link to="/users">Пользователи</Link>
+            </span>
+            <span className="v">
+              {fmtNumber(posture?.users?.total)}
+              <span className="v-meta"> ({roleLine(posture?.users?.by_role)})</span>
+              {posture?.users?.must_reset_password ? (
+                <span className="v-meta">
+                  {' '}
+                  · нужно сменить пароль: {posture.users.must_reset_password}
+                </span>
+              ) : null}
+            </span>
           </div>
-          <div>
-            <Link to="/api-tokens">API-токены</Link>
-            {' — '}
-            {fmtNumber(posture?.tokens?.total)}
-            {posture?.tokens?.expiring_soon
-              ? ` · истекают ≤30 дн.: ${posture.tokens.expiring_soon}`
-              : null}
+          <div className="kv-row">
+            <span className="k">
+              <Link to="/api-tokens">Ключи API</Link>
+            </span>
+            <span className="v">
+              {fmtNumber(posture?.tokens?.total)}
+              {posture?.tokens?.expiring_soon ? (
+                <span className="v-meta">
+                  {' '}
+                  · скоро истекают (≤30 дн.): {posture.tokens.expiring_soon}
+                </span>
+              ) : null}
+            </span>
           </div>
-          <div>
-            <Link to="/tls">TLS</Link>
-            {' — '}
-            {posture?.tls?.configured
-              ? [
-                  posture.tls.self_signed ? 'self-signed' : 'сертификат',
-                  posture.tls.days_left != null ? `${posture.tls.days_left} дн.` : null,
-                  posture.tls.not_after ? `до ${posture.tls.not_after}` : null,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')
-              : 'не настроен'}
+          <div className="kv-row">
+            <span className="k">
+              <Link to="/tls">Шифрование HTTPS</Link>
+            </span>
+            <span className="v">{tlsValue}</span>
           </div>
         </div>
       </section>
 
       <section className="card">
-        <h3 className="card-title">Периметр</h3>
-        <p className="hint">Отказы CSRF, proxy-gate и API rate-limit из журнала аудита.</p>
+        <h3 className="card-title">Отклонённые запросы</h3>
+        <p className="hint">Сколько раз система остановила подозрительные или слишком частые обращения.</p>
         <div className="table-wrap">
-          <table className="auth-fails-table">
+          <table className="auth-fails-table perimeter-table">
             <thead>
               <tr>
-                <th scope="col">Сигнал</th>
-                <th scope="col">24 ч</th>
-                <th scope="col">7 дн</th>
+                <th scope="col">Причина</th>
+                <th scope="col" className="num">
+                  За сутки
+                </th>
+                <th scope="col" className="num">
+                  За неделю
+                </th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td>CSRF</td>
-                <td>{fmtNumber(threat24?.csrf_reject)}</td>
-                <td>{fmtNumber(threat7?.csrf_reject)}</td>
+                <td>
+                  <div className="cell-stack">
+                    <span className="cell-primary">Поддельный запрос</span>
+                    <span className="cell-secondary">CSRF</span>
+                  </div>
+                </td>
+                <td className="num">{fmtNumber(threat24?.csrf_reject)}</td>
+                <td className="num">{fmtNumber(threat7?.csrf_reject)}</td>
               </tr>
               <tr>
-                <td>Proxy-gate</td>
-                <td>{fmtNumber(threat24?.proxy_gate)}</td>
-                <td>{fmtNumber(threat7?.proxy_gate)}</td>
+                <td>
+                  <div className="cell-stack">
+                    <span className="cell-primary">Доступ через прокси</span>
+                    <span className="cell-secondary">proxy-gate</span>
+                  </div>
+                </td>
+                <td className="num">{fmtNumber(threat24?.proxy_gate)}</td>
+                <td className="num">{fmtNumber(threat7?.proxy_gate)}</td>
               </tr>
               <tr>
-                <td>API rate-limit</td>
-                <td>{fmtNumber(threat24?.api_rate_limit)}</td>
-                <td>{fmtNumber(threat7?.api_rate_limit)}</td>
+                <td>
+                  <div className="cell-stack">
+                    <span className="cell-primary">Слишком частые запросы</span>
+                    <span className="cell-secondary">лимит API</span>
+                  </div>
+                </td>
+                <td className="num">{fmtNumber(threat24?.api_rate_limit)}</td>
+                <td className="num">{fmtNumber(threat7?.api_rate_limit)}</td>
               </tr>
             </tbody>
           </table>
