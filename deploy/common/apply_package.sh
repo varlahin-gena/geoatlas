@@ -2,7 +2,7 @@
 # Распаковка / наложение установочного пакета ГеоАтлас на каталог проекта.
 # Использование:
 #   source deploy/common/apply_package.sh
-#   ga_apply_install_payload /path/to/geoatlas-1.4.2.tar.gz /opt/geoatlas
+#   ga_apply_install_payload /path/to/geoatlas-2.6.0.tar.gz /opt/geoatlas
 #   ga_fetch_project /opt/geoatlas
 #
 # Env:

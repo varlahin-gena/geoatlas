@@ -58,7 +58,7 @@
 **Общий первый шаг на сервере** (Ubuntu и Oracle Linux одинаково):
 
 ```bash
-VER=2.1.3   # или нужный релиз
+VER=2.6.0   # или нужный релиз
 cd /tmp
 curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz"
 curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz.sha256"
@@ -77,7 +77,7 @@ cosign verify-blob \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   "geoatlas-${VER}.tar.gz"
 # `.tar.gz.sigstore` — тот же bundle (его читает OpenSSF Scorecard). --bundle принимает любое из имён.
-# Релизы v2.2.0–v2.5.0 подписаны позже workflow sign-release-assets.yml с уже выложенного tar.gz.
+# При необходимости доподписать уже выложенный tar.gz — workflow sign-release-assets.yml.
 
 # attestation git-тега vX.Y.Z (тот же workflow / OIDC)
 curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.gittag"

@@ -4,7 +4,7 @@
 # Scorecard Signed-Releases смотрит последние 5 релизов и суффикс .sigstore
 # (не .cosign.bundle). Архив не пересобирается.
 #
-#   TAGS=v2.5.1,v2.5.0 bash scripts/ci-sign-existing-releases.sh
+#   TAGS=v2.5.0,v2.0.0 bash scripts/ci-sign-existing-releases.sh
 #
 # Если на релизе уже есть .tar.gz.cosign.bundle — копируются те же байты в
 # .tar.gz.sigstore (идентичность release-tag.yml сохраняется).
