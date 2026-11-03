@@ -84,6 +84,6 @@ Bearer (env или именованный) **может опустить** reaut
 
 ## HTTP API
 
-Контракт REST API (в т.ч. auth, events, geo, reputation, retention, tokens, hunts, search-templates, backups, аномалии, `/metrics`): [`openapi.yaml`](../openapi.yaml), версия документа OpenAPI **1.18.0**. Пробы: `GET /api/live` (процесс), `GET /api/ready` (ClickHouse + ingest); `GET /api/health` — alias live. Остальные эндпоинты — cookie-сессия и/или Bearer (`API_AUTH_TOKEN` / именованный токен со scope). Prometheus scrape: `GET /metrics` (Bearer≥ops / administrator).
+Контракт REST API (в т.ч. auth, events, geo, reputation, retention, tokens, hunts, search-templates, backups, аномалии, `/metrics`): [`openapi.yaml`](../openapi.yaml), версия документа OpenAPI **1.19.0**. Пробы: `GET /api/live` (процесс), `GET /api/ready` (ClickHouse + ingest); `GET /api/health` — alias live. Остальные эндпоинты — cookie-сессия и/или Bearer (`API_AUTH_TOKEN` / именованный токен со scope). Prometheus scrape: `GET /metrics` (Bearer≥ops / administrator).
 
 При смене `info.version` в `openapi.yaml` обновите цитату `OpenAPI **N**` здесь и в [README](../README.md) (CI: `scripts/check-release-contract.sh`).

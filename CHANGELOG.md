@@ -5,12 +5,23 @@
 
 ## [Unreleased]
 
+
+## [2.5.6] — 2026-11-03
+
+Патч (тестовый): профиль (prefs) и UX triage аномалий.
+
 ### Added
 - Страница **/profile**: смена пароля, тема UI и группировка дуг карты; prefs на сервере (`users.json`).
 - `PATCH /api/auth/me/preferences` (`theme`, `map_group_by`); поля в `GET /api/auth/me`.
 
+### Changed
+- Аномалии: «Разбор» primary + меню «Ещё», чипы-фильтры важности, a11y поиска, «Скрыть на 24 ч», русские лейблы в эпизодах.
+
 ### Notes
 - OpenAPI API doc version: **1.19.0** (auth preferences: theme, map_group_by)
+- Продуктовая версия: **2.5.6**
+- Схема ClickHouse (ga_schema_version): без изменений Ensure*.
+- Тестовый pre-release для проверки на сервере.
 
 ## [2.5.5] — 2026-11-02
 
@@ -656,6 +667,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.5.6]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.6
 [2.5.5]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.5
 [2.5.4]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.4
 [2.5.3]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.3
