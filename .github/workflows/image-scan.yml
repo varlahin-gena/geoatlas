@@ -67,6 +67,8 @@ jobs:
       - name: Build geoatlas-stats-collector
         run: docker build -t geoatlas-stats-collector:scan -f stats-collector/Dockerfile .
 
+      # Without limit-severities-for-sarif, trivy-action embeds ALL severities in SARIF
+      # and exit-code then fails on HIGH/MEDIUM even when severity: CRITICAL.
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: image
@@ -76,6 +78,7 @@ jobs:
           ignore-unfixed: true
           format: sarif
           output: trivy-frontend.sarif
+          limit-severities-for-sarif: true
           exit-code: "1"
 
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -87,6 +90,7 @@ jobs:
           ignore-unfixed: true
           format: sarif
           output: trivy-backend.sarif
+          limit-severities-for-sarif: true
           exit-code: "1"
 
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -98,6 +102,7 @@ jobs:
           ignore-unfixed: true
           format: sarif
           output: trivy-stats.sarif
+          limit-severities-for-sarif: true
           exit-code: "1"
 
       - name: Build geoatlas-clickhouse
@@ -112,6 +117,7 @@ jobs:
           ignore-unfixed: true
           format: sarif
           output: trivy-clickhouse.sarif
+          limit-severities-for-sarif: true
           exit-code: "1"
 
       # Public ingest :514 — build hardened image (4.12.0 + apt/python patches).
@@ -127,6 +133,7 @@ jobs:
           ignore-unfixed: true
           format: sarif
           output: trivy-syslog-ng.sarif
+          limit-severities-for-sarif: true
           exit-code: "1"
 
       - uses: github/codeql-action/upload-sarif@4bfa242aa49c5f7c6770b98670d354a7dfac05f8 # v3
