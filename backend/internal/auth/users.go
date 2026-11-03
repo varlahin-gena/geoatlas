@@ -18,13 +18,13 @@ import (
 )
 
 var (
-	ErrUserExists      = errors.New("user already exists")
-	ErrUserNotFound    = errors.New("user not found")
-	ErrInvalidUsername = errors.New("invalid username")
-	ErrInvalidPassword = errors.New("invalid password")
-	ErrInvalidRole     = errors.New("invalid role")
-	ErrLastAdmin       = errors.New("cannot remove or demote the last administrator")
-	ErrSelfDelete      = errors.New("cannot delete your own account")
+	ErrUserExists         = errors.New("user already exists")
+	ErrUserNotFound       = errors.New("user not found")
+	ErrInvalidUsername    = errors.New("invalid username")
+	ErrInvalidPassword    = errors.New("invalid password")
+	ErrInvalidRole        = errors.New("invalid role")
+	ErrLastAdmin          = errors.New("cannot remove or demote the last administrator")
+	ErrSelfDelete         = errors.New("cannot delete your own account")
 	ErrBadOldPassword     = errors.New("current password is incorrect")
 	ErrInvalidFullName    = errors.New("invalid full name")
 	ErrInvalidPreferences = errors.New("invalid preferences")
@@ -57,7 +57,7 @@ type User struct {
 	Role               string `json:"role"`
 	MustResetPassword  bool   `json:"must_reset_password"`
 	GeoWizardDismissed bool   `json:"geo_wizard_dismissed,omitempty"`
-	Theme              string `json:"theme,omitempty"`         // light|dark; empty → DefaultTheme
+	Theme              string `json:"theme,omitempty"`        // light|dark; empty → DefaultTheme
 	MapGroupBy         string `json:"map_group_by,omitempty"` // see allowedMapGroupBy; empty → DefaultMapGroupBy
 	// SessionVersion — stamp в cookie; bump инвалидирует все ранее выданные сессии.
 	SessionVersion int64  `json:"session_version,omitempty"`
