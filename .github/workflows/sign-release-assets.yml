@@ -9,7 +9,7 @@ on:
       tags:
         description: "Comma-separated tags (vX.Y.Z), at most 10"
         required: true
-        default: "v2.5.1,v2.5.0,v2.4.0,v2.3.0,v2.2.0"
+        default: "v2.5.0,v2.0.0,v1.0.0"
         type: string
 
 permissions:
