@@ -6,6 +6,20 @@
 ## [Unreleased]
 
 
+## [2.5.7] — 2026-11-03
+
+Патч (тестовый): triage без лишней вкладки, inline-действия, полировка профиля.
+
+### Changed
+- Аномалии: все действия в одном ряду (без меню «Ещё»); «Разбор инцидента» убран из сайдбара — вход только с алерта (`/investigate?alert=…`).
+- Профиль: понятные подсказки, live-валидация пароля, лейблы группировки с заглавной.
+
+### Notes
+- OpenAPI API doc version: **1.19.0** (без изменений)
+- Продуктовая версия: **2.5.7**
+- Схема ClickHouse (ga_schema_version): без изменений Ensure*.
+- Тестовый pre-release для проверки на сервере.
+
 ## [2.5.6] — 2026-11-03
 
 Патч (тестовый): профиль (prefs) и UX triage аномалий.
@@ -667,6 +681,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.5.7]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.7
 [2.5.6]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.6
 [2.5.5]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.5
 [2.5.4]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.4
