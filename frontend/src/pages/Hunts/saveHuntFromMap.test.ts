@@ -33,7 +33,7 @@ describe('huntSnapshotLines', () => {
         group_by: 'city',
         filter: 'all',
       }),
-    ).toEqual(['Период: 1 день', 'Группировка: город']);
+    ).toEqual(['Период: 1 день', 'Группировка: Город']);
   });
 
   it('includes optional filter, query, country', () => {

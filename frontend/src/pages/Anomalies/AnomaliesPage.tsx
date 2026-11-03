@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from 'react';
+import { useCallback, useEffect, useMemo, useState, Fragment } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ackAnomaly,
@@ -110,33 +110,22 @@ function AnomalyRowActions({
   onTogglePeers: () => void;
   onHide: () => void;
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    function onDoc(e: MouseEvent) {
-      if (!wrapRef.current?.contains(e.target as Node)) setMenuOpen(false);
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setMenuOpen(false);
-    }
-    document.addEventListener('mousedown', onDoc);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDoc);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [menuOpen]);
-
-  const hasMore = canPeers || !acked;
-
   return (
-    <div className="anomaly-row-actions" ref={wrapRef}>
+    <div className="anomaly-row-actions">
       {item.fingerprint ? (
         <Link to={investigateHref(item.fingerprint)} className="btn sm primary">
           Разбор
         </Link>
+      ) : null}
+      {canPeers ? (
+        <button
+          type="button"
+          className="btn sm"
+          aria-expanded={expanded}
+          onClick={onTogglePeers}
+        >
+          {expanded ? 'Скрыть связи' : 'Связи'}
+        </button>
       ) : null}
       <Link
         to={anomalyMapHref(item)}
@@ -145,51 +134,10 @@ function AnomalyRowActions({
       >
         На карте
       </Link>
-      {hasMore ? (
-        <div className="anomaly-row-more">
-          <button
-            type="button"
-            className="btn sm"
-            aria-expanded={menuOpen}
-            aria-haspopup="menu"
-            aria-label="Другие действия"
-            onClick={() => setMenuOpen((v) => !v)}
-          >
-            Ещё
-          </button>
-          {menuOpen ? (
-            <div className="anomaly-row-menu" role="menu">
-              {canPeers ? (
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="anomaly-row-menu-item"
-                  aria-expanded={expanded}
-                  onClick={() => {
-                    onTogglePeers();
-                    setMenuOpen(false);
-                  }}
-                >
-                  {expanded ? 'Скрыть связи' : 'Связи'}
-                </button>
-              ) : null}
-              {!acked ? (
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="anomaly-row-menu-item is-danger"
-                  disabled={acking}
-                  onClick={() => {
-                    onHide();
-                    setMenuOpen(false);
-                  }}
-                >
-                  Скрыть на 24 ч
-                </button>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
+      {!acked ? (
+        <button type="button" className="btn sm danger" disabled={acking} onClick={onHide}>
+          Скрыть на 24 ч
+        </button>
       ) : null}
     </div>
   );

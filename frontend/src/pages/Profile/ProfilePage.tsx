@@ -1,4 +1,5 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { changePassword } from '@/api/auth';
 import { ApiError } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
@@ -17,11 +18,14 @@ import '@/styles/auth-form.css';
 import './profile.css';
 
 export default function ProfilePage() {
-  const { user, themePreference, mapGroupBy, setTheme, setMapGroupBy, refresh } = useAuth();
+  const { user, isAdmin, themePreference, mapGroupBy, setTheme, setMapGroupBy, refresh } =
+    useAuth();
   const { toast } = useToast();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [newTouched, setNewTouched] = useState(false);
+  const [confirmTouched, setConfirmTouched] = useState(false);
   const [pwdBusy, setPwdBusy] = useState(false);
   const [prefsBusy, setPrefsBusy] = useState(false);
 
@@ -29,8 +33,21 @@ export default function ProfilePage() {
     document.title = 'ГеоАтлас — Профиль';
   }, []);
 
+  const newPasswordHint = useMemo(() => {
+    if (!newTouched || !newPassword) return null;
+    return validatePasswordClient(newPassword, user?.username);
+  }, [newPassword, newTouched, user?.username]);
+
+  const confirmHint = useMemo(() => {
+    if (!confirmTouched || !confirm) return null;
+    if (newPassword !== confirm) return 'Пароли не совпадают';
+    return null;
+  }, [confirm, confirmTouched, newPassword]);
+
   async function onSavePassword(e: FormEvent) {
     e.preventDefault();
+    setNewTouched(true);
+    setConfirmTouched(true);
     if (newPassword !== confirm) {
       toast('Пароли не совпадают', 'error');
       return;
@@ -47,6 +64,8 @@ export default function ProfilePage() {
       setCurrentPassword('');
       setNewPassword('');
       setConfirm('');
+      setNewTouched(false);
+      setConfirmTouched(false);
       toast('Пароль изменён', 'success');
     } catch (err) {
       if (err instanceof ApiError && err.message === 'current password is incorrect') {
@@ -106,12 +125,23 @@ export default function ProfilePage() {
               <dd>{user?.role ? roleLabelRu(user.role) : '—'}</dd>
             </div>
           </dl>
+          <p className="hint profile-card-foot">
+            {isAdmin ? (
+              <>
+                ФИО меняется в{' '}
+                <Link to="/users">Пользователях</Link>.
+              </>
+            ) : (
+              'ФИО меняет администратор в разделе «Пользователи».'
+            )}
+          </p>
         </section>
 
         <section className="profile-card">
           <h2 className="profile-card-title">Пароль</h2>
           <p className="hint">
-            Смена пароля завершит остальные сессии. Минимум {MIN_PASSWORD_LEN} символов, буква и цифра.
+            Смена пароля завершит остальные сессии. Минимум {MIN_PASSWORD_LEN} символов, буква и
+            цифра.
           </p>
           <form className="profile-form" onSubmit={onSavePassword}>
             <AuthPasswordField
@@ -130,21 +160,46 @@ export default function ProfilePage() {
               autoComplete="new-password"
               required
               value={newPassword}
-              onChange={setNewPassword}
+              onChange={(v) => {
+                setNewPassword(v);
+                if (!newTouched) setNewTouched(true);
+              }}
+              onBlur={() => setNewTouched(true)}
             />
+            {newPasswordHint ? (
+              <p className="profile-field-hint" role="status">
+                {newPasswordHint}
+              </p>
+            ) : null}
             <AuthPasswordField
               id="profileConfirm"
-              label="Повтор"
+              label="Повторите новый пароль"
               name="confirm-password"
               autoComplete="new-password"
               required
               value={confirm}
-              onChange={setConfirm}
+              onChange={(v) => {
+                setConfirm(v);
+                if (!confirmTouched) setConfirmTouched(true);
+              }}
+              onBlur={() => setConfirmTouched(true)}
             />
+            {confirmHint ? (
+              <p className="profile-field-hint" role="status">
+                {confirmHint}
+              </p>
+            ) : null}
             <button
               type="submit"
               className="btn primary"
-              disabled={pwdBusy || !currentPassword || !newPassword || !confirm}
+              disabled={
+                pwdBusy ||
+                !currentPassword ||
+                !newPassword ||
+                !confirm ||
+                Boolean(newPasswordHint) ||
+                Boolean(confirmHint)
+              }
               aria-busy={pwdBusy}
             >
               {pwdBusy ? 'Сохранение…' : 'Сменить пароль'}
@@ -154,7 +209,10 @@ export default function ProfilePage() {
 
         <section className="profile-card">
           <h2 className="profile-card-title">Оформление</h2>
-          <p className="hint">Тема интерфейса для этого пользователя на всех устройствах.</p>
+          <p className="hint">
+            Тема интерфейса для этого пользователя на всех устройствах. Перекрывает тему
+            браузера/ОС.
+          </p>
           <div className="profile-choice-row" role="radiogroup" aria-label="Тема">
             {(['light', 'dark'] as const).map((t) => (
               <label key={t} className={`profile-choice${themePreference === t ? ' is-active' : ''}`}>
@@ -175,8 +233,7 @@ export default function ProfilePage() {
         <section className="profile-card">
           <h2 className="profile-card-title">Карта</h2>
           <p className="hint">
-            Группировка дуг по умолчанию. Применяется при открытии карты без параметра{' '}
-            <code>?group=</code> в адресе.
+            Группировка дуг при открытии карты, если на карте ещё не выбран другой режим.
           </p>
           <label htmlFor="profileGroupBy">Группировка дуг</label>
           <select

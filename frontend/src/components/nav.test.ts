@@ -15,7 +15,7 @@ describe('filterNav role access', () => {
     const operatorNav = filterNav(PAGE_NAV, opts);
     const dashboardNav = filterNav(PAGE_NAV, opts);
     expect(operatorNav.map((i) => i.href)).toEqual(dashboardNav.map((i) => i.href));
-    expect(operatorNav.map((i) => i.href)).toEqual(['/', '/anomalies', '/investigate', '/hunts']);
+    expect(operatorNav.map((i) => i.href)).toEqual(['/', '/anomalies', '/hunts']);
     expect(operatorNav.some((i) => i.href === '/system')).toBe(false);
     expect(operatorNav.some((i) => i.href === '/users')).toBe(false);
   });
@@ -38,7 +38,6 @@ describe('groupNav', () => {
     ]);
     expect(sections.find((s) => s.id === 'triage')?.items.map((i) => i.href)).toEqual([
       '/anomalies',
-      '/investigate',
       '/hunts',
     ]);
     expect(sections.find((s) => s.id === 'system')?.items.map((i) => i.href)).toEqual([
@@ -80,7 +79,6 @@ describe('splitNavItems', () => {
     expect(sections.map((s) => s.id)).toEqual(['triage', 'system', 'data', 'access']);
     expect(sections.find((s) => s.id === 'triage')?.items.map((i) => i.label)).toEqual([
       'Аномалии',
-      'Разбор инцидента',
       'Охоты',
     ]);
   });

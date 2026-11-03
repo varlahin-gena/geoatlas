@@ -1,4 +1,5 @@
 import { createHunt, type HuntMapState } from '@/api/hunts';
+import { MAP_GROUP_BY_DEFAULT, MAP_GROUP_BY_LABELS } from '@/lib/mapGrouping';
 import { PERIODS } from '@/pages/Map/mapPeriods';
 
 const DEFAULT_SCHEDULE = {
@@ -9,14 +10,9 @@ const DEFAULT_SCHEDULE = {
 };
 
 const GROUP_LABELS: Record<string, string> = {
-  city: 'город',
-  country: 'страна',
-  continent: 'континент',
-  subnet: '/24',
-  city_country: 'город — страна',
+  ...MAP_GROUP_BY_LABELS,
   asn: 'ASN',
-  org: 'организация',
-  ip: 'IP',
+  org: 'Организация',
 };
 
 const FILTER_LABELS: Record<string, string> = {
@@ -49,7 +45,9 @@ export function huntSnapshotLines(map: HuntMapState): string[] {
   } else {
     lines.push(`Период: ${periodLabel(map.period || '1d')}`);
   }
-  lines.push(`Группировка: ${GROUP_LABELS[map.group_by] || map.group_by || 'город'}`);
+  lines.push(
+    `Группировка: ${GROUP_LABELS[map.group_by] || map.group_by || MAP_GROUP_BY_LABELS[MAP_GROUP_BY_DEFAULT]}`,
+  );
   if (map.filter && map.filter !== 'all') {
     lines.push(`Фильтр: ${FILTER_LABELS[map.filter] || map.filter}`);
   }

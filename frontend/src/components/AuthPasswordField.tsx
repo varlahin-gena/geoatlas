@@ -1,10 +1,11 @@
-import { useState, type ChangeEvent, type KeyboardEvent, type Ref } from 'react';
+import { useState, type ChangeEvent, type FocusEvent, type KeyboardEvent, type Ref } from 'react';
 
 type AuthPasswordFieldProps = {
   id: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
+  onBlur?: (e: FocusEvent<HTMLInputElement>) => void;
   autoComplete?: string;
   required?: boolean;
   name?: string;
@@ -17,6 +18,7 @@ export function AuthPasswordField({
   label,
   value,
   onChange,
+  onBlur,
   autoComplete = 'current-password',
   required,
   name,
@@ -40,7 +42,10 @@ export function AuthPasswordField({
           onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
           onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => setCapsOn(e.getModifierState('CapsLock'))}
           onKeyUp={(e: KeyboardEvent<HTMLInputElement>) => setCapsOn(e.getModifierState('CapsLock'))}
-          onBlur={() => setCapsOn(false)}
+          onBlur={(e: FocusEvent<HTMLInputElement>) => {
+            setCapsOn(false);
+            onBlur?.(e);
+          }}
         />
         <button
           type="button"

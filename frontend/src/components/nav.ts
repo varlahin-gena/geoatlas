@@ -53,14 +53,8 @@ export const PAGE_NAV: NavItem[] = [
     href: '/anomalies',
     label: 'Аномалии',
     group: 'triage',
-    match: ['/anomalies', '/anomalies.html'],
-    adminOnly: false,
-  },
-  {
-    href: '/investigate',
-    label: 'Разбор инцидента',
-    group: 'triage',
-    match: ['/investigate', '/investigate.html'],
+    // Keep Аномалии active while drilling into /investigate?alert=…
+    match: ['/anomalies', '/anomalies.html', '/investigate', '/investigate.html'],
     adminOnly: false,
   },
   {

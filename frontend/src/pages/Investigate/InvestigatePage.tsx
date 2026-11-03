@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import {
   ackAnomaly,
   assignAnomaly,
@@ -233,7 +233,11 @@ export default function InvestigatePage() {
 
   const acked = Boolean(item?.acknowledged);
   const mapHref = item ? anomalyMapHref(item) : '/';
-  const workspaceHref = alertFp ? investigateHref(alertFp) : '/investigate';
+  const workspaceHref = alertFp ? investigateHref(alertFp) : '/anomalies';
+
+  if (!alertFp) {
+    return <Navigate to="/anomalies" replace />;
+  }
 
   return (
     <AdminLayout title="Разбор инцидента">
@@ -246,13 +250,6 @@ export default function InvestigatePage() {
         <p className="investigate-back">
           <Link to="/anomalies">← К списку аномалий</Link>
         </p>
-
-        {!alertFp ? (
-          <p className="hint warn-banner">
-            Не указан параметр <code>alert</code>. Откройте алерт со страницы{' '}
-            <Link to="/anomalies">Аномалии</Link>.
-          </p>
-        ) : null}
 
         {loading ? <p className="hint">Загрузка алерта…</p> : null}
 

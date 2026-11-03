@@ -16,10 +16,10 @@ export const MAP_GROUP_BY_DEFAULT: MapGroupBy = 'city';
 export const MAP_GROUP_BY_LABELS: Record<MapGroupBy, string> = {
   ip: 'IP',
   subnet: '/24',
-  city: 'город',
-  country: 'страна',
-  continent: 'континент',
-  city_country: 'город — страна',
+  city: 'Город',
+  country: 'Страна',
+  continent: 'Континент',
+  city_country: 'Город — страна',
 };
 
 const GROUP_SET = new Set<string>(MAP_GROUP_BY_KEYS);

@@ -61,6 +61,17 @@
   margin-top: 4px;
 }
 
+.profile-card-foot {
+  margin: 12px 0 0;
+}
+
+.profile-field-hint {
+  margin: -2px 0 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--red);
+}
+
 .profile-choice-row {
   display: flex;
   flex-wrap: wrap;

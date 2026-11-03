@@ -112,7 +112,6 @@ export const NAV_ICONS: Record<string, string> = {
   '/system': 'system',
   '/dozzle/': 'logs',
   '/anomalies': 'anomalies',
-  '/investigate': 'observe',
   '/hunts': 'hunt',
   '/anomalies/engine': 'settings',
   '/parser-test': 'parser',
