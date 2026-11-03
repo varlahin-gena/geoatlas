@@ -262,7 +262,8 @@ export function isBasemapTextLabelLayer(id: string): boolean {
 export function hideBasemapCountryLabels(map: {
   getStyle: () => { layers?: Array<{ id: string; type?: string }> } | undefined;
   getLayer: (id: string) => unknown;
-  setLayoutProperty: (id: string, key: string, value: unknown) => void;
+  // Narrow key so MapLibre Map (typed layout props) is assignable in callers.
+  setLayoutProperty: (id: string, key: 'visibility', value: 'none' | 'visible') => unknown;
 }): void {
   const layers = map.getStyle()?.layers;
   if (!layers?.length) return;
