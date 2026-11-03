@@ -47,7 +47,7 @@
 
 ## Установочный пакет
 
-Один архив **`geoatlas-X.Y.Z.tar.gz`** (плюс `.sha256`; SBOM `.cdx.json` / `.spdx.json` — для аудита; `.tar.gz.cosign.bundle` — подпись Sigstore; `.gittag` + `.gittag.cosign.bundle` — attestation git-тега `vX.Y.Z`) с [GitHub Releases](https://github.com/varlahin-gena/geoatlas/releases) — исходники стека, **оба** установщика (`deploy/ubuntu/…`, `deploy/oracle_linux/…`), `update.sh` и (для прод-пакета) каталог **`images/`** с готовыми Docker-образами. Это не `.deb`/`.rpm`: Docker и файрвол хоста ставит OS-скрипт из пакета.
+Один архив **`geoatlas-X.Y.Z.tar.gz`** (плюс `.sha256`; SBOM `.cdx.json` / `.spdx.json` — для аудита; `.tar.gz.cosign.bundle` и те же байты как `.tar.gz.sigstore` — подпись Sigstore; `.gittag` + `.gittag.cosign.bundle` — attestation git-тега `vX.Y.Z`) с [GitHub Releases](https://github.com/varlahin-gena/geoatlas/releases) — исходники стека, **оба** установщика (`deploy/ubuntu/…`, `deploy/oracle_linux/…`), `update.sh` и (для прод-пакета) каталог **`images/`** с готовыми Docker-образами. Это не `.deb`/`.rpm`: Docker и файрвол хоста ставит OS-скрипт из пакета.
 
 | Задача                                | Что запускать                                              |
 |---------------------------------------|------------------------------------------------------------|
@@ -73,9 +73,11 @@ cd "geoatlas-${VER}"
 curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz.cosign.bundle"
 cosign verify-blob \
   --bundle "geoatlas-${VER}.tar.gz.cosign.bundle" \
-  --certificate-identity-regexp 'https://github.com/varlahin-gena/geoatlas/.github/workflows/release-tag.yml@refs/tags/v.*' \
+  --certificate-identity-regexp 'https://github.com/varlahin-gena/geoatlas/.github/workflows/(release-tag.yml@refs/tags/v.*|sign-release-assets.yml@refs/heads/main)' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   "geoatlas-${VER}.tar.gz"
+# `.tar.gz.sigstore` — тот же bundle (его читает OpenSSF Scorecard). --bundle принимает любое из имён.
+# Релизы v2.2.0–v2.5.0 подписаны позже workflow sign-release-assets.yml с уже выложенного tar.gz.
 
 # attestation git-тега vX.Y.Z (тот же workflow / OIDC)
 curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.gittag"

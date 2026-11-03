@@ -1,0 +1,41 @@
+# Attach Sigstore bundles to releases cut before .tar.gz.sigstore existed.
+# Does not rebuild the tarball. Scorecard reads the filename, not a new build.
+
+name: Sign release assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: "Comma-separated tags (vX.Y.Z), at most 10"
+        required: true
+        default: "v2.5.1,v2.5.0,v2.4.0,v2.3.0,v2.2.0"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sign-release-assets
+  cancel-in-progress: false
+
+jobs:
+  sign:
+    name: Sign published tarballs
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+      id-token: write # cosign keyless (Sigstore)
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: sign existing release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAGS: ${{ inputs.tags }}
+        run: bash scripts/ci-sign-existing-releases.sh
