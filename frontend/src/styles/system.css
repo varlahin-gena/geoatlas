@@ -536,17 +536,18 @@ body.page-admin {
         font-size: 12px;
         padding: 8px 2px;
     }
-    .perimeter-table {
+    /* Full card width; beat .auth-fails-table .num { width:1% } specificity. */
+    .security-tab .perimeter-table {
         width: 100%;
-        max-width: 36rem;
+        max-width: none;
         table-layout: fixed;
     }
-    .perimeter-table th:first-child,
-    .perimeter-table td:first-child {
+    .security-tab .perimeter-table th:first-child,
+    .security-tab .perimeter-table td:first-child {
         width: auto;
     }
-    .perimeter-table .num {
-        width: 7rem;
+    .security-tab .perimeter-table .num {
+        width: 8.5rem;
         text-align: right;
     }
     .history-filters {
