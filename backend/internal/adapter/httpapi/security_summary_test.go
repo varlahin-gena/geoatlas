@@ -1,12 +1,12 @@
 package httpapi
 
 import (
-	"os"
-	"path/filepath"
 	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -21,7 +21,7 @@ type postureUsers struct {
 	items []auth.UserPublic
 }
 
-func (p postureUsers) Get(string) (auth.UserPublic, bool) { return auth.UserPublic{}, false }
+func (p postureUsers) Get(string) (auth.UserPublic, bool)  { return auth.UserPublic{}, false }
 func (p postureUsers) SessionVersion(string) (int64, bool) { return 0, false }
 func (p postureUsers) MustReset(string) bool               { return false }
 func (p postureUsers) List() []auth.UserPublic             { return p.items }

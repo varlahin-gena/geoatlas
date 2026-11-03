@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -34,8 +35,8 @@ const PersistentCookieTTL = 10 * 365 * 24 * time.Hour
 type Session struct {
 	Username       string `json:"u"`
 	Role           string `json:"r"`
-	Expires        int64  `json:"e"`  // unix seconds
-	SessionVersion int64  `json:"sv"` // must match User.SessionVersion (revoke stamp)
+	Expires        int64  `json:"e"`             // unix seconds
+	SessionVersion int64  `json:"sv"`            // must match User.SessionVersion (revoke stamp)
 	SID            string `json:"sid,omitempty"` // registry id for per-device revoke
 }
 
@@ -174,7 +175,7 @@ func LiveSessionChecked(users UserLookup, registry *SessionRegistry, sess Sessio
 func newSessionID() string {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {
-		return hex.EncodeToString([]byte(fmt.Sprintf("%d", time.Now().UnixNano())))
+		return hex.EncodeToString([]byte(strconv.FormatInt(time.Now().UnixNano(), 10)))
 	}
 	return hex.EncodeToString(b[:])
 }

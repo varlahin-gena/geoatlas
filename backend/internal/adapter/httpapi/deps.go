@@ -44,18 +44,18 @@ type AuthDeps struct {
 
 // SystemDeps — зависимости SystemHandler (system/retention/backup + shared loginLimiter).
 type SystemDeps struct {
-	queryTimeout      time.Duration
-	systemUC          *usecasesystem.Service
-	retentionUC       *usecaseretention.Service
-	backupUC          *usecasebackup.Service
-	tlsUC             *usecasetls.Service
-	reauth            ReauthChecker
-	loginLimiter      *loginthrottle.Limiter
-	sessionRegistry   *auth.SessionRegistry
-	users             UserDirectory
-	apiTokens         APITokenStore
-	loginPolicyFile   string
-	logs              *usecaseaudit.Service
+	queryTimeout    time.Duration
+	systemUC        *usecasesystem.Service
+	retentionUC     *usecaseretention.Service
+	backupUC        *usecasebackup.Service
+	tlsUC           *usecasetls.Service
+	reauth          ReauthChecker
+	loginLimiter    *loginthrottle.Limiter
+	sessionRegistry *auth.SessionRegistry
+	users           UserDirectory
+	apiTokens       APITokenStore
+	loginPolicyFile string
+	logs            *usecaseaudit.Service
 }
 
 // HealthDeps — зависимости HealthHandler (Ready: systemUC + CH pinger).
