@@ -113,7 +113,7 @@ grep -q 'reputation' frontend/src/pages/Map/mapReputation.ts || fail "map reputa
 grep -q 'events/series\|sparkline' frontend/src/pages/Map/mapDetail.tsx || fail "detail sparkline"
 grep -q 'upload-geo' \
   frontend/src/pages/Map/MapPage.tsx \
-  frontend/src/pages/Map/useMapUploads.ts \
+  frontend/src/pages/Map/useGeoWizard.ts \
   frontend/src/pages/Map/MapSidebar.tsx || fail "map upload-geo"
 grep -q 'geo-wizard\|GeoWizard\|useGeoWizard' \
   frontend/src/pages/Map/MapPage.tsx \
