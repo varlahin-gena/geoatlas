@@ -61,6 +61,7 @@ describe('buildCommandCatalog', () => {
   it('includes nav and prefs off the map', () => {
     const cmds = buildCommandCatalog(baseCtx);
     expect(cmds.some((c) => c.id === 'nav:/anomalies')).toBe(true);
+    expect(cmds.some((c) => c.id === 'prefs:profile')).toBe(true);
     expect(cmds.some((c) => c.id === 'prefs:theme')).toBe(true);
     expect(cmds.some((c) => c.id.startsWith('map:'))).toBe(false);
   });

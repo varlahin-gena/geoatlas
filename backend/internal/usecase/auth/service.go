@@ -154,6 +154,13 @@ func (s *Service) SetGeoWizardDismissed(username string, dismissed bool) (domain
 	return s.users.SetGeoWizardDismissed(username, dismissed)
 }
 
+func (s *Service) SetPreferences(username string, patch domain.PreferencesPatch) (domain.UserPublic, error) {
+	if s == nil || s.users == nil {
+		return domain.UserPublic{}, ErrNotConfigured
+	}
+	return s.users.SetPreferences(username, patch)
+}
+
 type ResetPasswordInput struct {
 	Username          string
 	Password          string

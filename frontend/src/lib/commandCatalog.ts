@@ -121,6 +121,14 @@ export function buildCommandCatalog(ctx: CommandCatalogContext): AppCommand[] {
   });
 
   cmds.push({
+    id: 'prefs:profile',
+    label: 'Открыть профиль',
+    group: 'prefs',
+    groupLabel: GROUP_LABELS.prefs,
+    keywords: 'profile prefs preferences пароль тема группировка',
+    href: '/profile',
+  });
+  cmds.push({
     id: 'prefs:theme',
     label: 'Сменить тему',
     group: 'prefs',

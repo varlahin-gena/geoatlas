@@ -1,5 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/auth/AuthContext';
+import {
+  MAP_GROUP_BY_DEFAULT,
+  isMapGroupBy,
+  normalizeMapGroupBy,
+  type MapGroupBy,
+} from '@/lib/mapGrouping';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import { PERIODS } from './mapPeriods';
 
@@ -12,7 +19,7 @@ export const MAP_VIEW_DEFAULTS = {
   period: '1d',
   periodFrom: '',
   periodTo: '',
-  groupBy: 'city',
+  groupBy: MAP_GROUP_BY_DEFAULT as MapGroupBy,
   filter: 'all' as MapActionFilter,
   search: '',
   focusedCountry: null as string | null,
@@ -20,8 +27,12 @@ export const MAP_VIEW_DEFAULTS = {
 
 export type MapViewState = typeof MAP_VIEW_DEFAULTS;
 
+export type MapViewDefaults = {
+  groupBy?: MapGroupBy;
+};
+
+
 const PERIOD_KEYS = new Set<string>(PERIODS.map(([id]) => id));
-const GROUP_KEYS = new Set(['ip', 'subnet', 'city', 'country', 'continent', 'city_country']);
 const FILTER_KEYS = new Set<MapActionFilter>(['all', 'allowed', 'blocked']);
 
 /** CH LIMIT: draw cap. Search/reputation apply on the server before LIMIT. */
@@ -39,11 +50,15 @@ export function mapServerScope(
   };
 }
 
-export function parseMapViewSearch(sp: URLSearchParams): MapViewState {
+export function parseMapViewSearch(
+  sp: URLSearchParams,
+  defaults?: MapViewDefaults,
+): MapViewState {
   const periodRaw = (sp.get('period') || '').trim();
   const period = PERIOD_KEYS.has(periodRaw) ? periodRaw : MAP_VIEW_DEFAULTS.period;
+  const groupDefault = normalizeMapGroupBy(defaults?.groupBy, MAP_GROUP_BY_DEFAULT);
   const groupRaw = (sp.get('group') || '').trim().toLowerCase();
-  const groupBy = GROUP_KEYS.has(groupRaw) ? groupRaw : MAP_VIEW_DEFAULTS.groupBy;
+  const groupBy = isMapGroupBy(groupRaw) ? groupRaw : groupDefault;
   const filterRaw = (sp.get('filter') || '').trim().toLowerCase() as MapActionFilter;
   const filter = FILTER_KEYS.has(filterRaw) ? filterRaw : MAP_VIEW_DEFAULTS.filter;
   const country = (sp.get('country') || '').trim();
@@ -58,7 +73,11 @@ export function parseMapViewSearch(sp: URLSearchParams): MapViewState {
   };
 }
 
-export function serializeMapViewSearch(state: MapViewState): URLSearchParams {
+export function serializeMapViewSearch(
+  state: MapViewState,
+  defaults?: MapViewDefaults,
+): URLSearchParams {
+  const groupDefault = normalizeMapGroupBy(defaults?.groupBy, MAP_GROUP_BY_DEFAULT);
   const sp = new URLSearchParams();
   if (state.period && state.period !== MAP_VIEW_DEFAULTS.period) {
     sp.set('period', state.period);
@@ -67,7 +86,7 @@ export function serializeMapViewSearch(state: MapViewState): URLSearchParams {
     if (state.periodFrom) sp.set('from', state.periodFrom);
     if (state.periodTo) sp.set('to', state.periodTo);
   }
-  if (state.groupBy && state.groupBy !== MAP_VIEW_DEFAULTS.groupBy) {
+  if (state.groupBy && state.groupBy !== groupDefault) {
     sp.set('group', state.groupBy);
   }
   if (state.filter && state.filter !== MAP_VIEW_DEFAULTS.filter) {
@@ -98,8 +117,10 @@ function sameView(a: MapViewState, b: MapViewState): boolean {
 }
 
 export function useMapViewQuery() {
+  const { mapGroupBy } = useAuth();
+  const viewDefaults = useMemo<MapViewDefaults>(() => ({ groupBy: mapGroupBy }), [mapGroupBy]);
   const [params, setParams] = useSearchParams();
-  const parsed = parseMapViewSearch(params);
+  const parsed = parseMapViewSearch(params, viewDefaults);
   const alertFingerprint = parseAlertFingerprint(params);
   const [search, setSearchState] = useState(parsed.search);
   const [builderOpen, setBuilderOpen] = useState(false);
@@ -124,16 +145,16 @@ export function useMapViewQuery() {
     (partial: Partial<MapViewState>, opts?: { clearAlert?: boolean }) => {
       setParams(
         (prev) => {
-          const next = { ...parseMapViewSearch(prev), ...partial };
+          const next = { ...parseMapViewSearch(prev, viewDefaults), ...partial };
           if (partial.period && partial.period !== 'custom') {
             next.periodFrom = '';
             next.periodTo = '';
           }
           if (opts?.clearAlert) alertKeepRef.current = null;
           const alert = alertKeepRef.current;
-          const nextSp = serializeMapViewSearch(next);
+          const nextSp = serializeMapViewSearch(next, viewDefaults);
           if (alert) nextSp.set('alert', alert);
-          const prevView = parseMapViewSearch(prev);
+          const prevView = parseMapViewSearch(prev, viewDefaults);
           const prevAlert = parseAlertFingerprint(prev);
           if (sameView(next, prevView) && alert === prevAlert) return prev;
           return nextSp;
@@ -141,7 +162,7 @@ export function useMapViewQuery() {
         { replace: true },
       );
     },
-    [setParams],
+    [setParams, viewDefaults],
   );
 
   useEffect(() => {
@@ -170,10 +191,11 @@ export function useMapViewQuery() {
   );
   const setGroupBy = useCallback(
     (v: string) => {
-      patchView({ groupBy: v });
+      patchView({ groupBy: normalizeMapGroupBy(v) });
     },
     [patchView],
   );
+
   const setFilter = useCallback(
     (v: MapActionFilter) => {
       patchView({ filter: v });
@@ -204,12 +226,12 @@ export function useMapViewQuery() {
       if (partial.search != null) setSearchState(partial.search);
       setParams(
         (prev) => {
-          const next = { ...parseMapViewSearch(prev), ...partial };
+          const next = { ...parseMapViewSearch(prev, viewDefaults), ...partial };
           if (partial.period && partial.period !== 'custom') {
             next.periodFrom = '';
             next.periodTo = '';
           }
-          const nextSp = serializeMapViewSearch(next);
+          const nextSp = serializeMapViewSearch(next, viewDefaults);
           if (opts?.clearAlert || opts?.alert === null) {
             alertKeepRef.current = null;
           } else if (opts?.alert) {
@@ -222,7 +244,7 @@ export function useMapViewQuery() {
         { replace: true },
       );
     },
-    [setParams],
+    [setParams, viewDefaults],
   );
 
   const resetToLiveView = useCallback(() => {
@@ -233,8 +255,18 @@ export function useMapViewQuery() {
     } catch {
       /* ignore */
     }
-    setParams(serializeMapViewSearch({ ...MAP_VIEW_DEFAULTS }), { replace: true });
-  }, [setParams]);
+    setParams(
+      serializeMapViewSearch(
+        {
+          ...MAP_VIEW_DEFAULTS,
+          groupBy: normalizeMapGroupBy(viewDefaults.groupBy, MAP_GROUP_BY_DEFAULT),
+        },
+        viewDefaults,
+      ),
+      { replace: true },
+    );
+
+  }, [setParams, viewDefaults]);
 
   return {
     period: parsed.period,

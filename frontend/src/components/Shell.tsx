@@ -127,6 +127,17 @@ export function UserMenu() {
             </div>
           ) : null}
         </div>
+        <Link
+          to="/profile"
+          className="ga-user-menu-item"
+          role="menuitem"
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen(false);
+          }}
+        >
+          Профиль
+        </Link>
         <button
           type="button"
           className="ga-user-menu-item"
@@ -140,6 +151,7 @@ export function UserMenu() {
           <span className="ga-theme-value">{themeLabel(themePreference)}</span>
         </button>
         <div className="ga-user-menu-sep" />
+
         <button
           type="button"
           className="ga-user-menu-item danger"

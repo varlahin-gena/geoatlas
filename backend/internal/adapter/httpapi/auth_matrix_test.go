@@ -34,6 +34,7 @@ func expectedAuthMatrix() map[string]authTier {
 		"DELETE /api/auth/sessions/{id}":                  tierAdmin,
 		"POST /api/auth/sessions/revoke-user":             tierAdmin,
 		"GET /api/auth/me":                                tierPublic, // handler returns 401 itself
+		"PATCH /api/auth/me/preferences":                  tierLogin,
 		"POST /api/auth/change-password":                  tierPublic, // handler checks session
 		"POST /api/auth/geo-wizard-dismiss":               tierLogin,
 		"GET /api/auth/check":                             tierPublic,

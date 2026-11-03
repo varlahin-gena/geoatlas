@@ -195,7 +195,8 @@ func TestOpenAPIAuthUserSchemaMatchesHandler(t *testing.T) {
 	props := schemaProps(t, doc, "AuthUser")
 	handlerFields := map[string]struct{}{
 		"username": {}, "full_name": {}, "role": {}, "must_reset_password": {},
-		"geo_wizard_dismissed": {}, "authDisabled": {}, "reputationEnabled": {},
+		"geo_wizard_dismissed": {}, "theme": {}, "map_group_by": {},
+		"authDisabled": {}, "reputationEnabled": {},
 	}
 	for f := range props {
 		if _, ok := handlerFields[f]; !ok {

@@ -26,6 +26,8 @@ type authUserResponse struct {
 	Role               string `json:"role"`
 	MustResetPassword  bool   `json:"must_reset_password,omitempty"`
 	GeoWizardDismissed bool   `json:"geo_wizard_dismissed,omitempty"`
+	Theme              string `json:"theme,omitempty"`
+	MapGroupBy         string `json:"map_group_by,omitempty"`
 	AuthDisabled       bool   `json:"authDisabled,omitempty"`
 	ReputationEnabled  bool   `json:"reputationEnabled"`
 }
@@ -65,6 +67,11 @@ type geoWizardDismissRequest struct {
 	Dismissed *bool `json:"dismissed"`
 }
 
+type preferencesRequest struct {
+	Theme      *string `json:"theme"`
+	MapGroupBy *string `json:"map_group_by"`
+}
+
 func userResponse(u auth.User) authUserResponse {
 	return authUserResponse{
 		Username:           u.Username,
@@ -72,6 +79,9 @@ func userResponse(u auth.User) authUserResponse {
 		Role:               u.Role,
 		MustResetPassword:  u.MustResetPassword,
 		GeoWizardDismissed: u.GeoWizardDismissed,
+		// Raw prefs: empty = unset (FE applies product defaults / local migrate).
+		Theme:      u.Theme,
+		MapGroupBy: u.MapGroupBy,
 	}
 }
 
@@ -82,6 +92,8 @@ func userPublicResponse(u auth.UserPublic) authUserResponse {
 		Role:               u.Role,
 		MustResetPassword:  u.MustResetPassword,
 		GeoWizardDismissed: u.GeoWizardDismissed,
+		Theme:              u.Theme,
+		MapGroupBy:         u.MapGroupBy,
 	}
 }
 
@@ -353,6 +365,62 @@ func (h *AuthHandler) LogoutAll(w http.ResponseWriter, r *http.Request) {
 	})
 	ClearCookie(w, r)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// UpdatePreferences — PATCH /api/auth/me/preferences (тема, группировка карты).
+func (h *AuthHandler) UpdatePreferences(w http.ResponseWriter, r *http.Request) {
+	if h.authDisabled() {
+		writeJSON(w, http.StatusOK, h.withModuleFlags(authUserResponse{
+			Username:     "anonymous",
+			Role:         auth.RoleAdministrator,
+			AuthDisabled: true,
+			Theme:        auth.DefaultTheme,
+			MapGroupBy:   auth.DefaultMapGroupBy,
+		}))
+		return
+	}
+	sess, err := SessionFromRequest(r, h.sessions)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
+		return
+	}
+	var req preferencesRequest
+	if !decodeJSONBody(w, r, &req, defaultJSONBodyLimit) {
+		return
+	}
+	if req.Theme == nil && req.MapGroupBy == nil {
+		writeBadRequest(w, "theme or map_group_by required")
+		return
+	}
+	if h.authUC == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "auth not configured"})
+		return
+	}
+	pub, err := h.authUC.SetPreferences(sess.Username, auth.PreferencesPatch{
+		Theme:      req.Theme,
+		MapGroupBy: req.MapGroupBy,
+	})
+	if err != nil {
+		writeUserStoreError(w, err)
+		return
+	}
+	details := map[string]any{}
+	if req.Theme != nil {
+		details["theme"] = pub.Theme
+	}
+	if req.MapGroupBy != nil {
+		details["map_group_by"] = pub.MapGroupBy
+	}
+	writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
+		Actor:        sess.Username,
+		Action:       "auth.preferences.update",
+		ResourceType: "user",
+		ResourceID:   sess.Username,
+		Result:       "succeeded",
+		IP:           clientIPFromRequest(r),
+		Details:      details,
+	})
+	writeJSON(w, http.StatusOK, h.withModuleFlags(userPublicResponse(pub)))
 }
 
 // DismissGeoWizard — POST /api/auth/geo-wizard-dismiss (свой флаг first-run GeoIP).
@@ -779,6 +847,8 @@ func writeUserStoreError(w http.ResponseWriter, err error) {
 		writeBadRequest(w, "invalid role")
 	case errors.Is(err, auth.ErrInvalidFullName):
 		writeBadRequest(w, "invalid full name")
+	case errors.Is(err, auth.ErrInvalidPreferences):
+		writeBadRequest(w, "invalid preferences")
 	case errors.Is(err, auth.ErrLastAdmin):
 		writeBadRequest(w, "cannot remove or demote the last administrator")
 	case errors.Is(err, auth.ErrSelfDelete):

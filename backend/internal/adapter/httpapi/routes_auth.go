@@ -21,6 +21,9 @@ func (w *routeWiring) registerAuthRoutes() {
 		chain(http.HandlerFunc(w.auth.RevokeUserSessions), w.adminMW, w.csrf, maxBytesMW(64<<10)),
 	)
 	w.handle("GET", "/api/auth/me", http.HandlerFunc(w.auth.Me))
+	w.handle("PATCH", "/api/auth/me/preferences",
+		chain(http.HandlerFunc(w.auth.UpdatePreferences), w.loginMW, w.csrf, maxBytesMW(64<<10)),
+	)
 	w.handle("POST", "/api/auth/change-password",
 		chain(http.HandlerFunc(w.auth.ChangePassword), w.csrf, maxBytesMW(64<<10)),
 	)

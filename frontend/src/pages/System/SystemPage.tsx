@@ -94,7 +94,7 @@ export default function SystemPage() {
   const rate = pipeline.rate || {};
   const storage = stats?.storage || {};
   const alerts = useMemo(() => stats?.alerts || [], [stats?.alerts]);
-  const failed = stats?.failed_logins || [];
+  const lockedNow = (stats?.failed_logins || []).filter((f) => f.locked);
   const edges = stats?.edges_agg;
 
   const eps = num(rate.input_events_per_sec ?? rate.events_per_sec);
@@ -262,8 +262,8 @@ export default function SystemPage() {
               onClick={() => setTab(id)}
             >
               {tabLabels[id]}
-              {id === 'security' && failed.length ? (
-                <span className="tab-badge">{failed.length}</span>
+              {id === 'security' && lockedNow.length ? (
+                <span className="tab-badge">{lockedNow.length}</span>
               ) : null}
             </button>
           ))}

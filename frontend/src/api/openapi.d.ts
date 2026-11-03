@@ -355,6 +355,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/me/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Обновить свои UI-предпочтения (тема, группировка карты)
+         * @description Частичный update: отсутствующее поле не меняется.
+         *     Хранится в `users.json` (`theme`, `map_group_by`).
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AuthPreferencesRequest"];
+                };
+            };
+            responses: {
+                /** @description OK (обновлённый пользователь) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AuthUser"];
+                    };
+                };
+                400: components["responses"]["ValidationError"];
+                /** @description Нет сессии */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
     "/api/auth/change-password": {
         parameters: {
             query?: never;
@@ -5046,8 +5098,24 @@ export interface components {
             role: "administrator" | "operator" | "dashboard";
             must_reset_password?: boolean;
             geo_wizard_dismissed?: boolean;
+            /**
+             * @description UI theme; empty on disk → dark
+             * @enum {string}
+             */
+            theme?: "light" | "dark";
+            /**
+             * @description Default map arc grouping; empty on disk → city
+             * @enum {string}
+             */
+            map_group_by?: "ip" | "subnet" | "city" | "country" | "continent" | "city_country";
             authDisabled?: boolean;
             reputationEnabled: boolean;
+        };
+        AuthPreferencesRequest: {
+            /** @enum {string} */
+            theme?: "light" | "dark";
+            /** @enum {string} */
+            map_group_by?: "ip" | "subnet" | "city" | "country" | "continent" | "city_country";
         };
         ReputationHit: {
             list: string;

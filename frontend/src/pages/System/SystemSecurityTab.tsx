@@ -124,7 +124,8 @@ export function SystemSecurityTab() {
     }
   }
 
-  const failed = data?.failed_logins || [];
+  // API отдаёт недавние неудачи входа; в этом блоке — только активный lockout.
+  const locked = (data?.failed_logins || []).filter((f) => f.locked);
   const sessions = data?.sessions || [];
   const recent = data?.auth_recent || [];
   const threat24 = data?.threat_counts?.last_24h;
@@ -152,60 +153,51 @@ export function SystemSecurityTab() {
   return (
     <div className="tab-panel active security-tab" role="tabpanel">
       <section className="card">
-        <details className="section-details" open>
-          <summary className={`card-title${failed.length ? ' is-alert' : ''}`}>
-            Кто сейчас заблокирован
-            <span className="card-title-count">
-              {failed.length ? failed.length : '0'}
-            </span>
-          </summary>
-          <div className="section-body">
-            {!failed.length ? (
-              <EmptyState
-                compact
-                title="Блокировок нет"
-                description="Если кто-то много раз ошибётся с паролем, запись появится здесь."
-              />
-            ) : (
-              <div className="table-wrap">
-                <table className="auth-fails-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">Учётная запись</th>
-                      <th scope="col">Адрес</th>
-                      <th scope="col" className="num">
-                        Попыток
-                      </th>
-                      <th scope="col">Первая попытка</th>
-                      <th scope="col">Последняя</th>
-                      <th scope="col">Статус</th>
-                      <th scope="col">До разблокировки</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {failed.map((f, i) => (
-                      <tr key={`${f.username}-${f.ip}-${i}`}>
-                        <td>{f.username}</td>
-                        <td className="mono">{f.ip}</td>
-                        <td className="num">{fmtNumber(f.count)}</td>
-                        <td>{fmtDate(f.first_at)}</td>
-                        <td>{fmtDate(f.last_at)}</td>
-                        <td>
-                          {f.locked ? <span className="badge-locked">Заблокирован</span> : 'Открыт'}
-                        </td>
-                        <td>{f.locked && f.locked_until ? fmtDate(f.locked_until) : '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+        <h3 className={`card-title${locked.length ? ' is-alert' : ''}`}>
+          Кто сейчас заблокирован
+          <span className="card-title-count">{locked.length}</span>
+        </h3>
+        {!locked.length ? (
+          <EmptyState
+            compact
+            title="Блокировок нет"
+            description="Если кто-то много раз ошибётся с паролем, запись появится здесь."
+          />
+        ) : (
+          <div className="table-wrap">
+            <table className="auth-fails-table">
+              <thead>
+                <tr>
+                  <th scope="col">Учётная запись</th>
+                  <th scope="col">Адрес</th>
+                  <th scope="col" className="num">
+                    Попыток
+                  </th>
+                  <th scope="col">Первая попытка</th>
+                  <th scope="col">Последняя</th>
+                  <th scope="col">До разблокировки</th>
+                </tr>
+              </thead>
+              <tbody>
+                {locked.map((f, i) => (
+                  <tr key={`${f.username}-${f.ip}-${i}`}>
+                    <td>{f.username}</td>
+                    <td className="mono">{f.ip}</td>
+                    <td className="num">{fmtNumber(f.count)}</td>
+                    <td>{fmtDate(f.first_at)}</td>
+                    <td>{fmtDate(f.last_at)}</td>
+                    <td>{f.locked_until ? fmtDate(f.locked_until) : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </details>
+        )}
       </section>
 
+
       <section className="card">
-        <h3 className="card-title">Защита от подбора пароля</h3>
+        <h3 className="card-title">Политика блокировки УЗ</h3>
         <p className="hint">Сколько раз можно ошибиться с паролем и на сколько потом блокировать вход.</p>
         <form className="form-row policy-form" onSubmit={onSavePolicy}>
           <div className="field">

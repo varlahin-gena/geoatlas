@@ -53,7 +53,8 @@ function applyResolved(theme: Theme): Theme {
   return t;
 }
 
-function setThemePreference(pref: Theme): Theme {
+/** Persist preference locally (FOUC cache) and apply to `data-theme`. */
+export function setThemePreference(pref: Theme): Theme {
   try {
     localStorage.setItem(THEME_KEY, pref);
   } catch {

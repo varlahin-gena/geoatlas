@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
+import { MAP_GROUP_BY_LABELS } from '@/lib/mapGrouping';
 import { mapRuCountry } from './mapConstants';
 import { categoryLabel } from './mapReputation';
 import type { RepFilterSide } from './mapTypes';
@@ -41,14 +42,7 @@ export function countActiveMapFilters(opts: {
   return describeActiveMapFilters({ ...opts, search: '' }).filter((c) => c.id !== 'search').length;
 }
 
-const GROUP_BY_LABELS: Record<string, string> = {
-  ip: 'IP',
-  subnet: '/24',
-  city: 'город',
-  country: 'страна',
-  continent: 'континент',
-  city_country: 'город — страна',
-};
+const GROUP_BY_LABELS: Record<string, string> = MAP_GROUP_BY_LABELS;
 
 export type ActiveMapFilterChip = {
   id: string;

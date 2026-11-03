@@ -5,20 +5,42 @@
   margin-bottom: 16px;
 }
 
-.anomaly-summary-card {
+.anomaly-summary-chip {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 4px;
   min-width: 120px;
-  padding: var(--density-summary-pad, 6px 10px);
+  min-height: 28px;
+  padding: var(--density-summary-pad, 8px 12px);
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel-2);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
 }
 
-.anomaly-summary-card strong {
+.anomaly-summary-chip:hover {
+  background: var(--panel-3);
+}
+
+.anomaly-summary-chip.is-active {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel-2));
+}
+
+.anomaly-summary-chip strong {
   font-size: 20px;
   line-height: 1.2;
+}
+
+.anomaly-search-count {
+  white-space: nowrap;
 }
 
 .anomaly-engine-form .form-row {
@@ -319,16 +341,18 @@
 
 .anomaly-assignee-select {
   max-width: 140px;
+  min-height: 28px;
   font-size: 12px;
-  padding: 4px 6px;
+  padding: 4px 8px;
 }
 
 .anomaly-sev-badge {
   display: inline-block;
-  padding: 2px 8px;
+  padding: 3px 9px;
   border-radius: 6px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
+  line-height: 1.3;
   border: 1px solid var(--border);
 }
 
@@ -349,15 +373,65 @@
 }
 
 .anomalies-table .actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
   white-space: nowrap;
 }
 
+.anomaly-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
 .anomalies-table .btn.sm {
+  min-height: 28px;
   font-size: 12px;
-  padding: 4px 8px;
+  padding: 5px 10px;
+}
+
+.anomaly-row-more {
+  position: relative;
+}
+
+.anomaly-row-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: var(--z-dropdown, 200);
+  min-width: 160px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.anomaly-row-menu-item {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.anomaly-row-menu-item:hover:not(:disabled) {
+  background: var(--panel-2);
+}
+
+.anomaly-row-menu-item.is-danger {
+  color: var(--red);
+}
+
+.anomaly-row-menu-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .sev-high { color: var(--red); }
@@ -397,6 +471,19 @@
 
 .anomaly-episodes-panel {
   margin-bottom: 16px;
+}
+
+.anomaly-episodes-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.anomaly-episodes-head .card-title {
+  margin: 0;
 }
 
 .anomaly-episode-row {

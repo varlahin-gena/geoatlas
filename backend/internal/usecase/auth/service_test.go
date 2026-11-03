@@ -80,6 +80,22 @@ func (f *fakeUsers) SetGeoWizardDismissed(username string, dismissed bool) (doma
 	f.user.GeoWizardDismissed = dismissed
 	return f.user.Public(), nil
 }
+
+func (f *fakeUsers) SetPreferences(username string, patch domain.PreferencesPatch) (domain.UserPublic, error) {
+	if f.err != nil {
+		return domain.UserPublic{}, f.err
+	}
+	if f.user == nil || f.user.Username != username {
+		return domain.UserPublic{}, domain.ErrUserNotFound
+	}
+	if patch.Theme != nil {
+		f.user.Theme = *patch.Theme
+	}
+	if patch.MapGroupBy != nil {
+		f.user.MapGroupBy = *patch.MapGroupBy
+	}
+	return f.user.Public(), nil
+}
 func (f *fakeUsers) ResetPassword(username, _ string, mustReset bool) (domain.UserPublic, error) {
 	if f.err != nil {
 		return domain.UserPublic{}, f.err

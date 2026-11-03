@@ -92,4 +92,18 @@ describe('theme preference', () => {
     expect(theme.themeLabel('light')).toBe('Светлая');
     expect(theme.themeLabel('dark')).toBe('Тёмная');
   });
+
+  it('applies server theme from /me over local FOUC cache', async () => {
+    store.set('nm.theme', 'dark');
+    document.documentElement.setAttribute('data-theme', 'dark');
+    const theme = await import('./theme');
+    expect(theme.getThemePreference()).toBe('dark');
+
+    const applied = theme.setThemePreference('light');
+    expect(applied).toBe('light');
+    expect(theme.getThemePreference()).toBe('light');
+    expect(store.get('nm.theme')).toBe('light');
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+  });
 });
+

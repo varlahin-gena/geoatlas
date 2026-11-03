@@ -9,10 +9,14 @@ const auth = vi.hoisted(() => ({
   uiAuthEnabled: true,
   theme: 'dark' as const,
   themePreference: 'dark' as const,
+  mapGroupBy: 'city' as const,
   user: null as null,
   refresh: async () => null,
   toggleTheme: () => {},
+  setTheme: async () => {},
+  setMapGroupBy: async () => {},
 }));
+
 
 vi.mock('@/auth/AuthContext', () => ({
   useAuth: () => auth,

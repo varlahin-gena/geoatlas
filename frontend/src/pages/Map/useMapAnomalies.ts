@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { isAbortError } from '@/api/client';
 import { ackAnomaly, fetchAnomalies, fetchAnomalySummary, type AnomalyEvent, type AnomalySummary } from '@/api/anomalies';
+import { normalizeMapGroupBy } from '@/lib/mapGrouping';
 import { usePolling } from '@/lib/usePolling';
 import type { AnomalyMapLink } from '@/api/anomalies';
 import type { MapActionFilter, MapViewState } from './mapQuery';
+
 
 const PERIOD_TO_MS: Record<string, number> = {
   '15m': 15 * 60_000,
@@ -58,7 +60,7 @@ export function anomalyMapToView(
   const search = link.group === 'country' && focusedCountry ? '' : link.q || '';
   return {
     period: resolveAnomalyPeriod(item, currentPeriod),
-    groupBy: link.group || 'ip',
+    groupBy: normalizeMapGroupBy(link.group || 'ip'),
     filter: filter === 'allowed' || filter === 'blocked' ? filter : 'all',
     search,
     focusedCountry,

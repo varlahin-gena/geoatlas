@@ -14,6 +14,7 @@ var mutationPaths = []struct {
 }{
 	{"post", "/api/auth/login"},
 	{"post", "/api/auth/change-password"},
+	{"patch", "/api/auth/me/preferences"},
 	{"post", "/api/auth/geo-wizard-dismiss"},
 	{"post", "/api/users"},
 	{"post", "/api/users/{username}/role"},

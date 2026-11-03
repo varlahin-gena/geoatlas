@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, Fragment } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ackAnomaly,
@@ -19,6 +19,7 @@ import {
   ANOMALY_CODE_OPTIONS,
   ANOMALY_SEVERITY_OPTIONS,
   ANOMALY_SINCE_OPTIONS,
+  anomalyCodeLabel,
   anomalyMapHref,
   eventCodeLabel,
   investigateHref,
@@ -70,21 +71,127 @@ function EpisodesPanel({
 
   return (
     <section className="card card-compact anomaly-episodes-panel">
-      <h3 className="card-title">Эпизоды (корреляция по IP / час)</h3>
-      <button type="button" className="btn sm" onClick={() => setOpen(false)}>
-        Скрыть
-      </button>
+      <div className="anomaly-episodes-head">
+        <h3 className="card-title">Эпизоды (корреляция по IP / час)</h3>
+        <button type="button" className="btn sm" onClick={() => setOpen(false)}>
+          Скрыть
+        </button>
+      </div>
       {!episodes.length ? <p className="hint">Нет эпизодов за период.</p> : null}
       {episodes.map((ep) => (
         <div key={ep.episode_id || ep.anchor_ip} className="anomaly-episode-row">
           <strong>{ep.anchor_ip || ep.episode_id?.slice(0, 8) || '—'}</strong>
           <span className={`sev-${ep.max_severity}`}>{severityLabel(ep.max_severity)}</span>
           <span>{fmtNumber(ep.alert_count ?? 0)} алертов</span>
-          <span className="hint">{(ep.codes || []).join(', ')}</span>
+          <span className="hint">
+            {(ep.codes || []).map(anomalyCodeLabel).filter(Boolean).join(', ')}
+          </span>
           <span className="hint">{relTime(ep.updated_at)}</span>
         </div>
       ))}
     </section>
+  );
+}
+
+function AnomalyRowActions({
+  item,
+  acked,
+  expanded,
+  canPeers,
+  acking,
+  onTogglePeers,
+  onHide,
+}: {
+  item: AnomalyEvent;
+  acked: boolean;
+  expanded: boolean;
+  canPeers: boolean;
+  acking: boolean;
+  onTogglePeers: () => void;
+  onHide: () => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onDoc(e: MouseEvent) {
+      if (!wrapRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setMenuOpen(false);
+    }
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
+
+  const hasMore = canPeers || !acked;
+
+  return (
+    <div className="anomaly-row-actions" ref={wrapRef}>
+      {item.fingerprint ? (
+        <Link to={investigateHref(item.fingerprint)} className="btn sm primary">
+          Разбор
+        </Link>
+      ) : null}
+      <Link
+        to={anomalyMapHref(item)}
+        className="btn sm"
+        onClick={() => rememberMapAlert(item)}
+      >
+        На карте
+      </Link>
+      {hasMore ? (
+        <div className="anomaly-row-more">
+          <button
+            type="button"
+            className="btn sm"
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+            aria-label="Другие действия"
+            onClick={() => setMenuOpen((v) => !v)}
+          >
+            Ещё
+          </button>
+          {menuOpen ? (
+            <div className="anomaly-row-menu" role="menu">
+              {canPeers ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="anomaly-row-menu-item"
+                  aria-expanded={expanded}
+                  onClick={() => {
+                    onTogglePeers();
+                    setMenuOpen(false);
+                  }}
+                >
+                  {expanded ? 'Скрыть связи' : 'Связи'}
+                </button>
+              ) : null}
+              {!acked ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="anomaly-row-menu-item is-danger"
+                  disabled={acking}
+                  onClick={() => {
+                    onHide();
+                    setMenuOpen(false);
+                  }}
+                >
+                  Скрыть на 24 ч
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -211,6 +318,10 @@ export default function AnomaliesPage() {
       .sort((a, b) => a.label.localeCompare(b.label, 'ru'));
   }, [directory, personLabel, rows, user?.username]);
 
+  function toggleSeverityFilter(next: string) {
+    setSeverity((cur) => (cur === next ? '' : next));
+  }
+
   async function hideAlert(item: AnomalyEvent) {
     const fp = item.fingerprint;
     if (!fp || acking) return;
@@ -243,11 +354,13 @@ export default function AnomaliesPage() {
         return { ...prev, high, warn, total: Math.max(0, (prev.total || 0) - 1) };
       });
       toast(
-        closer ? `Алерт закрыт (${personLabel(closer) || closer})` : 'Алерт закрыт',
+        closer
+          ? `Алерт скрыт на 24 ч (${personLabel(closer) || closer})`
+          : 'Алерт скрыт на 24 ч',
         'success',
       );
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Не удалось закрыть алерт', 'error');
+      toast(e instanceof Error ? e.message : 'Не удалось скрыть алерт', 'error');
     } finally {
       setAcking(null);
     }
@@ -272,12 +385,13 @@ export default function AnomaliesPage() {
 
   const moduleOff = summary?.module_loaded === false;
   const scanPaused = !moduleOff && summary?.enabled === false;
+  const searchActive = Boolean(search.trim());
 
   return (
     <AdminLayout title="Аномалии">
       <div className="page-content-inner wide">
         <p className="page-lead">
-          Алерты сканера за период. Закрытие скрывает алерт на 24 часа.
+          Алерты сканера за период. Скрытие прячет алерт на 24 часа.
         </p>
 
         {moduleOff ? (
@@ -301,32 +415,50 @@ export default function AnomaliesPage() {
         ) : null}
 
         {showSummary ? (
-          <div className="anomaly-summary-row">
-            <div className="anomaly-summary-card">
+          <div className="anomaly-summary-row" role="group" aria-label="Сводка по важности">
+            <button
+              type="button"
+              className={`anomaly-summary-chip${severity === 'high' ? ' is-active' : ''}`}
+              aria-pressed={severity === 'high'}
+              onClick={() => toggleSeverityFilter('high')}
+            >
               <span className="hint">Критично</span>
               <strong className="sev-high">{fmtNumber(summary?.high || 0)}</strong>
-            </div>
-            <div className="anomaly-summary-card">
+            </button>
+            <button
+              type="button"
+              className={`anomaly-summary-chip${severity === 'warn' ? ' is-active' : ''}`}
+              aria-pressed={severity === 'warn'}
+              onClick={() => toggleSeverityFilter('warn')}
+            >
               <span className="hint">Предупреждения</span>
               <strong className="sev-warn">{fmtNumber(summary?.warn || 0)}</strong>
-            </div>
-            <div className="anomaly-summary-card">
+            </button>
+            <button
+              type="button"
+              className={`anomaly-summary-chip${!severity ? ' is-active' : ''}`}
+              aria-pressed={!severity}
+              onClick={() => setSeverity('')}
+            >
               <span className="hint">Всего открытых</span>
               <strong>{fmtNumber(summary?.total || 0)}</strong>
-            </div>
-            <div className="anomaly-summary-card">
-              <span className="hint">Показано в таблице</span>
-              <strong>{fmtNumber(filtered.length)}</strong>
-            </div>
+            </button>
           </div>
         ) : null}
 
         <div className="toolbar anomaly-toolbar">
           <input
+            type="search"
             placeholder="Поиск по заголовку, IP, стране…"
+            aria-label="Поиск по заголовку, IP, стране"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          {searchActive ? (
+            <span className="hint anomaly-search-count" role="status">
+              Найдено: {fmtNumber(filtered.length)}
+            </span>
+          ) : null}
           <select value={severity} onChange={(e) => setSeverity(e.target.value)} aria-label="Важность">
             {ANOMALY_SEVERITY_OPTIONS.map((opt) => (
               <option key={opt.value || 'all'} value={opt.value}>
@@ -361,7 +493,7 @@ export default function AnomaliesPage() {
               checked={includeAcked}
               onChange={(e) => setIncludeAcked(e.target.checked)}
             />
-            <span>С закрытыми</span>
+            <span>Со скрытыми</span>
           </label>
           <button type="button" className="btn" onClick={() => void load()} disabled={loading}>
             Обновить
@@ -378,7 +510,7 @@ export default function AnomaliesPage() {
                 <th scope="col">Описание</th>
                 <th scope="col">Источник</th>
                 <th scope="col">Цель</th>
-                <th scope="col">ФИО</th>
+                <th scope="col">Исполнитель</th>
                 <th scope="col">Событий</th>
                 <th scope="col">Статус</th>
                 <th scope="col">
@@ -444,7 +576,7 @@ export default function AnomaliesPage() {
                           <span
                             title={
                               item.ack_by
-                                ? `Закрыл: ${personLabel(item.ack_by) || item.ack_by}`
+                                ? `Скрыл: ${personLabel(item.ack_by) || item.ack_by}`
                                 : undefined
                             }
                           >
@@ -453,7 +585,7 @@ export default function AnomaliesPage() {
                         ) : (
                           <select
                             className="anomaly-assignee-select"
-                            aria-label="ФИО исполнителя"
+                            aria-label="Исполнитель"
                             value={item.assigned_to || ''}
                             disabled={assigning === item.fingerprint}
                             onChange={(e) => {
@@ -474,47 +606,24 @@ export default function AnomaliesPage() {
                       <td>
                         {acked
                           ? item.ack_by
-                            ? `Закрыт (${personLabel(item.ack_by) || item.ack_by})`
-                            : 'Закрыт'
+                            ? `Скрыт (${personLabel(item.ack_by) || item.ack_by})`
+                            : 'Скрыт'
                           : 'Открыт'}
                       </td>
                       <td className="actions">
-                        {item.fingerprint ? (
-                          <Link to={investigateHref(item.fingerprint)} className="btn sm">
-                            Разбор
-                          </Link>
-                        ) : null}
-                        {canPeers ? (
-                          <button
-                            type="button"
-                            className="btn sm"
-                            aria-expanded={expanded}
-                            onClick={() =>
-                              setExpandedFp((cur) =>
-                                cur === item.fingerprint ? null : item.fingerprint || null,
-                              )
-                            }
-                          >
-                            {expanded ? 'Скрыть связи' : 'Связи'}
-                          </button>
-                        ) : null}
-                        <Link
-                          to={anomalyMapHref(item)}
-                          className="btn sm"
-                          onClick={() => rememberMapAlert(item)}
-                        >
-                          На карте
-                        </Link>
-                        {!acked ? (
-                          <button
-                            type="button"
-                            className="btn sm"
-                            disabled={acking === item.fingerprint}
-                            onClick={() => void hideAlert(item)}
-                          >
-                            Закрыть
-                          </button>
-                        ) : null}
+                        <AnomalyRowActions
+                          item={item}
+                          acked={acked}
+                          expanded={expanded}
+                          canPeers={canPeers}
+                          acking={acking === item.fingerprint}
+                          onTogglePeers={() =>
+                            setExpandedFp((cur) =>
+                              cur === item.fingerprint ? null : item.fingerprint || null,
+                            )
+                          }
+                          onHide={() => void hideAlert(item)}
+                        />
                       </td>
                     </tr>
                     {expanded && canPeers ? (

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: ГеоАтлас API
-  version: "1.18.0"
+  version: "1.19.0"
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
@@ -180,6 +180,32 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AuthUser"
+        "401":
+          description: Нет сессии
+  /api/auth/me/preferences:
+    patch:
+      tags: [auth]
+      summary: Обновить свои UI-предпочтения (тема, группировка карты)
+      description: |
+        Частичный update: отсутствующее поле не меняется.
+        Хранится в `users.json` (`theme`, `map_group_by`).
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthPreferencesRequest"
+      responses:
+        "200":
+          description: OK (обновлённый пользователь)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+        "400":
+          $ref: "#/components/responses/ValidationError"
         "401":
           description: Нет сессии
   /api/auth/change-password:
@@ -2835,8 +2861,27 @@ components:
           enum: [administrator, operator, dashboard]
         must_reset_password: { type: boolean }
         geo_wizard_dismissed: { type: boolean }
+        theme:
+          type: string
+          enum: [light, dark]
+          description: UI theme; empty on disk → dark
+        map_group_by:
+          type: string
+          enum: [ip, subnet, city, country, continent, city_country]
+          description: Default map arc grouping; empty on disk → city
         authDisabled: { type: boolean }
         reputationEnabled: { type: boolean }
+
+    AuthPreferencesRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        theme:
+          type: string
+          enum: [light, dark]
+        map_group_by:
+          type: string
+          enum: [ip, subnet, city, country, continent, city_country]
 
     ReputationHit:
       type: object

@@ -1,5 +1,8 @@
-import { ApiError, apiFetch, apiGet, apiPost } from './client';
+import { ApiError, apiFetch, apiGet, apiPatch, apiPost } from './client';
+import type { components } from './openapi';
 import type { AuthUser } from './types';
+
+export type AuthPreferencesPatch = components['schemas']['AuthPreferencesRequest'];
 
 export async function fetchMe(): Promise<AuthUser | null> {
   try {
@@ -38,4 +41,8 @@ export function changePassword(oldPassword: string, newPassword: string): Promis
 
 export function setGeoWizardDismissed(dismissed: boolean): Promise<AuthUser> {
   return apiPost('/api/auth/geo-wizard-dismiss', { dismissed });
+}
+
+export function updatePreferences(patch: AuthPreferencesPatch): Promise<AuthUser> {
+  return apiPatch('/api/auth/me/preferences', patch);
 }

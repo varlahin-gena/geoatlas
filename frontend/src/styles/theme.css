@@ -220,6 +220,7 @@ html[data-theme="light"] {
   justify-content: space-between;
   gap: 10px;
   width: 100%;
+  box-sizing: border-box;
   background: transparent;
   border: none;
   color: var(--text);
@@ -228,6 +229,7 @@ html[data-theme="light"] {
   font-size: 12px;
   cursor: pointer;
   text-align: left;
+  text-decoration: none;
 }
 .ga-user-menu-item:hover {
   background: var(--panel-3);

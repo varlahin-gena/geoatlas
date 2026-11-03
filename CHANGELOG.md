@@ -5,6 +5,12 @@
 
 ## [Unreleased]
 
+### Added
+- Страница **/profile**: смена пароля, тема UI и группировка дуг карты; prefs на сервере (`users.json`).
+- `PATCH /api/auth/me/preferences` (`theme`, `map_group_by`); поля в `GET /api/auth/me`.
+
+### Notes
+- OpenAPI API doc version: **1.19.0** (auth preferences: theme, map_group_by)
 
 ## [2.5.5] — 2026-11-02
 

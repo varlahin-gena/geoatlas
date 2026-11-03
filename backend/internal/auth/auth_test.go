@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"testing"
 	"time"
 )
@@ -191,6 +192,51 @@ func TestSetGeoWizardDismissed(t *testing.T) {
 	}
 	if pub.GeoWizardDismissed {
 		t.Fatal("expected cleared")
+	}
+}
+
+func TestSetPreferences(t *testing.T) {
+	dir := t.TempDir()
+	path := dir + "/users.json"
+	hash, err := HashPassword("adminpass1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := OpenOrSeed(path, []User{{
+		Username: "admin", PasswordHash: string(hash), Role: RoleAdministrator,
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	theme := ThemeLight
+	group := "city_country"
+	pub, err := store.SetPreferences("admin", PreferencesPatch{Theme: &theme, MapGroupBy: &group})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pub.Theme != ThemeLight || pub.MapGroupBy != "city_country" {
+		t.Fatalf("pub=%+v", pub)
+	}
+
+	bad := "neon"
+	if _, err := store.SetPreferences("admin", PreferencesPatch{Theme: &bad}); !errors.Is(err, ErrInvalidPreferences) {
+		t.Fatalf("want ErrInvalidPreferences, got %v", err)
+	}
+	if _, err := store.SetPreferences("admin", PreferencesPatch{}); !errors.Is(err, ErrInvalidPreferences) {
+		t.Fatalf("empty patch: %v", err)
+	}
+
+	store2, err := LoadUsersFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, ok := store2.Get("admin")
+	if !ok || got.Theme != ThemeLight || got.MapGroupBy != "city_country" {
+		t.Fatalf("reloaded=%+v ok=%v", got, ok)
+	}
+	if EffectiveTheme("") != DefaultTheme || EffectiveMapGroupBy("") != DefaultMapGroupBy {
+		t.Fatal("effective defaults")
 	}
 }
 
