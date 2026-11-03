@@ -78,6 +78,17 @@ jobs:
           output: trivy-frontend.sarif
           exit-code: "1"
 
+      # Table first so CRITICAL hits are visible in the job log (SARIF alone is opaque).
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: geoatlas-backend:scan
+          scanners: vuln
+          severity: CRITICAL
+          ignore-unfixed: true
+          format: table
+          exit-code: "0"
+
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: image

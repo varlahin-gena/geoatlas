@@ -16,11 +16,11 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
     -o /out/geoatlas ./cmd/geoatlas
 
 # ---------- runtime stage ----------
-FROM alpine:3.23@sha256:ff7f0c727dd796aa36787bfcd9a64bf35a6ce72a73451b3359fde849b6703d63
+FROM alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
 # uid/gid 101 = clickhouse/clickhouse-server — общий том clickhouse-backups
 # (иначе auth *.tgz и prune падают с permission denied).
 # libssl3/libcrypto3 и прочие пакеты: полный apk upgrade закрывает Trivy CRITICAL в Alpine.
-RUN apk add --no-cache ca-certificates=20261020-r0 tzdata=2026e-r0 && \
+RUN apk add --no-cache ca-certificates tzdata && \
     apk upgrade --no-cache && \
     addgroup -g 101 app && \
     adduser -D -u 101 -G app app && \
