@@ -32,13 +32,13 @@ export interface DetailAction {
   onClick: () => void;
 }
 
-export interface DetailHeroMetric {
+interface DetailHeroMetric {
   label: string;
   value: string;
   color?: string;
 }
 
-export interface DetailHero {
+interface DetailHero {
   statusLabel?: string;
   statusColor?: string;
   metrics?: DetailHeroMetric[];

@@ -45,7 +45,7 @@ func okHandler(t *testing.T) http.Handler {
 }
 
 func TestRequireLoginAuthDisabled(t *testing.T) {
-	h := RequireLogin(BearerAuth{}, nil, nil, true)(okHandler(t))
+	h := RequireLogin(BearerAuth{}, nil, nil, nil, true)(okHandler(t))
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
 	if rec.Code != http.StatusNoContent {
@@ -54,7 +54,7 @@ func TestRequireLoginAuthDisabled(t *testing.T) {
 }
 
 func TestRequireLoginUnauthorized(t *testing.T) {
-	h := RequireLogin(BearerAuth{}, nil, nil, false)(okHandler(t))
+	h := RequireLogin(BearerAuth{}, nil, nil, nil, false)(okHandler(t))
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
 	if rec.Code != http.StatusUnauthorized {
@@ -64,7 +64,7 @@ func TestRequireLoginUnauthorized(t *testing.T) {
 
 func TestRequireLoginBearer(t *testing.T) {
 	ba := NewBearerAuth([]string{"secret-token"}, nil, nil)
-	h := RequireLogin(ba, nil, nil, false)(okHandler(t))
+	h := RequireLogin(ba, nil, nil, nil, false)(okHandler(t))
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", "Bearer secret-token")
 	rec := httptest.NewRecorder()
@@ -79,7 +79,7 @@ func TestRequireLoginSession(t *testing.T) {
 	load := func(*http.Request) (auth.Session, error) {
 		return auth.Session{Username: "u", Role: auth.RoleOperator, SessionVersion: 1}, nil
 	}
-	h := RequireLogin(BearerAuth{}, load, users, false)(okHandler(t))
+	h := RequireLogin(BearerAuth{}, load, users, nil, false)(okHandler(t))
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
 	if rec.Code != http.StatusNoContent {
@@ -92,7 +92,7 @@ func TestRequireLoginMustReset(t *testing.T) {
 	load := func(*http.Request) (auth.Session, error) {
 		return auth.Session{Username: "u", Role: auth.RoleOperator, SessionVersion: 1}, nil
 	}
-	h := RequireLogin(BearerAuth{}, load, users, false)(okHandler(t))
+	h := RequireLogin(BearerAuth{}, load, users, nil, false)(okHandler(t))
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
 	if rec.Code != http.StatusForbidden {
@@ -105,7 +105,7 @@ func TestRequireAdminForbiddenForOperator(t *testing.T) {
 	load := func(*http.Request) (auth.Session, error) {
 		return auth.Session{Username: "u", Role: auth.RoleOperator, SessionVersion: 1}, nil
 	}
-	h := RequireAdmin(BearerAuth{}, load, users, false)(okHandler(t))
+	h := RequireAdmin(BearerAuth{}, load, users, nil, false)(okHandler(t))
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
 	if rec.Code != http.StatusForbidden {
@@ -118,7 +118,7 @@ func TestRequireAdminOK(t *testing.T) {
 	load := func(*http.Request) (auth.Session, error) {
 		return auth.Session{Username: "admin", Role: auth.RoleAdministrator, SessionVersion: 2}, nil
 	}
-	h := RequireAdmin(BearerAuth{}, load, users, false)(okHandler(t))
+	h := RequireAdmin(BearerAuth{}, load, users, nil, false)(okHandler(t))
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
 	if rec.Code != http.StatusNoContent {
@@ -128,7 +128,7 @@ func TestRequireAdminOK(t *testing.T) {
 
 func TestRequireOpsNamedToken(t *testing.T) {
 	ba := NewBearerAuth(nil, nil, stubTokens{scope: auth.ScopeOps, ok: true})
-	h := RequireOps(ba, nil, nil, false, false)(okHandler(t))
+	h := RequireOps(ba, nil, nil, nil, false, false)(okHandler(t))
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", "Bearer named")
 	rec := httptest.NewRecorder()

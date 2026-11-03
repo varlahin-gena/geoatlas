@@ -13,7 +13,6 @@ import type {
 } from './systemTypes';
 
 export type {
-  AuditEvent,
   BackupCatalog,
   BackupSchedule,
   DREvent,
@@ -83,7 +82,7 @@ export type AuthSessionRecord = {
   last_seen_at?: string;
 };
 
-export type SecurityThreatWindow = {
+type SecurityThreatWindow = {
   csrf_reject?: number;
   proxy_gate?: number;
   api_rate_limit?: number;
@@ -116,10 +115,6 @@ export type SystemSecuritySummary = {
 
 export function fetchSecuritySummary(init?: RequestInit): Promise<SystemSecuritySummary> {
   return apiGet('/api/system/security', init) as Promise<SystemSecuritySummary>;
-}
-
-export function fetchLoginPolicy(): Promise<LoginPolicy> {
-  return apiGet('/api/system/login-policy') as Promise<LoginPolicy>;
 }
 
 export function putLoginPolicy(body: LoginPolicy): Promise<LoginPolicy> {

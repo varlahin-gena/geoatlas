@@ -1,11 +1,9 @@
 export type {
-  AuditEvent,
   BackupCatalog,
   BackupEntry,
   BackupSchedule,
   DREvent,
   EdgesAgg,
-  FailedLogin,
   HistoryPoint,
   Retention,
   SystemStats,

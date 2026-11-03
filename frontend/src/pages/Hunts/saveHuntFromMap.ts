@@ -21,7 +21,7 @@ const FILTER_LABELS: Record<string, string> = {
   blocked: 'заблокированные',
 };
 
-export function periodLabel(period: string): string {
+function periodLabel(period: string): string {
   const hit = PERIODS.find(([id]) => id === period);
   return hit ? hit[1] : period;
 }

@@ -33,7 +33,7 @@ export function getThemePreference(): Theme {
   return 'dark';
 }
 
-export function resolveTheme(pref: Theme = getThemePreference()): Theme {
+function resolveTheme(pref: Theme = getThemePreference()): Theme {
   return pref === 'light' ? 'light' : 'dark';
 }
 
