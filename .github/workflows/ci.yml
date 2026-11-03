@@ -294,10 +294,12 @@ jobs:
           exit "$fail"
 
       # OpenSSF Silver: test_statement_coverage80 — overall Go statement coverage ≥80%.
+      # Exclude cmd (composition root) and //go:generate mains — not unit-tested by design.
       - name: coverage overall (≥80%)
         run: |
           set -euo pipefail
-          go test -count=1 -coverprofile=coverage.out ./...
+          mapfile -t pkgs < <(go list ./... | grep -Ev '/cmd/|/genschema$|/genactionsql$')
+          go test -count=1 -coverprofile=coverage.out "${pkgs[@]}"
           total=$(go tool cover -func=coverage.out | awk '/^total:/ { gsub(/%/,"",$NF); print $NF }')
           if [[ -z "$total" ]]; then
             echo "ERROR: could not parse overall coverage from go tool cover" >&2
