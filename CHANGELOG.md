@@ -6,6 +6,32 @@
 ## [Unreleased]
 
 
+## [2.6.0] — 2026-11-03
+
+Минор: стабильный пакет после train 2.5.1–2.5.7 — профиль и сессии, карта «город—страна», HIG triage UX, hardening образов и Scorecard на main.
+
+### Added
+- Страница **/profile**: смена пароля, тема UI и группировка дуг карты; prefs на сервере (`users.json`); `PATCH /api/auth/me/preferences`.
+- Session registry: активные UI-сессии, отзыв одной / всех (`/api/auth/sessions*`); политика lockout логина; сводка **Безопасность** (`GET /api/system/security`).
+- Карта: группировка **Город — страна** (`group_by=city_country`); «Скрыть связи внутри страны» в этом режиме.
+
+### Changed
+- Аномалии / навигация / мониторинг / логин / карта: HIG-полировка (inline triage, без лишней вкладки «Разбор», chrome карты в «Отображение», светлая/тёмная тема, Dozzle **v11.4.0**).
+- Релизы: подписи как `.sigstore` для Scorecard Signed-Releases; контракт CI coverage ≥80% и promote-gates после слияния train в main.
+
+### Security
+- Trivy Image scan: сброс CRITICAL по compose-образам (#148).
+- syslog-ng: `pyasn1` **0.6.5**, pin `oauthlib`; runtime digests Alpine/Node, nginx / Go build pins; frontend overrides (minimatch / undici / zod и др.).
+
+### Fixed
+- Глобус: длинные дуги (например RU↔AU) больше не отфильтровываются.
+- CI: golangci/gofmt, knip, MapLibre typing, SPA smoke после удаления upload с карты.
+
+### Notes
+- OpenAPI API doc version: **1.19.0** (prefs, sessions, security summary, login-policy, city_country)
+- Продуктовая версия: **2.6.0**
+- Схема ClickHouse (ga_schema_version): без изменений Ensure*.
+
 ## [2.5.7] — 2026-11-03
 
 Патч: triage без лишней вкладки, inline-действия, полировка профиля (stable).
@@ -680,6 +706,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.6.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.0
 [2.5.7]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.7
 [2.5.6]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.6
 [2.5.5]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.5
