@@ -166,17 +166,18 @@ export function SearchBuilder({
           <div className="search-builder-head">
             <div className="search-builder-title">Конструктор запроса</div>
             <div className="search-builder-actions">
-              <button type="button" onClick={() => setRows((r) => [...r, createDefaultBuilderRow()])}>
-                Добавить условие
-              </button>
-              <button type="button" onClick={() => setRows((r) => [...r, createDefaultBuilderGroup()])}>
-                Добавить группу
-              </button>
               <button type="button" className="primary" onClick={() => applyRows()}>
                 Применить
               </button>
+              <button type="button" onClick={() => setRows((r) => [...r, createDefaultBuilderRow()])}>
+                Условие
+              </button>
+              <button type="button" onClick={() => setRows((r) => [...r, createDefaultBuilderGroup()])}>
+                Группа
+              </button>
               <button
                 type="button"
+                className="ghost"
                 onClick={() => {
                   setRows([createDefaultBuilderRow()]);
                   onApply('');

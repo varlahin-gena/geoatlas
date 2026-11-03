@@ -146,7 +146,20 @@ export function makeChart(
           },
         },
       ],
-      scales: { x: { time: true } },
+      scales: {
+        x: { time: true },
+        // Memory/storage: anchor at 0 so axis units match legend (avoid tiny auto-range).
+        ...(opts?.isBytes
+          ? {
+              y: {
+                range: (_uPlot: uPlot, _min: number, max: number) => {
+                  const hi = Number.isFinite(max) && max > 0 ? max : 1024;
+                  return [0, hi * 1.08];
+                },
+              },
+            }
+          : {}),
+      },
     },
     [xs, ...ys],
     plotHost,

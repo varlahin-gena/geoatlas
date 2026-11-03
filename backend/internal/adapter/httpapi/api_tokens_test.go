@@ -55,10 +55,10 @@ func TestScopedBearerOpsVsAdmin(t *testing.T) {
 
 	opsOK := chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
-	}), requireOpsMW(ba, nil, nil, false, false))
+	}), requireOpsMW(ba, nil, nil, nil, false, false))
 	adminOK := chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
-	}), requireAdminMW(ba, nil, nil, false))
+	}), requireAdminMW(ba, nil, nil, nil, false))
 
 	reqOps := httptest.NewRequest(http.MethodGet, "/api/ingest/stats", nil)
 	reqOps.Header.Set("Authorization", "Bearer "+opsSecret)

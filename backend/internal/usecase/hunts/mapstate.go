@@ -89,7 +89,7 @@ func parseTime(s string) (time.Time, error) {
 func normalizeGroupBy(v string) string {
 	v = strings.ToLower(strings.TrimSpace(v))
 	switch v {
-	case "ip", "subnet", "country", "city", "continent":
+	case "ip", "subnet", "country", "city", "continent", "city_country":
 		return v
 	default:
 		return "city"

@@ -1,14 +1,21 @@
 import { MemoryRouter, useSearchParams } from 'react-router-dom';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import { useMapViewQuery } from './mapQuery';
+
+vi.mock('@/auth/AuthContext', () => ({
+  useAuth: () => ({
+    mapGroupBy: 'city',
+  }),
+}));
 
 function wrapperWith(initial: string) {
   return function Wrapper({ children }: { children: ReactNode }) {
     return <MemoryRouter initialEntries={[initial]}>{children}</MemoryRouter>;
   };
 }
+
 
 describe('useMapViewQuery alert / resetToLiveView', () => {
   it('exposes alertFingerprint from URL', () => {

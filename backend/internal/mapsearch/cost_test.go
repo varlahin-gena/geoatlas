@@ -45,6 +45,17 @@ func TestAssessMapQueryCostLightCityDay(t *testing.T) {
 	}
 }
 
+func TestAssessMapQueryCostHeavyCityCountry(t *testing.T) {
+	cost := AssessMapQueryCost(MapQueryCostInput{
+		GroupBy: "city_country",
+		Mode:    "hours",
+		Amount:  6,
+	})
+	if cost.Tier != QueryCostHeavy {
+		t.Fatalf("tier=%q want heavy", cost.Tier)
+	}
+}
+
 func TestEffectiveMapLimitCapsHeavy(t *testing.T) {
 	cost := AssessMapQueryCost(MapQueryCostInput{GroupBy: "ip", Mode: "hours", Amount: 1})
 	applied, capped := EffectiveMapLimit(20000, cost)

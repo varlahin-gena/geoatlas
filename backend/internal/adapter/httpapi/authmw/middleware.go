@@ -71,8 +71,17 @@ func denyIfMustReset(w http.ResponseWriter, users UserDirectory, username string
 // Middleware matches httpapi middleware signature.
 type Middleware func(http.Handler) http.Handler
 
+func liveOrDeny(w http.ResponseWriter, users UserDirectory, registry *auth.SessionRegistry, sess auth.Session) (auth.Session, bool) {
+	live, ok := auth.LiveSessionChecked(users, registry, sess)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
+		return auth.Session{}, false
+	}
+	return live, true
+}
+
 // RequireLogin требует cookie-сессию, Bearer (scope≥read), либо AUTH_DISABLED.
-func RequireLogin(ba BearerAuth, load SessionLoader, users UserDirectory, authDisabled bool) Middleware {
+func RequireLogin(ba BearerAuth, load SessionLoader, users UserDirectory, registry *auth.SessionRegistry, authDisabled bool) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if authDisabled {
@@ -92,9 +101,8 @@ func RequireLogin(ba BearerAuth, load SessionLoader, users UserDirectory, authDi
 				writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
 				return
 			}
-			live, ok := auth.LiveSession(users, sess)
+			live, ok := liveOrDeny(w, users, registry, sess)
 			if !ok {
-				writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
 				return
 			}
 			if denyIfMustReset(w, users, live.Username) {
@@ -106,7 +114,7 @@ func RequireLogin(ba BearerAuth, load SessionLoader, users UserDirectory, authDi
 }
 
 // RequireAdmin — роль administrator, Bearer scope=admin, либо AUTH_DISABLED.
-func RequireAdmin(ba BearerAuth, load SessionLoader, users UserDirectory, authDisabled bool) Middleware {
+func RequireAdmin(ba BearerAuth, load SessionLoader, users UserDirectory, registry *auth.SessionRegistry, authDisabled bool) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if authDisabled {
@@ -126,9 +134,8 @@ func RequireAdmin(ba BearerAuth, load SessionLoader, users UserDirectory, authDi
 				writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
 				return
 			}
-			live, ok := auth.LiveSession(users, sess)
+			live, ok := liveOrDeny(w, users, registry, sess)
 			if !ok {
-				writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
 				return
 			}
 			if !auth.IsAdmin(live.Role) {
@@ -144,7 +151,7 @@ func RequireAdmin(ba BearerAuth, load SessionLoader, users UserDirectory, authDi
 }
 
 // RequireOps — Bearer scope≥ops или administrator.
-func RequireOps(ba BearerAuth, load SessionLoader, users UserDirectory, apiAuthDisabled, authDisabled bool) Middleware {
+func RequireOps(ba BearerAuth, load SessionLoader, users UserDirectory, registry *auth.SessionRegistry, apiAuthDisabled, authDisabled bool) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if authDisabled || apiAuthDisabled {
@@ -164,9 +171,8 @@ func RequireOps(ba BearerAuth, load SessionLoader, users UserDirectory, apiAuthD
 				writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
 				return
 			}
-			live, ok := auth.LiveSession(users, sess)
+			live, ok := liveOrDeny(w, users, registry, sess)
 			if !ok {
-				writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
 				return
 			}
 			if !auth.IsAdmin(live.Role) {

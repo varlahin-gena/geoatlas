@@ -56,10 +56,8 @@ export default function ParseErrorsPage() {
   return (
     <SettingsLayout title="Ошибки парсинга">
       <div className="page-content-inner">
-        <h1>Строки, которые не удалось нормализовать</h1>
         <p className="page-lead">
-          Сюда попадают строки логов, которые ingest не смог разобрать. TTL — 7 дней; записи можно
-          удалить вручную.
+          Строки, которые ingest не разобрал. TTL 7 дней; можно удалить вручную.
         </p>
         <div className="toolbar" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
           <input

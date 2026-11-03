@@ -216,3 +216,15 @@ export function apiPut<P extends keyof paths & string>(
     body: body === undefined ? init?.body : JSON.stringify(body),
   });
 }
+
+export function apiPatch<P extends keyof paths & string>(
+  path: P,
+  body?: unknown,
+  init?: RequestInit,
+): Promise<ApiJson<P, 'patch'>> {
+  return apiFetch<ApiJson<P, 'patch'>>(path, {
+    ...init,
+    method: 'PATCH',
+    body: body === undefined ? init?.body : JSON.stringify(body),
+  });
+}

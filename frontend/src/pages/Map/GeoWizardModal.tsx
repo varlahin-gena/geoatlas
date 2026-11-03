@@ -1,5 +1,7 @@
-import { useEffect, useRef, type RefObject } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { Link } from 'react-router-dom';
+import { useToast } from '@/components/Toast';
+import { copyText } from '@/lib/clipboard';
 import { fmtNumber } from '@/lib/format';
 import { formatNetworkHint, type DryRunPreview, type GeoStatus, type GeoWizardStep } from './geoWizard';
 
@@ -69,10 +71,10 @@ interface Props {
   onWaitForCurl: () => void;
 }
 
-const STEPS: { id: GeoWizardStep; label: string }[] = [
-  { id: 'why', label: '1. Почему пусто' },
-  { id: 'upload', label: '2. Загрузка' },
-  { id: 'done', label: '3. Готово' },
+const STEPS: { id: GeoWizardStep; label: string; short: string }[] = [
+  { id: 'why', label: 'Почему пусто', short: '1' },
+  { id: 'upload', label: 'Загрузка', short: '2' },
+  { id: 'done', label: 'Готово', short: '3' },
 ];
 
 export function GeoWizardModal(props: Props) {
@@ -95,13 +97,26 @@ export function GeoWizardModal(props: Props) {
   } = props;
 
   const dialogRef = useDialogA11y(onDismiss);
+  const { toast } = useToast();
+  const [copied, setCopied] = useState(false);
+  const copiedTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copiedTimer.current != null) window.clearTimeout(copiedTimer.current);
+    };
+  }, []);
 
   async function copyCurl() {
-    try {
-      await navigator.clipboard.writeText(curlSnippet);
-    } catch {
-      /* ignore */
+    const ok = await copyText(curlSnippet);
+    if (!ok) {
+      toast('Не удалось скопировать команду', 'error');
+      return;
     }
+    toast('Команда скопирована', 'success');
+    setCopied(true);
+    if (copiedTimer.current != null) window.clearTimeout(copiedTimer.current);
+    copiedTimer.current = window.setTimeout(() => setCopied(false), 2000);
   }
 
   return (
@@ -124,7 +139,7 @@ export function GeoWizardModal(props: Props) {
         <div className="geo-wizard-header">
           <h3 id="geo-wizard-title">Мастер GeoIP</h3>
           <p className="geo-wizard-sub">
-            Карта рисует только IP с координатами. Без базы GeoIP дуги не появятся.
+            На карте видны только IP с координатами. Без базы дуги не появятся.
           </p>
         </div>
 
@@ -134,10 +149,14 @@ export function GeoWizardModal(props: Props) {
               key={s.id}
               type="button"
               className={`geo-wizard-step${step === s.id ? ' active' : ''}`}
+              aria-current={step === s.id ? 'step' : undefined}
               onClick={() => setStep(s.id)}
               disabled={busy && s.id !== step}
             >
-              {s.label}
+              <span className="geo-wizard-step-num" aria-hidden="true">
+                {s.short}
+              </span>
+              <span className="geo-wizard-step-label">{s.label}</span>
             </button>
           ))}
         </nav>
@@ -146,16 +165,18 @@ export function GeoWizardModal(props: Props) {
           {step === 'why' ? (
             <div className="geo-wizard-panel">
               <p>
-                После установки ClickHouse и ingest уже работают, но таблица <code>geo_ranges</code>{' '}
-                пуста. События пишутся, а на карту не попадают — нет lat/lon.
+                ClickHouse и ingest уже работают, но таблица <code>geo_ranges</code> пуста. События
+                пишутся, а на карту не попадают — нет координат.
               </p>
               <ul>
                 <li>
-                  База в индексе:{' '}
+                  В индексе:{' '}
                   <strong>{geo ? fmtNumber(geo.count) : '…'}</strong> диапазонов
                   {geo && !geo.indexReady ? ' (индекс ещё загружается)' : ''}
                 </li>
-                <li>Формат CSV — как в SIEM KUMA (Network, Country, Region, City, Latitude, Longitude)</li>
+                <li>
+                  CSV как в SIEM KUMA: Network, Country, Region, City, Latitude, Longitude
+                </li>
                 <li>Большие файлы надёжнее заливать с сервера через curl</li>
               </ul>
               <div className="modal-actions">
@@ -180,7 +201,7 @@ export function GeoWizardModal(props: Props) {
                 <section>
                   <h4>Из файла</h4>
                   <p className="geo-wizard-hint">
-                    Сначала проверка (<code>dry_run</code>), затем запись. Лимит:{' '}
+                    Сначала проверка, затем запись. Лимит:{' '}
                     {geo?.uploadMaxBytes
                       ? `${fmtNumber(geo.uploadMaxBytes)} байт`
                       : 'по профилю установки'}
@@ -251,16 +272,24 @@ export function GeoWizardModal(props: Props) {
                 </section>
 
                 <section>
-                  <h4>С сервера (рекомендуется для больших CSV)</h4>
+                  <h4>С сервера</h4>
                   <p className="geo-wizard-hint">
-                    Скопируйте CSV на хост и выполните команду (нужен{' '}
+                    Для больших CSV: скопируйте файл на хост и выполните команду (нужен{' '}
                     <code>API_AUTH_TOKEN</code> из <code>.env</code>).
                   </p>
-                  <pre className="geo-wizard-curl">{curlSnippet}</pre>
-                  <div className="geo-wizard-row">
-                    <button type="button" className="btn" onClick={() => void copyCurl()} disabled={busy}>
-                      Копировать
+                  <div className="geo-wizard-curl-wrap">
+                    <pre className="geo-wizard-curl">{curlSnippet}</pre>
+                    <button
+                      type="button"
+                      className="btn geo-wizard-copy"
+                      onClick={() => void copyCurl()}
+                      disabled={busy}
+                      aria-label="Копировать команду curl"
+                    >
+                      {copied ? 'Скопировано' : 'Копировать'}
                     </button>
+                  </div>
+                  <div className="geo-wizard-row">
                     <button
                       type="button"
                       className="btn"
@@ -270,15 +299,15 @@ export function GeoWizardModal(props: Props) {
                         void onWaitForCurl();
                       }}
                     >
-                      Я залил через curl — ждать
+                      Уже отправил через curl
                     </button>
                   </div>
                 </section>
 
                 <section>
-                  <h4>Позже точечно</h4>
+                  <h4>По одному IP</h4>
                   <p className="geo-wizard-hint">
-                    Когда появятся события, IP без координат можно добавить на странице{' '}
+                    Когда появятся события, адреса без координат можно добавить на странице{' '}
                     <Link to="/geo-missing">IP без координат</Link>.
                   </p>
                 </section>
@@ -300,29 +329,26 @@ export function GeoWizardModal(props: Props) {
               {geo && geo.count > 0 ? (
                 <>
                   <p>
-                    База GeoIP на месте: <strong>{fmtNumber(geo.count)}</strong> диапазонов
+                    База на месте: <strong>{fmtNumber(geo.count)}</strong> диапазонов
                     {geo.indexReady ? '' : ' (индекс ещё догружается)'}.
                   </p>
                   <p className="geo-wizard-hint">
-                    Обновите карту. Если дуг всё ещё нет — проверьте syslog / загрузку логов и период.
+                    Обновите карту. Если дуг нет — проверьте syslog и выбранный период.
                   </p>
                 </>
               ) : (
                 <>
                   <p>База пока пуста или индекс ещё поднимается.</p>
-                  <p className="geo-wizard-hint">{pollNote || 'Можно закрыть и открыть мастер снова из сайдбара.'}</p>
+                  <p className="geo-wizard-hint">
+                    {pollNote || 'Можно закрыть и открыть мастер снова из сайдбара.'}
+                  </p>
                 </>
               )}
               {pollNote && geo && geo.count > 0 ? (
                 <p className="geo-wizard-hint">{pollNote}</p>
               ) : null}
               <div className="modal-actions">
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={busy}
-                  onClick={onMoreUpload}
-                >
+                <button type="button" className="btn" disabled={busy} onClick={onMoreUpload}>
                   Ещё загрузка
                 </button>
                 <button

@@ -76,8 +76,7 @@ export default function ParserTestPage() {
     <SettingsLayout title="Тест парсеров">
       <div className="page-content-inner">
         <p className="page-lead">
-          Строки прогоняются через тот же реестр парсеров, что и боевой ingest (
-          <code>/api/parse-test</code>).
+          Тот же реестр парсеров, что и боевой ingest.
         </p>
         <div className="card">
           <div className="chrome-section-head" style={{ marginBottom: 8 }}>

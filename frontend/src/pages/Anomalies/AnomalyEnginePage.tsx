@@ -9,9 +9,8 @@ import {
   type AnomalyThresholds,
 } from '@/api/anomalies';
 import { AdminLayout } from '@/components/AdminLayout';
-import { TriageSectionNav } from '@/components/ObserveSectionNav';
 import { useToast } from '@/components/Toast';
-import { fmtDate, fmtNumber } from '@/lib/format';
+import { fmtBytes, fmtDate, fmtNumber } from '@/lib/format';
 import {
   DETECTOR_THRESHOLD_GROUPS,
   type DetectorThresholdMeta,
@@ -59,10 +58,6 @@ function StatusPanel({ status }: { status: AnomalyScanStatus | null }) {
     <section className="card card-compact anomaly-engine-status">
       <h3 className="card-title">Состояние сканера</h3>
       <dl className="anomaly-engine-dl">
-        <div>
-          <dt>Сканирование</dt>
-          <dd>{status.enabled ? 'включено' : 'приостановлено'}</dd>
-        </div>
         <div>
           <dt>Обучение</dt>
           <dd>{status.learning ? 'да' : 'нет'}</dd>
@@ -129,6 +124,9 @@ function ThresholdField({
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
       />
+      {field.unit === 'bytes' ? (
+        <span className="field-hint">≈ {fmtBytes(value)}</span>
+      ) : null}
       {field.hint ? <span className="field-hint">{field.hint}</span> : null}
     </label>
   );
@@ -167,12 +165,13 @@ function DetectorCard({
         </button>
       </header>
 
-      <p className="thresholds-detector-summary">{detector.summary}</p>
-
       {open ? (
-        <p id={adviceId} className="thresholds-detector-advice">
-          <strong>Рекомендации.</strong> {detector.advice}
-        </p>
+        <div id={adviceId} className="thresholds-detector-advice">
+          <p>{detector.summary}</p>
+          <p>
+            <strong>Рекомендации.</strong> {detector.advice}
+          </p>
+        </div>
       ) : null}
 
       <div className="form-row thresholds-detector-fields">
@@ -216,7 +215,7 @@ function ThresholdsPanel({
             {customized
               ? ' Сейчас используются переопределённые значения.'
               : ' Показаны значения по умолчанию профиля.'}{' '}
-            Детекторы сгруппированы по смыслу; у каждого типа — краткое описание и кнопка «Как настроить».
+            Подробности детектора — в «Как настроить».
           </p>
         </div>
         <button type="button" className="btn sm" onClick={onReset} disabled={!defaults}>
@@ -320,7 +319,6 @@ export default function AnomalyEnginePage() {
 
   return (
     <AdminLayout title="Движок аномалий">
-      <TriageSectionNav />
       <div className="page-intro">
         <p>
           Параметры сканера, пороги детекторов и подавление повторов. Журнал алертов — на странице{' '}
@@ -342,6 +340,21 @@ export default function AnomalyEnginePage() {
           <StatusPanel status={view.status ?? null} />
 
           <form className="card card-compact anomaly-engine-form" onSubmit={(e) => void onSave(e)}>
+            <div className="anomaly-engine-sticky-actions">
+              <button type="submit" className="btn primary" disabled={saving}>
+                {saving ? 'Сохранение…' : 'Сохранить'}
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => void load()}
+                disabled={loading || saving}
+                title="Перезагрузить настройки с сервера"
+              >
+                С сервера
+              </button>
+            </div>
+
             <h3 className="card-title">Параметры</h3>
 
             <label className="anomaly-include-acked">
@@ -409,15 +422,6 @@ export default function AnomalyEnginePage() {
               onChange={onThresholdChange}
               onReset={onResetThresholds}
             />
-
-            <div className="form-actions">
-              <button type="submit" className="btn primary" disabled={saving}>
-                {saving ? 'Сохранение…' : 'Сохранить'}
-              </button>
-              <button type="button" className="btn" onClick={() => void load()} disabled={loading || saving}>
-                Обновить
-              </button>
-            </div>
           </form>
         </>
       ) : null}

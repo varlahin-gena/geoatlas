@@ -134,7 +134,8 @@ body.page-admin .admin-main {
   flex-shrink: 0;
 }
 .sidebar-section-title {
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--text-muted);
   padding: 6px 10px 8px 10px;
@@ -175,6 +176,9 @@ body.page-admin .admin-main {
   color: var(--accent);
 }
 .side-btn.active .icon { color: var(--accent); }
+.app.sidebar-collapsed .side-btn.active {
+  background: color-mix(in srgb, var(--accent) 18%, var(--panel-2));
+}
 .side-btn .label { flex: 1; min-width: 0; }
 .side-btn-badge {
   display: inline-block;
@@ -241,7 +245,7 @@ body.page-admin .admin-main {
   top: auto;
 }
 .nav-flyout-title {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--text-muted);
@@ -512,7 +516,7 @@ body.page-admin .search-box svg {
 table { width: 100%; border-collapse: collapse; font-size: var(--density-font-table, 12px); }
 th, td {
   text-align: left;
-  padding: var(--density-row-pad-y, 8px) var(--density-row-pad-x, 10px);
+  padding: var(--density-row-pad-y, 4px) var(--density-row-pad-x, 8px);
   border-bottom: 1px solid var(--border);
   vertical-align: top;
 }

@@ -38,7 +38,7 @@ RUN set -eux; \
       rm -rf /var/lib/apt/lists/*; \
     fi; \
     "${py}" -m pip install --no-cache-dir --upgrade \
-      'pyasn1==0.6.4' \
+      'pyasn1==0.6.5' \
       'aiohttp==3.14.4' \
       'certifi==2026.10.18' \
       'idna==3.15' \
@@ -48,7 +48,7 @@ RUN set -eux; \
       'tornado==6.6'; \
     "${py}" -c "import importlib.metadata as m; \
 a=m.version; \
-assert a('pyasn1')=='0.6.4', a('pyasn1'); \
+assert a('pyasn1')=='0.6.5', a('pyasn1'); \
 assert a('aiohttp')=='3.14.4', a('aiohttp'); \
 assert a('certifi')=='2026.10.18', a('certifi'); \
 assert a('idna')=='3.15', a('idna'); \

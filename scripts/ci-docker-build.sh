@@ -207,7 +207,7 @@ build_syslog_ng() {
   # (Trivy false-positive setuptools 70.3 via pip/_vendor/bom.cdx.json).
   docker run --rm --entrypoint /var/lib/syslog-ng/python-venv/bin/python "$tag" \
     -c "import importlib.metadata as m; a=m.version; \
-assert a('pyasn1')=='0.6.4', a('pyasn1'); \
+assert a('pyasn1')=='0.6.5', a('pyasn1'); \
 assert a('aiohttp')=='3.14.4', a('aiohttp'); \
 assert a('certifi')=='2026.10.18', a('certifi'); \
 assert a('idna')=='3.15', a('idna'); \

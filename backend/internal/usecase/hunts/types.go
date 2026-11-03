@@ -93,7 +93,7 @@ func ValidateMapState(st MapState) error {
 		group = "city"
 	}
 	switch group {
-	case "ip", "subnet", "city", "country", "continent":
+	case "ip", "subnet", "city", "country", "continent", "city_country":
 	default:
 		return ErrInvalidMapState
 	}

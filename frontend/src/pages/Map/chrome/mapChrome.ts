@@ -1,4 +1,4 @@
-import type { Dispatch, RefObject, SetStateAction } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import type { MapRefreshSec } from '../mapRefreshInterval';
 import type { MapSidebarProps } from '../MapSidebar';
 import type { MapTopbarProps } from '../MapTopbar';
@@ -7,38 +7,13 @@ import type { RepFilterSide } from '../mapTypes';
 type ViewMode = 'map' | 'globe';
 
 export type MapChromeSidebarInput = {
-  viewMode: ViewMode;
-  setViewMode: (mode: ViewMode) => void;
-  isAdmin: boolean;
-  logFileRef: RefObject<HTMLInputElement | null>;
-  geoFileRef: RefObject<HTMLInputElement | null>;
-  uploadFile: (kind: 'logs' | 'geo', file: File) => void | Promise<void>;
-  fetchData: () => void | Promise<void>;
-  resetView: () => void;
-  exportPng: () => void | Promise<void>;
   toggleSidebar: () => void;
-  geoWizardOpen: () => void;
-  geoWizardEmpty: boolean | null;
 };
 
 export function buildMapSidebarProps(input: MapChromeSidebarInput): MapSidebarProps {
   return {
-    view: { viewMode: input.viewMode, setViewMode: input.setViewMode },
-    isAdmin: input.isAdmin,
-    uploads: {
-      logFileRef: input.logFileRef,
-      geoFileRef: input.geoFileRef,
-      uploadFile: input.uploadFile,
-    },
     actions: {
-      fetchData: input.fetchData,
-      resetView: input.resetView,
-      exportPng: input.exportPng,
       toggleSidebar: input.toggleSidebar,
-    },
-    geoWizard: {
-      open: input.geoWizardOpen,
-      empty: input.geoWizardEmpty,
     },
   };
 }
@@ -74,6 +49,10 @@ export type MapChromeTopbarInput = {
   setPeriodTo: (v: string) => void;
   fetchData: () => void | Promise<void>;
   viewMode: ViewMode;
+  setViewMode: (mode: ViewMode) => void;
+  resetView: () => void;
+  exportPng: () => void | Promise<void>;
+  learningNote: string | null;
   minCount: number;
   setMinCount: (n: number) => void;
   arcCountInfo: { shown: number; total: number };
@@ -100,6 +79,7 @@ export type MapChromeTopbarInput = {
   setAutoRotate: (v: boolean) => void;
   setInfoDockTab: (tab: 'legend' | 'stats') => void;
   focusedCountry: string | null;
+  clearFocusedCountry: () => void;
 };
 
 export function buildMapTopbarProps(input: MapChromeTopbarInput): MapTopbarProps {
@@ -126,6 +106,8 @@ export function buildMapTopbarProps(input: MapChromeTopbarInput): MapTopbarProps
       setFilter: input.setFilter,
       hideIntraCountry: input.hideIntraCountry,
       setHideIntraCountry: input.setHideIntraCountry,
+      focusedCountry: input.focusedCountry,
+      clearFocusedCountry: input.clearFocusedCountry,
     },
     reputation: {
       reputationEnabled: input.reputationEnabled,
@@ -150,8 +132,15 @@ export function buildMapTopbarProps(input: MapChromeTopbarInput): MapTopbarProps
       setPeriodTo: input.setPeriodTo,
       fetchData: input.fetchData,
     },
+    learningNote: input.learningNote,
     layers: {
       viewMode: input.viewMode,
+      setViewMode: input.setViewMode,
+      tools: {
+        fetchData: input.fetchData,
+        resetView: input.resetView,
+        exportPng: input.exportPng,
+      },
       viz: {
         minCount: input.minCount,
         setMinCount: input.setMinCount,

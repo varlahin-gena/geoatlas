@@ -41,6 +41,15 @@ type FailedLoginEvent struct {
 	LockedUntil time.Time `json:"locked_until,omitempty"`
 }
 
+// Policy — текущие пороги lockout.
+type Policy struct {
+	MaxFails   int           `json:"max_fails"`
+	Window     time.Duration `json:"-"`
+	Lockout    time.Duration `json:"-"`
+	WindowSec  int           `json:"window_sec"`
+	LockoutSec int           `json:"lockout_sec"`
+}
+
 // New — limiter with defaults when params are non-positive.
 func New(maxFails int, window, lockout time.Duration) *Limiter {
 	if maxFails <= 0 {
@@ -61,6 +70,40 @@ func New(maxFails int, window, lockout time.Duration) *Limiter {
 		lockout:      lockout,
 		retain:       24 * time.Hour,
 		maxAudit:     200,
+	}
+}
+
+// Policy returns a copy of current thresholds.
+func (l *Limiter) Policy() Policy {
+	if l == nil {
+		return Policy{MaxFails: 10, Window: time.Minute, Lockout: 5 * time.Minute, WindowSec: 60, LockoutSec: 300}
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return Policy{
+		MaxFails:   l.maxFails,
+		Window:     l.window,
+		Lockout:    l.lockout,
+		WindowSec:  int(l.window / time.Second),
+		LockoutSec: int(l.lockout / time.Second),
+	}
+}
+
+// SetPolicy updates thresholds live (non-positive values keep previous).
+func (l *Limiter) SetPolicy(maxFails int, window, lockout time.Duration) {
+	if l == nil {
+		return
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if maxFails > 0 {
+		l.maxFails = maxFails
+	}
+	if window > 0 {
+		l.window = window
+	}
+	if lockout > 0 {
+		l.lockout = lockout
 	}
 }
 

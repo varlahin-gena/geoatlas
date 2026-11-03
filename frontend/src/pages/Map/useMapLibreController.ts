@@ -18,6 +18,7 @@ import {
   MAP_STYLE_DARK,
   MAP_STYLE_LIGHT,
   emptyStyleFallback,
+  hideBasemapCountryLabels,
 } from './mapConstants';
 import {
   applyGlobeFitZoom,
@@ -100,6 +101,7 @@ export function useMapLibreController(opts: {
       mapTilesFailedRef.current = false;
       setMapTilesFailed(false);
       try {
+        hideBasemapCountryLabels(map);
         map.jumpTo({ center, zoom, bearing, pitch });
         applyMapProjection(map, viewModeRef.current);
         map.triggerRepaint();
@@ -208,6 +210,11 @@ export function useMapLibreController(opts: {
         basemapOkRef.current = true;
         mapTilesFailedRef.current = false;
         setMapTilesFailed(false);
+      }
+      try {
+        hideBasemapCountryLabels(map);
+      } catch {
+        /* ignore */
       }
 
       if (viewModeRef.current === 'globe') {

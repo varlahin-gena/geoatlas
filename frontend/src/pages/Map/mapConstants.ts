@@ -243,6 +243,41 @@ export function emptyStyleFallback(mode: 'map' | 'globe' = 'map') {
   };
 }
 
+/**
+ * CARTO Dark Matter / Positron text layers (EN places, roads, water, POI).
+ * All clash with our optional RU country TextLayer — hide the whole symbol set.
+ */
+export function isBasemapTextLabelLayer(id: string): boolean {
+  return (
+    id.startsWith('place_') ||
+    id.startsWith('roadname_') ||
+    id.startsWith('watername_') ||
+    id.startsWith('waterway_label') ||
+    id.startsWith('poi_') ||
+    id === 'housenumber'
+  );
+}
+
+/** Hide all basemap EN text; RU country names stay on the «Названия стран» checkbox. */
+export function hideBasemapCountryLabels(map: {
+  getStyle: () => { layers?: Array<{ id: string; type?: string }> } | undefined;
+  getLayer: (id: string) => unknown;
+  setLayoutProperty: (id: string, key: string, value: unknown) => void;
+}): void {
+  const layers = map.getStyle()?.layers;
+  if (!layers?.length) return;
+  for (const layer of layers) {
+    if (layer.type !== 'symbol') continue;
+    if (!isBasemapTextLabelLayer(layer.id)) continue;
+    if (!map.getLayer(layer.id)) continue;
+    try {
+      map.setLayoutProperty(layer.id, 'visibility', 'none');
+    } catch {
+      /* layer may disappear mid-style swap */
+    }
+  }
+}
+
 function cssVar(name: string, fallback: string): string {
   try {
     const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();

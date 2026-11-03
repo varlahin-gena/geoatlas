@@ -1,6 +1,9 @@
 import type { RefObject } from 'react';
+import { PERIODS } from './systemTypes';
 
 export function SystemChartsTab({
+  period,
+  onPeriodChange,
   chartEvents,
   chartLag,
   chartCpu,
@@ -8,6 +11,8 @@ export function SystemChartsTab({
   chartBuffer,
   chartStorage,
 }: {
+  period: string;
+  onPeriodChange: (period: string) => void;
   chartEvents: RefObject<HTMLDivElement | null>;
   chartLag: RefObject<HTMLDivElement | null>;
   chartCpu: RefObject<HTMLDivElement | null>;
@@ -17,6 +22,21 @@ export function SystemChartsTab({
 }) {
   return (
     <div className="tab-panel active" role="tabpanel">
+      <div className="charts-period-bar" role="group" aria-label="Период графиков">
+        <div className="period-tabs">
+          {PERIODS.map(([v, label]) => (
+            <button
+              key={v}
+              type="button"
+              data-period={v}
+              className={period === v ? 'active' : ''}
+              onClick={() => onPeriodChange(v)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
       <section className="row cols-2">
         <div className="card chart-card">
           <div className="chart-host" ref={chartEvents} style={{ height: 240 }} />

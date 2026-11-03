@@ -44,7 +44,7 @@ export function relTime(iso?: string): string {
   return `${Math.round(h / 24)} дн назад`;
 }
 
-function codeLabel(code?: string): string {
+export function anomalyCodeLabel(code?: string): string {
   switch (code) {
     case 'port_scan':
       return 'Сканирование портов';
@@ -70,7 +70,7 @@ function codeLabel(code?: string): string {
 }
 
 export function eventCodeLabel(item: AnomalyEvent): string {
-  return item.code_label || codeLabel(item.code);
+  return item.code_label || anomalyCodeLabel(item.code);
 }
 
 export function severityLabel(severity?: string): string {

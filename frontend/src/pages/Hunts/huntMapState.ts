@@ -1,5 +1,7 @@
 import type { SavedHunt, HuntMapState } from '@/api/hunts';
+import { normalizeMapGroupBy } from '@/lib/mapGrouping';
 import { MAP_VIEW_DEFAULTS, serializeMapViewSearch, type MapViewState } from '@/pages/Map/mapQuery';
+
 
 export function mapViewToHuntState(view: {
   period: string;
@@ -28,7 +30,7 @@ function huntStateToMapView(state: HuntMapState): Partial<MapViewState> {
     period: state.period || '1d',
     periodFrom: state.period_from || '',
     periodTo: state.period_to || '',
-    groupBy: state.group_by || 'city',
+    groupBy: normalizeMapGroupBy(state.group_by || 'city'),
     filter: (state.filter as MapViewState['filter']) || 'all',
     search: state.query || '',
     focusedCountry: state.country || null,

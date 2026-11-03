@@ -74,7 +74,7 @@ export default function ChangePasswordPage() {
           <img className="logo" src="/logo.png" alt="ГеоАтлас" width={40} height={40} />
           <div>
             <h1>Смена пароля</h1>
-            <p>
+            <p className="auth-sub">
               {user?.must_reset_password
                 ? 'Требуется сменить пароль'
                 : 'Новый пароль · остальные сессии будут завершены'}
@@ -114,8 +114,12 @@ export default function ChangePasswordPage() {
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
         />
-        <button type="submit" disabled={busy}>
-          Сохранить
+        <button
+          type="submit"
+          disabled={busy || !currentPassword || !newPassword || !confirm}
+          aria-busy={busy}
+        >
+          {busy ? 'Сохранение…' : 'Сохранить'}
         </button>
       </form>
     </>

@@ -4,6 +4,8 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   isNavActive,
   NAV_SECTION_ICONS,
+  navItemTitle,
+  sectionBadgeTitle,
   sectionBadgeTotal,
   splitNavItems,
   type NavGroupSection,
@@ -27,7 +29,8 @@ function NavLinkItem({
   onNavigate?: () => void;
 }) {
   const className = `side-btn${active ? ' active' : ''}${nested ? ' nav-nested-link' : ''}`;
-  const title = badge ? `${item.label} (${badge})` : item.label;
+  const name = navItemTitle(item);
+  const title = badge ? `${name} (${badge})` : name;
   const content = (
     <>
       <NavIcon kind={NAV_ICONS[item.href] || 'map'} />
@@ -174,7 +177,7 @@ function NavSectionBlock({
   }, [collapsed]);
 
   if (collapsed) {
-    const title = badge ? `${section.label} (${badge})` : section.label;
+    const title = sectionBadgeTitle(section, badges);
     return (
       <div className={`${sectionClassName} nav-section-collapsed`}>
         <button

@@ -2,7 +2,6 @@ import { filterNav, PAGE_NAV, type NavItem } from '@/components/nav';
 import { PERIODS } from '@/pages/Map/mapPeriods';
 import { dispatchMapCommand } from '@/lib/mapCommandBus';
 import { cycleThemePreference } from '@/auth/theme';
-import { toggleDensity } from '@/auth/density';
 
 type CommandGroup = 'navigate' | 'map' | 'triage' | 'prefs';
 
@@ -42,10 +41,10 @@ export type CommandCatalogContext = {
 function navCommands(items: NavItem[]): AppCommand[] {
   return items.map((item) => ({
     id: `nav:${item.href}`,
-    label: item.label,
+    label: item.title || item.label,
     group: 'navigate' as const,
     groupLabel: NAV_GROUP_SUBTITLE[item.group] || GROUP_LABELS.navigate,
-    keywords: `${item.href} ${item.group}`,
+    keywords: `${item.href} ${item.group} ${item.label} ${item.title || ''}`,
     href: item.external ? undefined : item.href,
     run: item.external
       ? () => {
@@ -122,23 +121,21 @@ export function buildCommandCatalog(ctx: CommandCatalogContext): AppCommand[] {
   });
 
   cmds.push({
+    id: 'prefs:profile',
+    label: 'Открыть профиль',
+    group: 'prefs',
+    groupLabel: GROUP_LABELS.prefs,
+    keywords: 'profile prefs preferences пароль тема группировка',
+    href: '/profile',
+  });
+  cmds.push({
     id: 'prefs:theme',
     label: 'Сменить тему',
     group: 'prefs',
     groupLabel: GROUP_LABELS.prefs,
-    keywords: 'theme dark light system',
+    keywords: 'theme dark light тема светлая тёмная',
     run: () => {
       cycleThemePreference();
-    },
-  });
-  cmds.push({
-    id: 'prefs:density',
-    label: 'Сменить плотность UI',
-    group: 'prefs',
-    groupLabel: GROUP_LABELS.prefs,
-    keywords: 'density compact comfortable',
-    run: () => {
-      toggleDensity();
     },
   });
 

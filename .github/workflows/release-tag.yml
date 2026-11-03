@@ -46,7 +46,12 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "release ${TAG} already exists"
           else
-            gh release create "$TAG" --title "$TAG" --notes-file "$notes"
+            # CHANGELOG Notes with «тестовый» / pre-release → GitHub Pre-release (not Latest).
+            extra=()
+            if grep -qiE 'тестов(ый|ая|ое)|pre-?release' "$notes"; then
+              extra+=(--prerelease)
+            fi
+            gh release create "$TAG" --title "$TAG" --notes-file "$notes" "${extra[@]}"
           fi
       - name: free disk space
         run: |

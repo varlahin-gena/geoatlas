@@ -9,7 +9,9 @@ import { PageLoading } from '@/components/AdminLayout';
 import LoginPage from '@/pages/Login/LoginPage';
 import ChangePasswordPage from '@/pages/ChangePassword/ChangePasswordPage';
 
+const ProfilePage = lazy(() => import('@/pages/Profile/ProfilePage'));
 const MapPage = lazy(() => import('@/pages/Map/MapPage'));
+
 const SystemPage = lazy(() => import('@/pages/System/SystemPage'));
 const UsersPage = lazy(() => import('@/pages/Users/UsersPage'));
 const ApiTokensPage = lazy(() => import('@/pages/ApiTokens/ApiTokensPage'));
@@ -51,6 +53,16 @@ export default function App() {
                 }
               />
               <Route
+                path="/profile"
+                element={
+                  <RequireAuth>
+                    <Lazy label="профиль">
+                      <ProfilePage />
+                    </Lazy>
+                  </RequireAuth>
+                }
+              />
+              <Route
                 path="/"
                 element={
                   <RequireAuth>
@@ -60,6 +72,7 @@ export default function App() {
                   </RequireAuth>
                 }
               />
+
               <Route
                 path="/system"
                 element={

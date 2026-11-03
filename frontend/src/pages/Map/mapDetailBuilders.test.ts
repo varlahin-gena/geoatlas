@@ -32,8 +32,8 @@ describe('buildLineDetail', () => {
     };
     const detail = buildLineDetail(line, 'ip', [], points);
     const dst = detail.sections.find((s) => s.title === 'Назначение');
-    expect(dst?.rows.some((r) => r.key === 'City' && r.value === 'Красноярск')).toBe(true);
-    expect(dst?.rows.some((r) => r.key === 'Country' && r.value === 'Россия')).toBe(true);
+    expect(dst?.rows.some((r) => r.key === 'Город' && r.value === 'Красноярск')).toBe(true);
+    expect(dst?.rows.some((r) => r.key === 'Страна' && r.value === 'Россия')).toBe(true);
   });
 
   it('prefers point city over empty line fields for both endpoints', () => {
@@ -56,7 +56,7 @@ describe('buildLineDetail', () => {
     const detail = buildLineDetail(line, 'ip', [], points);
     const src = detail.sections.find((s) => s.title === 'Источник');
     const dst = detail.sections.find((s) => s.title === 'Назначение');
-    expect(src?.rows.some((r) => r.key === 'City' && r.value === 'AlphaCity')).toBe(true);
-    expect(dst?.rows.some((r) => r.key === 'City' && r.value === 'BetaCity')).toBe(true);
+    expect(src?.rows.some((r) => r.key === 'Город' && r.value === 'AlphaCity')).toBe(true);
+    expect(dst?.rows.some((r) => r.key === 'Город' && r.value === 'BetaCity')).toBe(true);
   });
 });

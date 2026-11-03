@@ -99,10 +99,9 @@ export default function UsersPage() {
       }
     >
       <div className="page-content-inner narrow">
-        <p className="page-lead">Локальные учётные записи</p>
+        <p className="page-lead">Локальные учётные записи UI.</p>
 
         <div className="card">
-          <h2>Учётные записи</h2>
           <div className="table-wrap">
             <table>
               <thead>

@@ -22,6 +22,7 @@ import {
   buildLineCoordFallback,
   buildDisplayCoordMap,
   buildDeckLayers,
+  isArcVisibleOnGlobe,
 } from './mapLayers';
 import type { MapLine } from './mapTypes';
 
@@ -137,6 +138,37 @@ describe('mapLayers helpers', () => {
     expect(b).toBeTruthy();
     expect(a![0]).not.toBeCloseTo(b![0], 3);
     expect(map.get('8.8.8.8')).toEqual([-122.1, 37.4]);
+  });
+});
+
+describe('isArcVisibleOnGlobe', () => {
+  it('keeps long-haul RU→AU when the Asia face is in view', () => {
+    // ~130° angular span — previously culled by Math.PI*0.55 (~99°).
+    const line: MapLine = {
+      src: 'ru',
+      dst: 'au',
+      src_lat: 55.7,
+      src_lon: 37.6,
+      dst_lat: -25.3,
+      dst_lon: 133.8,
+      count: 1,
+      status: 'allowed',
+    };
+    expect(isArcVisibleOnGlobe(line, 100, 10, {})).toBe(true);
+  });
+
+  it('drops arcs when both ends are on the back hemisphere', () => {
+    const line: MapLine = {
+      src: 'a',
+      dst: 'b',
+      src_lat: 0,
+      src_lon: 170,
+      dst_lat: 10,
+      dst_lon: -170,
+      count: 1,
+    };
+    // Looking at the Atlantic (0,0) — Pacific endpoints sit behind.
+    expect(isArcVisibleOnGlobe(line, 0, 0, {})).toBe(false);
   });
 });
 

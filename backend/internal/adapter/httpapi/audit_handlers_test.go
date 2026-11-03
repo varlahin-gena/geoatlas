@@ -37,6 +37,10 @@ func (f *fakeAuditStore) ListAudit(_ context.Context, _ usecaseaudit.AuditQuery)
 	return f.audit, nil
 }
 
+func (f *fakeAuditStore) CountAuditByAction(_ context.Context, _ time.Time, _ string) ([]usecaseaudit.ActionCount, error) {
+	return nil, nil
+}
+
 func TestGetDRHistoryReturnsItems(t *testing.T) {
 	logs := usecaseaudit.New(&fakeAuditStore{
 		dr: []usecaseaudit.DREvent{{

@@ -76,19 +76,19 @@ export function useMapDetail(opts: {
           groupBy,
           [
             {
-              label: 'Копировать src',
+              label: 'Копировать источник',
               onClick: () => void copyToClipboard(line.src || '', toast),
             },
             {
-              label: 'Копировать dst',
+              label: 'Копировать назначение',
               onClick: () => void copyToClipboard(line.dst || '', toast),
             },
             {
-              label: 'Поиск src',
+              label: 'Искать источник',
               onClick: () => applySearchFilter(line.src_label || line.src || ''),
             },
             {
-              label: 'Поиск dst',
+              label: 'Искать назначение',
               onClick: () => applySearchFilter(line.dst_label || line.dst || ''),
             },
           ],

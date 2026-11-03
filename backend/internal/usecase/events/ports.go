@@ -37,3 +37,8 @@ type GeoLookuper = mapagg.GeoLookuper
 type ReputationLookuper interface {
 	Lookup(ipStr string) []model.ReputationHit
 }
+
+// EnterpriseNetLister — сети предприятия для groupBy=city_country.
+type EnterpriseNetLister interface {
+	ListEnterpriseNets(ctx context.Context) ([]model.EnterpriseNet, error)
+}

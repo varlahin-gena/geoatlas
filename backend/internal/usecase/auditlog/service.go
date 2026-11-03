@@ -35,11 +35,18 @@ type DRQuery struct {
 }
 
 type AuditQuery struct {
-	Since  time.Time
-	Limit  int
+	Since        time.Time
+	Limit        int
+	Action       string
+	ActionPrefix string   // e.g. "auth." or "security." (ignored when Action set)
+	Actions      []string // exact IN list (ignored when Action set)
+	Result       string
+	Actor        string
+}
+
+type ActionCount struct {
 	Action string
-	Result string
-	Actor  string
+	Count  int64
 }
 
 type Store interface {
@@ -47,6 +54,7 @@ type Store interface {
 	WriteAudit(context.Context, AuditEvent) error
 	ListDR(context.Context, DRQuery) ([]DREvent, error)
 	ListAudit(context.Context, AuditQuery) ([]AuditEvent, error)
+	CountAuditByAction(ctx context.Context, since time.Time, prefix string) ([]ActionCount, error)
 }
 
 type Service struct {
@@ -103,4 +111,14 @@ func (s *Service) ListAudit(ctx context.Context, q AuditQuery) ([]AuditEvent, er
 		q.Since = time.Now().UTC().Add(-30 * 24 * time.Hour)
 	}
 	return s.store.ListAudit(ctx, q)
+}
+
+func (s *Service) CountAuditByAction(ctx context.Context, since time.Time, prefix string) ([]ActionCount, error) {
+	if !s.Enabled() {
+		return []ActionCount{}, nil
+	}
+	if since.IsZero() {
+		since = time.Now().UTC().Add(-24 * time.Hour)
+	}
+	return s.store.CountAuditByAction(ctx, since, prefix)
 }
