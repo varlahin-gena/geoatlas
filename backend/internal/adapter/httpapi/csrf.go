@@ -9,12 +9,14 @@ import (
 	"strings"
 
 	"geoatlas/internal/adapter/httpapi/authmw"
+	"geoatlas/internal/adapter/httpapi/loginthrottle"
 	"geoatlas/internal/auth"
+	usecaseaudit "geoatlas/internal/usecase/auditlog"
 )
 
 // csrfMW — double-submit CSRF для cookie-сессий на небезопасных методах.
 // Bearer (любой scope) / AUTH_DISABLED пропускаются. GET/HEAD/OPTIONS — без проверки.
-func csrfMW(ba authmw.BearerAuth, authDisabled bool) middleware {
+func csrfMW(ba authmw.BearerAuth, authDisabled bool, logs *usecaseaudit.Service) middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if authDisabled || safeMethod(r.Method) || ba.Any(r) {
@@ -34,6 +36,7 @@ func csrfMW(ba authmw.BearerAuth, authDisabled bool) middleware {
 					"x_forwarded_host", r.Header.Get("X-Forwarded-Host"),
 					"path", r.URL.Path,
 				)
+				auditSecurityReject(r.Context(), logs, "security.csrf.reject", loginthrottle.ClientIP(r), r.URL.Path, "origin", nil)
 				writeJSON(w, http.StatusForbidden, map[string]any{"error": "csrf origin rejected"})
 				return
 			}
@@ -41,6 +44,7 @@ func csrfMW(ba authmw.BearerAuth, authDisabled bool) middleware {
 			header := strings.TrimSpace(r.Header.Get(auth.CSRFHeaderName))
 			if err != nil || cookie == nil || cookie.Value == "" || header == "" ||
 				subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(header)) != 1 {
+				auditSecurityReject(r.Context(), logs, "security.csrf.reject", loginthrottle.ClientIP(r), r.URL.Path, "token", nil)
 				writeJSON(w, http.StatusForbidden, map[string]any{"error": "csrf token missing or invalid"})
 				return
 			}

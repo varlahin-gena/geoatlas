@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AnomalyEvent } from '@/api/anomalies';
 import {
+  anomalyCodeLabel,
   anomalyEventsHours,
   anomalyEventsQuery,
   anomalyMapHref,
@@ -30,6 +31,12 @@ describe('anomalyDisplay', () => {
   it('filters rows by search text', () => {
     expect(matchesAnomalySearch(item, '203.0.113')).toBe(true);
     expect(matchesAnomalySearch(item, 'missing')).toBe(false);
+  });
+
+  it('maps detector codes to Russian labels', () => {
+    expect(anomalyCodeLabel('horizontal_scan')).toBe('Сканирование подсети');
+    expect(anomalyCodeLabel('port_scan')).toBe('Сканирование портов');
+    expect(anomalyCodeLabel('unknown_code')).toBe('unknown_code');
   });
 
   it('derives events hours and query for peers panel', () => {

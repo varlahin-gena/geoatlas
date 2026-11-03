@@ -1,4 +1,4 @@
-import { fmtNumber } from '@/lib/format';
+import { fmtBytes, fmtNumber } from '@/lib/format';
 import { mapRuCountry } from './mapConstants';
 import { countryAliases } from './mapHeatmap';
 import { reputationDetailRows } from './mapReputation';
@@ -20,23 +20,33 @@ const colorByStatus: Record<string, string> = {
   unknown: '',
 };
 
+const statusLabelRu: Record<string, string> = {
+  allowed: 'Разрешено',
+  blocked: 'Заблокировано',
+  unknown: 'Неизвестно',
+};
+
 function lineEndpointKeyLabel(groupBy: string): string {
   switch (groupBy) {
     case 'ip':
       return 'IP';
     case 'subnet':
       return 'Подсеть';
+    case 'city':
+      return 'Город';
     case 'country':
       return 'Страна';
     case 'continent':
       return 'Континент';
+    case 'city_country':
+      return 'Город / страна';
     default:
-      return 'Ключ';
+      return 'Узел';
   }
 }
 
 function lineDetailSampleKey(label: string, coarse: boolean): string {
-  return coarse ? `${label} (пример)` : label;
+  return coarse ? label : label;
 }
 
 function lineEndpointRows(
@@ -51,19 +61,25 @@ function lineEndpointRows(
   groupBy: string,
   coarse: boolean,
 ) {
-  const showLabel = side.label && side.label !== side.key;
+  const showLabel = !!(side.label && side.label !== side.key);
   const showCountry = groupBy !== 'country' && groupBy !== 'continent';
-  const rows = [{ key: lineEndpointKeyLabel(groupBy), value: side.key }];
-  if (showLabel) rows.push({ key: 'Метка', value: side.label || '' });
+  const rows: { key: string; value: string }[] = [];
+  // Coarse grouping: human label first; hide raw composite keys like city:country:RU.
+  if (coarse && showLabel) {
+    rows.push({ key: lineEndpointKeyLabel(groupBy), value: side.label || '' });
+  } else {
+    rows.push({ key: lineEndpointKeyLabel(groupBy), value: side.key });
+    if (showLabel) rows.push({ key: 'Метка', value: side.label || '' });
+  }
   rows.push(
     { key: lineDetailSampleKey('Порт', coarse), value: side.port ? String(side.port) : '' },
-    { key: lineDetailSampleKey('Zone', coarse), value: side.zone || '' },
+    { key: lineDetailSampleKey('Зона', coarse), value: side.zone || '' },
   );
   if (side.city) {
-    rows.push({ key: 'City', value: side.city });
+    rows.push({ key: 'Город', value: side.city });
   }
   if (showCountry) {
-    rows.push({ key: 'Country', value: mapRuCountry(side.country) });
+    rows.push({ key: 'Страна', value: mapRuCountry(side.country) });
   }
   return rows;
 }
@@ -74,72 +90,90 @@ export function buildLineDetail(
   actions: DetailAction[],
   points?: Record<string, MapPoint>,
 ): DetailState {
-  const coarse = groupBy === 'subnet' || groupBy === 'city' || groupBy === 'country' || groupBy === 'continent';
+  const coarse =
+    groupBy === 'subnet' ||
+    groupBy === 'city' ||
+    groupBy === 'country' ||
+    groupBy === 'continent' ||
+    groupBy === 'city_country';
   const srcPoint = points?.[line.src];
   const dstPoint = points?.[line.dst];
+  const status = line.status || '';
+  const statusColor = colorByStatus[status] || '';
+  const statusLabel = statusLabelRu[status] || status || '—';
+  const repRows = [
+    ...reputationDetailRows('Источник', line.src, line.src_reputation),
+    ...reputationDetailRows('Назначение', line.dst, line.dst_reputation),
+  ];
+  const sections: DetailSection[] = [
+    {
+      title: 'Связь',
+      rows: [
+        { key: 'Событий', value: fmtNumber(line.count) },
+        { key: 'Разрешено', value: fmtNumber(line.allowed_count), color: 'green' },
+        { key: 'Заблокировано', value: fmtNumber(line.blocked_count), color: 'red' },
+        { key: 'Исходящие байты', value: fmtBytes(line.bytes_sent) },
+        { key: 'Входящие байты', value: fmtBytes(line.bytes_recv) },
+      ],
+    },
+    {
+      title: 'Источник',
+      rows: lineEndpointRows(
+        {
+          key: line.src,
+          label: line.src_label,
+          port: line.src_port,
+          zone: line.src_zone,
+          country: line.src_country || srcPoint?.country,
+          city: srcPoint?.city,
+        },
+        groupBy,
+        coarse,
+      ),
+    },
+    {
+      title: 'Назначение',
+      rows: lineEndpointRows(
+        {
+          key: line.dst,
+          label: line.dst_label,
+          port: line.dst_port,
+          zone: line.dst_zone,
+          country: line.dst_country || dstPoint?.country,
+          city: dstPoint?.city,
+        },
+        groupBy,
+        coarse,
+      ),
+    },
+  ];
+  if (repRows.length) {
+    sections.push({ title: 'Репутация', rows: repRows });
+  }
+  sections.push({
+    title: 'Параметры',
+    rows: [
+      { key: lineDetailSampleKey('Протокол', coarse), value: line.proto || '' },
+      { key: lineDetailSampleKey('Правило', coarse), value: line.rule || '' },
+      { key: lineDetailSampleKey('Устройство', coarse), value: line.device || '' },
+      { key: 'Последнее действие', value: line.last_action || '' },
+    ],
+  });
+
   return {
     kind: 'line',
     title: `${line.src_label || line.src} → ${line.dst_label || line.dst}`,
     actions,
-    sections: [
-      {
-        title: 'Связь',
-        rows: [
-          { key: 'Статус', value: line.status || '', color: colorByStatus[line.status || ''] || '' },
-          { key: 'Событий', value: fmtNumber(line.count) },
-          { key: 'Allowed', value: fmtNumber(line.allowed_count), color: 'green' },
-          { key: 'Blocked', value: fmtNumber(line.blocked_count), color: 'red' },
-          { key: 'Bytes out', value: fmtNumber(line.bytes_sent) },
-          { key: 'Bytes in', value: fmtNumber(line.bytes_recv) },
-        ],
-      },
-      {
-        title: 'Источник',
-        rows: lineEndpointRows(
-          {
-            key: line.src,
-            label: line.src_label,
-            port: line.src_port,
-            zone: line.src_zone,
-            country: line.src_country || srcPoint?.country,
-            city: srcPoint?.city,
-          },
-          groupBy,
-          coarse,
-        ),
-      },
-      {
-        title: 'Назначение',
-        rows: lineEndpointRows(
-          {
-            key: line.dst,
-            label: line.dst_label,
-            port: line.dst_port,
-            zone: line.dst_zone,
-            country: line.dst_country || dstPoint?.country,
-            city: dstPoint?.city,
-          },
-          groupBy,
-          coarse,
-        ),
-      },
-      {
-        title: 'Репутация',
-        rows: [
-          ...reputationDetailRows('Src', line.src, line.src_reputation),
-          ...reputationDetailRows('Dst', line.dst, line.dst_reputation),
-        ],
-      },
-      {
-        title: 'Параметры',
-        rows: [
-          { key: lineDetailSampleKey('Protocol', coarse), value: line.proto || '' },
-          { key: lineDetailSampleKey('Rule', coarse), value: line.rule || '' },
-          { key: lineDetailSampleKey('Device', coarse), value: line.device || '' },
-          { key: 'Last action', value: line.last_action || '' },
-        ],
-      },
-    ],
+    hero: {
+      statusLabel,
+      statusColor,
+      metrics: [
+        { label: 'События', value: fmtNumber(line.count) },
+        { label: 'Исх. байты', value: fmtBytes(line.bytes_sent) },
+        { label: 'Вх. байты', value: fmtBytes(line.bytes_recv) },
+      ],
+    },
+    sections,
   };
 }
 

@@ -32,11 +32,24 @@ export interface DetailAction {
   onClick: () => void;
 }
 
+interface DetailHeroMetric {
+  label: string;
+  value: string;
+  color?: string;
+}
+
+interface DetailHero {
+  statusLabel?: string;
+  statusColor?: string;
+  metrics?: DetailHeroMetric[];
+}
+
 export interface DetailState {
   kind: DetailKind;
   title: string;
   sections: DetailSection[];
   actions: DetailAction[];
+  hero?: DetailHero;
   countryKey?: string;
   sparklinePoints?: SeriesPoint[];
   sparklineLoading?: boolean;

@@ -59,6 +59,20 @@ describe('map view query string', () => {
     });
   });
 
+  it('accepts city_country group', () => {
+    const sp = serializeMapViewSearch({
+      period: '1d',
+      periodFrom: '',
+      periodTo: '',
+      groupBy: 'city_country',
+      filter: 'all',
+      search: '',
+      focusedCountry: null,
+    });
+    expect(sp.get('group')).toBe('city_country');
+    expect(parseMapViewSearch(sp).groupBy).toBe('city_country');
+  });
+
   it('keeps custom from/to only for custom period', () => {
     const sp = serializeMapViewSearch({
       period: 'custom',
@@ -75,4 +89,34 @@ describe('map view query string', () => {
       periodTo: '2026-08-02T00:00',
     });
   });
+
+  it('uses user map_group_by when URL has no group', () => {
+    const sp = new URLSearchParams();
+    expect(parseMapViewSearch(sp, { groupBy: 'country' }).groupBy).toBe('country');
+    expect(parseMapViewSearch(sp, { groupBy: 'city_country' }).groupBy).toBe('city_country');
+    expect(parseMapViewSearch(sp).groupBy).toBe('city');
+  });
+
+  it('URL group wins over user default', () => {
+    const sp = new URLSearchParams('group=ip');
+    expect(parseMapViewSearch(sp, { groupBy: 'country' }).groupBy).toBe('ip');
+  });
+
+  it('omits group when equal to user default', () => {
+    const sp = serializeMapViewSearch(
+      {
+        period: '1d',
+        periodFrom: '',
+        periodTo: '',
+        groupBy: 'country',
+        filter: 'all',
+        search: '',
+        focusedCountry: null,
+      },
+      { groupBy: 'country' },
+    );
+    expect(sp.get('group')).toBeNull();
+    expect(sp.toString()).toBe('');
+  });
 });
+

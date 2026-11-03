@@ -343,17 +343,12 @@ function isOnVisibleGlobeHemisphere(
   return cosC > 0.22;
 }
 
-function globeAngularDistanceRad(lon1: number, lat1: number, lon2: number, lat2: number): number {
-  const toRad = Math.PI / 180;
-  const φ1 = lat1 * toRad;
-  const φ2 = lat2 * toRad;
-  const dλ = (lon2 - lon1) * toRad;
-  const cosC =
-    Math.sin(φ1) * Math.sin(φ2) + Math.cos(φ1) * Math.cos(φ2) * Math.cos(dλ);
-  return Math.acos(Math.max(-1, Math.min(1, cosC)));
-}
-
-function isArcVisibleOnGlobe(
+/**
+ * Cull arcs whose both endpoints sit on the back of the globe.
+ * Do not filter by angular span: RU↔AU (~130°) and similar hauls are valid
+ * and were previously dropped by a Math.PI*0.55 cap while still on-screen.
+ */
+export function isArcVisibleOnGlobe(
   line: MapLine,
   viewLon: number,
   viewLat: number,
@@ -364,21 +359,9 @@ function isArcVisibleOnGlobe(
   const [tLon, tLat] = nodeLonLat(line.dst, line.dst_lon, line.dst_lat, allPoints, lineFallback);
   const srcVis = isOnVisibleGlobeHemisphere(sLon, sLat, viewLon, viewLat);
   const dstVis = isOnVisibleGlobeHemisphere(tLon, tLat, viewLon, viewLat);
-  if (!srcVis || !dstVis) return false;
-  if (globeAngularDistanceRad(sLon, sLat, tLon, tLat) > Math.PI * 0.55) return false;
-
-  let dLon = tLon - sLon;
-  if (dLon > 180) dLon -= 360;
-  if (dLon < -180) dLon += 360;
-
-  const samples = 10;
-  for (let i = 1; i < samples; i++) {
-    const t = i / samples;
-    const lon = sLon + dLon * t;
-    const lat = sLat + (tLat - sLat) * t;
-    if (!isOnVisibleGlobeHemisphere(lon, lat, viewLon, viewLat)) return false;
-  }
-  return true;
+  // Keep the arc if either end faces the camera (long hauls often have one
+  // endpoint near the limb); drop only when both are behind.
+  return srcVis || dstVis;
 }
 
 function getVisiblePointsFromLines(
@@ -474,7 +457,11 @@ export function buildDeckLayers(opts: BuildLayersOpts): BuildLayersResult {
   const outlineColor = cssRgb('--map-outline-rgb', opts.mapTilesFailed ? 255 : 140);
   const outlineSoft = cssRgb('--map-outline-rgb', 160);
   const useHeat = opts.showHeatmap;
-  const countriesPickable = useHeat || opts.groupBy === 'country' || opts.groupBy === 'continent';
+  const countriesPickable =
+    useHeat ||
+    opts.groupBy === 'country' ||
+    opts.groupBy === 'continent' ||
+    opts.groupBy === 'city_country';
   const heavyOk = opts.heavyCountryLayersAllowed;
 
   // На глобусе GeoJson-заливка стран даёт артефакты (иглы / ломаный wrap /

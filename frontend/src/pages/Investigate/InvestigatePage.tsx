@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import {
   ackAnomaly,
   assignAnomaly,
@@ -11,7 +11,6 @@ import type { MapLine } from '@/api/eventsTypes';
 import { listUserDirectory, type UserDirectoryEntry } from '@/api/users';
 import { useAuth } from '@/auth/AuthContext';
 import { AdminLayout } from '@/components/AdminLayout';
-import { TriageSectionNav } from '@/components/ObserveSectionNav';
 import { useToast } from '@/components/Toast';
 import { fmtDate, fmtNumber } from '@/lib/format';
 import { AnomalyPeersPanel } from '@/pages/Anomalies/AnomalyPeersPanel';
@@ -29,7 +28,8 @@ import {
 } from '@/pages/Anomalies/anomalyDisplay';
 import { rememberMapAlert } from '@/pages/Map/AnomalyActiveBanner';
 import { mapViewToHuntState } from '@/pages/Hunts/huntMapState';
-import { promptSaveHuntFromMap } from '@/pages/Hunts/saveHuntFromMap';
+import type { HuntMapState } from '@/api/hunts';
+import { SaveHuntModal } from '@/pages/Hunts/SaveHuntModal';
 import './investigate.css';
 
 async function findAnomalyByFingerprint(
@@ -68,6 +68,7 @@ export default function InvestigatePage() {
   const [assigning, setAssigning] = useState(false);
   const [savingTpl, setSavingTpl] = useState(false);
   const [peerLines, setPeerLines] = useState<MapLine[]>([]);
+  const [huntDraft, setHuntDraft] = useState<HuntMapState | null>(null);
 
   const load = useCallback(async (fp: string, signal?: AbortSignal) => {
     setLoading(true);
@@ -90,7 +91,7 @@ export default function InvestigatePage() {
   }, [toast]);
 
   useEffect(() => {
-    document.title = 'ГеоАтлас — Разбор';
+    document.title = 'ГеоАтлас — Разбор инцидента';
   }, []);
 
   useEffect(() => {
@@ -232,13 +233,15 @@ export default function InvestigatePage() {
 
   const acked = Boolean(item?.acknowledged);
   const mapHref = item ? anomalyMapHref(item) : '/';
-  const workspaceHref = alertFp ? investigateHref(alertFp) : '/investigate';
+  const workspaceHref = alertFp ? investigateHref(alertFp) : '/anomalies';
+
+  if (!alertFp) {
+    return <Navigate to="/anomalies" replace />;
+  }
 
   return (
-    <AdminLayout title="Разбор">
+    <AdminLayout title="Разбор инцидента">
       <div className="page-content-inner wide">
-        <TriageSectionNav />
-
         <p className="page-lead">
           Рабочее место расследования по одному алерту: контекст, связи из карты, ack/assign и
           выгрузка. Карта открывается deep-link’ом без встраивания.
@@ -247,13 +250,6 @@ export default function InvestigatePage() {
         <p className="investigate-back">
           <Link to="/anomalies">← К списку аномалий</Link>
         </p>
-
-        {!alertFp ? (
-          <p className="hint warn-banner">
-            Не указан параметр <code>alert</code>. Откройте алерт со страницы{' '}
-            <Link to="/anomalies">Аномалии</Link>.
-          </p>
-        ) : null}
 
         {loading ? <p className="hint">Загрузка алерта…</p> : null}
 
@@ -370,7 +366,7 @@ export default function InvestigatePage() {
                 className="btn"
                 onClick={() => {
                   const m = item.map;
-                  void promptSaveHuntFromMap(
+                  setHuntDraft(
                     mapViewToHuntState({
                       period: m?.period || '1d',
                       periodFrom: '',
@@ -380,7 +376,6 @@ export default function InvestigatePage() {
                       search: m?.q || anomalyEventsQuery(item) || '',
                       focusedCountry: m?.country || null,
                     }),
-                    toast,
                   );
                 }}
               >
@@ -429,6 +424,9 @@ export default function InvestigatePage() {
           </section>
         ) : null}
       </div>
+      {huntDraft ? (
+        <SaveHuntModal mapState={huntDraft} onClose={() => setHuntDraft(null)} />
+      ) : null}
     </AdminLayout>
   );
 }

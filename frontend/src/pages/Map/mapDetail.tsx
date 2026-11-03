@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import type { DetailState, SeriesPoint } from './mapTypes';
 
 function sparklinePolylines(points: SeriesPoint[]) {
@@ -109,8 +110,21 @@ export function MapDetailPanel({
   onClose: () => void;
 }) {
   const open = !!detail;
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
   return (
-    <aside className={`detail-panel${open ? ' open' : ''}`}>
+    <aside
+      className={`detail-panel${open ? ' open' : ''}`}
+      aria-label="Детали связи"
+      aria-hidden={!open}
+    >
       <div className="detail-header">
         <h3>{detail?.title || 'Детали'}</h3>
         <button
@@ -137,6 +151,29 @@ export function MapDetailPanel({
         </div>
       ) : null}
       <div className="detail-body">
+        {detail?.hero ? (
+          <div className="detail-hero">
+            {detail.hero.statusLabel ? (
+              <div
+                className={`detail-hero-status${detail.hero.statusColor ? ` ${detail.hero.statusColor}` : ''}`}
+              >
+                {detail.hero.statusLabel}
+              </div>
+            ) : null}
+            {detail.hero.metrics?.length ? (
+              <div className="detail-hero-metrics">
+                {detail.hero.metrics.map((m) => (
+                  <div key={m.label} className="detail-hero-metric">
+                    <span className="detail-hero-metric-label">{m.label}</span>
+                    <span className={`detail-hero-metric-value${m.color ? ` ${m.color}` : ''}`}>
+                      {m.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         {detail ? <DetailSparkline detail={detail} /> : null}
         {detail?.sections.map((sec, si) => (
           <div key={`${sec.title || 'sec'}-${si}`}>

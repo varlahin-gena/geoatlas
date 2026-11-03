@@ -1,17 +1,15 @@
 export type {
-  AuditEvent,
   BackupCatalog,
   BackupEntry,
   BackupSchedule,
   DREvent,
   EdgesAgg,
-  FailedLogin,
   HistoryPoint,
   Retention,
   SystemStats,
 } from '@/api/systemTypes';
 
-export type Tab = 'overview' | 'pipeline' | 'backup' | 'security' | 'audit' | 'charts';
+export type Tab = 'overview' | 'pipeline' | 'backup' | 'security' | 'charts';
 
 export const CONTAINERS = ['backend', 'clickhouse', 'syslog-ng', 'frontend'] as const;
 export const PERIODS = [

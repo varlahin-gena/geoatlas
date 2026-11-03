@@ -262,6 +262,23 @@ func TestAuthSessionChangeLogoutDismiss(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	rec = httptest.NewRecorder()
+	h.UpdatePreferences(rec, cookieReq(http.MethodPatch, "/api/auth/me/preferences",
+		`{"theme":"light","map_group_by":"city_country"}`))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("prefs: %d %s", rec.Code, rec.Body.String())
+	}
+	got, ok := users.Get("admin")
+	if !ok || got.Theme != auth.ThemeLight || got.MapGroupBy != "city_country" {
+		t.Fatalf("prefs stored=%+v", got)
+	}
+
+	rec = httptest.NewRecorder()
+	h.UpdatePreferences(rec, cookieReq(http.MethodPatch, "/api/auth/me/preferences", `{}`))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("empty prefs: %d", rec.Code)
+	}
+
 	dismissed := true
 	_ = dismissed
 	rec = httptest.NewRecorder()

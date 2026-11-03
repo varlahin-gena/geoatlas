@@ -13,7 +13,7 @@ import (
 func TestRequireOpsPaths(t *testing.T) {
 	ok := okHandler(t)
 
-	h := RequireOps(BearerAuth{}, nil, nil, true, false)(ok)
+	h := RequireOps(BearerAuth{}, nil, nil, nil, true, false)(ok)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
 	if rec.Code != http.StatusNoContent {
@@ -21,7 +21,7 @@ func TestRequireOpsPaths(t *testing.T) {
 	}
 
 	ba := NewBearerAuth(nil, []string{"ops-secret"}, stubTokens{scope: auth.ScopeOps, ok: true})
-	h = RequireOps(ba, nil, nil, false, false)(ok)
+	h = RequireOps(ba, nil, nil, nil, false, false)(ok)
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", "Bearer ops-secret")
 	rec = httptest.NewRecorder()
@@ -30,7 +30,7 @@ func TestRequireOpsPaths(t *testing.T) {
 		t.Fatalf("bearer ops: %d", rec.Code)
 	}
 
-	h = RequireOps(BearerAuth{}, nil, nil, false, false)(ok)
+	h = RequireOps(BearerAuth{}, nil, nil, nil, false, false)(ok)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
 	if rec.Code != http.StatusUnauthorized {
@@ -38,7 +38,7 @@ func TestRequireOpsPaths(t *testing.T) {
 	}
 
 	loadErr := func(*http.Request) (auth.Session, error) { return auth.Session{}, errors.New("no") }
-	h = RequireOps(BearerAuth{}, loadErr, nil, false, false)(ok)
+	h = RequireOps(BearerAuth{}, loadErr, nil, nil, false, false)(ok)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
 	if rec.Code != http.StatusUnauthorized {
@@ -49,7 +49,7 @@ func TestRequireOpsPaths(t *testing.T) {
 	loadOp := func(*http.Request) (auth.Session, error) {
 		return auth.Session{Username: "u", Role: auth.RoleOperator, SessionVersion: 1}, nil
 	}
-	h = RequireOps(BearerAuth{}, loadOp, users, false, false)(ok)
+	h = RequireOps(BearerAuth{}, loadOp, users, nil, false, false)(ok)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
 	if rec.Code != http.StatusForbidden {
@@ -60,7 +60,7 @@ func TestRequireOpsPaths(t *testing.T) {
 	loadAdm := func(*http.Request) (auth.Session, error) {
 		return auth.Session{Username: "a", Role: auth.RoleAdministrator, SessionVersion: 1}, nil
 	}
-	h = RequireOps(BearerAuth{}, loadAdm, admin, false, false)(ok)
+	h = RequireOps(BearerAuth{}, loadAdm, admin, nil, false, false)(ok)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
 	if rec.Code != http.StatusNoContent {
@@ -68,7 +68,7 @@ func TestRequireOpsPaths(t *testing.T) {
 	}
 
 	reset := stubUsers{role: auth.RoleAdministrator, version: 1, mustReset: true}
-	h = RequireOps(BearerAuth{}, loadAdm, reset, false, false)(ok)
+	h = RequireOps(BearerAuth{}, loadAdm, reset, nil, false, false)(ok)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
 	if rec.Code != http.StatusForbidden {
@@ -76,7 +76,7 @@ func TestRequireOpsPaths(t *testing.T) {
 	}
 
 	missing := stubUsers{missing: true}
-	h = RequireOps(BearerAuth{}, loadAdm, missing, false, false)(ok)
+	h = RequireOps(BearerAuth{}, loadAdm, missing, nil, false, false)(ok)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
 	if rec.Code != http.StatusUnauthorized {
@@ -97,7 +97,7 @@ func TestRequireOpsPaths(t *testing.T) {
 
 func TestRequireAdminMorePaths(t *testing.T) {
 	ok := okHandler(t)
-	h := RequireAdmin(BearerAuth{}, nil, nil, true)(ok)
+	h := RequireAdmin(BearerAuth{}, nil, nil, nil, true)(ok)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
 	if rec.Code != http.StatusNoContent {
@@ -105,7 +105,7 @@ func TestRequireAdminMorePaths(t *testing.T) {
 	}
 
 	ba := NewBearerAuth([]string{"admin-secret"}, nil, nil)
-	h = RequireAdmin(ba, nil, nil, false)(ok)
+	h = RequireAdmin(ba, nil, nil, nil, false)(ok)
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", "Bearer admin-secret")
 	rec = httptest.NewRecorder()
@@ -114,7 +114,7 @@ func TestRequireAdminMorePaths(t *testing.T) {
 		t.Fatal(rec.Code)
 	}
 
-	h = RequireAdmin(BearerAuth{}, nil, nil, false)(ok)
+	h = RequireAdmin(BearerAuth{}, nil, nil, nil, false)(ok)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
 	if rec.Code != http.StatusUnauthorized {
@@ -122,7 +122,7 @@ func TestRequireAdminMorePaths(t *testing.T) {
 	}
 
 	loadErr := func(*http.Request) (auth.Session, error) { return auth.Session{}, errors.New("x") }
-	h = RequireAdmin(BearerAuth{}, loadErr, nil, false)(ok)
+	h = RequireAdmin(BearerAuth{}, loadErr, nil, nil, false)(ok)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
 	if rec.Code != http.StatusUnauthorized {
@@ -133,7 +133,7 @@ func TestRequireAdminMorePaths(t *testing.T) {
 	load := func(*http.Request) (auth.Session, error) {
 		return auth.Session{Username: "a", Role: auth.RoleAdministrator, SessionVersion: 1}, nil
 	}
-	h = RequireAdmin(BearerAuth{}, load, reset, false)(ok)
+	h = RequireAdmin(BearerAuth{}, load, reset, nil, false)(ok)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
 	if rec.Code != http.StatusForbidden {

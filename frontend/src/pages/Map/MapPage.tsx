@@ -30,7 +30,6 @@ import { useMapViewQuery } from './mapQuery';
 import { mapQueryWarning } from './mapQueryCost';
 import { useMapLibreController } from './useMapLibreController';
 import { useMapReputation } from './useMapReputation';
-import { useMapUploads } from './useMapUploads';
 import { useMapVizChrome } from './useMapVizChrome';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import '@/styles/index.css';
@@ -202,6 +201,7 @@ export default function MapPage() {
         setRepSide('any');
         setRepColorArcs(false);
         setSearch('');
+        clearFocusedCountry();
         return;
       }
       if (detail.type === 'focus-search') {
@@ -222,6 +222,7 @@ export default function MapPage() {
     setRepSide,
     setRepColorArcs,
     setSearch,
+    clearFocusedCountry,
   ]);
 
   const {
@@ -319,12 +320,6 @@ export default function MapPage() {
     setViewMode: viz.setViewMode,
     autoRotate: viz.autoRotate,
     toast,
-  });
-
-  const { logFileRef, geoFileRef, uploadFile } = useMapUploads({
-    isAdmin,
-    toast,
-    fetchData,
   });
 
   const anomalies = useMapAnomalies();
@@ -440,6 +435,7 @@ export default function MapPage() {
       setRepSide('any');
       setRepColorArcs(false);
       setSearch('');
+      clearFocusedCountry();
       return;
     }
     if (kind === 'clear-search') {
@@ -466,18 +462,7 @@ export default function MapPage() {
   return (
     <MapChromeProvider
       sidebarInput={{
-        viewMode: viz.viewMode,
-        setViewMode: viz.setViewMode,
-        isAdmin,
-        logFileRef,
-        geoFileRef,
-        uploadFile,
-        fetchData,
-        resetView,
-        exportPng,
         toggleSidebar,
-        geoWizardOpen: geoWizard.open,
-        geoWizardEmpty: geoWizard.geo == null ? null : geoWizard.geo.count === 0,
       }}
       topbarInput={{
         search,
@@ -510,6 +495,13 @@ export default function MapPage() {
         setPeriodTo,
         fetchData,
         viewMode: viz.viewMode,
+        setViewMode: viz.setViewMode,
+        resetView,
+        exportPng,
+        learningNote:
+          anomalies.summary?.enabled && anomalies.summary.learning && !anomalies.summary.total
+            ? 'Базовая линия аномалий: обучение (первые дни после появления логов)'
+            : null,
         minCount,
         setMinCount,
         arcCountInfo,
@@ -536,6 +528,7 @@ export default function MapPage() {
         setAutoRotate: viz.setAutoRotate,
         setInfoDockTab: viz.setInfoDockTab,
         focusedCountry,
+        clearFocusedCountry,
       }}
     >
       <MapChromeShell

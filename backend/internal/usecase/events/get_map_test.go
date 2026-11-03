@@ -140,6 +140,121 @@ func (s stubRep) Lookup(ipStr string) []model.ReputationHit {
 	return s[ipStr]
 }
 
+type stubEnterprise []model.EnterpriseNet
+
+func (s stubEnterprise) ListEnterpriseNets(context.Context) ([]model.EnterpriseNet, error) {
+	return append([]model.EnterpriseNet(nil), s...), nil
+}
+
+func TestNormalizeGroupByCityCountry(t *testing.T) {
+	if normalizeGroupBy("city_country") != "city_country" {
+		t.Fatal(normalizeGroupBy("city_country"))
+	}
+}
+
+func TestGetMapCityCountryHybrid(t *testing.T) {
+	repo := &stubRepo{
+		raws: []model.RawAgg{{
+			SrcIP: "10.0.0.1", DstIP: "8.8.8.8", Count: 7, AllowedCnt: 7,
+		}},
+	}
+	geo := stubGeo{
+		"10.0.0.1": {Found: true, Lat: 55.75, Lon: 37.62, City: "Moscow", Country: "Russia"},
+		"8.8.8.8":  {Found: true, Lat: 37.4, Lon: -122.1, City: "Mountain View", Country: "United States"},
+	}
+	uc := New(repo, geo, nil)
+	uc.SetEnterpriseNets(stubEnterprise{{
+		StartIP: 0x0a000000, EndIP: 0x0a0000ff, Network: "10.0.0.0/24",
+		City: "Moscow", Country: "Russia",
+	}})
+	out, err := uc.GetMap(context.Background(), GetMapInput{
+		TimeRange: model.TimeRange{Mode: "hours", Amount: 6},
+		GroupBy:   "city_country",
+		Filter:    "all",
+		Timeout:   time.Minute,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Lines) == 0 {
+		t.Fatal("expected lines")
+	}
+	ln := out.Lines[0]
+	if ln.Src != "Moscow, Russia" {
+		t.Fatalf("src=%q want Moscow, Russia", ln.Src)
+	}
+	if ln.Dst != "United States" {
+		t.Fatalf("dst=%q want United States", ln.Dst)
+	}
+}
+
+func TestGetMapCityCountryEmptyEnterpriseIsCountry(t *testing.T) {
+	repo := &stubRepo{
+		raws: []model.RawAgg{{
+			SrcIP: "10.0.0.1", DstIP: "8.8.8.8", Count: 3, AllowedCnt: 3,
+		}},
+	}
+	geo := stubGeo{
+		"10.0.0.1": {Found: true, Lat: 55.75, Lon: 37.62, City: "Moscow", Country: "Russia"},
+		"8.8.8.8":  {Found: true, Lat: 37.4, Lon: -122.1, City: "Mountain View", Country: "United States"},
+	}
+	uc := New(repo, geo, nil)
+	out, err := uc.GetMap(context.Background(), GetMapInput{
+		TimeRange: model.TimeRange{Mode: "hours", Amount: 6},
+		GroupBy:   "city_country",
+		Filter:    "all",
+		Timeout:   time.Minute,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Lines) == 0 {
+		t.Fatal("expected lines")
+	}
+	ln := out.Lines[0]
+	if ln.Src != "Russia" || ln.Dst != "United States" {
+		t.Fatalf("src=%q dst=%q want Russia → United States", ln.Src, ln.Dst)
+	}
+}
+
+func TestGetMapCityCountryScansAsIP(t *testing.T) {
+	repo := &stubRepo{
+		geoOK: true,
+		geoRows: []model.GeoEdgeAgg{{
+			SrcKey: "10.0.0.1", DstKey: "8.8.8.8",
+			SrcLabel: "10.0.0.1", DstLabel: "8.8.8.8",
+			SrcLat: 55.75, SrcLon: 37.62, DstLat: 37.4, DstLon: -122.1,
+			SrcCity: "Moscow", SrcCountry: "Russia",
+			DstCity: "Mountain View", DstCountry: "United States",
+			Count: 4, AllowedCnt: 4,
+		}},
+	}
+	geo := stubGeo{
+		"10.0.0.1": {Found: true, Lat: 55.75, Lon: 37.62, City: "Moscow", Country: "Russia"},
+		"8.8.8.8":  {Found: true, Lat: 37.4, Lon: -122.1, City: "Mountain View", Country: "United States"},
+	}
+	uc := New(repo, geo, nil)
+	uc.SetEnterpriseNets(stubEnterprise{{
+		StartIP: 0x0a000000, EndIP: 0x0a0000ff,
+		City: "Moscow", Country: "Russia",
+	}})
+	out, err := uc.GetMap(context.Background(), GetMapInput{
+		TimeRange: model.TimeRange{Mode: "hours", Amount: 1},
+		GroupBy:   "city_country",
+		Timeout:   time.Minute,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// stub encodes scan group_by into Source.
+	if out.Source != "geo_ip" {
+		t.Fatalf("source=%q want geo_ip (scan as ip)", out.Source)
+	}
+	if len(out.Lines) == 0 || out.Lines[0].Src != "Moscow, Russia" {
+		t.Fatalf("lines=%v", out.Lines)
+	}
+}
+
 func TestGetMapFiltersReputationBeforeLimit(t *testing.T) {
 	repo := &stubRepo{
 		raws: []model.RawAgg{

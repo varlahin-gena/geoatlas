@@ -16,7 +16,7 @@ import (
 type GetMapInput struct {
 	TimeRange     model.TimeRange
 	Limit         int
-	GroupBy       string // ip|subnet|city|country|continent
+	GroupBy       string // ip|subnet|city|country|continent|city_country
 	Filter        string // all|allowed|blocked
 	Country       string
 	Query         string
@@ -62,10 +62,19 @@ type Service struct {
 	traffic    TrafficRepository
 	geo        GeoLookuper
 	reputation ReputationLookuper
+	enterprise EnterpriseNetLister
 }
 
 func New(traffic TrafficRepository, geo GeoLookuper, reputation ReputationLookuper) *Service {
 	return &Service{traffic: traffic, geo: geo, reputation: reputation}
+}
+
+// SetEnterpriseNets подключает список сетей предприятия для groupBy=city_country.
+func (s *Service) SetEnterpriseNets(l EnterpriseNetLister) {
+	if s == nil {
+		return
+	}
+	s.enterprise = l
 }
 
 // GetMap строит линии/узлы: сначала pre-agg geo edges, иначе live IP + GeoIP.
@@ -93,8 +102,14 @@ func (s *Service) GetMap(ctx context.Context, in GetMapInput) (GetMapResult, err
 		scanLimit = mapScanHardMax
 	}
 
+	// city_country: скан на уровне IP, свёртка city|country — в Go по enterprise_nets.
+	scanGroupBy := groupBy
+	if groupBy == "city_country" {
+		scanGroupBy = "ip"
+	}
+
 	scan, err := s.traffic.ScanMapAggs(ctx, in.TimeRange, MapScanQuery{
-		GroupBy:    groupBy,
+		GroupBy:    scanGroupBy,
 		Limit:      scanLimit,
 		Filter:     filter,
 		Country:    country,
@@ -104,7 +119,21 @@ func (s *Service) GetMap(ctx context.Context, in GetMapInput) (GetMapResult, err
 	if err != nil {
 		return GetMapResult{}, err
 	}
-	if len(scan.GeoEdges) > 0 {
+
+	var enterprise *mapagg.EnterpriseIndex
+	if groupBy == "city_country" {
+		enterprise = loadEnterpriseIndex(ctx, s.enterprise)
+	}
+
+	if groupBy == "city_country" {
+		raws := scan.Raws
+		if len(raws) == 0 && len(scan.GeoEdges) > 0 {
+			raws = geoEdgesAsIPRaws(scan.GeoEdges)
+		}
+		out.RawPairs = len(raws)
+		out.Lines, out.Points, out.SkippedNoGeo = buildMapFromIPRaws(raws, s.geo, groupBy, enterprise)
+		out.Source = scan.Source
+	} else if len(scan.GeoEdges) > 0 {
 		lines, points, skipped := mapagg.BuildMapFromGeoEdges(scan.GeoEdges)
 		out.Lines = lines
 		out.Points = points
@@ -113,7 +142,7 @@ func (s *Service) GetMap(ctx context.Context, in GetMapInput) (GetMapResult, err
 		out.Source = scan.Source
 	} else if len(scan.Raws) > 0 {
 		out.RawPairs = len(scan.Raws)
-		out.Lines, out.Points, out.SkippedNoGeo = buildMapFromIPRaws(scan.Raws, s.geo, groupBy)
+		out.Lines, out.Points, out.SkippedNoGeo = buildMapFromIPRaws(scan.Raws, s.geo, groupBy, nil)
 		out.Source = scan.Source
 	}
 
@@ -298,7 +327,7 @@ func trimLinesByCount(lines []model.Line, limit int) []model.Line {
 
 func normalizeGroupBy(v string) string {
 	switch v {
-	case "ip", "subnet", "country", "city", "continent":
+	case "ip", "subnet", "country", "city", "continent", "city_country":
 		return v
 	default:
 		return "city"
@@ -314,24 +343,72 @@ func normalizeFilter(v string) string {
 	}
 }
 
-func buildMapFromIPRaws(raws []model.RawAgg, geo mapagg.GeoLookuper, groupBy string) ([]model.Line, map[string]model.Node, int) {
+func loadEnterpriseIndex(ctx context.Context, lister EnterpriseNetLister) *mapagg.EnterpriseIndex {
+	if lister == nil {
+		return mapagg.NewEnterpriseIndex(nil)
+	}
+	nets, err := lister.ListEnterpriseNets(ctx)
+	if err != nil || len(nets) == 0 {
+		return mapagg.NewEnterpriseIndex(nil)
+	}
+	return mapagg.NewEnterpriseIndex(nets)
+}
+
+// geoEdgesAsIPRaws — IP-рёбра из CH (SrcKey/DstKey = IP) → RawAgg для hybrid-свёртки.
+func geoEdgesAsIPRaws(edges []model.GeoEdgeAgg) []model.RawAgg {
+	raws := make([]model.RawAgg, 0, len(edges))
+	for _, e := range edges {
+		raws = append(raws, model.RawAgg{
+			SrcIP: e.SrcKey, DstIP: e.DstKey,
+			Count: e.Count, BlockedCnt: e.BlockedCnt, AllowedCnt: e.AllowedCnt,
+			LastAction: e.LastAction, Rule: e.Rule, Proto: e.Proto,
+			SrcPort: e.SrcPort, DstPort: e.DstPort, Device: e.Device,
+			SrcZone: e.SrcZone, DstZone: e.DstZone,
+			SrcCountry: e.SrcCountry, DstCountry: e.DstCountry,
+			SrcCity: e.SrcCity, DstCity: e.DstCity,
+			SrcLat: e.SrcLat, SrcLon: e.SrcLon, DstLat: e.DstLat, DstLon: e.DstLon,
+			BytesSent: e.BytesSent, BytesRecv: e.BytesRecv,
+			PacketsSent: e.PacketsSent, PacketsRecv: e.PacketsRecv,
+		})
+	}
+	return raws
+}
+
+func buildMapFromIPRaws(raws []model.RawAgg, geo mapagg.GeoLookuper, groupBy string, enterprise *mapagg.EnterpriseIndex) ([]model.Line, map[string]model.Node, int) {
 	edgesMap := make(map[string]*mapagg.EdgeAgg)
 	srcCache := make(map[string]model.GroupMeta)
 	dstCache := make(map[string]model.GroupMeta)
+
+	resolveMeta := func(ip string, hint mapagg.LogGeoHint) model.GroupMeta {
+		if groupBy == "city_country" {
+			hit, ok := enterprise.Lookup(ip)
+			if ok {
+				if strings.TrimSpace(hint.City) == "" && hit.City != "" {
+					hint.City = hit.City
+				}
+				if strings.TrimSpace(hint.Country) == "" && hit.Country != "" {
+					hint.Country = hit.Country
+				}
+				return mapagg.IPGroupMetaHybrid(geo, ip, true, hint)
+			}
+			return mapagg.IPGroupMetaHybrid(geo, ip, false, hint)
+		}
+		return mapagg.IPGroupMetaHinted(geo, ip, groupBy, hint)
+	}
 
 	metaFor := func(ip string, hint mapagg.LogGeoHint, cache map[string]model.GroupMeta) model.GroupMeta {
 		if m, ok := cache[ip]; ok {
 			if m.Valid {
 				return m
 			}
-			m2 := mapagg.IPGroupMetaHinted(geo, ip, groupBy, hint)
+			m2 := resolveMeta(ip, hint)
 			if m2.Valid {
 				cache[ip] = m2
 				return m2
 			}
 			return m
 		}
-		m := mapagg.IPGroupMetaHinted(geo, ip, groupBy, hint)
+		m := resolveMeta(ip, hint)
 		cache[ip] = m
 		return m
 	}

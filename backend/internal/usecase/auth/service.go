@@ -33,8 +33,9 @@ func (s *Service) SessionTTL() time.Duration {
 }
 
 type LoginResult struct {
-	User  domain.User
-	Token string
+	User    domain.User
+	Token   string
+	Session domain.Session
 }
 
 // VerifyPassword — re-auth: пароль текущего актёра без выдачи сессии.
@@ -54,11 +55,11 @@ func (s *Service) Login(username, password string) (LoginResult, error) {
 	if !ok || user == nil {
 		return LoginResult{}, ErrInvalidCredentials
 	}
-	token, _, err := s.sessions.Issue(user.Username, user.Role, user.SessionVersion)
+	token, sess, err := s.sessions.Issue(user.Username, user.Role, user.SessionVersion)
 	if err != nil {
 		return LoginResult{}, ErrSession
 	}
-	return LoginResult{User: *user, Token: token}, nil
+	return LoginResult{User: *user, Token: token, Session: sess}, nil
 }
 
 func (s *Service) Me(username string) (domain.UserPublic, error) {
@@ -74,8 +75,9 @@ func (s *Service) Me(username string) (domain.UserPublic, error) {
 
 // ChangePasswordResult — после смены пароля выдаём новый token (старые cookie revoke).
 type ChangePasswordResult struct {
-	User  domain.UserPublic
-	Token string
+	User    domain.UserPublic
+	Token   string
+	Session domain.Session
 }
 
 func (s *Service) ChangePassword(username, oldPassword, newPassword string) (ChangePasswordResult, error) {
@@ -90,11 +92,11 @@ func (s *Service) ChangePassword(username, oldPassword, newPassword string) (Cha
 	if !ok {
 		return ChangePasswordResult{}, ErrUnauthorized
 	}
-	token, _, err := s.sessions.Issue(pub.Username, pub.Role, sv)
+	token, sess, err := s.sessions.Issue(pub.Username, pub.Role, sv)
 	if err != nil {
 		return ChangePasswordResult{}, ErrSession
 	}
-	return ChangePasswordResult{User: pub, Token: token}, nil
+	return ChangePasswordResult{User: pub, Token: token, Session: sess}, nil
 }
 
 // LogoutAll bump'ает session_version — все ранее выданные cookie перестают быть валидными.
@@ -150,6 +152,13 @@ func (s *Service) SetGeoWizardDismissed(username string, dismissed bool) (domain
 		return domain.UserPublic{}, ErrNotConfigured
 	}
 	return s.users.SetGeoWizardDismissed(username, dismissed)
+}
+
+func (s *Service) SetPreferences(username string, patch domain.PreferencesPatch) (domain.UserPublic, error) {
+	if s == nil || s.users == nil {
+		return domain.UserPublic{}, ErrNotConfigured
+	}
+	return s.users.SetPreferences(username, patch)
 }
 
 type ResetPasswordInput struct {

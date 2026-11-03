@@ -9,7 +9,6 @@ import {
 } from '@/api/hunts';
 import { huntMapHref } from '@/pages/Hunts/huntMapState';
 import { AdminLayout } from '@/components/AdminLayout';
-import { TriageSectionNav } from '@/components/ObserveSectionNav';
 import { EmptyState, ContentSkeleton } from '@/components/Skeleton';
 import { useToast } from '@/components/Toast';
 import { COPY } from '@/lib/glossary';
@@ -101,7 +100,6 @@ export default function HuntsPage() {
   return (
     <AdminLayout title="Охоты">
       <div className="page-content-inner wide">
-        <TriageSectionNav />
         <p className="page-lead">
           Сохранённые запросы карты с полным контекстом (период, группировка, фильтры). Расписание
           запускает snapshot-прогон; при превышении порога создаётся алерт{' '}

@@ -43,6 +43,12 @@ func (f *fakeStore) ListAudit(_ context.Context, q AuditQuery) ([]AuditEvent, er
 	}
 	return f.audit, nil
 }
+func (f *fakeStore) CountAuditByAction(_ context.Context, _ time.Time, _ string) ([]ActionCount, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return nil, nil
+}
 
 func TestEnabledAndNilGuards(t *testing.T) {
 	var s *Service

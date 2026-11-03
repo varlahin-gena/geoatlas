@@ -20,6 +20,19 @@ describe('assessMapQueryCost', () => {
     expect(cost.limitCap).toBe(3000);
   });
 
+  it('marks city_country+6h as heavy', () => {
+    const cost = assessMapQueryCost({
+      period: '6h',
+      periodFrom: '',
+      periodTo: '',
+      groupBy: 'city_country',
+      search: '',
+      focusedCountry: null,
+      repActive: false,
+    });
+    expect(cost.tier).toBe('heavy');
+  });
+
   it('raises cap when filter present on heavy query', () => {
     const cost = assessMapQueryCost({
       period: '7d',

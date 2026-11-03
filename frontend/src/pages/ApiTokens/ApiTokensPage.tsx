@@ -97,8 +97,8 @@ export default function ApiTokensPage() {
       }
     >
       <div className="page-content-inner narrow">
+        <p className="page-lead">Именованные токены для автоматизации и интеграций.</p>
         <div className="card">
-          <h2>Токены</h2>
           <div className="table-wrap">
             <table>
               <thead>

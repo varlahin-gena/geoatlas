@@ -239,9 +239,8 @@ export function SystemBackupTab() {
           </button>
         </div>
         <p className="hint">
-          Native ClickHouse BACKUP на том clickhouse-backups. «Подключить» копирует данные в
-          shadow-таблицы <code>ga_bak_*</code> — live и ingest не меняются. На карте переключатель
-          Прямой эфир / Резервная копия. «Отключить» удаляет только shadow. Полный appliance restore (включая auth):{' '}
+          Снимки на томе <code>clickhouse-backups</code>. «Подключить» — shadow <code>ga_bak_*</code>{' '}
+          для карты (Прямой эфир / Резерв); live не меняется. Полный restore:{' '}
           <code>./scripts/restore-clickhouse.sh &lt;name&gt;</code>
         </p>
         {loading && !cat ? <ContentSkeleton label="Загрузка backup…" /> : null}
@@ -514,12 +513,8 @@ export function SystemBackupTab() {
       <section className="card card-compact">
         <h3 className="card-title">Список бэкапов</h3>
         <p className="hint">
-          Колонка <strong>Создан</strong> — в поясе расписания (
-          <code>{savedSched.timezone || sched.timezone || 'UTC'}</code>
-          ). Имя файла — то же локальное время с оффсетом (<code>…+0300</code>); старые{' '}
-          <code>…Z</code> — UTC. <strong>Источник</strong> — вручную или по расписанию.{' '}
-          <strong>Auth</strong> — снимок <code>/app/data</code> как <code>*.auth.tgz</code> (не
-          трафик).
+          Время — пояс расписания (<code>{savedSched.timezone || sched.timezone || 'UTC'}</code>).
+          Auth — снимок <code>/app/data</code> (<code>*.auth.tgz</code>), не трафик.
         </p>
         {backups.length === 0 ? (
           <EmptyState
@@ -623,15 +618,15 @@ export function SystemBackupTab() {
           }}
         >
           <h3 className="card-title" style={{ margin: 0 }}>
-            DR-history
+            История DR
           </h3>
-          <span className="hint">Последние 50 backup/attach/detach/delete/schedule событий</span>
+          <span className="hint">Последние 50 событий backup / подключение / удаление / расписание</span>
         </div>
         {!history.length ? (
           <EmptyState
             compact
             title="Событий пока нет"
-            description="Здесь появятся backup, attach, detach, delete и изменения расписания."
+            description="Здесь появятся создание, подключение, удаление бэкапов и изменения расписания."
           />
         ) : (
           <div className="table-wrap">
@@ -639,11 +634,11 @@ export function SystemBackupTab() {
               <thead>
                 <tr>
                   <th scope="col">Время</th>
-                  <th scope="col">Actor</th>
-                  <th scope="col">Action</th>
-                  <th scope="col">Target</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Message</th>
+                  <th scope="col">Кто</th>
+                  <th scope="col">Действие</th>
+                  <th scope="col">Цель</th>
+                  <th scope="col">Статус</th>
+                  <th scope="col">Сообщение</th>
                 </tr>
               </thead>
               <tbody>

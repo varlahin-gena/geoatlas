@@ -53,7 +53,13 @@ export function useMapFilters(opts: {
     return lines.filter((line) => {
       if (!hasCoords(line)) return false;
       if (line.src && line.src === line.dst) return false;
-      if (groupBy === 'city' && hideIntraCountry && lineIsIntraCountry(line, points)) return false;
+      if (
+        (groupBy === 'city' || groupBy === 'city_country') &&
+        hideIntraCountry &&
+        lineIsIntraCountry(line, points)
+      ) {
+        return false;
+      }
       if ((line.count || 0) < minCount) return false;
       if (filter === 'allowed' && line.status !== 'allowed') return false;
       if (filter === 'blocked' && line.status !== 'blocked') return false;
@@ -162,7 +168,9 @@ export function useMapFilters(opts: {
     if (minCount > 1) filterHints.push(`порог ≥ ${minCount} соб.`);
     if (repActive) filterHints.push('репутация');
     if (focusedCountry) filterHints.push('фокус страны');
-    if (groupBy === 'city' && hideIntraCountry) filterHints.push('без связей внутри страны');
+    if ((groupBy === 'city' || groupBy === 'city_country') && hideIntraCountry) {
+      filterHints.push('без связей внутри страны');
+    }
 
     const classified = classifyEmptyMap({
       loading,

@@ -18,16 +18,29 @@ import (
 )
 
 var (
-	ErrUserExists      = errors.New("user already exists")
-	ErrUserNotFound    = errors.New("user not found")
-	ErrInvalidUsername = errors.New("invalid username")
-	ErrInvalidPassword = errors.New("invalid password")
-	ErrInvalidRole     = errors.New("invalid role")
-	ErrLastAdmin       = errors.New("cannot remove or demote the last administrator")
-	ErrSelfDelete      = errors.New("cannot delete your own account")
-	ErrBadOldPassword  = errors.New("current password is incorrect")
-	ErrInvalidFullName = errors.New("invalid full name")
+	ErrUserExists         = errors.New("user already exists")
+	ErrUserNotFound       = errors.New("user not found")
+	ErrInvalidUsername    = errors.New("invalid username")
+	ErrInvalidPassword    = errors.New("invalid password")
+	ErrInvalidRole        = errors.New("invalid role")
+	ErrLastAdmin          = errors.New("cannot remove or demote the last administrator")
+	ErrSelfDelete         = errors.New("cannot delete your own account")
+	ErrBadOldPassword     = errors.New("current password is incorrect")
+	ErrInvalidFullName    = errors.New("invalid full name")
+	ErrInvalidPreferences = errors.New("invalid preferences")
 )
+
+const (
+	ThemeLight = "light"
+	ThemeDark  = "dark"
+
+	DefaultTheme      = ThemeDark
+	DefaultMapGroupBy = "city"
+)
+
+var allowedMapGroupBy = map[string]struct{}{
+	"ip": {}, "subnet": {}, "city": {}, "country": {}, "continent": {}, "city_country": {},
+}
 
 var usernameRe = regexp.MustCompile(`^[a-zA-Z0-9._-]{2,64}$`)
 
@@ -44,6 +57,8 @@ type User struct {
 	Role               string `json:"role"`
 	MustResetPassword  bool   `json:"must_reset_password"`
 	GeoWizardDismissed bool   `json:"geo_wizard_dismissed,omitempty"`
+	Theme              string `json:"theme,omitempty"`        // light|dark; empty → DefaultTheme
+	MapGroupBy         string `json:"map_group_by,omitempty"` // see allowedMapGroupBy; empty → DefaultMapGroupBy
 	// SessionVersion — stamp в cookie; bump инвалидирует все ранее выданные сессии.
 	SessionVersion int64  `json:"session_version,omitempty"`
 	CreatedAt      string `json:"created_at,omitempty"`
@@ -56,6 +71,8 @@ type UserPublic struct {
 	Role               string `json:"role"`
 	MustResetPassword  bool   `json:"must_reset_password"`
 	GeoWizardDismissed bool   `json:"geo_wizard_dismissed,omitempty"`
+	Theme              string `json:"theme,omitempty"`
+	MapGroupBy         string `json:"map_group_by,omitempty"`
 	CreatedAt          string `json:"created_at,omitempty"`
 }
 
@@ -66,8 +83,55 @@ func (u User) Public() UserPublic {
 		Role:               u.Role,
 		MustResetPassword:  u.MustResetPassword,
 		GeoWizardDismissed: u.GeoWizardDismissed,
+		Theme:              u.Theme,
+		MapGroupBy:         u.MapGroupBy,
 		CreatedAt:          u.CreatedAt,
 	}
+}
+
+// PreferencesPatch — частичное обновление UI-prefs; nil-поле не меняем.
+type PreferencesPatch struct {
+	Theme      *string
+	MapGroupBy *string
+}
+
+func NormalizeTheme(raw string) (string, error) {
+	v := strings.TrimSpace(strings.ToLower(raw))
+	switch v {
+	case ThemeLight, ThemeDark:
+		return v, nil
+	case "":
+		return "", fmt.Errorf("%w: theme required", ErrInvalidPreferences)
+	default:
+		return "", fmt.Errorf("%w: theme", ErrInvalidPreferences)
+	}
+}
+
+func NormalizeMapGroupBy(raw string) (string, error) {
+	v := strings.TrimSpace(strings.ToLower(raw))
+	if v == "" {
+		return "", fmt.Errorf("%w: map_group_by required", ErrInvalidPreferences)
+	}
+	if _, ok := allowedMapGroupBy[v]; !ok {
+		return "", fmt.Errorf("%w: map_group_by", ErrInvalidPreferences)
+	}
+	return v, nil
+}
+
+func EffectiveTheme(raw string) string {
+	v := strings.TrimSpace(strings.ToLower(raw))
+	if v == ThemeLight || v == ThemeDark {
+		return v
+	}
+	return DefaultTheme
+}
+
+func EffectiveMapGroupBy(raw string) string {
+	v := strings.TrimSpace(strings.ToLower(raw))
+	if _, ok := allowedMapGroupBy[v]; ok {
+		return v
+	}
+	return DefaultMapGroupBy
 }
 
 type usersFile struct {
@@ -461,6 +525,46 @@ func (s *UserStore) SetGeoWizardDismissed(username string, dismissed bool) (User
 		return UserPublic{}, ErrUserNotFound
 	}
 	u.GeoWizardDismissed = dismissed
+	if err := s.persistUnlocked(); err != nil {
+		return UserPublic{}, err
+	}
+	return u.Public(), nil
+}
+
+// SetPreferences — частичное обновление theme / map_group_by.
+func (s *UserStore) SetPreferences(username string, patch PreferencesPatch) (UserPublic, error) {
+	if s == nil {
+		return UserPublic{}, ErrUserNotFound
+	}
+	if patch.Theme == nil && patch.MapGroupBy == nil {
+		return UserPublic{}, fmt.Errorf("%w: empty patch", ErrInvalidPreferences)
+	}
+	var theme, group string
+	var err error
+	if patch.Theme != nil {
+		theme, err = NormalizeTheme(*patch.Theme)
+		if err != nil {
+			return UserPublic{}, err
+		}
+	}
+	if patch.MapGroupBy != nil {
+		group, err = NormalizeMapGroupBy(*patch.MapGroupBy)
+		if err != nil {
+			return UserPublic{}, err
+		}
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	u := s.byLower[strings.ToLower(strings.TrimSpace(username))]
+	if u == nil {
+		return UserPublic{}, ErrUserNotFound
+	}
+	if patch.Theme != nil {
+		u.Theme = theme
+	}
+	if patch.MapGroupBy != nil {
+		u.MapGroupBy = group
+	}
 	if err := s.persistUnlocked(); err != nil {
 		return UserPublic{}, err
 	}

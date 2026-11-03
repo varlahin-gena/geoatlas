@@ -22,6 +22,15 @@ func (w *routeWiring) registerAdminSystemRoutes() {
 	w.handle("GET", "/api/system/stats",
 		withTimeout(chain(http.HandlerFunc(w.system.GetSystemStats), w.adminMW), readTimeout),
 	)
+	w.handle("GET", "/api/system/security",
+		withTimeout(chain(http.HandlerFunc(w.system.GetSecuritySummary), w.adminMW), readTimeout),
+	)
+	w.handle("GET", "/api/system/login-policy",
+		withTimeout(chain(http.HandlerFunc(w.system.GetLoginPolicy), w.adminMW), healthTimeout),
+	)
+	w.handle("PUT", "/api/system/login-policy",
+		chain(http.HandlerFunc(w.system.PutLoginPolicy), w.adminMW, w.csrf, maxBytesMW(maxJSONBodySize)),
+	)
 	w.handle("GET", "/api/system/history",
 		withTimeout(chain(http.HandlerFunc(w.system.GetSystemHistory), w.adminMW), readTimeout),
 	)

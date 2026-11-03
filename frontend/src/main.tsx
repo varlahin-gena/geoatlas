@@ -4,7 +4,6 @@ import App from './App';
 import '@/i18n';
 import '@/styles/theme.css';
 import '@/styles/common.css';
-import '@/auth/density';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

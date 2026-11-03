@@ -1,0 +1,109 @@
+.profile-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 36rem;
+  padding: 4px 0 24px;
+}
+
+.profile-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+
+.profile-card-title {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.profile-kv {
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.profile-kv > div {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.profile-kv dt {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.profile-kv dd {
+  margin: 0;
+  font-weight: 500;
+}
+
+.profile-kv .mono {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 22rem;
+}
+
+.profile-form label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.profile-card-foot {
+  margin: 12px 0 0;
+}
+
+.profile-field-hint {
+  margin: -2px 0 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--red);
+}
+
+.profile-choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.profile-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-2);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.profile-choice.is-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.profile-choice input {
+  margin: 0;
+}
+
+.profile-card .input,
+.profile-card select.input {
+  max-width: 22rem;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 6px;
+}

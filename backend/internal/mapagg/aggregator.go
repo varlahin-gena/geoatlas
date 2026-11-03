@@ -24,6 +24,42 @@ func IPGroupMeta(g GeoLookuper, ipStr, groupBy string) model.GroupMeta {
 	return IPGroupMetaHinted(g, ipStr, groupBy, LogGeoHint{})
 }
 
+// IPGroupMetaHybrid — enterprise IP → город; иначе → страна.
+// Нет города у enterprise-IP → страна (как fallback режима city).
+func IPGroupMetaHybrid(g GeoLookuper, ipStr string, inEnterprise bool, hint LogGeoHint) model.GroupMeta {
+	if !inEnterprise {
+		return IPGroupMetaHinted(g, ipStr, "country", hint)
+	}
+	m := IPGroupMetaHinted(g, ipStr, "city", hint)
+	city := strings.TrimSpace(m.City)
+	if city == "" {
+		city = strings.TrimSpace(hint.City)
+	}
+	if city == "" || city == "Неизвестно" {
+		// Без города гибрид ведёт себя как country-узел (не city:country:…).
+		return IPGroupMetaHinted(g, ipStr, "country", hint)
+	}
+	country := strings.TrimSpace(m.Country)
+	if country == "" || country == "Неизвестно" {
+		country = strings.TrimSpace(hint.Country)
+	}
+	key := city
+	if country != "" && country != "Неизвестно" {
+		key = city + ", " + country
+		m.Country = country
+	}
+	m.Key = key
+	m.Label = city
+	m.City = city
+	if !m.Valid || (m.Lat == 0 && m.Lon == 0) {
+		if cLat, cLon, ok := model.CountryCenter(country); ok {
+			m.Lat, m.Lon = cLat, cLon
+			m.Valid = true
+		}
+	}
+	return m
+}
+
 func IPGroupMetaHinted(g GeoLookuper, ipStr, groupBy string, hint LogGeoHint) model.GroupMeta {
 	var lk model.GeoLookup
 	if g != nil {

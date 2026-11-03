@@ -5,7 +5,6 @@ import { isAbortError } from '@/api/client';
 import { fetchSystemStatus, fetchSystemVersion } from '@/api/system';
 import { roleLabelRu } from '@/auth/roles';
 import { themeLabel } from '@/auth/theme';
-import { densityLabel, getDensity, toggleDensity, type UiDensity } from '@/auth/density';
 import { ReauthModal } from '@/components/ReauthModal';
 import { useToast } from '@/components/Toast';
 import { usePolling } from '@/lib/usePolling';
@@ -48,14 +47,7 @@ export function UserMenu() {
   const [logoutAllBusy, setLogoutAllBusy] = useState(false);
   const [versionText, setVersionText] = useState('');
   const [versionTitle, setVersionTitle] = useState('');
-  const [density, setDensity] = useState<UiDensity>(getDensity());
   const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const onDensity = () => setDensity(getDensity());
-    document.addEventListener('ga-density-change', onDensity);
-    return () => document.removeEventListener('ga-density-change', onDensity);
-  }, []);
 
   useEffect(() => {
     if (!user || user.authDisabled) return;
@@ -135,6 +127,17 @@ export function UserMenu() {
             </div>
           ) : null}
         </div>
+        <Link
+          to="/profile"
+          className="ga-user-menu-item"
+          role="menuitem"
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen(false);
+          }}
+        >
+          Профиль
+        </Link>
         <button
           type="button"
           className="ga-user-menu-item"
@@ -147,19 +150,8 @@ export function UserMenu() {
           <span>Тема</span>
           <span className="ga-theme-value">{themeLabel(themePreference)}</span>
         </button>
-        <button
-          type="button"
-          className="ga-user-menu-item"
-          role="menuitem"
-          onClick={(e) => {
-            e.stopPropagation();
-            setDensity(toggleDensity());
-          }}
-        >
-          <span>Плотность</span>
-          <span className="ga-theme-value">{densityLabel(density)}</span>
-        </button>
         <div className="ga-user-menu-sep" />
+
         <button
           type="button"
           className="ga-user-menu-item danger"

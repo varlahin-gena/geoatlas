@@ -24,6 +24,7 @@ import (
 	"geoatlas/internal/adapter/parseradapter"
 	"geoatlas/internal/adapter/searchtemplatesfile"
 	"geoatlas/internal/adapter/systemlive"
+	domainauth "geoatlas/internal/auth"
 	"geoatlas/internal/config"
 	"geoatlas/internal/installprofile"
 	"geoatlas/internal/parser"
@@ -52,6 +53,7 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 	eventsUC := usecaseevents.New(trafficRepo, bg.geo, repLookuper)
 	geoUC := usecasegeo.New(geoRepo, trafficRepo, bg.geo, a.geoJobs, geoipcodec.New(), cfg.Geo.MaxUploadRanges)
 	geoUC.SetEnterpriseStore(geoRepo)
+	eventsUC.SetEnterpriseNets(geoUC)
 	geoUC.SetHeavySlot(a.heavy)
 	if p, err := installprofile.Load(cfg.InstallProfilePath); err == nil && p != nil && p.Limits.Backend.MemoryGB > 0 {
 		geoUC.SetSoftMemLimitBytes(config.BackendSoftMemLimitBytes(p.Limits.Backend.MemoryGB))
@@ -149,6 +151,13 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 	)
 	a.huntJobs = huntjob.New(huntsUC, time.Minute)
 
+	sessPath := filepath.Join(dataDir, "sessions.json")
+	sessReg, err := domainauth.NewSessionRegistry(sessPath)
+	if err != nil {
+		sessReg, _ = domainauth.NewSessionRegistry("")
+	}
+	loginPolicyPath := filepath.Join(dataDir, "login_policy.json")
+
 	return httpapi.NewServer(httpapi.Params{
 		Cfg:               cfg,
 		Ingest:            a.ingestSvc,
@@ -164,11 +173,13 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 		AuthUC:            authUC,
 		Users:             auth.users,
 		Sessions:          auth.sessions,
+		SessionRegistry:   sessReg,
 		APITokens:         auth.apiTokens,
 		SearchTemplatesUC: searchTemplatesUC,
 		AnomalyUC:         anomalyUC,
 		AnomalySettingsUC: anomalySettingsUC,
 		HuntsUC:           huntsUC,
 		Logs:              logsUC,
+		LoginPolicyPath:   loginPolicyPath,
 	}, httpapi.WithMetrics(a.prom))
 }

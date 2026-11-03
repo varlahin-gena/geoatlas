@@ -11,7 +11,19 @@ func (w *routeWiring) registerAuthRoutes() {
 	w.handle("POST", "/api/auth/logout-all",
 		chain(http.HandlerFunc(w.auth.LogoutAll), w.csrf),
 	)
+	w.handle("GET", "/api/auth/sessions",
+		withTimeout(chain(http.HandlerFunc(w.auth.ListSessions), w.adminMW), healthTimeout),
+	)
+	w.handle("DELETE", "/api/auth/sessions/{id}",
+		chain(http.HandlerFunc(w.auth.RevokeSession), w.adminMW, w.csrf),
+	)
+	w.handle("POST", "/api/auth/sessions/revoke-user",
+		chain(http.HandlerFunc(w.auth.RevokeUserSessions), w.adminMW, w.csrf, maxBytesMW(64<<10)),
+	)
 	w.handle("GET", "/api/auth/me", http.HandlerFunc(w.auth.Me))
+	w.handle("PATCH", "/api/auth/me/preferences",
+		chain(http.HandlerFunc(w.auth.UpdatePreferences), w.loginMW, w.csrf, maxBytesMW(64<<10)),
+	)
 	w.handle("POST", "/api/auth/change-password",
 		chain(http.HandlerFunc(w.auth.ChangePassword), w.csrf, maxBytesMW(64<<10)),
 	)

@@ -1,4 +1,4 @@
-import { fmtNumber } from '@/lib/format';
+import { fmtBytes as fmtBytesShared, fmtNumber } from '@/lib/format';
 import type { EdgesAgg } from './systemTypes';
 
 export function num(v: unknown): number {
@@ -6,12 +6,9 @@ export function num(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+/** @deprecated Prefer `@/lib/format` — kept for system pages. */
 export function fmtBytes(bytes: unknown): string {
-  const b = num(bytes);
-  if (b < 1024) return `${fmtNumber(b)} Б`;
-  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} КБ`;
-  if (b < 1024 * 1024 * 1024) return `${(b / (1024 * 1024)).toFixed(1)} МБ`;
-  return `${(b / (1024 * 1024 * 1024)).toFixed(2)} ГБ`;
+  return fmtBytesShared(bytes);
 }
 
 /** Axis ticks share one unit (from max split) so labels stay ordered and readable. */

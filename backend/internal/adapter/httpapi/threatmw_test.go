@@ -10,7 +10,7 @@ import (
 
 func TestAPIThreatMWRejectsPathTraversal(t *testing.T) {
 	cfg := config.Config{HTTPThreat: config.HTTPThreatConfig{APIRateLimitRPS: 0}}
-	h := apiThreatMW(cfg)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := apiThreatMW(cfg, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	req := httptest.NewRequest(http.MethodGet, "/api/../../etc/passwd", nil)
@@ -24,7 +24,7 @@ func TestAPIThreatMWRejectsPathTraversal(t *testing.T) {
 func TestAPIThreatMWRateLimit(t *testing.T) {
 	// RPS ≪ 1 so the bucket does not refill between immediate requests.
 	cfg := config.Config{HTTPThreat: config.HTTPThreatConfig{APIRateLimitRPS: 0.001, APIRateLimitBurst: 1}}
-	h := apiThreatMW(cfg)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := apiThreatMW(cfg, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	for i := 0; i < 2; i++ {
@@ -48,7 +48,7 @@ func TestAPIThreatMWRateLimit(t *testing.T) {
 
 func TestAPIThreatMWSetsSecurityHeaders(t *testing.T) {
 	cfg := config.Config{HTTPThreat: config.HTTPThreatConfig{APIRateLimitRPS: 0}}
-	h := apiThreatMW(cfg)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := apiThreatMW(cfg, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	req := httptest.NewRequest(http.MethodGet, "/api/events", nil)

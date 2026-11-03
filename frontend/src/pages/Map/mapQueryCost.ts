@@ -14,7 +14,7 @@ const CAP_MEDIUM = 10000;
 
 function isIPGroup(groupBy: string): boolean {
   const g = (groupBy || '').trim().toLowerCase();
-  return g === 'ip' || g === 'subnet';
+  return g === 'ip' || g === 'subnet' || g === 'city_country';
 }
 
 function hasMapFilter(country: string | null, search: string): boolean {

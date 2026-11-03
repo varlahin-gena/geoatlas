@@ -5,8 +5,132 @@
 
 ## [Unreleased]
 
+
+## [2.5.7] — 2026-11-03
+
+Патч: triage без лишней вкладки, inline-действия, полировка профиля (stable).
+
+### Changed
+- Аномалии: все действия в одном ряду (без меню «Ещё»); «Разбор инцидента» убран из сайдбара — вход только с алерта (`/investigate?alert=…`).
+- Профиль: понятные подсказки, live-валидация пароля, лейблы группировки с заглавной.
+
+### Notes
+- OpenAPI API doc version: **1.19.0** (без изменений)
+- Продуктовая версия: **2.5.7**
+- Схема ClickHouse (ga_schema_version): без изменений Ensure*.
+
+## [2.5.6] — 2026-11-03
+
+Патч (тестовый): профиль (prefs) и UX triage аномалий.
+
+### Added
+- Страница **/profile**: смена пароля, тема UI и группировка дуг карты; prefs на сервере (`users.json`).
+- `PATCH /api/auth/me/preferences` (`theme`, `map_group_by`); поля в `GET /api/auth/me`.
+
+### Changed
+- Аномалии: «Разбор» primary + меню «Ещё», чипы-фильтры важности, a11y поиска, «Скрыть на 24 ч», русские лейблы в эпизодах.
+
+### Notes
+- OpenAPI API doc version: **1.19.0** (auth preferences: theme, map_group_by)
+- Продуктовая версия: **2.5.6**
+- Схема ClickHouse (ga_schema_version): без изменений Ensure*.
+- Тестовый pre-release для проверки на сервере.
+
+## [2.5.5] — 2026-11-02
+
+Патч (тестовый): полировка вкладки «Безопасность», pyasn1 0.6.5, Dozzle v11.4.0.
+
+### Changed
+- Мониторинг → Безопасность: понятные RU-лейблы аудита/ролей/результатов, компактнее таблицы и posture.
+- syslog-ng image: `pyasn1` **0.6.5** (CVE-2026-119194…119197 DoS).
+- Compose / offline export: Dozzle **v11.4.0** (было v10.7.4).
+
+### Notes
+- OpenAPI API doc version: **1.18.0** (без изменений)
+- Продуктовая версия: **2.5.5**
+- Схема ClickHouse (ga_schema_version): без изменений Ensure*.
+- Тестовый pre-release для проверки на сервере.
+
+## [2.5.4] — 2026-11-02
+
+Патч (тестовый): безопасность сессий + группировка карты «Город — страна».
+
+### Added
+- Карта: режим группировки **Город — страна** (group_by=city_country) — IP из «Сети предприятия» → города, остальные → страны; «Скрыть связи внутри страны» доступен в этом режиме.
+- Session registry: активные UI-сессии, отзыв одной / всех сессий пользователя (/api/auth/sessions*).
+- Политика lockout логина (/api/system/login-policy, login_policy.json).
+- Сводка безопасности для администратора (GET /api/system/security) и расширенная вкладка **Безопасность** в мониторинге.
+- Audit: фильтр по списку actions / prefix и CountAuditByAction для threat counters.
+
+### Changed
+- Карта: скрыты EN-подписи basemap (place/road/water/POI), чтобы не конфликтовать с RU-слоем стран; сброс фокуса страны при смене фильтров.
+- Auth middleware учитывает registry / live session; threat middleware пишет audit по CSRF / proxy-gate / rate-limit.
+
+### Notes
+- OpenAPI API doc version: **1.18.0** (city_country, sessions, security summary, login-policy)
+- Продуктовая версия: **2.5.4**
+- Схема ClickHouse (ga_schema_version): без изменений Ensure*.
+- Тестовый pre-release для проверки на сервере.
+
+## [2.5.3] — 2026-11-02
+
+Патч (тестовый): HIG-полировка навигации, аномалий, настроек, логина и мониторинга системы.
+
+### Changed
+- Сайдбар: короткие labels + tooltips; пункт **Разбор инцидента**; разные иконки охот/парсеров; сильнее active в collapsed.
+- Аномалии / охоты / разбор / движок: убран дублирующий TriageSectionNav; короче lead; пустой summary/эпизоды скрыты; обучение — тихая строка.
+- Движок: sticky Save; описание детектора в «Как настроить»; байты как ≈ МБ; без дубля «сканирование» в статусе.
+- Настройки: убраны settings-panes (навигация — сайдбар); короче leads; «Очистить базу» GeoIP — в опасной зоне внизу.
+- Логин: показать/скрыть пароль, фокус после ошибки, Caps Lock hint.
+- Мониторинг: subtitle = вкладка; пустые алерты свёрнуты; KPI только на Обзор/Конвейер/Графики; вкладка **Резерв**; период графиков внутри вкладки; короче backup copy; **История DR**; audit labels по-русски.
+- Карта (после 2.5.2): Отображение без upload логов/GeoIP, крупнее панель; байты как КБ/МБ/ГБ; «Исх./Вх. байты».
+- Статус в шапке мониторинга: **Система OK** (как глобальный pill).
+
+### Notes
+- OpenAPI API doc version: **1.17.0** (без изменений)
+- Продуктовая версия: **2.5.3**
+- Схема ClickHouse (`ga_schema_version`): без изменений Ensure*.
+- Тестовый pre-release для проверки на сервере.
+
+## [2.5.2] — 2026-11-02
+
+Патч (тестовый): UX карты / глобуса и тема light↔dark.
+
+### Changed
+- Карта: действия (режим, загрузка, обновление, PNG, охота) перенесены из сайдбара в панель **Отображение**; сайдбар — только навигация.
+- Topbar карты упрощён (поиск · период · фильтры · отображение); обучение baseline — тихая строка под чипами.
+- Конструктор запроса: **Применить** — единственный primary.
+- Панель детали дуги: статус/метрики сверху, RU-подписи, без пустой «Репутации».
+- Тема: только **Светлая** / **Тёмная** (без «Системная»); убрана плотность UI из меню.
+- Light: лёгкое отделение chrome от карты.
+
+### Fixed
+- Глобус: длинные дуги (например RU↔AU) больше не отфильтровываются по угловому порогу ~99°.
+
+### Notes
+- OpenAPI API doc version: **1.17.0** (без изменений)
+- Продуктовая версия: **2.5.2**
+- Схема ClickHouse (`ga_schema_version`): без изменений Ensure*.
+- Тестовый pre-release для проверки на сервере.
+
+## [2.5.1] — 2026-11-02
+
+Патч: security/image pins, hardening supply chain (Scorecard / OpenSSF), CI coverage.
+
 ### Security
-- syslog-ng image: pin `oauthlib==4.0.0` (CVE-2026-49264, CVE-2026-49265) so Image scan Trivy gate passes.
+- syslog-ng image: pin `oauthlib==4.0.0` (CVE-2026-49264, CVE-2026-49265) для Trivy Image scan.
+- frontend: override `minimatch` 11.0.1 (GHSA-g3hv-75wg-m249); pins для undici / zod / vite и других transitive npm CVE.
+- Runtime images: digests Alpine/Node, pins tzdata / ca-certificates, nginx 1.30.6, Go build image 1.26.9.
+
+### Changed
+- OpenSSF Best Practices / Scorecard: pin action digests, DCO, CODEOWNERS, signed release tags, nightly compose smoke.
+- CI: gate ≥80% overall Go coverage; frontend Playwright на `ubuntu-24.04`.
+- Dependabot: bumps GitHub Actions и base-образов (Alpine / Node).
+
+### Notes
+- OpenAPI API doc version: **1.17.0** (без изменений)
+- Продуктовая версия: **2.5.1**
+- Схема ClickHouse (`ga_schema_version`): без изменений Ensure*.
 
 ## [2.5.0] — 2026-09-11
 
@@ -556,6 +680,13 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.5.7]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.7
+[2.5.6]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.6
+[2.5.5]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.5
+[2.5.4]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.4
+[2.5.3]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.3
+[2.5.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.2
+[2.5.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.1
 [2.5.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.0
 [2.4.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.4.0
 [2.3.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.3.0

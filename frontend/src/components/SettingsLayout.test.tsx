@@ -1,8 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
-import { SettingsLayout, settingsNavSections } from './SettingsLayout';
-import { filterNav, PAGE_NAV } from './nav';
+import { SettingsLayout } from './SettingsLayout';
 
 vi.mock('@/auth/AuthContext', () => ({
   useAuth: () => ({
@@ -19,21 +18,8 @@ vi.mock('./Shell', () => ({
   UserMenu: () => null,
 }));
 
-describe('settingsNavSections', () => {
-  it('keeps only data and access groups', () => {
-    const items = filterNav(PAGE_NAV, {
-      isAdmin: true,
-      reputationEnabled: true,
-      uiAuthEnabled: true,
-    });
-    const sections = settingsNavSections(items);
-    expect(sections.every((s) => s.id === 'data' || s.id === 'access')).toBe(true);
-    expect(sections.length).toBeGreaterThan(0);
-  });
-});
-
 describe('SettingsLayout', () => {
-  it('renders panes and prefixes title', () => {
+  it('prefixes title and renders children without settings panes', () => {
     render(
       <MemoryRouter initialEntries={['/users']}>
         <SettingsLayout title="Пользователи">
@@ -42,7 +28,7 @@ describe('SettingsLayout', () => {
       </MemoryRouter>,
     );
     expect(screen.getByText('Настройки · Пользователи')).toBeTruthy();
-    expect(screen.getByLabelText('Разделы настроек')).toBeTruthy();
+    expect(screen.queryByLabelText('Разделы настроек')).toBeNull();
     expect(screen.getByText('тело')).toBeTruthy();
   });
 });

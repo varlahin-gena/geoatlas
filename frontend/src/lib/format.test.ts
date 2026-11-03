@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { fmtDate, safeNext } from './format';
+import { fmtBytes, fmtDate, safeNext } from './format';
+
+describe('fmtBytes', () => {
+  it('scales to Б / КБ / МБ / ГБ', () => {
+    expect(fmtBytes(512)).toMatch(/Б$/);
+    expect(fmtBytes(2048)).toMatch(/КБ$/);
+    expect(fmtBytes(2 * 1024 * 1024)).toMatch(/МБ$/);
+    expect(fmtBytes(2 * 1024 * 1024 * 1024)).toMatch(/ГБ$/);
+  });
+});
 
 describe('fmtDate', () => {
   it('hides Go zero / pre-epoch timestamps', () => {
