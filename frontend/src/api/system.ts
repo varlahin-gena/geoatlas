@@ -66,16 +66,6 @@ export function fetchDRHistory(query?: {
   return apiGetQuery('/api/dr/history', query || {});
 }
 
-export function fetchAuditLog(query?: {
-  since?: string;
-  limit?: number;
-  action?: string;
-  result?: string;
-  actor?: string;
-}): Promise<{ items?: AuditEvent[] }> {
-  return apiGetQuery('/api/audit', query || {});
-}
-
 export type LoginPolicy = {
   max_fails: number;
   window_sec: number;
