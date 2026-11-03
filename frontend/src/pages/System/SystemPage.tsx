@@ -20,7 +20,6 @@ import {
 } from './systemFormat';
 import { type Tab } from './systemTypes';
 import { SystemBackupTab } from './SystemBackupTab';
-import { SystemAuditTab } from './SystemAuditTab';
 import { SystemChartsTab } from './SystemChartsTab';
 import { SystemOverviewTab } from './SystemOverviewTab';
 import { SystemPipelineTab } from './SystemPipelineTab';
@@ -32,7 +31,19 @@ export default function SystemPage() {
   const { toast } = useToast();
   const [tab, setTab] = useState<Tab>(() => {
     try {
-      return (localStorage.getItem('nm.system.tab') as Tab) || 'overview';
+      const saved = localStorage.getItem('nm.system.tab');
+      // Former "Журнал аудита" tab removed — covered by Безопасность.
+      if (saved === 'audit') return 'security';
+      if (
+        saved === 'overview' ||
+        saved === 'pipeline' ||
+        saved === 'backup' ||
+        saved === 'security' ||
+        saved === 'charts'
+      ) {
+        return saved;
+      }
+      return 'overview';
     } catch {
       return 'overview';
     }
@@ -143,7 +154,6 @@ export default function SystemPage() {
     pipeline: 'Конвейер',
     backup: 'Резерв',
     security: 'Безопасность',
-    audit: 'Журнал аудита',
     charts: 'Графики',
   };
   const showKpiStrip = tab === 'overview' || tab === 'pipeline' || tab === 'charts';
@@ -240,7 +250,7 @@ export default function SystemPage() {
         ) : null}
 
         <nav className="view-tabs" role="tablist" aria-label="Разделы мониторинга">
-          {(['overview', 'pipeline', 'backup', 'security', 'audit', 'charts'] as const).map((id) => (
+          {(['overview', 'pipeline', 'backup', 'security', 'charts'] as const).map((id) => (
             <button
               key={id}
               type="button"
@@ -309,8 +319,6 @@ export default function SystemPage() {
         {tab === 'backup' ? <SystemBackupTab /> : null}
 
         {tab === 'security' ? <SystemSecurityTab /> : null}
-
-        {tab === 'audit' ? <SystemAuditTab /> : null}
 
         {tab === 'charts' ? (
           <SystemChartsTab
