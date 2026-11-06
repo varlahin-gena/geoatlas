@@ -29,8 +29,8 @@
     "maplibre-gl": "6.8.0",
     "react": "^19.2.9",
     "react-dom": "^19.2.9",
-    "react-i18next": "^17.1.9",
-    "react-router-dom": "^7.18.4",
+    "react-i18next": "^17.1.12",
+    "react-router-dom": "^7.18.5",
     "uplot": "1.6.32"
   },
   "devDependencies": {
