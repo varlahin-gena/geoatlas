@@ -70,5 +70,12 @@ assert a('tornado')=='6.6', a('tornado')"; \
       \( -name 'setuptools-*.dist-info' -o -name 'setuptools-*.egg-info' \) \
       ! -name 'setuptools-84.1.0.dist-info' 2>/dev/null || true)"; \
     [ -z "$leftovers" ] || { printf 'leftover setuptools:\n%s\n' "$leftovers" >&2; exit 1; }
+COPY reload_agent.py /usr/local/bin/ga-reload-agent.py
+COPY entrypoint.sh /usr/local/bin/ga-entrypoint.sh
+RUN chmod 0755 /usr/local/bin/ga-reload-agent.py /usr/local/bin/ga-entrypoint.sh
+
 LABEL org.opencontainers.image.title="geoatlas-syslog-ng" \
       org.opencontainers.image.source="https://github.com/varlahin-gena/geoatlas"
+
+ENTRYPOINT ["/usr/local/bin/ga-entrypoint.sh"]
+

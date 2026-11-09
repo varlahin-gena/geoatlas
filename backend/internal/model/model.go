@@ -13,6 +13,7 @@ type TrafficLog struct {
 	ParsedAt    time.Time // момент разбора строки (для метрики pipeline lag)
 	Vendor      string
 	Device      string
+	ConnectorID string // syslog connector id (ops diagnostics); empty for HTTP ingest
 	SrcIP       string
 	DstIP       string
 	SrcPort     uint32
@@ -57,29 +58,39 @@ type IngestTransportStats struct {
 	Connections   int64 `json:"connections"`
 }
 
+// IngestConnectorStats — per-connector counters (ops diagnostics).
+type IngestConnectorStats struct {
+	ID                string `json:"id"`
+	ReceivedTotal     int64  `json:"received_total"`
+	DroppedTotal      int64  `json:"dropped_total"` // attributed enqueue drops
+	AuthRejectedTotal int64  `json:"auth_rejected_total"`
+	LastEventAt       string `json:"last_event_at,omitempty"`
+}
+
 // IngestLiveStats — снимок метрик live-ingest для API и мониторинга.
 type IngestLiveStats struct {
-	State              string               `json:"state"`
-	ReceivedTotal      int64                `json:"received_total"`
-	ParsedTotal        int64                `json:"parsed_total"`
-	InsertedTotal      int64                `json:"inserted_total"`
-	SkippedTotal       int64                `json:"skipped_total"`
-	ParseErrorsTotal   int64                `json:"parse_errors_total"`
-	BufferedLines      int64                `json:"buffered_lines"`
-	QueueDepth         int64                `json:"queue_depth"`
-	QueueCapacity      int64                `json:"queue_capacity"`
-	QueueBytes         int64                `json:"queue_bytes"`
-	QueueBytesCapacity int64                `json:"queue_bytes_capacity"`
-	DroppedTotal       int64                `json:"dropped_total"`       // queue admission drops
-	BufferDropsTotal   int64                `json:"buffer_drops_total"`  // processor buffer drops (CH outage path)
-	AuthRejectedTotal  int64                `json:"auth_rejected_total"` // peer allowlist / bad ingest token
-	CircuitOpen        bool                 `json:"circuit_open"`        // insert circuit currently blocking dequeue
-	LastDropAt         string               `json:"last_drop_at,omitempty"`
-	Connections        int64                `json:"connections"`
-	UDP                IngestTransportStats `json:"udp"`
-	TCP                IngestTransportStats `json:"tcp"`
-	LastFlushAt        string               `json:"last_flush_at,omitempty"`
-	LastError          string               `json:"last_error,omitempty"`
+	State              string                 `json:"state"`
+	ReceivedTotal      int64                  `json:"received_total"`
+	ParsedTotal        int64                  `json:"parsed_total"`
+	InsertedTotal      int64                  `json:"inserted_total"`
+	SkippedTotal       int64                  `json:"skipped_total"`
+	ParseErrorsTotal   int64                  `json:"parse_errors_total"`
+	BufferedLines      int64                  `json:"buffered_lines"`
+	QueueDepth         int64                  `json:"queue_depth"`
+	QueueCapacity      int64                  `json:"queue_capacity"`
+	QueueBytes         int64                  `json:"queue_bytes"`
+	QueueBytesCapacity int64                  `json:"queue_bytes_capacity"`
+	DroppedTotal       int64                  `json:"dropped_total"`       // queue admission drops
+	BufferDropsTotal   int64                  `json:"buffer_drops_total"`  // processor buffer drops (CH outage path)
+	AuthRejectedTotal  int64                  `json:"auth_rejected_total"` // peer allowlist / bad ingest token
+	CircuitOpen        bool                   `json:"circuit_open"`        // insert circuit currently blocking dequeue
+	LastDropAt         string                 `json:"last_drop_at,omitempty"`
+	Connections        int64                  `json:"connections"`
+	UDP                IngestTransportStats   `json:"udp"`
+	TCP                IngestTransportStats   `json:"tcp"`
+	Connectors         []IngestConnectorStats `json:"connectors,omitempty"`
+	LastFlushAt        string                 `json:"last_flush_at,omitempty"`
+	LastError          string                 `json:"last_error,omitempty"`
 }
 
 type GeoRange struct {

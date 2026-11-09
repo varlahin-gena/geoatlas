@@ -30,6 +30,14 @@ type EdgesAggStatus struct {
 }
 
 // IngestSnapshot is the live ingest data required for monitoring.
+type IngestConnectorSnapshot struct {
+	ID                string
+	ReceivedTotal     int64
+	DroppedTotal      int64
+	AuthRejectedTotal int64
+	LastEventAt       string
+}
+
 type IngestSnapshot struct {
 	State                                                                     string
 	ReceivedTotal, ParsedTotal, InsertedTotal, SkippedTotal, ParseErrorsTotal int64
@@ -40,6 +48,16 @@ type IngestSnapshot struct {
 	CircuitOpen                                                               bool
 	LastError                                                                 string
 	LastDropAt                                                                string // RFC3339; empty if never dropped
+	Connectors                                                                []IngestConnectorSnapshot
+}
+
+// SyslogConnectorSnapshot — per-connector syslog-ng counters.
+type SyslogConnectorSnapshot struct {
+	ID           string
+	UDPProcessed int64
+	TCPProcessed int64
+	Dropped      int64
+	Queued       int64
 }
 
 // SyslogNGSnapshot is live stats-exporter data (drops/queue before backend ingest).
@@ -50,6 +68,7 @@ type SyslogNGSnapshot struct {
 	ProcessedTotal int64
 	UDPProcessed   int64
 	TCPProcessed   int64
+	Connectors     []SyslogConnectorSnapshot
 }
 
 // IngestLive exposes optional live ingest metrics.

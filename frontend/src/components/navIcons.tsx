@@ -119,6 +119,7 @@ export const NAV_ICONS: Record<string, string> = {
   '/geo-missing': 'geo-missing',
   '/geo-ranges': 'geo',
   '/reputation': 'reputation',
+  '/connectors': 'system',
   '/users': 'users',
   '/api-tokens': 'tokens',
   '/tls': 'tls',

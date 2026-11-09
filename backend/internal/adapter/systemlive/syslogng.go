@@ -32,12 +32,25 @@ func (a *SyslogNGAdapter) Snapshot(ctx context.Context) (system.SyslogNGSnapshot
 	if err != nil {
 		return system.SyslogNGSnapshot{Up: false}, true
 	}
-	return system.SyslogNGSnapshot{
+	out := system.SyslogNGSnapshot{
 		Up:             true,
 		DroppedTotal:   int64(raw.DroppedTotal),
 		Queued:         int64(raw.Queued),
 		ProcessedTotal: int64(raw.ProcessedTotal),
 		UDPProcessed:   int64(raw.UDPProcessed),
 		TCPProcessed:   int64(raw.TCPProcessed),
-	}, true
+	}
+	if len(raw.Connectors) > 0 {
+		out.Connectors = make([]system.SyslogConnectorSnapshot, 0, len(raw.Connectors))
+		for id, c := range raw.Connectors {
+			if c == nil {
+				continue
+			}
+			out.Connectors = append(out.Connectors, system.SyslogConnectorSnapshot{
+				ID: id, UDPProcessed: int64(c.UDPProcessed), TCPProcessed: int64(c.TCPProcessed),
+				Dropped: int64(c.Dropped), Queued: int64(c.Queued),
+			})
+		}
+	}
+	return out, true
 }

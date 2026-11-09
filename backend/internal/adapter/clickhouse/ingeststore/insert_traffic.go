@@ -19,7 +19,7 @@ func InsertTrafficLogs(ctx context.Context, ch clickhouse.Conn, logs []model.Tra
 		(timestamp, parsed_at, vendor, device, src_ip, dst_ip, src_port, dst_port, action, rule, proto,
 		 src_zone, dst_zone, src_country, dst_country, src_city, dst_city, src_region, dst_region,
 		 src_lat, src_lon, dst_lat, dst_lon, bytes_sent, bytes_recv,
-		 packets_sent, packets_recv)
+		 packets_sent, packets_recv, connector_id)
 	`)
 	if err != nil {
 		return err
@@ -37,7 +37,7 @@ func InsertTrafficLogs(ctx context.Context, ch clickhouse.Conn, logs []model.Tra
 	return batch.Send()
 }
 
-const trafficColumnCount = 27
+const trafficColumnCount = 28
 
 var trafficColumnsPool = sync.Pool{
 	New: func() any { return &trafficColumns{} },
@@ -73,6 +73,7 @@ type trafficColumns struct {
 	bytesRecv    []uint64
 	packetsSent  []uint64
 	packetsRecv  []uint64
+	connectorIDs []string
 
 	anyCols []any
 }
@@ -112,6 +113,7 @@ func (c *trafficColumns) ensure(n int) {
 	c.bytesRecv = growSlice(c.bytesRecv, n)
 	c.packetsSent = growSlice(c.packetsSent, n)
 	c.packetsRecv = growSlice(c.packetsRecv, n)
+	c.connectorIDs = growSlice(c.connectorIDs, n)
 }
 
 func (c *trafficColumns) fill(logs []model.TrafficLog, now time.Time) {
@@ -148,6 +150,7 @@ func (c *trafficColumns) fill(logs []model.TrafficLog, now time.Time) {
 		c.bytesRecv[i] = l.BytesRecv
 		c.packetsSent[i] = l.PacketsSent
 		c.packetsRecv[i] = l.PacketsRecv
+		c.connectorIDs[i] = l.ConnectorID
 	}
 }
 
@@ -182,6 +185,7 @@ func (c *trafficColumns) asAny() []any {
 	c.anyCols[24] = c.bytesRecv
 	c.anyCols[25] = c.packetsSent
 	c.anyCols[26] = c.packetsRecv
+	c.anyCols[27] = c.connectorIDs
 	return c.anyCols
 }
 
@@ -214,6 +218,7 @@ func releaseTrafficColumns(c *trafficColumns) {
 	clear(c.dstCities)
 	clear(c.srcRegions)
 	clear(c.dstRegions)
+	clear(c.connectorIDs)
 	for i := range c.anyCols {
 		c.anyCols[i] = nil
 	}

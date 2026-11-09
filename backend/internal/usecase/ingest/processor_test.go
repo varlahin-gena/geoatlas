@@ -52,8 +52,9 @@ type memStats struct {
 	received, skipped, parsed, parseErrs, inserted, buffered, bufferDrops int64
 }
 
-func (m *memStats) AddReceived(string)         { m.received++ }
-func (m *memStats) AddSkipped(n int64)         { m.skipped += n }
+func (m *memStats) AddReceived(string)              { m.received++ }
+func (m *memStats) AddReceivedConnector(string)     {}
+func (m *memStats) AddSkipped(n int64)              { m.skipped += n }
 func (m *memStats) AddParsed(n int64)          { m.parsed += n }
 func (m *memStats) AddParseErrors(n int64)     { m.parseErrs += n }
 func (m *memStats) AddInserted(n int64)        { m.inserted += n }

@@ -13,6 +13,7 @@ import (
 	usecaseaudit "geoatlas/internal/usecase/auditlog"
 	usecaseauth "geoatlas/internal/usecase/auth"
 	usecasebackup "geoatlas/internal/usecase/backup"
+	"geoatlas/internal/usecase/connectors"
 	usecaseevents "geoatlas/internal/usecase/events"
 	usecasegeo "geoatlas/internal/usecase/geo"
 	usecasehunts "geoatlas/internal/usecase/hunts"
@@ -97,6 +98,12 @@ type ReputationDeps struct {
 	reputationUC *usecasereputation.Service
 }
 
+// ConnectorsDeps — зависимости ConnectorsHandler.
+type ConnectorsDeps struct {
+	connectorsUC *connectors.Service
+	logs         *usecaseaudit.Service
+}
+
 // SearchTemplatesDeps — зависимости SearchTemplatesHandler.
 type SearchTemplatesDeps struct {
 	authDisabled    bool
@@ -120,6 +127,7 @@ type Params struct {
 	EventsUC          *usecaseevents.Service
 	GeoUC             *usecasegeo.Service
 	ReputationUC      *usecasereputation.Service
+	ConnectorsUC      *connectors.Service
 	ParseErrorsUC     *parseerrors.Service
 	SystemUC          *usecasesystem.Service
 	SystemPinger      usecasesystem.ClickHousePinger
@@ -151,6 +159,7 @@ type Deps struct {
 	ingest     *IngestDeps
 	parse      *ParseDeps
 	reputation *ReputationDeps
+	connectors *ConnectorsDeps
 	templates  *SearchTemplatesDeps
 	anomaly    *AnomalyDeps
 	hunts      *usecasehunts.Service
@@ -218,6 +227,7 @@ func NewDeps(p Params) *Deps {
 		ingest:     &IngestDeps{ingestFlushSec: p.Cfg.Ingest.FlushSec, ingest: p.Ingest},
 		parse:      &ParseDeps{queryTimeout: p.Cfg.QueryTimeout, parseErrorsUC: p.ParseErrorsUC, parseTestUC: p.ParseTestUC},
 		reputation: &ReputationDeps{reputationUC: p.ReputationUC},
+		connectors: &ConnectorsDeps{connectorsUC: p.ConnectorsUC, logs: p.Logs},
 		templates: &SearchTemplatesDeps{
 			authDisabled:    p.Cfg.Auth.Disabled,
 			searchTemplates: p.SearchTemplatesUC,

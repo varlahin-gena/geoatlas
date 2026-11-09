@@ -27,6 +27,8 @@ var mutationPaths = []struct {
 	{"put", "/api/geo-ranges"},
 	{"post", "/api/enterprise-nets"},
 	{"post", "/api/reputation/feeds"},
+	{"post", "/api/connectors"},
+	{"patch", "/api/connectors/{id}"},
 	{"put", "/api/system/retention"},
 	{"put", "/api/system/tls"},
 	{"put", "/api/system/backup-schedule"},

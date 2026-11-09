@@ -6,6 +6,19 @@ import (
 	"geoatlas/internal/model"
 )
 
+// ConnectorPipelineRow — ops table on /system Pipeline (per syslog connector).
+type ConnectorPipelineRow struct {
+	ID                string  `json:"id"`
+	ReceivedTotal     int64   `json:"received_total"`
+	DroppedTotal      int64   `json:"dropped_total"`
+	AuthRejectedTotal int64   `json:"auth_rejected_total"`
+	LastEventAt       string  `json:"last_event_at,omitempty"`
+	SyslogUDP         float64 `json:"syslog_udp_processed"`
+	SyslogTCP         float64 `json:"syslog_tcp_processed"`
+	SyslogQueued      float64 `json:"syslog_queued"`
+	SyslogDropped     float64 `json:"syslog_dropped"`
+}
+
 type SystemStatsResponse struct {
 	Timestamp      string                        `json:"timestamp"`
 	UptimeSec      float64                       `json:"uptime_sec"`
@@ -18,6 +31,7 @@ type SystemStatsResponse struct {
 	Backend        BackendInfo                   `json:"backend_info"`
 	InstallProfile *CapacityProfile              `json:"install_profile,omitempty"`
 	EdgesAgg       EdgesAggView                  `json:"edges_agg"`
+	Connectors     []ConnectorPipelineRow        `json:"connectors,omitempty"`
 }
 
 // CapacityProfile is the installation sizing data required by system APIs.

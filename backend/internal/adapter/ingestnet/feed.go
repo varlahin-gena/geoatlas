@@ -28,6 +28,7 @@ func (s *Service) TryEnqueue(line, transport string) bool {
 
 	if maxBytes > 0 && n > maxBytes {
 		s.stats.addDropped(1)
+		s.stats.addConnectorDropped(line, 1)
 		return false
 	}
 
@@ -37,6 +38,7 @@ func (s *Service) TryEnqueue(line, transport string) bool {
 			cur := s.queueBytes.Load()
 			if cur+n > maxBytes {
 				s.stats.addDropped(1)
+				s.stats.addConnectorDropped(line, 1)
 				return false
 			}
 			if s.queueBytes.CompareAndSwap(cur, cur+n) {
@@ -54,6 +56,7 @@ func (s *Service) TryEnqueue(line, transport string) bool {
 			s.queueBytes.Add(-n)
 		}
 		s.stats.addDropped(1)
+		s.stats.addConnectorDropped(line, 1)
 		return false
 	}
 }

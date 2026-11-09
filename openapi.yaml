@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: ГеоАтлас API
-  version: "1.19.0"
+  version: "1.20.0"
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
@@ -43,6 +43,7 @@ tags:
   - name: parse
   - name: geo
   - name: reputation
+  - name: connectors
 
 paths:
   /api/auth/login:
@@ -1493,6 +1494,130 @@ paths:
           description: deleted
         "401":
           description: unauthorized
+
+  /api/connectors:
+    get:
+      tags: [connectors]
+      summary: Список syslog-коннекторов
+      description: Только administrator. Файл CONNECTORS_FILE; порты из GA_CONNECTOR_EXTRA_PORTS + 514.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: connectors
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  connectors:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SyslogConnector"
+                  max_connectors: { type: integer }
+                  extra_ports:
+                    type: object
+                    properties:
+                      min: { type: integer }
+                      max: { type: integer }
+        "401":
+          description: unauthorized
+    post:
+      tags: [connectors]
+      summary: Создать syslog-коннектор
+      description: administrator или Bearer ops. После создания нужен POST /api/connectors/apply.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SyslogConnectorCreateRequest"
+      responses:
+        "200":
+          description: created
+        "400":
+          description: validation error
+        "401":
+          description: unauthorized
+  /api/connectors/apply:
+    post:
+      tags: [connectors]
+      summary: Записать syslog-ng conf и reload
+      description: administrator или Bearer ops. Пишет zz_connectors.conf и вызывает reload agent.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: applied
+        "502":
+          description: conf written but reload failed
+        "401":
+          description: unauthorized
+  /api/connectors/{id}:
+    get:
+      tags: [connectors]
+      summary: Один коннектор
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: connector
+        "404":
+          description: not found
+    patch:
+      tags: [connectors]
+      summary: Изменить коннектор
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SyslogConnectorUpdateRequest"
+      responses:
+        "200":
+          description: updated
+        "400":
+          description: validation error
+        "404":
+          description: not found
+    delete:
+      tags: [connectors]
+      summary: Удалить коннектор (не builtin default)
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: deleted
+        "400":
+          description: builtin cannot be deleted
+        "404":
+          description: not found
 
   /api/reputation/feeds:
     get:
@@ -3223,6 +3348,36 @@ components:
             $ref: "#/components/schemas/EnterpriseNet"
         count: { type: integer }
         max: { type: integer }
+
+    SyslogConnector:
+      type: object
+      additionalProperties: false
+      required: [id, name, port, protocols, enabled]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        port: { type: integer }
+        protocols: { type: string, enum: [udp, tcp, both] }
+        enabled: { type: boolean }
+        builtin: { type: boolean }
+    SyslogConnectorCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [id, name, port]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        port: { type: integer }
+        protocols: { type: string, enum: [udp, tcp, both] }
+        enabled: { type: boolean }
+    SyslogConnectorUpdateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string }
+        port: { type: integer }
+        protocols: { type: string, enum: [udp, tcp, both] }
+        enabled: { type: boolean }
 
     ReputationFeed:
       type: object

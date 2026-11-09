@@ -164,6 +164,7 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 		EventsUC:          eventsUC,
 		GeoUC:             geoUC,
 		ReputationUC:      bg.repUC,
+		ConnectorsUC:      bg.connectorsUC,
 		ParseErrorsUC:     parseErrorsUC,
 		SystemUC:          systemUC,
 		SystemPinger:      systemRepo,

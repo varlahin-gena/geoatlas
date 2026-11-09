@@ -71,6 +71,11 @@ const (
 )
 
 func (p *Processor) ProcessLine(ctx context.Context, line string, transport string) (LineOutcome, int, error) {
+	return p.ProcessLineMeta(ctx, line, transport, "")
+}
+
+// ProcessLineMeta — как ProcessLine, плюс connectorID для CH / per-connector stats.
+func (p *Processor) ProcessLineMeta(ctx context.Context, line, transport, connectorID string) (LineOutcome, int, error) {
 	line = strings.TrimSpace(line)
 	if line == "" {
 		return OutcomeEmpty, 0, nil
@@ -78,6 +83,9 @@ func (p *Processor) ProcessLine(ctx context.Context, line string, transport stri
 
 	if p.stats != nil {
 		p.stats.AddReceived(transport)
+		if connectorID != "" {
+			p.stats.AddReceivedConnector(connectorID)
+		}
 	}
 
 	res := p.parser.ParseVerbose(line)
@@ -117,6 +125,9 @@ func (p *Processor) ProcessLine(ctx context.Context, line string, transport stri
 	logEntry := res.Log
 	if logEntry.ParsedAt.IsZero() {
 		logEntry.ParsedAt = time.Now()
+	}
+	if connectorID != "" {
+		logEntry.ConnectorID = connectorID
 	}
 	p.enrichGeo(&logEntry)
 	p.appendTrafficLog(logEntry)

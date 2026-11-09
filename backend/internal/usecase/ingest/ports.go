@@ -32,6 +32,7 @@ type LineParser interface {
 // LineStats — опциональные счётчики live-ingest (очередь/мониторинг).
 type LineStats interface {
 	AddReceived(transport string)
+	AddReceivedConnector(connectorID string)
 	AddSkipped(n int64)
 	AddParsed(n int64)
 	AddParseErrors(n int64)

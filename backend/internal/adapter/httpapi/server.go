@@ -46,6 +46,7 @@ func NewServer(p Params, opts ...ServerOption) *Server {
 	ingestH := &IngestHandler{deps.ingest}
 	geoH := &GeoHandler{deps.geo}
 	repH := &ReputationHandler{deps.reputation}
+	connH := &ConnectorsHandler{deps.connectors}
 	system := &SystemHandler{deps.system}
 	parse := &ParseHandler{deps.parse}
 	authDeps := deps.auth
@@ -83,6 +84,7 @@ func NewServer(p Params, opts ...ServerOption) *Server {
 		ingest:              ingestH,
 		geo:                 geoH,
 		rep:                 repH,
+		connectors:          connH,
 		system:              system,
 		parse:               parse,
 		auth:                authH,

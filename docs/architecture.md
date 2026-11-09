@@ -6,9 +6,9 @@
 
 ```
 МСЭ (UserGate, FortiGate, …) или SIEM
-      │ syslog (514/tcp, 514/udp)          [профиль syslog]
+      │ syslog (514 + connector ports)     [профиль syslog]
       ▼
- ┌───────────┐   TCP :1514 (@@ga/udp/@@, @@ga/tcp/@@)                      ┌───────────┐
+ ┌───────────┐   TCP :1514 (@@ga/{udp|tcp}/token/id/@@)                    ┌───────────┐
  │ syslog-ng │ ──────────────────────────────────────────────────────────► │ backend   │
  └───────────┘                                                             │ (Go)      │
                                                                            │ parser +  │

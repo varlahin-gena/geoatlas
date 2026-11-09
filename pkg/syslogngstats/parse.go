@@ -11,6 +11,15 @@ import (
 	"strings"
 )
 
+// ConnectorSnap — per-connector syslog-ng counters (source/dest ids s_<id>_udp…).
+type ConnectorSnap struct {
+	ID           string
+	UDPProcessed float64
+	TCPProcessed float64
+	Dropped      float64
+	Queued       float64
+}
+
 // Snapshot — счётчики syslog-ng, нужные пайплайну (drops до backend).
 type Snapshot struct {
 	DroppedTotal   float64
@@ -18,6 +27,7 @@ type Snapshot struct {
 	ProcessedTotal float64
 	UDPProcessed   float64
 	TCPProcessed   float64
+	Connectors     map[string]*ConnectorSnap
 }
 
 // Fetch GET url и разбирает CSV или Prometheus text.
@@ -130,14 +140,26 @@ func applyStat(snap *Snapshot, srcName, srcID, typ string, num float64) {
 	}
 	isSrc := strings.Contains(srcName, "src") || strings.Contains(srcName, "_src_")
 	isDst := strings.Contains(srcName, "dst") || strings.Contains(srcName, "_dst_")
+	connID, proto := parseConnectorSourceID(srcID)
+	if connID == "" {
+		connID, proto = parseConnectorSourceID(srcName)
+	}
 	switch typ {
 	case "dropped":
-		if isDst || strings.Contains(srcID, "d_backend") {
+		if isDst || strings.Contains(srcID, "d_backend") || strings.HasPrefix(srcID, "d_") {
 			snap.DroppedTotal += num
+			if connID != "" {
+				cs := ensureConnector(snap, connID)
+				cs.Dropped += num
+			}
 		}
 	case "queued":
-		if isDst || strings.Contains(srcID, "d_backend") {
+		if isDst || strings.Contains(srcID, "d_backend") || strings.HasPrefix(srcID, "d_") {
 			snap.Queued += num
+			if connID != "" {
+				cs := ensureConnector(snap, connID)
+				cs.Queued += num
+			}
 		}
 	case "processed":
 		if !isSrc {
@@ -147,14 +169,57 @@ func applyStat(snap *Snapshot, srcName, srcID, typ string, num float64) {
 			return
 		}
 		switch {
-		case strings.Contains(srcID, "s_udp") || (strings.Contains(srcID, "udp") && !strings.Contains(srcID, "backend")):
+		case proto == "udp" || strings.Contains(srcID, "s_udp") || (strings.Contains(srcID, "udp") && !strings.Contains(srcID, "backend")):
 			snap.UDPProcessed += num
 			snap.ProcessedTotal += num
-		case strings.Contains(srcID, "s_tcp") || (strings.Contains(srcID, "tcp") && !strings.Contains(srcID, "backend")):
+			if connID != "" {
+				ensureConnector(snap, connID).UDPProcessed += num
+			}
+		case proto == "tcp" || strings.Contains(srcID, "s_tcp") || (strings.Contains(srcID, "tcp") && !strings.Contains(srcID, "backend")):
 			snap.TCPProcessed += num
 			snap.ProcessedTotal += num
+			if connID != "" {
+				ensureConnector(snap, connID).TCPProcessed += num
+			}
 		}
 	}
+}
+
+func ensureConnector(snap *Snapshot, id string) *ConnectorSnap {
+	if snap.Connectors == nil {
+		snap.Connectors = map[string]*ConnectorSnap{}
+	}
+	cs, ok := snap.Connectors[id]
+	if !ok {
+		cs = &ConnectorSnap{ID: id}
+		snap.Connectors[id] = cs
+	}
+	return cs
+}
+
+// parseConnectorSourceID recognizes s_<id>_udp / s_<id>_tcp / d_<id>_udp …
+func parseConnectorSourceID(id string) (connectorID, proto string) {
+	id = strings.ToLower(strings.TrimSpace(id))
+	for _, prefix := range []string{"s_", "d_"} {
+		if !strings.HasPrefix(id, prefix) {
+			continue
+		}
+		rest := id[len(prefix):]
+		switch {
+		case strings.HasSuffix(rest, "_udp"):
+			return strings.TrimSuffix(rest, "_udp"), "udp"
+		case strings.HasSuffix(rest, "_tcp"):
+			return strings.TrimSuffix(rest, "_tcp"), "tcp"
+		}
+	}
+	// legacy s_udp / s_tcp
+	switch id {
+	case "s_udp", "d_backend_udp":
+		return "default", "udp"
+	case "s_tcp", "d_backend_tcp":
+		return "default", "tcp"
+	}
+	return "", ""
 }
 
 func parsePromLine(line string) (name string, labels map[string]string, value float64, ok bool) {

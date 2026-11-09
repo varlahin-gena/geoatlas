@@ -6,6 +6,18 @@
 ## [Unreleased]
 
 
+## [2.7.0] — 2026-11-09
+
+Тестовый / pre-release: multi-port syslog connectors для обкатки на сервере (не Latest).
+
+### Added
+- **Syslog connectors** (multi-port): CRUD в UI `/connectors`, Apply → `syslog-ng.d/zz_connectors.conf` + reload agent; pre-publish ports `5514-5529`; per-connector метрики на `/system` → Pipeline; колонка `traffic_logs.connector_id`; API `/api/connectors*`; `scripts/sync-syslog-firewall.sh`.
+
+### Notes
+- OpenAPI API doc version: **1.20.0**
+- Продуктовая версия: **2.7.0** (тестовый пререлиз)
+- Схема ClickHouse: `EnsureTrafficLogsConnectorID` (`connector_id`).
+
 ## [2.6.0] — 2026-11-03
 
 Минор: профиль и сессии, карта «город—страна», HIG triage UX, hardening образов и Scorecard на main.
@@ -129,6 +141,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.7.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.0
 [2.6.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.0
 [2.5.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.0
 [2.0.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.0.0
