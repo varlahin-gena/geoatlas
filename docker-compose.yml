@@ -78,8 +78,14 @@ services:
     ports:
       - "514:514/tcp"
       - "514:514/udp"
+      # Pre-published extra connector ports (GA_CONNECTOR_EXTRA_PORTS=5514-5529).
+      - "5514-5529:5514-5529/tcp"
+      - "5514-5529:5514-5529/udp"
     expose:
       - "9577"
+      - "9578"
+    environment:
+      INGEST_SHARED_SECRET: ${INGEST_SHARED_SECRET:?set INGEST_SHARED_SECRET in .env}
     volumes:
       - ./syslog-ng.conf:/etc/syslog-ng/syslog-ng.conf:ro
       - ./syslog-ng.d:/etc/syslog-ng/conf.d:ro
@@ -148,6 +154,10 @@ services:
       INGEST_CONN_IDLE_SEC: "300"
       INGEST_SHARED_SECRET: ${INGEST_SHARED_SECRET:?set INGEST_SHARED_SECRET in .env}
       INGEST_ALLOW_FROM: ${INGEST_ALLOW_FROM:-syslog-ng}
+      CONNECTORS_FILE: /app/data/connectors.json
+      CONNECTORS_CONF_PATH: /etc/syslog-ng/conf.d/zz_connectors.conf
+      CONNECTORS_RELOAD_URL: http://syslog-ng:9578/reload
+      GA_CONNECTOR_EXTRA_PORTS: ${GA_CONNECTOR_EXTRA_PORTS:-5514-5529}
       GA_TRUSTED_PROXIES: ${GA_TRUSTED_PROXIES:-frontend}
       GOMAXPROCS: "4"
       CH_MAX_MEMORY_USAGE: "2147483648"
@@ -210,6 +220,8 @@ services:
       - auth-users:/app/data
       - clickhouse-backups:/var/lib/clickhouse-backups
       - ./certs:/certs:rw
+      # Generated syslog-ng connector sources (shared with syslog-ng container).
+      - ./syslog-ng.d:/etc/syslog-ng/conf.d:rw
     depends_on:
       volume-perms:
         condition: service_completed_successfully

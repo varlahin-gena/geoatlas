@@ -135,3 +135,24 @@ func (w *routeWiring) registerMapRoutes() {
 		withTimeout(chain(http.HandlerFunc(w.rep.Lookup), w.loginMW), healthTimeout),
 	)
 }
+
+func (w *routeWiring) registerConnectorRoutes() {
+	w.handle("GET", "/api/connectors",
+		withTimeout(chain(http.HandlerFunc(w.connectors.List), w.adminMW), readTimeout),
+	)
+	w.handle("POST", "/api/connectors",
+		chain(http.HandlerFunc(w.connectors.Create), w.opsMW, w.csrf, maxBytesMW(maxJSONBodySize)),
+	)
+	w.handle("GET", "/api/connectors/{id}",
+		withTimeout(chain(http.HandlerFunc(w.connectors.Get), w.adminMW), healthTimeout),
+	)
+	w.handle("PATCH", "/api/connectors/{id}",
+		chain(http.HandlerFunc(w.connectors.Update), w.opsMW, w.csrf, maxBytesMW(maxJSONBodySize)),
+	)
+	w.handle("DELETE", "/api/connectors/{id}",
+		chain(http.HandlerFunc(w.connectors.Delete), w.opsMW, w.csrf),
+	)
+	w.handle("POST", "/api/connectors/apply",
+		chain(http.HandlerFunc(w.connectors.Apply), w.opsMW, w.csrf, maxBytesMW(maxJSONBodySize)),
+	)
+}

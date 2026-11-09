@@ -559,12 +559,15 @@ func (s *Service) worker(ctx context.Context, proc *usecaseingest.Processor) {
 			return
 		case item := <-s.lineCh:
 			s.releaseQueueBytes(item.line)
-			transport, line, ok := ResolveTransportAuth(item.line, item.transport, s.cfg.SharedSecret)
+			transport, line, connectorID, ok := ResolveTransportAuth(item.line, item.transport, s.cfg.SharedSecret)
 			if !ok {
 				s.stats.authRejected.Add(1)
+				if id := PeekConnectorID(item.line); id != "" && s.stats.connectors != nil {
+					s.stats.connectors.addAuthRejected(id)
+				}
 				continue
 			}
-			if _, _, err := proc.ProcessLine(ctx, line, transport); err != nil {
+			if _, _, err := proc.ProcessLineMeta(ctx, line, transport, connectorID); err != nil {
 				noteErr(err)
 				slog.Error("ingest: process error", "err", err)
 				continue
@@ -609,12 +612,15 @@ func (s *Service) drainWorker(ctx context.Context, proc *usecaseingest.Processor
 			return
 		case item := <-s.lineCh:
 			s.releaseQueueBytes(item.line)
-			transport, line, ok := ResolveTransportAuth(item.line, item.transport, s.cfg.SharedSecret)
+			transport, line, connectorID, ok := ResolveTransportAuth(item.line, item.transport, s.cfg.SharedSecret)
 			if !ok {
 				s.stats.authRejected.Add(1)
+				if id := PeekConnectorID(item.line); id != "" && s.stats.connectors != nil {
+					s.stats.connectors.addAuthRejected(id)
+				}
 				continue
 			}
-			if _, _, err := proc.ProcessLine(ctx, line, transport); err != nil {
+			if _, _, err := proc.ProcessLineMeta(ctx, line, transport, connectorID); err != nil {
 				slog.Error("ingest: drain process error", "err", err)
 			}
 		default:

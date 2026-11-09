@@ -35,12 +35,13 @@ type stats struct {
 	connections      atomic.Int64
 	udp              transportStats
 	tcp              transportStats
+	connectors       *connectorStatsMap
 	lastFlushAt      atomic.Value // string
 	lastError        atomic.Value // string
 }
 
 func newStats() *stats {
-	s := &stats{}
+	s := &stats{connectors: newConnectorStatsMap()}
 	s.state.Store("idle")
 	return s
 }
@@ -98,13 +99,27 @@ func (s *stats) addReceived(transport string) {
 
 // LineStats (usecase/ingest) adapters.
 func (s *stats) AddReceived(transport string) { s.addReceived(transport) }
-func (s *stats) AddSkipped(n int64)           { s.skippedTotal.Add(n) }
-func (s *stats) AddParsed(n int64)            { s.parsedTotal.Add(n) }
-func (s *stats) AddParseErrors(n int64)       { s.parseErrorsTotal.Add(n) }
-func (s *stats) AddInserted(n int64)          { s.insertedTotal.Add(n) }
-func (s *stats) AddBuffered(delta int64)      { s.addBuffered(delta) }
-func (s *stats) AddBufferDropped(n int64)     { s.addBufferDropped(n) }
-func (s *stats) SetLastFlushAt(t time.Time)   { s.setLastFlushAt(t) }
+func (s *stats) AddReceivedConnector(connectorID string) {
+	if s.connectors != nil {
+		s.connectors.addReceived(connectorID)
+	}
+}
+func (s *stats) AddSkipped(n int64)         { s.skippedTotal.Add(n) }
+func (s *stats) AddParsed(n int64)          { s.parsedTotal.Add(n) }
+func (s *stats) AddParseErrors(n int64)     { s.parseErrorsTotal.Add(n) }
+func (s *stats) AddInserted(n int64)        { s.insertedTotal.Add(n) }
+func (s *stats) AddBuffered(delta int64)    { s.addBuffered(delta) }
+func (s *stats) AddBufferDropped(n int64)   { s.addBufferDropped(n) }
+func (s *stats) SetLastFlushAt(t time.Time) { s.setLastFlushAt(t) }
+
+func (s *stats) addConnectorDropped(line string, n int64) {
+	if s.connectors == nil || n <= 0 {
+		return
+	}
+	if id := PeekConnectorID(line); id != "" {
+		s.connectors.addDropped(id, n)
+	}
+}
 
 func (s *stats) addConnection(transport string, delta int64) {
 	s.connections.Add(delta)
@@ -144,7 +159,7 @@ func (s *stats) snapshot() model.IngestLiveStats {
 	if ns := s.lastDropAtUnix.Load(); ns > 0 {
 		lastDrop = time.Unix(0, ns).UTC().Format(time.RFC3339)
 	}
-	return model.IngestLiveStats{
+	out := model.IngestLiveStats{
 		State:             state,
 		ReceivedTotal:     s.receivedTotal.Load(),
 		ParsedTotal:       s.parsedTotal.Load(),
@@ -162,4 +177,8 @@ func (s *stats) snapshot() model.IngestLiveStats {
 		LastFlushAt:       lastFlush,
 		LastError:         lastErr,
 	}
+	if s.connectors != nil {
+		out.Connectors = s.connectors.snapshot()
+	}
+	return out
 }

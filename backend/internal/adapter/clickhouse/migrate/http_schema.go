@@ -16,6 +16,9 @@ func EnsureHTTPSchema(ctx context.Context, ch clickhouse.Conn) error {
 	if err := EnsureTrafficLogsIPv4(ctx, ch); err != nil {
 		return fmt.Errorf("traffic_logs ipv4: %w", err)
 	}
+	if err := EnsureTrafficLogsConnectorID(ctx, ch); err != nil {
+		return fmt.Errorf("traffic_logs connector_id: %w", err)
+	}
 	if err := EnsureGeoEdgesAggSchema(ctx, ch); err != nil {
 		return fmt.Errorf("geo edges: %w", err)
 	}

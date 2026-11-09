@@ -45,6 +45,7 @@ describe('groupNav', () => {
       '/dozzle/',
       '/anomalies/engine',
       '/reputation',
+      '/connectors',
     ]);
     expect(sections.find((s) => s.id === 'data')?.items.map((i) => i.href)).toEqual([
       '/parse-errors',

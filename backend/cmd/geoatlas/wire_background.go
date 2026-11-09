@@ -10,6 +10,9 @@ import (
 	"geoatlas/internal/adapter/clickhouse/geostore"
 	"geoatlas/internal/adapter/clickhouse/migrate"
 	"geoatlas/internal/adapter/clickhouse/repstore"
+	"geoatlas/internal/adapter/connectorsconf"
+	"geoatlas/internal/adapter/connectorsfile"
+	"geoatlas/internal/adapter/connectorsreload"
 	"geoatlas/internal/adapter/geojob"
 	"geoatlas/internal/adapter/reputationcodec"
 	"geoatlas/internal/adapter/reputationfeedsfile"
@@ -17,16 +20,18 @@ import (
 	"geoatlas/internal/adapter/retentionfile"
 	"geoatlas/internal/config"
 	"geoatlas/internal/usecase/bootstrap"
+	"geoatlas/internal/usecase/connectors"
 	usecasereputation "geoatlas/internal/usecase/reputation"
 	usecaseretention "geoatlas/internal/usecase/retention"
 )
 
 // backgroundParts — индексы/UC, нужные ingest и HTTP после wireBackground.
 type backgroundParts struct {
-	geo         *geostore.ReloadableGeoIndex
-	repIdx      *repstore.ReloadableReputationIndex
-	repUC       *usecasereputation.Service
-	retentionUC *usecaseretention.Service
+	geo          *geostore.ReloadableGeoIndex
+	repIdx       *repstore.ReloadableReputationIndex
+	repUC        *usecasereputation.Service
+	retentionUC  *usecaseretention.Service
+	connectorsUC *connectors.Service
 }
 
 func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backgroundParts {
@@ -106,6 +111,28 @@ func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backg
 		retentionfile.New(cfg.RetentionFile),
 		chadapter.NewRetentionApplier(a.pools.Background),
 	)
+
+	portRange, err := config.ParseConnectorExtraPorts(cfg.Connectors.ExtraPorts)
+	if err != nil {
+		slog.Warn("connectors: invalid GA_CONNECTOR_EXTRA_PORTS, using empty range", "err", err)
+		portRange = connectors.PortRange{}
+	}
+	connectorsUC := connectors.New(
+		connectorsfile.New(cfg.Connectors.File),
+		connectorsconf.New(cfg.Connectors.ConfPath),
+		connectorsreload.New(cfg.Connectors.ReloadURL, cfg.Ingest.SharedSecret),
+		portRange,
+	)
+	if doc, err := connectorsUC.EnsureSeed(); err != nil {
+		slog.Warn("connectors seed failed", "err", err, "path", cfg.Connectors.File)
+	} else {
+		slog.Info("connectors loaded", "count", len(doc.Connectors), "path", cfg.Connectors.File)
+		// Best-effort: write conf at startup so syslog-ng has sources even before first Apply.
+		if _, err := connectorsUC.Apply(ctx); err != nil {
+			slog.Warn("connectors startup apply failed", "err", err)
+		}
+	}
+
 	bgStore := &bootstrapadapter.Storage{CH: a.pools.Background}
 	a.bgWg.Add(1)
 	go func() {
@@ -127,10 +154,11 @@ func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backg
 	}()
 
 	return backgroundParts{
-		geo:         geo,
-		repIdx:      repIdx,
-		repUC:       repUC,
-		retentionUC: retentionUC,
+		geo:          geo,
+		repIdx:       repIdx,
+		repUC:        repUC,
+		retentionUC:  retentionUC,
+		connectorsUC: connectorsUC,
 	}
 }
 

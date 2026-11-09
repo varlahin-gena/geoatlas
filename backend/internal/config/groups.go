@@ -58,6 +58,14 @@ type IngestConfig struct {
 	AllowFrom      string
 }
 
+// ConnectorsConfig — multi-port syslog connectors (CRUD + syslog-ng apply).
+type ConnectorsConfig struct {
+	File       string // CONNECTORS_FILE
+	ConfPath   string // CONNECTORS_CONF_PATH — zz_connectors.conf for syslog-ng
+	ReloadURL  string // CONNECTORS_RELOAD_URL — POST reload agent
+	ExtraPorts string // GA_CONNECTOR_EXTRA_PORTS e.g. "5514-5529"
+}
+
 // HTTPThreatConfig — proxy gate and API rate limits.
 type HTTPThreatConfig struct {
 	TrustedProxies    string

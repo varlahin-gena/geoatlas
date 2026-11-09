@@ -21,7 +21,7 @@ func (a *IngestAdapter) Snapshot() (system.IngestSnapshot, bool) {
 		return system.IngestSnapshot{}, false
 	}
 	snapshot := a.Src.Stats()
-	return system.IngestSnapshot{
+	out := system.IngestSnapshot{
 		State:         snapshot.State,
 		ReceivedTotal: snapshot.ReceivedTotal, ParsedTotal: snapshot.ParsedTotal,
 		InsertedTotal: snapshot.InsertedTotal, SkippedTotal: snapshot.SkippedTotal,
@@ -33,5 +33,15 @@ func (a *IngestAdapter) Snapshot() (system.IngestSnapshot, bool) {
 		UDPReceived: snapshot.UDP.ReceivedTotal, UDPConnections: snapshot.UDP.Connections,
 		TCPReceived: snapshot.TCP.ReceivedTotal, TCPConnections: snapshot.TCP.Connections,
 		LastError: snapshot.LastError, LastDropAt: snapshot.LastDropAt,
-	}, true
+	}
+	if len(snapshot.Connectors) > 0 {
+		out.Connectors = make([]system.IngestConnectorSnapshot, 0, len(snapshot.Connectors))
+		for _, c := range snapshot.Connectors {
+			out.Connectors = append(out.Connectors, system.IngestConnectorSnapshot{
+				ID: c.ID, ReceivedTotal: c.ReceivedTotal, DroppedTotal: c.DroppedTotal,
+				AuthRejectedTotal: c.AuthRejectedTotal, LastEventAt: c.LastEventAt,
+			})
+		}
+	}
+	return out, true
 }

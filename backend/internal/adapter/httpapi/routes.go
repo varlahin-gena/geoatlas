@@ -7,19 +7,20 @@ import "net/http"
 type routeWiring struct {
 	rr *routeRegistrar
 
-	health *HealthHandler
-	events *EventsHandler
-	ingest *IngestHandler
-	geo    *GeoHandler
-	rep    *ReputationHandler
-	system *SystemHandler
-	parse  *ParseHandler
-	auth   *AuthHandler
-	users  *UsersHandler
-	tokens *APITokensHandler
-	tpl    *SearchTemplatesHandler
-	anom   *AnomalyHandler
-	hunts  *HuntsHandler
+	health     *HealthHandler
+	events     *EventsHandler
+	ingest     *IngestHandler
+	geo        *GeoHandler
+	rep        *ReputationHandler
+	connectors *ConnectorsHandler
+	system     *SystemHandler
+	parse      *ParseHandler
+	auth       *AuthHandler
+	users      *UsersHandler
+	tokens     *APITokensHandler
+	tpl        *SearchTemplatesHandler
+	anom       *AnomalyHandler
+	hunts      *HuntsHandler
 
 	loginMW middleware
 	adminMW middleware
@@ -41,6 +42,7 @@ func (w *routeWiring) registerAll() {
 	w.registerTokenRoutes()
 	w.registerProbeRoutes()
 	w.registerMapRoutes()
+	w.registerConnectorRoutes()
 	w.registerAdminSystemRoutes()
 	w.registerUploadRoutes()
 }

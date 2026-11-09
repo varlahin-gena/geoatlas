@@ -9,6 +9,18 @@ export type EdgesAgg = components['schemas']['SystemEdgesAgg'];
  * Wire schema (`SystemStats` in openapi) is intentionally loose (additionalProperties);
  * nestings below are the fields the System page actually reads.
  */
+export interface ConnectorPipelineRow {
+  id: string;
+  received_total?: number;
+  dropped_total?: number;
+  auth_rejected_total?: number;
+  last_event_at?: string;
+  syslog_udp_processed?: number;
+  syslog_tcp_processed?: number;
+  syslog_queued?: number;
+  syslog_dropped?: number;
+}
+
 export interface SystemStats {
   alerts?: Alert[];
   containers?: Record<string, components['schemas']['SystemContainerStats']>;
@@ -27,6 +39,7 @@ export interface SystemStats {
   failed_logins?: FailedLogin[];
   uptime_sec?: number;
   timestamp?: string;
+  connectors?: ConnectorPipelineRow[];
 }
 
 export type Retention = components['schemas']['RetentionSettings'];

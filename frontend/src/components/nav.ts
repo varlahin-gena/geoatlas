@@ -99,6 +99,14 @@ export const PAGE_NAV: NavItem[] = [
     requiresReputation: true,
   },
   {
+    href: '/connectors',
+    label: 'Коннекторы',
+    title: 'Syslog-коннекторы',
+    group: 'system',
+    match: ['/connectors'],
+    adminOnly: true,
+  },
+  {
     href: '/parse-errors',
     label: 'Ошибки',
     title: 'Ошибки парсинга',

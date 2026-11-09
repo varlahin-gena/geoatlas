@@ -375,6 +375,7 @@ func mergeLiveIngestStats(resp *SystemStatsResponse, ingestStats IngestSnapshot,
 			p["lag_sec"] = backlog / eventRate
 		}
 	}
+	mergeConnectorRows(resp, ingestStats.Connectors, nil)
 }
 
 func mergeLiveSyslogNG(resp *SystemStatsResponse, snap SyslogNGSnapshot, rates *RateSampler) {
@@ -403,7 +404,64 @@ func mergeLiveSyslogNG(resp *SystemStatsResponse, snap SyslogNGSnapshot, rates *
 		dropsPerSec, eventsPerSec = rates.ObserveSyslogNG(snap.DroppedTotal, snap.ProcessedTotal)
 	}
 	p["drops_per_sec"] = dropsPerSec
+	mergeConnectorRows(resp, nil, snap.Connectors)
 	p["events_per_sec"] = eventsPerSec
+}
+
+func mergeConnectorRows(resp *SystemStatsResponse, ingest []IngestConnectorSnapshot, syslog []SyslogConnectorSnapshot) {
+	if resp == nil {
+		return
+	}
+	byID := map[string]ConnectorPipelineRow{}
+	for _, c := range resp.Connectors {
+		if c.ID == "" {
+			continue
+		}
+		byID[c.ID] = c
+	}
+	for _, c := range ingest {
+		if c.ID == "" {
+			continue
+		}
+		row := byID[c.ID]
+		row.ID = c.ID
+		row.ReceivedTotal = c.ReceivedTotal
+		row.DroppedTotal = c.DroppedTotal
+		row.AuthRejectedTotal = c.AuthRejectedTotal
+		row.LastEventAt = c.LastEventAt
+		byID[c.ID] = row
+	}
+	for _, c := range syslog {
+		if c.ID == "" {
+			continue
+		}
+		row := byID[c.ID]
+		row.ID = c.ID
+		row.SyslogUDP = float64(c.UDPProcessed)
+		row.SyslogTCP = float64(c.TCPProcessed)
+		row.SyslogQueued = float64(c.Queued)
+		row.SyslogDropped = float64(c.Dropped)
+		byID[c.ID] = row
+	}
+	out := make([]ConnectorPipelineRow, 0, len(byID))
+	for _, row := range byID {
+		out = append(out, row)
+	}
+	// stable-ish: default first, then by id
+	for i := 0; i < len(out); i++ {
+		for j := i + 1; j < len(out); j++ {
+			swap := false
+			if out[i].ID != "default" && out[j].ID == "default" {
+				swap = true
+			} else if (out[i].ID == "default") == (out[j].ID == "default") && out[i].ID > out[j].ID {
+				swap = true
+			}
+			if swap {
+				out[i], out[j] = out[j], out[i]
+			}
+		}
+	}
+	resp.Connectors = out
 }
 
 func parsePeriod(input string) time.Duration {

@@ -53,6 +53,7 @@ type Config struct {
 	TLS        TLSConfig
 	Auth       AuthConfig
 	Ingest     IngestConfig
+	Connectors ConnectorsConfig
 	HTTPThreat HTTPThreatConfig
 	Geo        GeoConfig
 	Reputation ReputationConfig
@@ -81,6 +82,12 @@ func FromEnv() Config {
 		InstallProfilePath:  envOr("INSTALL_PROFILE_PATH", "/app/install-profile.json"),
 		InstallMetaPath:     envOr("INSTALL_META_PATH", "/app/install-meta.json"),
 		SyslogStatsURL:      strings.TrimSpace(os.Getenv("SYSLOG_STATS_URL")),
+		Connectors: ConnectorsConfig{
+			File:       envOr("CONNECTORS_FILE", "/app/data/connectors.json"),
+			ConfPath:   envOr("CONNECTORS_CONF_PATH", "/etc/syslog-ng/conf.d/zz_connectors.conf"),
+			ReloadURL:  envOr("CONNECTORS_RELOAD_URL", "http://syslog-ng:9578/reload"),
+			ExtraPorts: envOr("GA_CONNECTOR_EXTRA_PORTS", "5514-5529"),
+		},
 		ClickHouse: ClickHouseConfig{
 			Host:              envOr("CLICKHOUSE_HOST", "clickhouse"),
 			Port:              parser.port("CLICKHOUSE_PORT", "9000"),

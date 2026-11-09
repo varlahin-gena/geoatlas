@@ -310,6 +310,7 @@ export default function SystemPage() {
             lastDropAt={lastDropAt}
             parseErr1h={parseErr1h}
             uptimeSec={uptimeSec}
+            connectors={stats?.connectors || []}
             retention={retention}
             setRetention={setRetention}
             saveRetention={saveRetention}

@@ -138,6 +138,7 @@ func trafficLogsCreateSQL(table string, ifNotExists bool) string {
 			ingest_time   DateTime64(3) DEFAULT now64(3),
 			vendor        LowCardinality(String) DEFAULT '',
 			device        LowCardinality(String),
+			connector_id  LowCardinality(String) DEFAULT '',
 			src_ip        IPv4,
 			dst_ip        IPv4,
 			src_port      UInt32,

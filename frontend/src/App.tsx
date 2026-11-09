@@ -21,6 +21,7 @@ const ParserTestPage = lazy(() => import('@/pages/ParserTest/ParserTestPage'));
 const GeoMissingPage = lazy(() => import('@/pages/GeoMissing/GeoMissingPage'));
 const GeoRangesPage = lazy(() => import('@/pages/GeoRanges/GeoRangesPage'));
 const ReputationPage = lazy(() => import('@/pages/Reputation/ReputationPage'));
+const ConnectorsPage = lazy(() => import('@/pages/Connectors/ConnectorsPage'));
 const AnomaliesPage = lazy(() => import('@/pages/Anomalies/AnomaliesPage'));
 const AnomalyEnginePage = lazy(() => import('@/pages/Anomalies/AnomalyEnginePage'));
 const HuntsPage = lazy(() => import('@/pages/Hunts/HuntsPage'));
@@ -199,6 +200,16 @@ export default function App() {
                   <RequireAuth admin>
                     <Lazy label="репутация">
                       <ReputationPage />
+                    </Lazy>
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/connectors"
+                element={
+                  <RequireAuth admin>
+                    <Lazy label="коннекторы">
+                      <ConnectorsPage />
                     </Lazy>
                   </RequireAuth>
                 }

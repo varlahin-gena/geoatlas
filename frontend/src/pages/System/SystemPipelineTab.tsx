@@ -8,6 +8,7 @@ import {
   fmtUptime,
   num,
 } from './systemFormat';
+import type { ConnectorPipelineRow } from '@/api/systemTypes';
 import type { Retention } from './systemTypes';
 
 export function SystemPipelineTab({
@@ -31,6 +32,7 @@ export function SystemPipelineTab({
   lastDropAt,
   parseErr1h,
   uptimeSec,
+  connectors,
   retention,
   setRetention,
   saveRetention,
@@ -55,6 +57,7 @@ export function SystemPipelineTab({
   lastDropAt: string;
   parseErr1h: number;
   uptimeSec: number;
+  connectors: ConnectorPipelineRow[];
   retention: Retention;
   setRetention: (r: Retention) => void;
   saveRetention: (e: FormEvent) => void | Promise<void>;
@@ -111,6 +114,50 @@ export function SystemPipelineTab({
           </div>
         </div>
       </section>
+
+      {connectors.length > 0 ? (
+        <section className="card card-compact">
+          <h3 className="card-title">По коннекторам</h3>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Syslog EPS (udp/tcp)</th>
+                  <th>Syslog q / drop</th>
+                  <th>Backend recv</th>
+                  <th>Drop / auth</th>
+                  <th>Last event</th>
+                </tr>
+              </thead>
+              <tbody>
+                {connectors.map((c) => (
+                  <tr key={c.id}>
+                    <td>
+                      <code>{c.id}</code>
+                    </td>
+                    <td>
+                      {fmtNumber(c.syslog_udp_processed)} / {fmtNumber(c.syslog_tcp_processed)}
+                    </td>
+                    <td>
+                      {fmtNumber(c.syslog_queued)} / {fmtNumber(c.syslog_dropped)}
+                    </td>
+                    <td>{fmtNumber(c.received_total)}</td>
+                    <td>
+                      {fmtNumber(c.dropped_total)} / {fmtNumber(c.auth_rejected_total)}
+                    </td>
+                    <td>{c.last_event_at ? fmtDate(c.last_event_at) : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="hint">
+            Управление портами — в разделе Система → Коннекторы. Цифры syslog — накопленные processed
+            (не EPS/s); backend — received/drops с атрибуцией.
+          </p>
+        </section>
+      ) : null}
 
       <section className="row cols-2">
         <div className="card card-compact">
