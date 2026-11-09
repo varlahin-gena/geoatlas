@@ -66,6 +66,7 @@ func ensureSchema(t *testing.T, conn ch.Conn) {
 			parsed_at DateTime64(3) DEFAULT now64(3),
 			vendor LowCardinality(String) DEFAULT '',
 			device String,
+			connector_id LowCardinality(String) DEFAULT '',
 			src_ip IPv4, dst_ip IPv4,
 			src_port UInt32, dst_port UInt32,
 			action LowCardinality(String),
@@ -80,6 +81,7 @@ func ensureSchema(t *testing.T, conn ch.Conn) {
 			packets_sent UInt64, packets_recv UInt64,
 			raw String
 		) ENGINE = MergeTree() ORDER BY (timestamp, src_ip, dst_ip)`,
+		`ALTER TABLE traffic_logs ADD COLUMN IF NOT EXISTS connector_id LowCardinality(String) DEFAULT ''`,
 		`CREATE TABLE IF NOT EXISTS parse_errors (
 			id UUID DEFAULT generateUUIDv4(),
 			timestamp DateTime64(3) DEFAULT now64(3),
