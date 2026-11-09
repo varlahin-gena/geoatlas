@@ -4,7 +4,7 @@
 #   bash scripts/ci-sbom.sh [dist/geoatlas-X.Y.Z.tar.gz]
 #
 # Нужен syft (в CI: anchore/sbom-action/download-syft). Локально:
-#   https://github.com/anchore/syft/releases  (пин: v1.51.0)
+#   https://github.com/anchore/syft/releases  (пин: v1.57.0)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
