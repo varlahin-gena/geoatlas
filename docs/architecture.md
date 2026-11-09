@@ -12,7 +12,7 @@
  │ syslog-ng │ ──────────────────────────────────────────────────────────► │ backend   │
  └───────────┘                                                             │ (Go)      │
                                                                            │ parser +  │
- пользователь ── login / upload-logs / upload-geo ───►                     │ geoip +   │
+ пользователь ── login / upload-geo ───►                                   │ geoip +   │
                                                                            │ ingest +  │
                                                                            │ aggregator│
  ┌────────────────┐                                                        └────┬──────┘

@@ -40,7 +40,7 @@ type Config struct {
 	ListenAddr          string
 	QueryTimeout        time.Duration
 	AllowMultiInstance  bool
-	MaxLogUploadSize    int64
+	MaxLogUploadSize    int64 // лимит тела POST /api/ingest (MAX_LOG_UPLOAD_SIZE)
 	RetentionFile       string
 	SearchTemplatesFile string
 	HuntsFile           string
@@ -74,7 +74,7 @@ func FromEnv() Config {
 		ListenAddr:          envOr("LISTEN_ADDR", ":8080"),
 		QueryTimeout:        parser.durationSeconds("QUERY_TIMEOUT_SEC", 3*time.Minute),
 		AllowMultiInstance:  parser.bool("GA_ALLOW_MULTI_INSTANCE", false),
-		MaxLogUploadSize:    parser.int64("MAX_LOG_UPLOAD_SIZE", 1<<30), // 1 GiB
+		MaxLogUploadSize:    parser.int64("MAX_LOG_UPLOAD_SIZE", 1<<30), // 1 GiB — body limit для POST /api/ingest
 		RetentionFile:       envOr("RETENTION_FILE", "/app/data/retention.json"),
 		SearchTemplatesFile: envOr("SEARCH_TEMPLATES_FILE", "/app/data/search_templates.json"),
 		HuntsFile:           envOr("HUNTS_FILE", "/app/data/saved_hunts.json"),

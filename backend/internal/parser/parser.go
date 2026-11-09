@@ -17,7 +17,7 @@ type Parser interface {
 
 // SkipParser — опциональный интерфейс. Парсер может реализовать его, чтобы сообщить,
 // что строка им распознана, но осознанно не нужна (это НЕ ошибка парсинга).
-// Пример: события Cowrie без сетевой пары (login.*, command.*, session.closed и т.п.).
+// Пример: служебные события Cisco ASA/FTD без пары IPv4.
 type SkipParser interface {
 	ShouldSkip(line string) bool
 }

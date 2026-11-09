@@ -67,7 +67,6 @@ func TestPostCASmoke(t *testing.T) {
 		&parser.FortigateCEF{},
 		&parser.CiscoFTD{},
 		&parser.CiscoASA{},
-		&parser.CowrieJSON{},
 		&parser.GenericKV{},
 	)
 	pta := parseradapter.NewParseTest(parsers)

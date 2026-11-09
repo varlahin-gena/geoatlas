@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"geoatlas/internal/model"
 )
@@ -39,40 +38,6 @@ func (h *IngestHandler) IngestLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		slog.Error("ingest logs failed", "err", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal server error", "stats": stats})
-		return
-	}
-	writeIngestAccepted(w, h.ingestRetryAfterSec(), stats)
-}
-
-func (h *IngestHandler) UploadLogs(w http.ResponseWriter, r *http.Request) {
-	var reader io.Reader
-
-	ct := r.Header.Get("Content-Type")
-	if strings.HasPrefix(ct, "multipart/form-data") {
-		file, _, err := r.FormFile("file")
-		if err != nil {
-			writeBadRequest(w, "missing file")
-			return
-		}
-		defer file.Close()
-		reader = file
-	} else {
-		if r.Body == nil {
-			writeBadRequest(w, "empty body")
-			return
-		}
-		defer r.Body.Close()
-		reader = r.Body
-	}
-
-	stats, err := h.ingestReader(r.Context(), reader)
-	if errors.Is(err, errIngestUnavailable) {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "ingest unavailable", "stats": stats})
-		return
-	}
-	if err != nil {
-		slog.Error("upload logs failed", "err", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal server error", "stats": stats})
 		return
 	}

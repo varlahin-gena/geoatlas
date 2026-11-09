@@ -246,20 +246,6 @@
         gzip off;
     }
 
-    # Streaming-upload: лимит ≈ MaxLogUploadSize (дефолт 1 GiB); 0 = без лимита nginx
-    location = /upload-logs {
-        client_max_body_size 0;
-        client_body_timeout 1800s;
-        client_body_buffer_size 1m;
-        auth_request /auth-check-ops;
-        proxy_pass http://backend:8080/upload-logs;
-        proxy_request_buffering off;
-        proxy_buffering off;
-        proxy_read_timeout 1800s;
-        proxy_send_timeout 1800s;
-        include /etc/nginx/includes/proxy-headers.inc;
-    }
-
     location = /upload-geo {
         client_max_body_size 0;
         client_body_timeout 1800s;

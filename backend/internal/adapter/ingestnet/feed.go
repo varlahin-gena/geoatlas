@@ -62,7 +62,7 @@ func (s *Service) TryEnqueue(line, transport string) bool {
 // request-scoped счётчики: received / queued / dropped.
 //
 // Parsed / skipped / parse_errors / inserted намеренно 0: они глобальные
-// (общие с syslog TCP) и при concurrent upload'ах врут. Обработка — async
+// (общие с syslog TCP) и при concurrent HTTP-ingest врут. Обработка — async
 // через ту же очередь, что TCP; прогресс смотреть в /api/ingest/stats.
 // transport обычно "http"; пустой → "http".
 func (s *Service) FeedReader(ctx context.Context, r io.Reader, transport string) (model.IngestStats, error) {

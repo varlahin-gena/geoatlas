@@ -433,21 +433,6 @@ func TestServerWithMetricsOption(t *testing.T) {
 	}
 }
 
-func TestIngestUploadLogsNil(t *testing.T) {
-	h := &IngestHandler{IngestDeps: &IngestDeps{}}
-	rec := call(h.UploadLogs, http.MethodPost, "/api/ingest/upload", "line\n")
-	if rec.Code != http.StatusServiceUnavailable {
-		t.Fatalf("upload nil: %d %s", rec.Code, rec.Body.String())
-	}
-	req := httptest.NewRequest(http.MethodPost, "/api/ingest/upload", strings.NewReader("--b\r\n--b--"))
-	req.Header.Set("Content-Type", "multipart/form-data; boundary=b")
-	rec = httptest.NewRecorder()
-	h.UploadLogs(rec, req)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("multipart: %d", rec.Code)
-	}
-}
-
 func TestReputationAddRemoveFeedWithoutStore(t *testing.T) {
 	store := &repMemStore{lists: map[string][]model.ReputationRange{}}
 	uc := usecasereputation.New(store, &repMemIndex{}, reputationcodec.New(), &repStubRef{}, nil)
