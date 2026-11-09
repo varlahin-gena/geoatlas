@@ -6,6 +6,18 @@
 ## [Unreleased]
 
 
+## [2.6.2] — 2026-11-09
+
+Тестовый / pre-release: HIG-полировка UI Коннекторы (не Latest).
+
+### Changed
+- **Коннекторы** (`/connectors`): иконка PlugsConnected в сайдбаре; компактный help; форма на dark `.field`; «Применить» на странице с dirty-state; живой статус ВКЛ/ВЫКЛ (зелёный / серый / красный по `enabled` + `last_event_at`); кнопка «Перезапуск» (выкл→вкл); таблица в общем settings-стиле.
+
+### Notes
+- OpenAPI API doc version: **1.20.0**
+- Продуктовая версия: **2.6.2** (тестовый пререлиз)
+- Схема ClickHouse: без изменений Ensure*.
+
 ## [2.6.1] — 2026-11-09
 
 Тестовый / pre-release: multi-port syslog connectors для обкатки на сервере (не Latest).
@@ -141,6 +153,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.6.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.2
 [2.6.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.1
 [2.6.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.0
 [2.5.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.0
