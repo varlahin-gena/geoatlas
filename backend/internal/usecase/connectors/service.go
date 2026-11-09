@@ -255,7 +255,8 @@ func (s *Service) Apply(ctx context.Context) (ApplyResult, error) {
 	}
 	if err := s.reload.Reload(ctx); err != nil {
 		res.ReloadError = err.Error()
-		return res, nil // conf written; surface reload failure without failing HTTP as 500 always
+		// Conf already written; surface reload failure in ReloadError (HTTP 200 + payload).
+		return res, nil //nolint:nilerr // intentional: soft-fail reload
 	}
 	res.Reloaded = true
 	res.OK = true
