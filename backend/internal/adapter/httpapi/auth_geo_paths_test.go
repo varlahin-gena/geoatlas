@@ -621,8 +621,4 @@ func TestIngestHappyPaths(t *testing.T) {
 	if rec.Code != http.StatusAccepted && rec.Code != http.StatusOK {
 		t.Fatalf("ingest: %d %s", rec.Code, rec.Body.String())
 	}
-	rec = call(h.UploadLogs, http.MethodPost, "/api/ingest/upload", "line\n")
-	if rec.Code != http.StatusAccepted && rec.Code != http.StatusOK {
-		t.Fatalf("upload: %d %s", rec.Code, rec.Body.String())
-	}
 }

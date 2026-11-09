@@ -24,9 +24,8 @@ Appliance: **IPv4-only**, один хост / один процесс backend, �
 ## Возможности
 
 - Приём логов по **syslog** (TCP/UDP, порт 514)
-- Ручная загрузка логов через веб-интерфейс
-- Парсинг **UserGate, FortiGate, Cisco ASA, Cisco FTD (FirePower), Cowrie (honeypot)** и универсальный фолбэк (Generic KV)
-- **Осознанный пропуск** событий: распознанные, но несетевые строки (например, часть `cowrie.*`) не попадают в `parse_errors`
+- Парсинг **UserGate, FortiGate, Cisco ASA, Cisco FTD (FirePower)** и универсальный фолбэк (Generic KV)
+- **Осознанный пропуск** событий: распознанные, но несетевые строки (например, служебные события Cisco) не попадают в `parse_errors`
 - **Авторизация по умолчанию**: одна учётка по умолчанию `admin`; роли `administrator` / `operator` / `dashboard`; управление УЗ в UI.
 - Веб-интерфейс — **React SPA**
 - Опциональный **HTTPS** на nginx со своими PEM-сертификатами (редирект HTTP→HTTPS)
@@ -108,7 +107,7 @@ Appliance: **IPv4-only**, один хост / один процесс backend, �
 - `GA_REQUIRE_PROXY=1` в compose (не открывать backend мимо nginx); rate limit API — `GA_API_RATE_LIMIT_*`
 - ClickHouse `default`: networks loopback+RFC1918 (не `::/0`)
 - Syslog `:514` **без TLS/auth** — ограничьте источником МСЭ (`GA_SYSLOG_ALLOW_FROM` / Security Group / firewall)
-- Ingest внутри docker: маркер с `INGEST_SHARED_SECRET` + `INGEST_ALLOW_FROM=syslog-ng` (HTTP upload API — без маркера)
+- Ingest внутри docker: маркер с `INGEST_SHARED_SECRET` + `INGEST_ALLOW_FROM=syslog-ng` (`POST /api/ingest` — Bearer/ops, без маркера)
 - Reputation URL-фиды: только публичные IPv4-хосты (private/metadata блокируются)
 - Ротация env Bearer: `API_AUTH_PREVIOUS_TOKEN` / `API_OPS_PREVIOUS_TOKEN`; именованные токены — rotate в UI
 - Установка и обновление: только `geoatlas-X.Y.Z.tar.gz` с GitHub Releases; проверяйте `.sha256` до `./update.sh` (опционально online: `.cosign.bundle` + `cosign verify-blob`, см. [install.md](docs/install.md))

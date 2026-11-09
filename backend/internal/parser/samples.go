@@ -52,15 +52,6 @@ var sampleCorpus = []Sample{
 	{Vendor: "cisco-ftd", Desc: "430003 connection end (Rapid7)",
 		Line: `%FTD-6-430003: AccessControlRuleAction: Allow, SrcIP: 10.101.11.21, DstIP: 10.178.219.10, SrcPort: 46915, DstPort: 391, Protocol: udp, IngressZone: Inside, EgressZone: R7_Outside, ACPolicy: Access_Control, AccessControlRuleName: Allow_All_Outbound, Prefilter Policy: Prefilter, User: Unknown, Client: CLDAP client, ApplicationProtocol: CLDAP, ConnectionDuration: 0, InitiatorPackets: 1, ResponderPackets: 0, InitiatorBytes: 131, ResponderBytes: 0, NAPPolicy: Unknown`},
 
-	{Vendor: "cowrie", Desc: "session.connect (JSON)",
-		Line: `{"eventid":"cowrie.session.connect","src_ip":"203.0.113.200","dst_ip":"10.0.0.50","src_port":54321,"dst_port":22,"protocol":"ssh","sensor":"honeypot1","timestamp":"2023-11-14T22:13:20.123456Z"}`},
-	{Vendor: "cowrie", Desc: "login.failed (python-repr)",
-		Line: `Jun 30 18:50:43 172.18.0.1 {'eventid': 'cowrie.login.failed', 'src_ip': '203.0.113.201', 'dst_ip': '10.0.0.51', 'src_port': 40000, 'dst_port': 22, 'protocol': 'telnet', 'sensor': 'hp2', 'username': 'root'}`},
-	{Vendor: "cowrie", Desc: "command.input (пропуск: нет сетевой пары)", Skip: true,
-		Line: `{"eventid":"cowrie.command.input","src_ip":"203.0.113.202","input":"ls -la"}`},
-	{Vendor: "cowrie", Desc: "direct-tcpip.request (пропуск: dst — цель прокси)", Skip: true,
-		Line: `{"eventid":"cowrie.direct-tcpip.request","dst_ip":"77.88.21.158","dst_port":25,"src_ip":"203.0.113.200","src_port":19453,"protocol":"ssh","sensor":"hp1","timestamp":"2026-07-19T00:00:35.207887Z"}`},
-
 	{Vendor: "generic", Desc: "generic key=value",
 		Line: `src=192.0.2.55 dst=198.51.100.66 spt=12345 dpt=8080 act=deny proto=udp rule=BlockRule out=100 in=200 cn1=2 cn2=3`},
 }

@@ -65,7 +65,6 @@ func testRegistry() *Registry {
 		&FortigateCEF{},
 		&CiscoFTD{},
 		&CiscoASA{},
-		&CowrieJSON{},
 		&GenericKV{},
 	)
 }
@@ -435,80 +434,6 @@ func TestCiscoFTD(t *testing.T) {
 			vendor: "cisco-ftd", src: "10.0.0.20", dst: "8.8.8.8",
 			sport: 40000, dport: 53, action: "allow", proto: "TCP",
 			szone: "inside", dzone: "outside",
-		})
-	})
-}
-
-// ============================================================
-// Cowrie: строгий JSON и Python-repr + skip
-// ============================================================
-
-func TestCowrie(t *testing.T) {
-	p := &CowrieJSON{}
-
-	t.Run("json connect", func(t *testing.T) {
-		line := `{"eventid":"cowrie.session.connect","src_ip":"203.0.113.200","dst_ip":"10.0.0.50","src_port":54321,"dst_port":22,"protocol":"ssh","sensor":"honeypot1","timestamp":"2023-11-14T22:13:20.123456Z"}`
-		if !p.CanParse(line) {
-			t.Fatal("CanParse = false")
-		}
-		got, ok := p.Parse(line)
-		if !ok {
-			t.Fatal("Parse = false")
-		}
-		checkTL(t, "cowrie-json", got, tlWant{
-			vendor: "cowrie", src: "203.0.113.200", dst: "10.0.0.50",
-			sport: 54321, dport: 22, action: "accept", proto: "TCP",
-			rule: "ssh", device: "honeypot1",
-		})
-	})
-
-	t.Run("python-repr login.failed", func(t *testing.T) {
-		line := `Jun 30 18:50:43 172.18.0.1 {'eventid': 'cowrie.login.failed', 'src_ip': '203.0.113.201', 'dst_ip': '10.0.0.51', 'src_port': 40000, 'dst_port': 22, 'protocol': 'telnet', 'sensor': 'hp2', 'username': 'root'}`
-		got, ok := p.Parse(line)
-		if !ok {
-			t.Fatal("Parse = false")
-		}
-		checkTL(t, "cowrie-repr", got, tlWant{
-			vendor: "cowrie", src: "203.0.113.201", dst: "10.0.0.51",
-			sport: 40000, dport: 22, action: "reject", proto: "TCP",
-			rule: "telnet", device: "hp2",
-		})
-	})
-
-	t.Run("skip without net pair", func(t *testing.T) {
-		line := `{"eventid":"cowrie.command.input","src_ip":"203.0.113.202","input":"ls -la"}`
-		if _, ok := p.Parse(line); ok {
-			t.Error("Parse = true, want false (нет сетевой пары)")
-		}
-		if !p.ShouldSkip(line) {
-			t.Error("ShouldSkip = false, want true")
-		}
-	})
-
-	// direct-tcpip содержит src+dst, но dst — цель прокси, не honeypot.
-	t.Run("skip direct-tcpip.request", func(t *testing.T) {
-		line := `{"eventid":"cowrie.direct-tcpip.request","dst_ip":"77.88.21.158","dst_port":25,"src_ip":"203.0.113.200","src_port":19453,"protocol":"ssh","sensor":"hp1","timestamp":"2026-07-19T00:00:35.207887Z"}`
-		if !p.CanParse(line) {
-			t.Fatal("CanParse = false")
-		}
-		if _, ok := p.Parse(line); ok {
-			t.Error("Parse = true, want false (direct-tcpip не в граф)")
-		}
-		if !p.ShouldSkip(line) {
-			t.Error("ShouldSkip = false, want true")
-		}
-	})
-
-	t.Run("real jsonlog session.connect", func(t *testing.T) {
-		line := `{"eventid":"cowrie.session.connect","src_ip":"117.211.15.93","src_port":38540,"dst_ip":"155.212.245.143","dst_port":2222,"session":"190c85024af6","protocol":"ssh","message":"New connection: 117.211.15.93:38540 (155.212.245.143:2222) [session: 190c85024af6]","sensor":"197616tg.com","uuid":"f2768fa8-74b1-11f1-ad9d-00163cba124e","timestamp":"2026-07-19T00:00:32.159611Z"}`
-		got, ok := p.Parse(line)
-		if !ok {
-			t.Fatal("Parse = false")
-		}
-		checkTL(t, "cowrie-real-json", got, tlWant{
-			vendor: "cowrie", src: "117.211.15.93", dst: "155.212.245.143",
-			sport: 38540, dport: 2222, action: "accept", proto: "TCP",
-			rule: "ssh", device: "197616tg.com",
 		})
 	})
 }

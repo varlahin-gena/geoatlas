@@ -19,7 +19,6 @@ func newParserRegistry() *parser.Registry {
 		&parser.FortigateCEF{},
 		&parser.CiscoFTD{},
 		&parser.CiscoASA{},
-		&parser.CowrieJSON{},
 		&parser.GenericKV{},
 	)
 }

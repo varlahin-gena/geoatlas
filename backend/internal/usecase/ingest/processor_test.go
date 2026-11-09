@@ -27,7 +27,6 @@ func testParsers() LineParser {
 		&parser.FortigateCEF{},
 		&parser.CiscoFTD{},
 		&parser.CiscoASA{},
-		&parser.CowrieJSON{},
 		&parser.GenericKV{},
 	)}
 }

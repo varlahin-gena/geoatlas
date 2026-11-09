@@ -19,7 +19,7 @@
 | URL                    | Страница              | Кто                 | Основные возможности                                                                                                                                 |
 |------------------------|-----------------------|---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `/login`               | Вход                  | public              | Логин; смена пароля при `must_reset_password`                                                                                                        |
-| `/`                    | Карта / глобус        | login               | 2D/3D, группировка, фильтры, конструктор поиска и шаблоны, автообновление 30 с/1 м/5 м, порог событий, mono-дуги, экспорт PNG, загрузка логов/GeoIP (admin) |
+| `/`                    | Карта / глобус        | login               | 2D/3D, группировка, фильтры, конструктор поиска и шаблоны, автообновление 30 с/1 м/5 м, порог событий, mono-дуги, экспорт PNG, загрузка GeoIP (admin) |
 | `/anomalies`           | Аномалии              | login               | Список срабатываний, ack / assign; «Связи»; кнопка «Разбор»; баннер на карте                                                                       |
 | `/investigate`         | Разбор алерта         | login               | Workspace по `?alert=<fingerprint>`: шапка, peers, ack/assign, CSV, шаблон поиска, ссылка на карту                                                   |
 | `/hunts`               | Охоты                 | login               | Saved hunts: CRUD, ручной/плановый запуск; сохранение с карты и из разбора                                                                           |
@@ -43,10 +43,10 @@ SPA (React Router); nginx `auth_request` для `/api/*` и `/dozzle/`. Неиз
 | Роль | Cookie-сессия | UI | API (кратко) |
 |------|---------------|-----|--------------|
 | **administrator** | обычный TTL (`SESSION_TTL_HOURS`, по умолчанию 12 ч) | все страницы + `/dozzle/` | полные права (admin middleware) |
-| **operator** | обычный TTL | карта, аномалии, разбор, охоты, смена пароля | login-tier: events, anomalies ack/assign, hunts, search templates; **без** uploads / system / geo / reputation / users / tokens |
+| **operator** | обычный TTL | карта, аномалии, разбор, охоты, смена пароля | login-tier: events, anomalies ack/assign, hunts, search templates; **без** GeoIP/reputation uploads / system / users / tokens |
 | **dashboard** | **длительная** (~видеостена) | как operator | как operator по login-tier |
 
-Загрузки логов/GeoIP, ingest-stats, system и прочие **ops**-маршруты: сессия **administrator** или Bearer ≥ **ops**. Одна cookie operator **не** открывает ops API.
+Загрузки GeoIP/репутации, ingest-stats, system и прочие **ops**-маршруты: сессия **administrator** или Bearer ≥ **ops**. Одна cookie operator **не** открывает ops API.
 
 ### Cookie vs Bearer
 

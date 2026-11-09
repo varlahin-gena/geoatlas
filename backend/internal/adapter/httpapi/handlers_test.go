@@ -266,7 +266,7 @@ func TestOpsMWForbidsDashboard(t *testing.T) {
 	h := chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}), requireOpsMW(newBearerAuth([]string{"api-token"}, nil, nil), mgr, nil, nil, false, false))
-	req := httptest.NewRequest(http.MethodPost, "/upload-logs", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/ingest", nil)
 	req.AddCookie(&http.Cookie{Name: auth.CookieName, Value: token})
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -287,7 +287,7 @@ func TestRequireLoginMWAllowsSession(t *testing.T) {
 	h := chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}), requireLoginMW(newBearerAuth([]string{"api-token"}, nil, nil), mgr, nil, nil, false))
-	req := httptest.NewRequest(http.MethodPost, "/upload-logs", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/ingest", nil)
 	req.AddCookie(&http.Cookie{Name: auth.CookieName, Value: token})
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -319,7 +319,7 @@ func TestOpsMWForbidsOperator(t *testing.T) {
 	h := chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}), requireOpsMW(newBearerAuth([]string{"api-token"}, nil, nil), mgr, store, nil, false, false))
-	req := httptest.NewRequest(http.MethodPost, "/upload-logs", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/ingest", nil)
 	req.AddCookie(&http.Cookie{Name: auth.CookieName, Value: token})
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)

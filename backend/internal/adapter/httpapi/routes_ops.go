@@ -104,9 +104,6 @@ func (w *routeWiring) registerUploadRoutes() {
 	w.handle("POST", "/api/ingest",
 		chain(http.HandlerFunc(w.ingest.IngestLogs), w.opsMW, w.csrf, maxBytesMW(w.maxLogUpload)),
 	)
-	w.handle("POST", "/upload-logs",
-		chain(http.HandlerFunc(w.ingest.UploadLogs), w.opsMW, w.csrf, maxBytesMW(w.maxLogUpload)),
-	)
 	w.handle("POST", "/upload-geo",
 		chain(http.HandlerFunc(w.geo.UploadGeo), w.opsMW, w.csrf, maxBytesMW(w.maxGeoUpload)),
 	)

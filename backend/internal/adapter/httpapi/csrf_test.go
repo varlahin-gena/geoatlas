@@ -24,7 +24,7 @@ func TestCSRFMiddlewareRejectsMissingToken(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 
-	req := httptest.NewRequest(http.MethodPost, "/upload-logs", nil)
+	req := httptest.NewRequest(http.MethodPost, "/upload-geo", nil)
 	req.AddCookie(&http.Cookie{Name: auth.CookieName, Value: tok})
 	req.Host = "localhost"
 	rec := httptest.NewRecorder()
@@ -52,7 +52,7 @@ func TestCSRFMiddlewareAcceptsMatchingToken(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 
-	req := httptest.NewRequest(http.MethodPost, "/upload-logs", nil)
+	req := httptest.NewRequest(http.MethodPost, "/upload-geo", nil)
 	req.Host = "localhost"
 	req.Header.Set("Origin", "http://localhost")
 	req.AddCookie(&http.Cookie{Name: auth.CookieName, Value: tok})
@@ -84,7 +84,7 @@ func TestCSRFMiddlewareRejectsBadOrigin(t *testing.T) {
 	h := csrfMW(newBearerAuth([]string{"bearer-secret"}, nil, nil), false, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
-	req := httptest.NewRequest(http.MethodPost, "/upload-logs", nil)
+	req := httptest.NewRequest(http.MethodPost, "/upload-geo", nil)
 	req.Host = "localhost"
 	req.Header.Set("Origin", "https://evil.example")
 	req.AddCookie(&http.Cookie{Name: auth.CookieName, Value: "sess"})

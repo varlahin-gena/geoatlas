@@ -51,7 +51,6 @@ func TestIntegrationMapPathLogToEvents(t *testing.T) {
 		&parser.FortigateCEF{},
 		&parser.CiscoFTD{},
 		&parser.CiscoASA{},
-		&parser.CowrieJSON{},
 		&parser.GenericKV{},
 	)
 	ingestRepo := ingeststore.NewIngestRepository(conn)
@@ -127,7 +126,7 @@ func TestIntegrationMapPathLogToEvents(t *testing.T) {
 		logs.WriteString(s.Line)
 		logs.WriteByte('\n')
 	}
-	logReq, err := http.NewRequest(http.MethodPost, ts.URL+"/upload-logs", strings.NewReader(logs.String()))
+	logReq, err := http.NewRequest(http.MethodPost, ts.URL+"/api/ingest", strings.NewReader(logs.String()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +139,7 @@ func TestIntegrationMapPathLogToEvents(t *testing.T) {
 	defer logResp.Body.Close()
 	if logResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(logResp.Body)
-		t.Fatalf("upload-logs: status=%d body=%s", logResp.StatusCode, body)
+		t.Fatalf("api/ingest: status=%d body=%s", logResp.StatusCode, body)
 	}
 
 	deadline := time.Now().Add(10 * time.Second)

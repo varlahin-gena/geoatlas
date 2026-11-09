@@ -26,7 +26,7 @@ info:
     - **admin** — роль administrator ИЛИ Bearer scope=admin
       (system/*, parse-*, управление УЗ/токенами);
     - **ops** — administrator или Bearer≥ops для мутаций и pipeline (`POST /api/ingest`,
-      `/upload-logs`, `/upload-geo`, `/upload-reputation`, `GET /api/ingest/stats`, `GET /metrics`).
+      `/upload-geo`, `/upload-reputation`, `GET /api/ingest/stats`, `GET /metrics`).
       При `AUTH_DISABLED=1` / `API_AUTH_DISABLED=1` ops открыты; старт только с `GA_ALLOW_INSECURE=1`.
 
 servers:
@@ -1370,35 +1370,6 @@ paths:
         content:
           text/plain:
             schema: { type: string }
-      responses:
-        "200":
-          description: все строки приняты в очередь (dropped=0)
-        "503":
-          description: очередь полна — часть/все строки дропнуты; смотри stats + Retry-After
-        "401":
-          description: unauthorized
-
-  /upload-logs:
-    post:
-      tags: [ingest]
-      summary: Upload логов (multipart file или raw body)
-      description: |
-        administrator или Bearer (ops). Сессия operator — 403.
-        Тот же delivery contract, что `POST /api/ingest` (503 при drops).
-      security:
-        - bearerAuth: []
-        - cookieAuth: []
-      requestBody:
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              properties:
-                file:
-                  type: string
-                  format: binary
-          application/octet-stream:
-            schema: { type: string, format: binary }
       responses:
         "200":
           description: все строки приняты в очередь (dropped=0)

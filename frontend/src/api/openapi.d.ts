@@ -2863,66 +2863,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/upload-logs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Upload логов (multipart file или raw body)
-         * @description administrator или Bearer (ops). Сессия operator — 403.
-         *     Тот же delivery contract, что `POST /api/ingest` (503 при drops).
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "multipart/form-data": {
-                        /** Format: binary */
-                        file?: string;
-                    };
-                    "application/octet-stream": string;
-                };
-            };
-            responses: {
-                /** @description все строки приняты в очередь (dropped=0) */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description очередь полна — часть/все строки дропнуты; смотри stats + Retry-After */
-                503: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/upload-geo": {
         parameters: {
             query?: never;

@@ -63,7 +63,6 @@ func expectedAuthMatrix() map[string]authTier {
 		"DELETE /api/enterprise-nets/{start_ip}/{end_ip}": tierOps,
 		"GET /api/ingest/stats":                           tierOps,
 		"POST /api/ingest":                                tierOps,
-		"POST /upload-logs":                               tierOps,
 		"POST /upload-geo":                                tierOps,
 		"POST /upload-reputation":                         tierOps,
 		"GET /api/reputation/lists":                       tierAdmin,
@@ -171,8 +170,8 @@ func TestAuthMatrixCoversServerRoutes(t *testing.T) {
 	if want["GET /api/system/status"] != tierLogin {
 		t.Fatal("system status pill must stay login-gated")
 	}
-	if want["POST /upload-logs"] != tierOps || want["POST /upload-geo"] != tierOps {
-		t.Fatal("uploads require ops (admin/Bearer), not operator session alone")
+	if want["POST /api/ingest"] != tierOps || want["POST /upload-geo"] != tierOps {
+		t.Fatal("ingest and geo upload require ops (admin/Bearer), not operator session alone")
 	}
 	if want["GET /api/system/stats"] != tierAdmin {
 		t.Fatal("system stats require admin")
