@@ -5,6 +5,20 @@
 
 ## [Unreleased]
 
+## [2.6.4] — 2026-11-10
+
+Тестовый / pre-release: CPU/память контейнеров как у Dozzle + ясные алерты EPS vs CPU (не Latest).
+
+### Changed
+- **stats-collector CPU**: `cpu_pct` нормализован к хосту (100% = все ядра), как host-шкала Dozzle; порог `cpu_high` >90% теперь про долю машины, а не «>0.9 ядра».
+- **stats-collector память**: `mem_bytes` = Docker/Dozzle `usage − inactive_file` (без reclaimable page cache); ClickHouse больше не раздувается за счёт file cache.
+- **Алерты / UI**: тексты `cpu_high` / `capacity_*` явно разделяют CPU хоста и лимит EPS профиля; подписи «EPS профиля», график CPU «% хоста», память «без page cache».
+
+### Notes
+- OpenAPI API doc version: **1.20.0**
+- Продуктовая версия: **2.6.4** (тестовый пререлиз)
+- Схема ClickHouse: без изменений Ensure*.
+
 ## [2.6.3] — 2026-11-10
 
 Тестовый / pre-release: map ClickHouse CPU + dismiss system warn-алертов (не Latest).
@@ -172,6 +186,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.6.4]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.4
 [2.6.3]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.3
 [2.6.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.2
 [2.6.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.1

@@ -277,7 +277,7 @@ export default function SystemPage() {
               </span>
             </div>
             <div className="status-metric" hidden={!epsMax}>
-              <span className="sm-label">Ёмкость</span>
+              <span className="sm-label">EPS профиля</span>
               <span className={`sm-value ${toneClass(capacityTone(capPct))}`}>{capPct}%</span>
             </div>
           </div>

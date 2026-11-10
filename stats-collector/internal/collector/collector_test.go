@@ -5,6 +5,8 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -151,7 +153,8 @@ func TestWriteMetricsSkipsNaN(t *testing.T) {
 }
 
 func TestCPUPercent(t *testing.T) {
-	c := &Collector{cpuPrev: make(map[string]cpuDelta)}
+	// 0.5 core·s за 1s на хосте с 4 ядрами → 12.5% хоста (раньше было 50% «ядра»).
+	c := &Collector{cpuPrev: make(map[string]cpuDelta), hostCPUCount: 4}
 	ts := time.Now()
 	if _, ok := c.cpuPercent("x", 1e9, ts); ok {
 		t.Fatal("first sample should be undefined")
@@ -160,7 +163,61 @@ func TestCPUPercent(t *testing.T) {
 	if !ok {
 		t.Fatal("second sample")
 	}
-	if pct < 40 || pct > 60 {
-		t.Fatalf("pct=%v want ~50", pct)
+	if pct < 10 || pct > 15 {
+		t.Fatalf("pct=%v want ~12.5", pct)
+	}
+}
+
+func TestDetectHostCPUCountFallback(t *testing.T) {
+	n := detectHostCPUCount("/nonexistent/proc")
+	if n < 1 {
+		t.Fatalf("n=%d want >=1", n)
+	}
+}
+
+func TestDetectHostCPUCountFromCpuinfo(t *testing.T) {
+	dir := t.TempDir()
+	content := "processor\t: 0\nprocessor\t: 1\nprocessor\t: 2\n"
+	if err := os.WriteFile(filepath.Join(dir, "cpuinfo"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	n := detectHostCPUCount(dir)
+	if n != 3 {
+		t.Fatalf("n=%d want 3", n)
+	}
+}
+
+func TestMemUsageNoCacheSubtractsInactiveFile(t *testing.T) {
+	// Как Dozzle/Docker: 2.24GiB current − ~1.74GiB inactive_file ≈ 500MiB.
+	stat := "anon 524288000\ninactive_file 1862270976\nactive_file 100\n"
+	got := memUsageNoCache(2386558976, stat)
+	want := 2386558976 - 1862270976
+	if got != float64(want) {
+		t.Fatalf("got=%v want=%v", got, want)
+	}
+}
+
+func TestMemUsageNoCacheCgroupV1TotalInactive(t *testing.T) {
+	stat := "total_inactive_file 400\ninactive_file 50\n"
+	got := memUsageNoCache(1000, stat)
+	if got != 600 { // prefers total_inactive_file first
+		t.Fatalf("got=%v want 600", got)
+	}
+}
+
+func TestReadMemoryBytesNoCache(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "memory.current"), []byte("1000"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "memory.stat"), []byte("inactive_file 300\nanon 700\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, ok := readMemoryBytes(dir)
+	if !ok {
+		t.Fatal("expected ok")
+	}
+	if got != 700 {
+		t.Fatalf("got=%v want 700", got)
 	}
 }

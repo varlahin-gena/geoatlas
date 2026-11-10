@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -160,22 +161,77 @@ func readCPUUsage(cgroupPath string) (float64, bool) {
 	return 0, false
 }
 
+// parseMemoryStatKey читает одно числовое поле из memory.stat (cgroup v1/v2).
+func parseMemoryStatKey(statContent, key string) (float64, bool) {
+	prefix := key + " "
+	for _, line := range strings.Split(statContent, "\n") {
+		if !strings.HasPrefix(line, prefix) {
+			continue
+		}
+		v, err := strconv.ParseFloat(strings.TrimSpace(strings.TrimPrefix(line, prefix)), 64)
+		if err != nil {
+			return 0, false
+		}
+		return v, true
+	}
+	return 0, false
+}
+
+// memUsageNoCache — формула Docker/Dozzle: usage минус reclaimable page cache
+// (inactive_file / total_inactive_file). Без этого ClickHouse и др. выглядят
+// в разы «тяжелее» из‑за file cache в memory.current.
+func memUsageNoCache(usage float64, statContent string) float64 {
+	if statContent == "" {
+		return usage
+	}
+	// cgroup v1: total_inactive_file; v2 / Docker: inactive_file
+	for _, key := range []string{"total_inactive_file", "inactive_file"} {
+		if inactive, ok := parseMemoryStatKey(statContent, key); ok && inactive < usage {
+			return usage - inactive
+		}
+	}
+	return usage
+}
+
 func readMemoryBytes(cgroupPath string) (float64, bool) {
+	stat := readFile(filepath.Join(cgroupPath, "memory.stat"))
 	if v := readFile(filepath.Join(cgroupPath, "memory.current")); v != "" { // v2
 		if f, err := strconv.ParseFloat(v, 64); err == nil {
-			return f, true
+			return memUsageNoCache(f, stat), true
 		}
 	}
 	if v := readFile(filepath.Join(cgroupPath, "memory.usage_in_bytes")); v != "" { // v1
 		if f, err := strconv.ParseFloat(v, 64); err == nil {
-			return f, true
+			return memUsageNoCache(f, stat), true
 		}
 	}
 	return 0, false
 }
 
-// cpuPercent считает загрузку с прошлого замера. 100% == одно ядро
-// (значение может превышать 100% на многоядерной нагрузке).
+// detectHostCPUCount читает число ядер хоста из HOST_PROC/cpuinfo.
+// Fallback: runtime.NumCPU(); минимум 1.
+func detectHostCPUCount(hostProcRoot string) int {
+	path := filepath.Join(hostProcRoot, "cpuinfo")
+	content := readFile(path)
+	if content != "" {
+		n := 0
+		for _, line := range strings.Split(content, "\n") {
+			if strings.HasPrefix(line, "processor") {
+				n++
+			}
+		}
+		if n > 0 {
+			return n
+		}
+	}
+	if n := runtime.NumCPU(); n > 0 {
+		return n
+	}
+	return 1
+}
+
+// cpuPercent считает загрузку с прошлого замера.
+// 100% == все ядра хоста (шкала как в Doozle); обычно ≤100% на один контейнер.
 func (c *Collector) cpuPercent(name string, usageNs float64, now time.Time) (float64, bool) {
 	prev, ok := c.cpuPrev[name]
 	c.cpuPrev[name] = cpuDelta{usage: usageNs, at: now}
@@ -190,7 +246,11 @@ func (c *Collector) cpuPercent(name string, usageNs float64, now time.Time) (flo
 	if du < 0 {
 		return 0, false // счётчик сбросился (рестарт контейнера)
 	}
-	return (du / dt) * 100.0, true
+	nCPU := c.hostCPUCount
+	if nCPU < 1 {
+		nCPU = 1
+	}
+	return (du / dt) / float64(nCPU) * 100.0, true
 }
 
 func (c *Collector) collectContainerMetrics(ts time.Time) []Metric {

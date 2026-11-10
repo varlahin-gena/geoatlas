@@ -35,22 +35,26 @@ type Collector struct {
 
 	// Состояние между тиками. Доступ строго из Collect() (один горутин),
 	// поэтому синхронизация не требуется.
-	cpuPrev     map[string]cpuDelta
-	cgroupCache map[string]string
-	prevSent    float64
-	prevRecv    float64
-	prevUDPRecv float64
-	prevTCPRecv float64
-	prevSentTS  time.Time
+	cpuPrev      map[string]cpuDelta
+	cgroupCache  map[string]string
+	hostCPUCount int // ядра хоста; 100% cpu_pct = все ядра (как Doozle)
+	prevSent     float64
+	prevRecv     float64
+	prevUDPRecv  float64
+	prevTCPRecv  float64
+	prevSentTS   time.Time
 }
 
 func NewCollector(cfg config.Config, conn clickhouse.Conn) *Collector {
+	nCPU := detectHostCPUCount(cfg.HostProcRoot)
+	log.Printf("host CPU count for container metrics: %d", nCPU)
 	return &Collector{
-		cfg:         cfg,
-		conn:        conn,
-		http:        &http.Client{Timeout: 3 * time.Second},
-		cpuPrev:     make(map[string]cpuDelta),
-		cgroupCache: make(map[string]string),
+		cfg:          cfg,
+		conn:         conn,
+		http:         &http.Client{Timeout: 3 * time.Second},
+		cpuPrev:      make(map[string]cpuDelta),
+		cgroupCache:  make(map[string]string),
+		hostCPUCount: nCPU,
 	}
 }
 
