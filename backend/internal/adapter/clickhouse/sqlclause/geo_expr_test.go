@@ -123,7 +123,7 @@ func TestTrafficLogsEnrichedFromSQLJoinsLookup(t *testing.T) {
 	from := TrafficLogsEnrichedFromSQL(pred)
 	for _, want := range []string{
 		GeoEnrichIPTable,
-		"LEFT JOIN",
+		"ANY LEFT JOIN",
 		"AS sg ON",
 		"AS dg ON",
 		"AS traffic_logs",
@@ -136,11 +136,18 @@ func TestTrafficLogsEnrichedFromSQLJoinsLookup(t *testing.T) {
 }
 
 func TestMapLogsFromSQL(t *testing.T) {
-	live := MapLogsFromSQL("traffic_logs", "timestamp >= now()")
-	if !strings.Contains(live, GeoEnrichIPTable) {
-		t.Fatalf("live must join enrich:\n%s", live)
+	liveOverlay := MapLogsFromSQL("traffic_logs", "timestamp >= now()", true)
+	if !strings.Contains(liveOverlay, GeoEnrichIPTable) {
+		t.Fatalf("overlay on must join enrich:\n%s", liveOverlay)
 	}
-	bak := MapLogsFromSQL("ga_bak_traffic_logs", "timestamp >= now()")
+	livePlain := MapLogsFromSQL("traffic_logs", "timestamp >= now()", false)
+	if strings.Contains(livePlain, GeoEnrichIPTable) {
+		t.Fatalf("overlay off must skip enrich:\n%s", livePlain)
+	}
+	if !strings.Contains(livePlain, "FROM traffic_logs") {
+		t.Fatalf("plain live FROM missing:\n%s", livePlain)
+	}
+	bak := MapLogsFromSQL("ga_bak_traffic_logs", "timestamp >= now()", true)
 	if strings.Contains(bak, GeoEnrichIPTable) {
 		t.Fatalf("backup must skip enrich:\n%s", bak)
 	}

@@ -214,9 +214,14 @@ func TestScanGeoEdgesForTimeRange(t *testing.T) {
 	if _, used, err := ScanGeoEdgesForTimeRange(ctxH, ch, model.TimeRange{Mode: "hours", Amount: 2}, "ip", sel, to); err != nil || !used {
 		t.Fatalf("%v %v", used, err)
 	}
+	// Legacy minutes coerce to hours → hourly path when ready.
+	ch.push(geoEdgeVals())
+	if _, used, err := ScanGeoEdgesForTimeRange(ctxH, ch, model.TimeRange{Mode: "minutes", Amount: 30}, "country", sel, to); err != nil || !used {
+		t.Fatalf("minutes→hourly %v %v", used, err)
+	}
 	ch.push(geoEdgeVals())
 	if _, used, err := ScanGeoEdgesForTimeRange(ctx, ch, model.TimeRange{Mode: "minutes", Amount: 30}, "country", sel, to); err != nil || !used {
-		t.Fatalf("%v %v", used, err)
+		t.Fatalf("minutes→hours logs %v %v", used, err)
 	}
 
 	from := time.Now().UTC().Add(-2 * time.Hour)

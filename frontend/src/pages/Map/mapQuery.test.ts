@@ -90,6 +90,11 @@ describe('map view query string', () => {
     });
   });
 
+  it('normalizes legacy minute periods to 1h', () => {
+    expect(parseMapViewSearch(new URLSearchParams('period=15m')).period).toBe('1h');
+    expect(parseMapViewSearch(new URLSearchParams('period=30m')).period).toBe('1h');
+  });
+
   it('uses user map_group_by when URL has no group', () => {
     const sp = new URLSearchParams();
     expect(parseMapViewSearch(sp, { groupBy: 'country' }).groupBy).toBe('country');

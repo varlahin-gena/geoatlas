@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -148,7 +149,11 @@ func (h *ConnectorsHandler) Apply(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 	if err != nil {
-		writeInternalError(w, "connectors apply", err)
+		// Surface write/path errors to admin UI (permission denied on syslog-ng.d is common).
+		slog.Error("connectors apply", "err", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{
+			"error": "connectors apply failed: " + err.Error(),
+		})
 		return
 	}
 	status := http.StatusOK

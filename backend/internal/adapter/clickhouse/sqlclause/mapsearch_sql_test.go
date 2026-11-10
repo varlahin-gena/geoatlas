@@ -23,8 +23,39 @@ func TestMapSearchSQLAdvancedAND(t *testing.T) {
 func TestMapSearchSQLSimpleBind(t *testing.T) {
 	c := mapsearch.Compile("Moscow")
 	clause, args := MapSearchSQL(c, LogsMapSearchColumns)
-	if !strings.Contains(clause, "concat_ws") || len(args) != 1 || args[0] != "Moscow" {
+	if strings.Contains(clause, "concat_ws") {
+		t.Fatalf("simple must not use concat_ws: %s", clause)
+	}
+	if !strings.Contains(clause, "positionCaseInsensitiveUTF8") || !strings.Contains(clause, " OR ") {
 		t.Fatalf("clause=%s args=%v", clause, args)
+	}
+	if len(args) != len(LogsMapSearchColumns.Simple) || args[0] != "Moscow" {
+		t.Fatalf("clause=%s args=%v", clause, args)
+	}
+}
+
+func TestMapSearchSQLSimpleIPv4(t *testing.T) {
+	c := mapsearch.Compile("10.0.0.1")
+	clause, args := MapSearchSQL(c, LogsMapSearchColumns)
+	if !strings.Contains(clause, "toIPv4OrNull") || !strings.Contains(clause, "src_ip") {
+		t.Fatalf("clause=%s args=%v", clause, args)
+	}
+	if strings.Contains(clause, "concat_ws") {
+		t.Fatal("concat_ws")
+	}
+	if len(args) != 2 || args[0] != "10.0.0.1" {
+		t.Fatalf("args=%v", args)
+	}
+}
+
+func TestMapSearchSQLSimplePort(t *testing.T) {
+	c := mapsearch.Compile("443")
+	clause, args := MapSearchSQL(c, LogsMapSearchColumns)
+	if !strings.Contains(clause, "src_port = ?") || !strings.Contains(clause, "dst_port = ?") {
+		t.Fatalf("clause=%s", clause)
+	}
+	if len(args) != 2 {
+		t.Fatalf("args=%v", args)
 	}
 }
 
@@ -48,14 +79,22 @@ func TestMapSearchSQLCountryAliases(t *testing.T) {
 func TestMapSearchSQLSrcDstFields(t *testing.T) {
 	c := mapsearch.Compile("src_ip=10.0.0.1 AND dst_port=443")
 	clause, args := MapSearchSQL(c, LogsMapSearchColumns)
-	if !strings.Contains(clause, "toString(src_ip)") || !strings.Contains(clause, "toString(dst_port)") {
+	if !strings.Contains(clause, "src_ip = toIPv4OrNull(?)") {
 		t.Fatalf("clause=%s", clause)
 	}
-	if !strings.Contains(clause, "lowerUTF8") {
-		t.Fatalf("expected eq SQL, clause=%s", clause)
+	if !strings.Contains(clause, "dst_port = ?") {
+		t.Fatalf("clause=%s", clause)
 	}
 	if len(args) < 2 {
 		t.Fatalf("args=%v", args)
+	}
+}
+
+func TestMapSearchSQLIPPrefix(t *testing.T) {
+	c := mapsearch.Compile("ip:10.0.")
+	clause, _ := MapSearchSQL(c, LogsMapSearchColumns)
+	if !strings.Contains(clause, "startsWith(toString(src_ip)") {
+		t.Fatalf("clause=%s", clause)
 	}
 }
 
@@ -71,10 +110,14 @@ func TestMapSearchSQLActionField(t *testing.T) {
 		t.Fatalf("legacy rule alias should map to action, clause=%s", clause2)
 	}
 }
+
 func TestMapSearchSQLNeJoinsWithAnd(t *testing.T) {
 	c := mapsearch.Compile("ip!=10.0.0.1")
 	clause, _ := MapSearchSQL(c, LogsMapSearchColumns)
 	if !strings.Contains(clause, " AND ") {
 		t.Fatalf("expected AND join for ne, clause=%s", clause)
+	}
+	if !strings.Contains(clause, "toIPv4OrNull") {
+		t.Fatalf("expected native IP ne, clause=%s", clause)
 	}
 }

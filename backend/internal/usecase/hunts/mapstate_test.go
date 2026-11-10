@@ -8,8 +8,8 @@ import (
 func TestMapStateToTimeRangePeriods(t *testing.T) {
 	now := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
 	tr := mapStateToTimeRange(MapState{Period: "15m"}, now)
-	if tr.Mode != "minutes" || tr.Amount != 15 {
-		t.Fatalf("15m: %+v", tr)
+	if tr.Mode != "hours" || tr.Amount != 1 {
+		t.Fatalf("15m→1h: %+v", tr)
 	}
 	tr = mapStateToTimeRange(MapState{Period: "3h"}, now)
 	if tr.Mode != "hours" || tr.Amount != 3 {

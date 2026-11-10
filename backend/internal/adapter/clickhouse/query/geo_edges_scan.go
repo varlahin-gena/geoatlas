@@ -25,9 +25,24 @@ func (s MapSelect) scope() sqlclause.MapScope {
 	return sqlclause.MapScope{Country: s.Country, Query: s.Query}
 }
 
+// coerceMapMinHours — map minimum window is 1h (legacy minutes → ceil hours).
+func coerceMapMinHours(tr model.TimeRange) model.TimeRange {
+	if tr.Mode != "minutes" {
+		return tr
+	}
+	h := tr.Amount / 60
+	if tr.Amount%60 != 0 {
+		h++
+	}
+	if h < 1 {
+		h = 1
+	}
+	return model.TimeRange{Mode: "hours", Amount: h}
+}
+
 // ScanGeoEdgesForTimeRange читает рёбра, свёрнутые по city|country|ip|subnet.
 // city/country + days → pre-agg таблицы при готовности, иначе GROUP BY geo из traffic_logs;
-// ip/subnet и minutes/hours/absolute → GROUP BY geo-колонок traffic_logs (без O(n) GeoIP в Go).
+// ip/subnet и hours/absolute → GROUP BY geo-колонок traffic_logs (без O(n) GeoIP в Go).
 // (nil, false, nil) — нужен fallback на live IP-путь (редкий default).
 func ScanGeoEdgesForTimeRange(
 	ctx context.Context,
@@ -42,6 +57,8 @@ func ScanGeoEdgesForTimeRange(
 	default:
 		return nil, false, nil
 	}
+
+	tr = coerceMapMinHours(tr)
 
 	tables := TablesOf(ctx)
 	agg := aggstate.AggFromContext(ctx)
@@ -146,11 +163,11 @@ func promoteMinutesToHours(tr model.TimeRange, prefer bool) model.TimeRange {
 	return model.TimeRange{Mode: "hours", Amount: tr.Amount / 60}
 }
 
-func scanGeoFromLogsSelect(logsTable, srcKey, dstKey, srcLabel, dstLabel, whereExtra string) string {
+func scanGeoFromLogsSelect(logsTable, srcKey, dstKey, srcLabel, dstLabel, whereExtra string, enrichOverlay bool) string {
 	// Не использовать any(src_city) AS src_city: ClickHouse подставит алиас
 	// внутрь any(cityLabelExpr), получится вложенный aggregate (code 184).
-	// Live traffic_logs — JOIN ga_geo_enrich_ip (дыры без ALTER UPDATE).
-	fromSQL := sqlclause.MapLogsFromSQL(logsTable, whereExtra)
+	// Live traffic_logs — JOIN ga_geo_enrich_ip только при непустом overlay.
+	fromSQL := sqlclause.MapLogsFromSQL(logsTable, whereExtra, enrichOverlay)
 	return fmt.Sprintf(`
 		SELECT
 			%s AS src_key,
@@ -213,8 +230,10 @@ func scanGeoFromLogsRelative(
 	srcKey, dstKey, srcLabel, dstLabel := sqlclause.GeoGroupExprs(groupBy)
 	scopeSQL, scopeArgs := sel.scope().LogsWhere()
 	where := fmt.Sprintf("timestamp >= now() - INTERVAL ? %s%s%s", unit, sqlclause.ActionWhereSQL(sel.Filter), scopeSQL)
+	logsTable := TablesOf(ctx).Logs
+	overlay := logsTable == "traffic_logs" && aggstate.AggFromContext(ctx).PreferGeoEnrichOverlay()
 	// ClickHouse: ORDER BY → LIMIT → SETTINGS (SETTINGS must be last).
-	q := scanGeoFromLogsSelect(TablesOf(ctx).Logs, srcKey, dstKey, srcLabel, dstLabel, where) +
+	q := scanGeoFromLogsSelect(logsTable, srcKey, dstKey, srcLabel, dstLabel, where, overlay) +
 		"\n\t\t" + limitClause(sel.Limit) + AggSettings()
 
 	qctx, cancel := context.WithTimeout(ctx, timeout)
@@ -239,7 +258,9 @@ func scanGeoFromLogsAbsolute(
 	srcKey, dstKey, srcLabel, dstLabel := sqlclause.GeoGroupExprs(groupBy)
 	scopeSQL, scopeArgs := sel.scope().LogsWhere()
 	where := fmt.Sprintf("timestamp >= ? AND timestamp < ?%s%s", sqlclause.ActionWhereSQL(sel.Filter), scopeSQL)
-	q := scanGeoFromLogsSelect(TablesOf(ctx).Logs, srcKey, dstKey, srcLabel, dstLabel, where) +
+	logsTable := TablesOf(ctx).Logs
+	overlay := logsTable == "traffic_logs" && aggstate.AggFromContext(ctx).PreferGeoEnrichOverlay()
+	q := scanGeoFromLogsSelect(logsTable, srcKey, dstKey, srcLabel, dstLabel, where, overlay) +
 		"\n\t\t" + limitClause(sel.Limit) + AggSettings()
 
 	qctx, cancel := context.WithTimeout(ctx, timeout)

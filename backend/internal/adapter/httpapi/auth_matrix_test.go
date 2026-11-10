@@ -86,6 +86,8 @@ func expectedAuthMatrix() map[string]authTier {
 		"GET /api/system/history":                         tierAdmin,
 		"GET /api/system/edges-agg":                       tierAdmin,
 		"POST /api/system/maintenance/backfill":           tierAdmin,
+		"POST /api/system/alerts/ack":                     tierAdmin,
+		"DELETE /api/system/alerts/ack":                   tierAdmin,
 		"GET /api/system/install-profile":                 tierAdmin,
 		"GET /api/system/retention":                       tierAdmin,
 		"PUT /api/system/retention":                       tierAdmin,

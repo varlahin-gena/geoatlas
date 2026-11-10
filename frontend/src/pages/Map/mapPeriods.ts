@@ -1,6 +1,4 @@
 export const PERIODS = [
-  ['15m', '15 минут'],
-  ['30m', '30 минут'],
   ['1h', '1 час'],
   ['3h', '3 часа'],
   ['6h', '6 часов'],
@@ -12,3 +10,12 @@ export const PERIODS = [
   ['30d', '30 дней'],
   ['custom', 'Свой диапазон…'],
 ] as const;
+
+/** Legacy minute presets → minimum map window is 1h. */
+export function normalizeMapPeriod(period: string): string {
+  const p = (period || '').trim();
+  if (!p) return '';
+  const m = p.match(/^(\d+)m$/i);
+  if (m) return '1h';
+  return p;
+}

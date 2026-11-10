@@ -306,8 +306,13 @@ export function buildPeriodQuery(
     }
     return q;
   }
+  // Legacy minute presets: map min window is 1h (ceil minutes → hours).
   const m = period.match(/^(\d+)m$/);
-  if (m) return `&minutes=${m[1]}`;
+  if (m) {
+    const mins = parseInt(m[1], 10);
+    const hours = Math.max(1, Math.ceil(mins / 60));
+    return `&hours=${hours}`;
+  }
   const h = period.match(/^(\d+)h$/);
   if (h) return `&hours=${h[1]}`;
   const d = period.match(/^(\d+)d$/);

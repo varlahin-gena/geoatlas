@@ -37,9 +37,9 @@ func CityNeedsSQL(col string) string {
 	return fmt.Sprintf(`(%[1]s = '' OR lower(%[1]s) IN ('unknown', 'неизвестно'))`, col)
 }
 
-// TrafficLogsEnrichedFromSQL — FROM-подзапрос: traffic_logs + LEFT JOIN ga_geo_enrich_ip.
+// TrafficLogsEnrichedFromSQL — FROM-подзапрос: traffic_logs + ANY LEFT JOIN ga_geo_enrich_ip.
 // Исторические дыры закрываются на чтении без ALTER UPDATE.
-// Пустая lookup-таблица → поведение как FROM traffic_logs.
+// WHERE применяется до JOIN (filter-before-join).
 func TrafficLogsEnrichedFromSQL(wherePred string) string {
 	sgCountryNeed := CountryNeedsSQL("traffic_logs.src_country")
 	dgCountryNeed := CountryNeedsSQL("traffic_logs.dst_country")
@@ -75,18 +75,26 @@ func TrafficLogsEnrichedFromSQL(wherePred string) string {
 				if(traffic_logs.dst_region = '' AND dg.region != '', dg.region, traffic_logs.dst_region) AS dst_region,
 				if(%[2]s AND sg.country != '', sg.country, traffic_logs.src_country) AS src_country,
 				if(%[3]s AND dg.country != '', dg.country, traffic_logs.dst_country) AS dst_country
-			FROM traffic_logs
-			LEFT JOIN %[1]s AS sg ON traffic_logs.src_ip = sg.ip
-			LEFT JOIN %[1]s AS dg ON traffic_logs.dst_ip = dg.ip
-			WHERE %[4]s
+			FROM (
+				SELECT
+					timestamp, action, rule, proto, src_port, dst_port, device,
+					src_zone, dst_zone, bytes_sent, bytes_recv, packets_sent, packets_recv,
+					src_ip, dst_ip, src_lat, src_lon, dst_lat, dst_lon,
+					src_city, dst_city, src_region, dst_region, src_country, dst_country
+				FROM traffic_logs
+				WHERE %[4]s
+			) AS traffic_logs
+			ANY LEFT JOIN %[1]s AS sg ON traffic_logs.src_ip = sg.ip
+			ANY LEFT JOIN %[1]s AS dg ON traffic_logs.dst_ip = dg.ip
 		) AS traffic_logs
 	`, GeoEnrichIPTable, sgCountryNeed, dgCountryNeed, wherePred,
 		CityNeedsSQL("traffic_logs.src_city"), CityNeedsSQL("traffic_logs.dst_city"))
 }
 
-// MapLogsFromSQL — FROM для скана карты. Live traffic_logs — с overlay ga_geo_enrich_ip.
-func MapLogsFromSQL(logsTable, wherePred string) string {
-	if logsTable == "traffic_logs" {
+// MapLogsFromSQL — FROM для скана карты.
+// Live traffic_logs: overlay ga_geo_enrich_ip только когда enrichOverlay=true.
+func MapLogsFromSQL(logsTable, wherePred string, enrichOverlay bool) string {
+	if logsTable == "traffic_logs" && enrichOverlay {
 		return TrafficLogsEnrichedFromSQL(wherePred)
 	}
 	return fmt.Sprintf("FROM %s\n\t\tWHERE %s", logsTable, wherePred)

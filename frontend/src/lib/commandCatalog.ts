@@ -55,7 +55,7 @@ function navCommands(items: NavItem[]): AppCommand[] {
   }));
 }
 
-const MAP_PERIOD_IDS = new Set(['1h', '1d', '7d', '15m', '6h']);
+const MAP_PERIOD_IDS = new Set(['1h', '1d', '7d', '6h']);
 
 export function buildCommandCatalog(ctx: CommandCatalogContext): AppCommand[] {
   const items = filterNav(PAGE_NAV, {

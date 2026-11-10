@@ -1797,6 +1797,70 @@ paths:
         "503":
           description: system service unavailable
 
+  /api/system/alerts/ack:
+    post:
+      tags: [system]
+      summary: Скрыть warn-алерт системы
+      description: |
+        Только administrator или Bearer. Скрывает активный warn до конца эпизода;
+        для `*_dropped_total` — до роста счётчика выше baseline на момент ack.
+        Error-алерты скрыть нельзя (409).
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SystemAlertAckRequest"
+      responses:
+        "200":
+          description: Alert dismissed
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          description: bad request
+        "401":
+          description: unauthorized
+        "404":
+          description: alert not currently active
+        "409":
+          description: alert is not ackable (error level)
+        "503":
+          description: system service unavailable
+    delete:
+      tags: [system]
+      summary: Снять скрытие warn-алерта
+      description: |
+        Только administrator или Bearer. Снимает in-memory dismiss для `(code, target)`.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SystemAlertAckRequest"
+      responses:
+        "200":
+          description: Dismiss cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          description: bad request
+        "401":
+          description: unauthorized
+        "503":
+          description: system service unavailable
+
   /api/system/stats:
     get:
       tags: [system]
@@ -2995,6 +3059,14 @@ components:
         code: { type: string }
         target: { type: string }
         message: { type: string }
+        ackable: { type: boolean, description: "true for warn alerts that can be dismissed" }
+
+    SystemAlertAckRequest:
+      type: object
+      required: [code]
+      properties:
+        code: { type: string }
+        target: { type: string }
 
     SystemFailedLogin:
       type: object

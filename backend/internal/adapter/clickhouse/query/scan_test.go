@@ -8,7 +8,7 @@ import (
 )
 
 func TestScanGeoFromLogsSelectClauseOrder(t *testing.T) {
-	q := scanGeoFromLogsSelect("traffic_logs", "src_k", "dst_k", "src_l", "dst_l", "timestamp >= now()") +
+	q := scanGeoFromLogsSelect("traffic_logs", "src_k", "dst_k", "src_l", "dst_l", "timestamp >= now()", true) +
 		"\n\t\t" + limitClause(20000) + AggSettings()
 
 	orderIdx := strings.Index(q, "ORDER BY coord_weight DESC, cnt DESC")
@@ -24,10 +24,10 @@ func TestScanGeoFromLogsSelectClauseOrder(t *testing.T) {
 }
 
 func TestScanGeoFromLogsSelectJoinsEnrichLookup(t *testing.T) {
-	q := scanGeoFromLogsSelect("traffic_logs", "src_k", "dst_k", "src_l", "dst_l", "timestamp >= now()")
+	q := scanGeoFromLogsSelect("traffic_logs", "src_k", "dst_k", "src_l", "dst_l", "timestamp >= now()", true)
 	for _, want := range []string{
 		sqlclause.GeoEnrichIPTable,
-		"LEFT JOIN",
+		"ANY LEFT JOIN",
 		"AS sg ON",
 		"AS dg ON",
 		"AS traffic_logs",
@@ -42,8 +42,18 @@ func TestScanGeoFromLogsSelectJoinsEnrichLookup(t *testing.T) {
 	}
 }
 
+func TestScanGeoFromLogsSelectSkipsEnrichWhenOverlayOff(t *testing.T) {
+	q := scanGeoFromLogsSelect("traffic_logs", "src_k", "dst_k", "src_l", "dst_l", "timestamp >= now()", false)
+	if strings.Contains(q, sqlclause.GeoEnrichIPTable) {
+		t.Fatalf("overlay off must not join enrich:\n%s", q)
+	}
+	if !strings.Contains(q, "FROM traffic_logs") {
+		t.Fatalf("expected bare live FROM:\n%s", q)
+	}
+}
+
 func TestScanGeoFromLogsSelectBackupSkipsEnrich(t *testing.T) {
-	q := scanGeoFromLogsSelect("ga_bak_traffic_logs", "src_k", "dst_k", "src_l", "dst_l", "timestamp >= now()")
+	q := scanGeoFromLogsSelect("ga_bak_traffic_logs", "src_k", "dst_k", "src_l", "dst_l", "timestamp >= now()", true)
 	if strings.Contains(q, sqlclause.GeoEnrichIPTable) {
 		t.Fatalf("backup scan must not join enrich table:\n%s", q)
 	}
@@ -59,6 +69,7 @@ func TestScanGeoFromLogsSelectNoAliasShadowing(t *testing.T) {
 		srcKey, dstKey,
 		srcLabel, dstLabel,
 		"timestamp >= now()",
+		true,
 	)
 	// Alias matching the column name makes CH nest any(src_city) inside any(labelExpr).
 	for _, bad := range []string{

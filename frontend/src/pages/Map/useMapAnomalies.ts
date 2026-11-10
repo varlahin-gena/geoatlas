@@ -8,8 +8,6 @@ import type { MapActionFilter, MapViewState } from './mapQuery';
 
 
 const PERIOD_TO_MS: Record<string, number> = {
-  '15m': 15 * 60_000,
-  '30m': 30 * 60_000,
   '1h': 60 * 60_000,
   '3h': 3 * 60 * 60_000,
   '6h': 6 * 60 * 60_000,

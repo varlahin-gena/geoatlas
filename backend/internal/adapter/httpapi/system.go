@@ -111,6 +111,61 @@ func (h *SystemHandler) PostMaintenanceBackfill(w http.ResponseWriter, r *http.R
 	})
 }
 
+type systemAlertAckRequest struct {
+	Code   string `json:"code"`
+	Target string `json:"target"`
+}
+
+func (h *SystemHandler) PostSystemAlertAck(w http.ResponseWriter, r *http.Request) {
+	if h.systemUC == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "system service unavailable"})
+		return
+	}
+	var req systemAlertAckRequest
+	if !decodeJSONBody(w, r, &req, smallJSONBodyLimit) {
+		return
+	}
+	req.Code = strings.TrimSpace(req.Code)
+	req.Target = strings.TrimSpace(req.Target)
+	if req.Code == "" {
+		writeBadRequest(w, "code is required")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), h.queryTimeout)
+	defer cancel()
+	if err := h.systemUC.AckAlert(ctx, req.Code, req.Target); err != nil {
+		switch {
+		case errors.Is(err, system.ErrAlertNotFound):
+			writeJSON(w, http.StatusNotFound, map[string]any{"error": err.Error()})
+		case errors.Is(err, system.ErrAlertNotAckable):
+			writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error()})
+		default:
+			writeInternalError(w, "system alert ack failed", err)
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "code": req.Code, "target": req.Target})
+}
+
+func (h *SystemHandler) DeleteSystemAlertAck(w http.ResponseWriter, r *http.Request) {
+	if h.systemUC == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "system service unavailable"})
+		return
+	}
+	var req systemAlertAckRequest
+	if !decodeJSONBody(w, r, &req, smallJSONBodyLimit) {
+		return
+	}
+	req.Code = strings.TrimSpace(req.Code)
+	req.Target = strings.TrimSpace(req.Target)
+	if req.Code == "" {
+		writeBadRequest(w, "code is required")
+		return
+	}
+	h.systemUC.UnackAlert(req.Code, req.Target)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "code": req.Code, "target": req.Target})
+}
+
 func (h *SystemHandler) GetInstallProfile(w http.ResponseWriter, r *http.Request) {
 	if h.systemUC == nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "system service unavailable"})

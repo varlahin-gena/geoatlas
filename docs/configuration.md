@@ -20,7 +20,7 @@
 
 ## Что переживает обновление пакета
 
-`update.sh` **не затирает**: `.env`, `.admin_password_once`, `docker-compose.override.yml`, `install-profile.json`, `install-modules.json`, `certs/`, `syslog-ng.d/zz_profile.conf`, `syslog-ng.d/zz_ingest_auth.conf`, `clickhouse/users.d/zz_install_limits.xml`. Тома Docker (данные CH, `/app/data`) не трогаются.
+`update.sh` **не затирает**: `.env`, `.admin_password_once`, `docker-compose.override.yml`, `install-profile.json`, `install-modules.json`, `certs/`, `syslog-ng.d/zz_profile.conf`, `syslog-ng.d/01-ingest-auth.conf` (и legacy `zz_ingest_auth.conf`), `clickhouse/users.d/zz_install_limits.xml`. Тома Docker (данные CH, `/app/data`) не трогаются.
 
 ## Порты и HTTPS
 

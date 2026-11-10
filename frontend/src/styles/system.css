@@ -456,6 +456,14 @@ body.page-admin {
         border-left: 3px solid var(--text-muted);
         font-size: 12px;
     }
+    .alert-row .alert-body { flex: 1; min-width: 0; }
+    .alert-row .alert-msg { display: inline; }
+    .alert-row .alert-ack {
+        flex-shrink: 0;
+        margin-left: auto;
+        padding: 3px 8px;
+        font-size: 11px;
+    }
     .alert-row.warn  { border-left-color: var(--orange); background: rgba(210, 153, 34, 0.06); }
     .alert-row.error { border-left-color: var(--red);    background: rgba(248, 81, 73, 0.06); }
     .alert-row.info  { border-left-color: var(--accent); background: rgba(88, 166, 255, 0.06); }

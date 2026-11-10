@@ -7,6 +7,7 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 
+	"geoatlas/internal/adapter/clickhouse/aggstate"
 	"geoatlas/internal/adapter/clickhouse/sqlclause"
 	"geoatlas/internal/model"
 )
@@ -84,7 +85,7 @@ func scanIPEdges(
 		GROUP BY src_ip, dst_ip
 	`, table, where)
 
-	enriched := ipEdgesEnrichOverlaySQL(inner)
+	enriched := ipEdgesEnrichOverlaySQL(inner, aggstate.AggFromContext(ctx).PreferGeoEnrichOverlay())
 
 	srcKey, dstKey, srcLabel, dstLabel := sqlclause.GeoGroupExprs(groupBy)
 	scopeHaving, scopeArgs := sel.scope().GeoAggHavingExpr()
@@ -140,8 +141,12 @@ func scanIPEdges(
 	return scanGeoEdgeRows(rows)
 }
 
-// ipEdgesEnrichOverlaySQL wraps an aggregated IP-edges subquery with ga_geo_enrich_ip.
-func ipEdgesEnrichOverlaySQL(inner string) string {
+// ipEdgesEnrichOverlaySQL wraps an aggregated IP-edges subquery with ga_geo_enrich_ip
+// when the lookup table is non-empty; otherwise returns the inner subquery as-is.
+func ipEdgesEnrichOverlaySQL(inner string, enrichOverlay bool) string {
+	if !enrichOverlay {
+		return "(" + inner + ")"
+	}
 	return fmt.Sprintf(`
 		SELECT
 			e.src_ip AS src_ip,
@@ -178,8 +183,8 @@ func ipEdgesEnrichOverlaySQL(inner string) string {
 			if(%[4]s AND sg.city != '', sg.city, e.src_city) AS src_city,
 			if(%[5]s AND dg.city != '', dg.city, e.dst_city) AS dst_city
 		FROM (%[1]s) AS e
-		LEFT JOIN %[6]s AS sg ON e.src_ip = sg.ip
-		LEFT JOIN %[6]s AS dg ON e.dst_ip = dg.ip
+		ANY LEFT JOIN %[6]s AS sg ON e.src_ip = sg.ip
+		ANY LEFT JOIN %[6]s AS dg ON e.dst_ip = dg.ip
 	`, inner,
 		sqlclause.CountryNeedsSQL("e.src_country"),
 		sqlclause.CountryNeedsSQL("e.dst_country"),

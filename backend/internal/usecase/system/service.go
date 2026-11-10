@@ -39,6 +39,7 @@ type Service struct {
 	startupTime        time.Time
 	rates              *RateSampler
 	slo                IngestSLO
+	acks               *AlertAckStore
 }
 
 func New(deps Dependencies) *Service {
@@ -65,6 +66,7 @@ func New(deps Dependencies) *Service {
 		startupTime:        startupTime,
 		rates:              &RateSampler{},
 		slo:                slo,
+		acks:               NewAlertAckStore(),
 	}
 }
 
@@ -156,7 +158,7 @@ func (s *Service) CollectStats(ctx context.Context) (SystemStatsResponse, error)
 
 	resp.EdgesAgg = s.EdgesAgg(ctx)
 	resp.IngestSLO = s.slo
-	resp.Alerts = computeAlerts(resp)
+	resp.Alerts = s.acks.Filter(computeAlerts(resp), resp)
 	return resp, nil
 }
 
@@ -174,6 +176,27 @@ func (s *Service) Status(ctx context.Context) (SystemStatusResponse, error) {
 		AlertCount: len(alerts),
 		Alerts:     alerts,
 	}, nil
+}
+
+// AckAlert hides an active warn alert until the episode ends (or a baseline counter grows).
+func (s *Service) AckAlert(ctx context.Context, code, target string) error {
+	if s == nil {
+		return ErrAlertNotFound
+	}
+	stats, err := s.CollectStats(ctx)
+	if err != nil {
+		return err
+	}
+	// Validate against unfiltered alerts (CollectStats already applied Filter).
+	return s.acks.Ack(code, target, stats, computeAlerts(stats))
+}
+
+// UnackAlert clears a previously stored dismiss for (code, target).
+func (s *Service) UnackAlert(code, target string) {
+	if s == nil {
+		return
+	}
+	s.acks.Unack(code, target)
 }
 
 func (s *Service) History(ctx context.Context, periodStr, metricsRaw string) (HistoryResponse, error) {

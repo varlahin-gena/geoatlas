@@ -40,6 +40,12 @@ func (w *routeWiring) registerAdminSystemRoutes() {
 	w.handle("POST", "/api/system/maintenance/backfill",
 		chain(http.HandlerFunc(w.system.PostMaintenanceBackfill), w.adminMW, w.csrf, maxBytesMW(maxJSONBodySize)),
 	)
+	w.handle("POST", "/api/system/alerts/ack",
+		chain(http.HandlerFunc(w.system.PostSystemAlertAck), w.adminMW, w.csrf, maxBytesMW(maxJSONBodySize)),
+	)
+	w.handle("DELETE", "/api/system/alerts/ack",
+		chain(http.HandlerFunc(w.system.DeleteSystemAlertAck), w.adminMW, w.csrf, maxBytesMW(maxJSONBodySize)),
+	)
 	w.handle("GET", "/api/system/install-profile",
 		withTimeout(chain(http.HandlerFunc(w.system.GetInstallProfile), w.adminMW), healthTimeout),
 	)

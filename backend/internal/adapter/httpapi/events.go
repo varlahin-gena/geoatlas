@@ -84,15 +84,23 @@ func parseEventTimeRange(q map[string][]string) (eventTimeRange, error) {
 		return eventTimeRange{Mode: "absolute", From: from.UTC(), To: to.UTC()}, nil
 	}
 
+	// Legacy minutes= : map minimum window is 1h (ceil to hours).
 	if mStr := get("minutes"); mStr != "" {
 		m, err := strconv.Atoi(mStr)
 		if err != nil || m < 1 {
-			m = 15
+			m = 60
 		}
 		if m > 30*24*60 {
 			m = 30 * 24 * 60
 		}
-		return eventTimeRange{Mode: "minutes", Amount: m}, nil
+		h := (m + 59) / 60
+		if h < 1 {
+			h = 1
+		}
+		if h > 30*24 {
+			h = 30 * 24
+		}
+		return eventTimeRange{Mode: "hours", Amount: h}, nil
 	}
 
 	if hStr := get("hours"); hStr != "" {
@@ -229,7 +237,10 @@ func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	})
 	limit, limitCapped := mapsearch.EffectiveMapLimit(requestedLimit, queryCost)
 
-	result, err := h.eventsUC.GetMap(r.Context(), usecaseevents.GetMapInput{
+	mapCtx, mapDone := h.mapGate.Begin(mapQueryGateKey(r), r.Context())
+	defer mapDone()
+
+	result, err := h.eventsUC.GetMap(mapCtx, usecaseevents.GetMapInput{
 		TimeRange:     model.TimeRange{Mode: tr.Mode, Amount: tr.Amount, From: tr.From, To: tr.To},
 		Limit:         limit,
 		GroupBy:       groupBy,
@@ -243,6 +254,9 @@ func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 		Timeout:       h.queryTimeout,
 	})
 	if err != nil {
+		if mapCtx.Err() != nil {
+			return
+		}
 		writeInternalError(w, "events: get map failed", err)
 		return
 	}

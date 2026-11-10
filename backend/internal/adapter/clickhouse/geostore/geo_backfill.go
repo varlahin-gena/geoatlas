@@ -12,6 +12,7 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 
+	"geoatlas/internal/adapter/clickhouse/aggstate"
 	"geoatlas/internal/adapter/clickhouse/sqlclause"
 	"geoatlas/internal/model"
 )
@@ -52,6 +53,7 @@ func EnrichLogsMissingGeo(ctx context.Context, ch clickhouse.Conn, geo GeoResolv
 	if err := ch.Exec(qctx, "TRUNCATE TABLE IF EXISTS "+sqlclause.GeoEnrichIPTable); err != nil {
 		return 0, fmt.Errorf("truncate %s: %w", sqlclause.GeoEnrichIPTable, err)
 	}
+	aggstate.SetGeoEnrichOverlay(false)
 
 	timeFilter := ""
 	if lookbackDays > 0 {
@@ -110,6 +112,7 @@ func EnrichLogsMissingGeo(ctx context.Context, ch clickhouse.Conn, geo GeoResolv
 	if err != nil {
 		return 0, err
 	}
+	aggstate.SetGeoEnrichOverlay(n > 0)
 	slog.Info("geo backfill: lookup table ready",
 		"ips", n,
 		"lookback_days", lookbackDays,

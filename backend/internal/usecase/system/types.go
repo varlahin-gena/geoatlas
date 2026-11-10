@@ -131,6 +131,7 @@ type Alert struct {
 	Code    string `json:"code"`
 	Target  string `json:"target"`
 	Message string `json:"message"`
+	Ackable bool   `json:"ackable,omitempty"`
 }
 
 type BackendInfo struct {

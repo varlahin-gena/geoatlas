@@ -44,7 +44,7 @@ func TestGeoEdgesEnrichedFromSQLJoinsLookup(t *testing.T) {
 	from := geoEdgesEnrichedFromSQL(pred)
 	for _, want := range []string{
 		sqlclause.GeoEnrichIPTable,
-		"LEFT JOIN",
+		"ANY LEFT JOIN",
 		"AS sg ON",
 		"AS dg ON",
 		"AS traffic_logs",

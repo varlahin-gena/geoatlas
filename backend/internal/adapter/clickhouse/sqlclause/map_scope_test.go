@@ -22,11 +22,16 @@ func TestLogsWhereBindsCountryAndQuery(t *testing.T) {
 	if !strings.Contains(clause, "src_country") || !strings.Contains(clause, "positionCaseInsensitiveUTF8") {
 		t.Fatalf("clause=%s", clause)
 	}
+	if strings.Contains(clause, "concat_ws") {
+		t.Fatal("search must not use concat_ws")
+	}
 	if strings.Contains(clause, "Russia") || strings.Contains(clause, "tcp") {
 		t.Fatal("values must not be interpolated")
 	}
-	if len(args) != 3 {
-		t.Fatalf("args=%d", len(args))
+	// country binds twice + one bind per Simple column
+	want := 2 + len(LogsMapSearchColumns.Simple)
+	if len(args) != want {
+		t.Fatalf("args=%d want %d", len(args), want)
 	}
 }
 
