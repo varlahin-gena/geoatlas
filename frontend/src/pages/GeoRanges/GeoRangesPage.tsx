@@ -406,12 +406,12 @@ export default function GeoRangesPage() {
   async function clearDatabase() {
     if (
       !window.confirm(
-        'Удалить ВСЮ базу GeoIP (geo_ranges) и обнулить индекс в памяти?\nКарта временно останется без координат, пока не зальёте CSV снова.',
+        'Удалить всю базу GeoIP?\nКарта останется без координат, пока вы снова не загрузите CSV.',
       )
     ) {
       return;
     }
-    if (!window.confirm('Точно очистить? Это необратимо без повторной загрузки CSV.')) {
+      if (!window.confirm('Точно очистить? Вернуть базу можно только новой загрузкой CSV.')) {
       return;
     }
     setBusy(true);
@@ -439,7 +439,7 @@ export default function GeoRangesPage() {
     }
     if (totalInDb >= 400_000) {
       const ok = window.confirm(
-        `В базе уже ${fmtNumber(totalInDb)} диапазонов. Полная заливка без очистки всё ещё часто упирается в защиту upload и может вернуть HTTP 409.\nBackend теперь расходует RAM экономнее, но безопаснее сначала нажать «Очистить базу». Продолжить?`,
+        `В базе уже ${fmtNumber(totalInDb)} диапазонов. Полный CSV без очистки часто не принимается.\nНадёжнее сначала нажать «Очистить базу». Продолжить всё равно?`,
       );
       if (!ok) return;
     }
@@ -783,8 +783,8 @@ export default function GeoRangesPage() {
         {totalInDb >= 400_000 ? (
           <p className="hint" style={{ marginBottom: 12, color: 'var(--warn, #b45309)' }}>
             В базе уже {fmtNumber(totalInDb)} диапазонов
-            {uploadMaxRanges > 0 ? ` (лимит upload ≈ ${fmtNumber(uploadMaxRanges)})` : ''}.
-            Повторная заливка без очистки будет отклонена (HTTP 409).
+            {uploadMaxRanges > 0 ? ` (лимит загрузки ≈ ${fmtNumber(uploadMaxRanges)})` : ''}.
+            Повторная загрузка без очистки, скорее всего, не пройдёт.
             {uploadMaxBytes > 0
               ? ` Лимит размера файла: ${(uploadMaxBytes / (1024 * 1024)).toFixed(0)} МиБ.`
               : ''}
@@ -898,8 +898,8 @@ export default function GeoRangesPage() {
             <section className="card card-compact geo-danger-zone" aria-label="Опасная зона">
               <h3 className="card-title">Опасная зона</h3>
               <p className="hint">
-                Полная очистка снимает early 409 перед большой заливкой CSV. Карта останется без
-                координат, пока не загрузите базу снова. Рестарт backend не нужен.
+                Очистите базу перед загрузкой большого CSV, иначе файл может не приняться. После
+                очистки карта останется без координат, пока вы не загрузите базу снова.
               </p>
               <button
                 type="button"

@@ -35,6 +35,9 @@ type Store struct {
 
 	hourlyMu    sync.RWMutex
 	hourlyReady bool
+
+	enrichMu      sync.RWMutex
+	enrichOverlay bool
 }
 
 // Default — process-wide store used by package-level helpers.
@@ -113,6 +116,20 @@ func (s *Store) SetHourlyEdgesAggReady(v bool) {
 	s.hourlyMu.Unlock()
 }
 
+// PreferGeoEnrichOverlay — true, когда ga_geo_enrich_ip содержит строки
+// (map/live scan может делать ANY LEFT JOIN; иначе plain FROM traffic_logs).
+func (s *Store) PreferGeoEnrichOverlay() bool {
+	s.enrichMu.RLock()
+	defer s.enrichMu.RUnlock()
+	return s.enrichOverlay
+}
+
+func (s *Store) SetGeoEnrichOverlay(v bool) {
+	s.enrichMu.Lock()
+	s.enrichOverlay = v
+	s.enrichMu.Unlock()
+}
+
 // Package-level wrappers — совместимость с существующими call sites.
 
 func SetEdgesAggStatus(st EdgesAggStatus) { Default.SetEdgesAggStatus(st) }
@@ -123,3 +140,5 @@ func PreferGeoEdgesAgg() bool       { return Default.PreferGeoEdgesAgg() }
 func SetGeoEdgesAggReady(v bool)    { Default.SetGeoEdgesAggReady(v) }
 func PreferHourlyEdgesAgg() bool    { return Default.PreferHourlyEdgesAgg() }
 func SetHourlyEdgesAggReady(v bool) { Default.SetHourlyEdgesAggReady(v) }
+func PreferGeoEnrichOverlay() bool  { return Default.PreferGeoEnrichOverlay() }
+func SetGeoEnrichOverlay(v bool)    { Default.SetGeoEnrichOverlay(v) }

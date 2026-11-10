@@ -8,10 +8,10 @@ import (
 )
 
 func TestIPEdgesEnrichOverlaySQLJoinsLookup(t *testing.T) {
-	got := ipEdgesEnrichOverlaySQL("SELECT 1")
+	got := ipEdgesEnrichOverlaySQL("SELECT 1", true)
 	for _, want := range []string{
 		sqlclause.GeoEnrichIPTable,
-		"LEFT JOIN",
+		"ANY LEFT JOIN",
 		"AS sg ON e.src_ip = sg.ip",
 		"AS dg ON e.dst_ip = dg.ip",
 		"sg.city",
@@ -22,5 +22,12 @@ func TestIPEdgesEnrichOverlaySQLJoinsLookup(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Fatalf("missing %q in:\n%s", want, got)
 		}
+	}
+	plain := ipEdgesEnrichOverlaySQL("SELECT 1", false)
+	if strings.Contains(plain, sqlclause.GeoEnrichIPTable) {
+		t.Fatalf("overlay off must skip enrich:\n%s", plain)
+	}
+	if !strings.Contains(plain, "(SELECT 1)") {
+		t.Fatalf("overlay off must keep inner:\n%s", plain)
 	}
 }

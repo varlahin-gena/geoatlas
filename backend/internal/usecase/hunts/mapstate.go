@@ -33,15 +33,23 @@ func mapStateToTimeRange(st MapState, now time.Time) model.TimeRange {
 	if p == "" {
 		p = "1d"
 	}
+	// Legacy minute presets: map minimum window is 1h (ceil to hours).
 	if strings.HasSuffix(p, "m") {
 		n, _ := strconv.Atoi(strings.TrimSuffix(p, "m"))
 		if n < 1 {
-			n = 15
+			n = 60
 		}
 		if n > 30*24*60 {
 			n = 30 * 24 * 60
 		}
-		return model.TimeRange{Mode: "minutes", Amount: n}
+		h := (n + 59) / 60
+		if h < 1 {
+			h = 1
+		}
+		if h > 30*24 {
+			h = 30 * 24
+		}
+		return model.TimeRange{Mode: "hours", Amount: h}
 	}
 	if strings.HasSuffix(p, "h") {
 		n, _ := strconv.Atoi(strings.TrimSuffix(p, "h"))

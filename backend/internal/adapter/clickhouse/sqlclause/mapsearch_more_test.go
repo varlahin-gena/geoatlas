@@ -31,7 +31,7 @@ func TestMapSearchSQLOrNotEmptyAndNodeCols(t *testing.T) {
 	}
 	c5 := mapsearch.Compile("ip:1.2.3.4")
 	clause5, _ := MapSearchSQL(c5, IPAggMapSearchColumns)
-	if clause5 == "" {
-		t.Fatal("ipagg clause")
+	if clause5 == "" || !strings.Contains(clause5, "toIPv4OrNull") {
+		t.Fatalf("ipagg clause=%s", clause5)
 	}
 }

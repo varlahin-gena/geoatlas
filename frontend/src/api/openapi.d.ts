@@ -3727,6 +3727,138 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/system/alerts/ack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Скрыть warn-алерт системы
+         * @description Только administrator или Bearer. Скрывает активный warn до конца эпизода;
+         *     для `*_dropped_total` — до роста счётчика выше baseline на момент ack.
+         *     Error-алерты скрыть нельзя (409).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SystemAlertAckRequest"];
+                };
+            };
+            responses: {
+                /** @description Alert dismissed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description alert not currently active */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description alert is not ackable (error level) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description system service unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /**
+         * Снять скрытие warn-алерта
+         * @description Только administrator или Bearer. Снимает in-memory dismiss для `(code, target)`.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SystemAlertAckRequest"];
+                };
+            };
+            responses: {
+                /** @description Dismiss cleared */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description system service unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/system/stats": {
         parameters: {
             query?: never;
@@ -5326,8 +5458,14 @@ export interface components {
             code?: string;
             target?: string;
             message?: string;
+            /** @description true for warn alerts that can be dismissed */
+            ackable?: boolean;
         } & {
             [key: string]: unknown;
+        };
+        SystemAlertAckRequest: {
+            code: string;
+            target?: string;
         };
         SystemFailedLogin: {
             username?: string;

@@ -8,7 +8,7 @@ import {
   type MapGroupBy,
 } from '@/lib/mapGrouping';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
-import { PERIODS } from './mapPeriods';
+import { normalizeMapPeriod, PERIODS } from './mapPeriods';
 
 const MAP_LIMIT_MIN = 100;
 const MAP_LIMIT_MAX = 20000;
@@ -54,7 +54,7 @@ export function parseMapViewSearch(
   sp: URLSearchParams,
   defaults?: MapViewDefaults,
 ): MapViewState {
-  const periodRaw = (sp.get('period') || '').trim();
+  const periodRaw = normalizeMapPeriod(sp.get('period') || '');
   const period = PERIOD_KEYS.has(periodRaw) ? periodRaw : MAP_VIEW_DEFAULTS.period;
   const groupDefault = normalizeMapGroupBy(defaults?.groupBy, MAP_GROUP_BY_DEFAULT);
   const groupRaw = (sp.get('group') || '').trim().toLowerCase();
@@ -127,8 +127,8 @@ export function useMapViewQuery() {
   const [minCount, setMinCount] = useState(1);
   const [maxArcs, setMaxArcs] = useState(5000);
   const [hideIntraCountry, setHideIntraCountry] = useState(false);
-  const debouncedSearch = useDebouncedValue(search, 300);
-  const debouncedMaxArcs = useDebouncedValue(maxArcs, 300);
+  const debouncedSearch = useDebouncedValue(search, 500);
+  const debouncedMaxArcs = useDebouncedValue(maxArcs, 500);
   /** Desired alert fingerprint to keep across patchView; null after Live reset. */
   const alertKeepRef = useRef<string | null>(alertFingerprint);
 

@@ -1,0 +1,4 @@
+# Placeholder: start.sh writes 01-ingest-auth.conf with the real token.
+# Filename must sort BEFORE zz_connectors.conf — backtick macros expand at parse time.
+# Legacy zz_ingest_auth.conf sorted after connectors and baked an empty token (auth rejects).
+@define ga_ingest_token ""

@@ -5,6 +5,25 @@
 
 ## [Unreleased]
 
+## [2.6.3] — 2026-11-10
+
+Тестовый / pre-release: map ClickHouse CPU + dismiss system warn-алертов (не Latest).
+
+### Added
+- **System alerts dismiss**: скрытие warn-алертов на `/system` (`POST/DELETE /api/system/alerts/ack`); error-алерты скрыть нельзя.
+
+### Changed
+- **Карта**: минимальный период **1h** (убраны пресеты 15m/30m); legacy `minutes=` / `period=*m` поднимаются до часов.
+- **Карта / ClickHouse**: окна часов читают `traffic_edges_hourly` при готовности pre-agg; JOIN к `ga_geo_enrich_ip` только если lookup непустой (`ANY LEFT JOIN`, filter-before-join).
+- **Карта / search**: без `concat_ws` — OR по колонкам; IP/port fast-path (`toIPv4OrNull` / равенство портов); debounce поиска 500ms; один in-flight GetMap на сессию (новый отменяет предыдущий).
+
+### Fixed
+- **Коннекторы Apply**: `volume-perms` выставляет владельца `./syslog-ng.d` на uid 101, иначе backend не мог записать `zz_connectors.conf` (permission denied → 500).
+
+### Notes
+- OpenAPI API doc version: **1.20.0**
+- Продуктовая версия: **2.6.3** (тестовый пререлиз)
+- Схема ClickHouse: без изменений Ensure*.
 
 ## [2.6.2] — 2026-11-09
 
@@ -153,6 +172,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.6.3]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.3
 [2.6.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.2
 [2.6.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.1
 [2.6.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.0

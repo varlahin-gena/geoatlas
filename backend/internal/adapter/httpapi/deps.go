@@ -70,6 +70,7 @@ type EventsDeps struct {
 	queryTimeout time.Duration
 	eventsUC     *usecaseevents.Service
 	backupUC     *usecasebackup.Service
+	mapGate      *MapQueryGate
 }
 
 // GeoDeps — зависимости GeoHandler.
@@ -217,7 +218,12 @@ func NewDeps(p Params) *Deps {
 			logs:            p.Logs,
 		},
 		health: &HealthDeps{systemUC: p.SystemUC, systemPinger: p.SystemPinger},
-		events: &EventsDeps{queryTimeout: p.Cfg.QueryTimeout, eventsUC: p.EventsUC, backupUC: p.BackupUC},
+		events: &EventsDeps{
+			queryTimeout: p.Cfg.QueryTimeout,
+			eventsUC:     p.EventsUC,
+			backupUC:     p.BackupUC,
+			mapGate:      NewMapQueryGate(),
+		},
 		geo: &GeoDeps{
 			maxGeoUploadSize:   p.Cfg.Geo.MaxUploadSize,
 			maxGeoUploadRanges: p.Cfg.Geo.MaxUploadRanges,

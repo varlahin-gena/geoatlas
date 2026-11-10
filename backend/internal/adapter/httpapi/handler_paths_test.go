@@ -58,6 +58,7 @@ func TestSystemHandlerNilAndBareUC(t *testing.T) {
 	nilH := &SystemHandler{SystemDeps: &SystemDeps{queryTimeout: time.Second}}
 	for _, fn := range []http.HandlerFunc{
 		nilH.GetSystemStats, nilH.GetSystemStatus, nilH.GetSystemVersion, nilH.GetSystemHistory,
+		nilH.PostSystemAlertAck, nilH.DeleteSystemAlertAck,
 		nilH.GetEdgesAggStatus, nilH.GetInstallProfile, nilH.GetRetention, nilH.PutRetention,
 		nilH.GetBackups, nilH.PostBackup, nilH.PostBackupAttach, nilH.PostBackupDetach,
 		nilH.DeleteBackup, nilH.GetBackupSchedule, nilH.PutBackupSchedule,
@@ -942,8 +943,8 @@ func TestLoginReadyDomainErrorsHuntsBoost(t *testing.T) {
 	_ = parseLimit("")
 	_ = parseLimit("5")
 	tr, err := parseEventTimeRange(map[string][]string{"minutes": {"15"}})
-	if err != nil || tr.Mode != "minutes" {
-		t.Fatalf("minutes: %+v %v", tr, err)
+	if err != nil || tr.Mode != "hours" || tr.Amount != 1 {
+		t.Fatalf("minutes→hours: %+v %v", tr, err)
 	}
 
 	svc := usecasehunts.New(newHuntMem(), huntRunnerOK{}, nil, nil, time.Minute)

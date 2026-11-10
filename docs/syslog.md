@@ -17,7 +17,7 @@
 
 ### Несколько портов (коннекторы)
 
-В UI **Система → Коннекторы** можно добавить источники на портах из `GA_CONNECTOR_EXTRA_PORTS` (compose заранее публикует range). После create/edit нажмите **Применить** — backend пишет `syslog-ng.d/zz_connectors.conf` и вызывает reload agent. Метрики по коннекторам — `/system` → Pipeline. Host firewall: `./scripts/sync-syslog-firewall.sh`.
+В UI **Система → Коннекторы** можно добавить источники на портах из `GA_CONNECTOR_EXTRA_PORTS` (compose заранее публикует range). После create/edit нажмите **Применить** — backend пишет `syslog-ng.d/zz_connectors.conf` и вызывает reload agent. Метрики по коннекторам — `/system` → Pipeline. Host firewall: `./scripts/sync-syslog-firewall.sh`. Каталог `syslog-ng.d` должен быть доступен на запись uid **101** (`volume-perms` при старте compose).
 
 ## Ограничить источник
 
@@ -40,7 +40,7 @@ syslog-ng добавляет к сырой строке маркер с секр
 - `@@ga/tcp/<token>/<connector_id>/@@…` — приём по TCP
 - legacy без connector_id → `connector_id=default`
 
-Backend снимает маркер, проверяет токен, пишет `connector_id` в `traffic_logs` и считает UDP/TCP EPS (и per-connector counters). Конфиг секрета: `syslog-ng.d/zz_ingest_auth.conf` (создаёт `./start.sh`, переживает update).
+Backend снимает маркер, проверяет токен, пишет `connector_id` в `traffic_logs` и считает UDP/TCP EPS (и per-connector counters). Конфиг секрета: `syslog-ng.d/01-ingest-auth.conf` (создаёт `./start.sh`, переживает update; имя `01-*` важно — файл должен грузиться до `zz_connectors.conf`, иначе в маркеры попадает пустой токен и растёт `auth_rejected`).
 
 `POST /api/ingest` (Bearer ≥ ops) — отдельный HTTP-путь без маркера; обычный ввод событий — только syslog.
 
@@ -68,6 +68,7 @@ curl -fsS http://127.0.0.1/api/ready
 |---------|----------------|
 | Нет событий на карте | `docker compose logs syslog-ng`, `/api/ingest/stats`, модуль syslog, FW `:514` |
 | Есть ingest, пустая карта | GeoIP загружена? `/geo-missing` |
+| CPU syslog/backend ↑, EPS=0, `auth_rejected` ↑ | Токен в маркере пустой: `01-ingest-auth.conf` должен грузиться **до** `zz_connectors.conf` (не `zz_ingest_auth.conf`). `./start.sh` + reload syslog-ng |
 | Ошибки парсинга | UI «Ошибки парсинга», вендор/формат строки |
 | Drops / очередь растёт | [Ingest SLO](architecture.md#ingest-slo), профиль (`tune-resources.sh`), здоровье ClickHouse |
 | `kernel refused SO_RCVBUF` | `net.core.rmem_max` / `wmem_max` на хосте — [буферы профиля](operations.md#профили-производительности) |

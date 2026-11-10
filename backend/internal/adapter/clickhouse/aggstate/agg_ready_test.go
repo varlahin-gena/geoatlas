@@ -55,6 +55,19 @@ func TestPreferHourlyEdgesAggFlag(t *testing.T) {
 	}
 }
 
+func TestPreferGeoEnrichOverlayFlag(t *testing.T) {
+	t.Cleanup(func() { SetGeoEnrichOverlay(false) })
+
+	SetGeoEnrichOverlay(false)
+	if PreferGeoEnrichOverlay() {
+		t.Fatal("expected false before overlay")
+	}
+	SetGeoEnrichOverlay(true)
+	if !PreferGeoEnrichOverlay() {
+		t.Fatal("expected true after overlay")
+	}
+}
+
 func TestIsolatedStoreDoesNotAffectDefault(t *testing.T) {
 	t.Cleanup(func() {
 		SetEdgesAggStatus(EdgesAggStatus{State: "idle", Message: "not started"})

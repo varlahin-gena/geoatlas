@@ -176,3 +176,9 @@ export function putTls(body: {
 export function postTlsReload(): Promise<TlsMutationResponse> {
   return apiPost('/api/system/tls/reload', {});
 }
+
+export function ackSystemAlert(code: string, target?: string): Promise<{ ok?: boolean }> {
+  return apiPost('/api/system/alerts/ack', { code, target: target || '' }) as Promise<{
+    ok?: boolean;
+  }>;
+}

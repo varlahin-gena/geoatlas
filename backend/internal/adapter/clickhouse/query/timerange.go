@@ -23,6 +23,7 @@ func ScanRawAggsForTimeRange(
 	sel MapSelect,
 	timeout time.Duration,
 ) ([]model.RawAgg, error) {
+	tr = coerceMapMinHours(tr)
 	switch tr.Mode {
 	case "minutes", "hours":
 		return scanRawLogsRelative(ctx, ch, tr.Mode, tr.Amount, sel, timeout)

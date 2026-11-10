@@ -198,8 +198,19 @@ func ensureConnector(snap *Snapshot, id string) *ConnectorSnap {
 }
 
 // parseConnectorSourceID recognizes s_<id>_udp / s_<id>_tcp / d_<id>_udp …
+// syslog-ng often appends an instance suffix (#0) to source/dest ids in stats.
 func parseConnectorSourceID(id string) (connectorID, proto string) {
 	id = strings.ToLower(strings.TrimSpace(id))
+	if i := strings.IndexByte(id, '#'); i >= 0 {
+		id = id[:i]
+	}
+	// legacy names before generic s_<id>_udp (d_backend_udp ≠ connector "backend")
+	switch id {
+	case "s_udp", "d_backend_udp":
+		return "default", "udp"
+	case "s_tcp", "d_backend_tcp":
+		return "default", "tcp"
+	}
 	for _, prefix := range []string{"s_", "d_"} {
 		if !strings.HasPrefix(id, prefix) {
 			continue
@@ -211,13 +222,6 @@ func parseConnectorSourceID(id string) (connectorID, proto string) {
 		case strings.HasSuffix(rest, "_tcp"):
 			return strings.TrimSuffix(rest, "_tcp"), "tcp"
 		}
-	}
-	// legacy s_udp / s_tcp
-	switch id {
-	case "s_udp", "d_backend_udp":
-		return "default", "udp"
-	case "s_tcp", "d_backend_tcp":
-		return "default", "tcp"
 	}
 	return "", ""
 }

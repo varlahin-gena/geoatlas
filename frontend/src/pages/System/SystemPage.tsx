@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { putRetention } from '@/api/system';
+import { ackSystemAlert, putRetention } from '@/api/system';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useToast } from '@/components/Toast';
 import { fmtNumber } from '@/lib/format';
@@ -29,6 +29,7 @@ import { useSystemStatsPolling } from './useSystemStatsPolling';
 
 export default function SystemPage() {
   const { toast } = useToast();
+  const [acking, setAcking] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>(() => {
     try {
       const saved = localStorage.getItem('nm.system.tab');
@@ -52,8 +53,26 @@ export default function SystemPage() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [themeTick, setThemeTick] = useState(0);
 
-  const { stats, retention, setRetention, updatedAt } = useSystemStatsPolling(toast, autoRefresh);
+  const { stats, retention, setRetention, updatedAt, loadStats } = useSystemStatsPolling(
+    toast,
+    autoRefresh,
+  );
   const charts = useSystemCharts(toast, { tab, period, autoRefresh, themeTick });
+
+  async function hideAlert(code?: string, target?: string) {
+    if (!code) return;
+    const key = `${code}|${target || ''}`;
+    setAcking(key);
+    try {
+      await ackSystemAlert(code, target);
+      await loadStats();
+      toast('Алерт скрыт', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Не удалось скрыть алерт', 'error');
+    } finally {
+      setAcking(null);
+    }
+  }
 
   useEffect(() => {
     document.title = 'ГеоАтлас — Мониторинг системы';
@@ -195,14 +214,29 @@ export default function SystemPage() {
                 <span className="chrome-section-meta">{alerts.length}</span>
               </div>
               <div className="alerts">
-                {alerts.map((a, i) => (
-                  <div key={`${a.code}-${i}`} className={`alert-row ${a.level || ''}`}>
-                    <span className="level">{a.level}</span>
-                    {a.code ? <span className="code">{a.code}</span> : null}
-                    {a.target ? <span className="target">{a.target}</span> : null}
-                    <span>{a.message}</span>
-                  </div>
-                ))}
+                {alerts.map((a, i) => {
+                  const ackKey = `${a.code || ''}|${a.target || ''}`;
+                  return (
+                    <div key={`${a.code}-${i}`} className={`alert-row ${a.level || ''}`}>
+                      <span className="level">{a.level}</span>
+                      <div className="alert-body">
+                        {a.code ? <span className="code">{a.code}</span> : null}
+                        {a.target ? <span className="target">{a.target}</span> : null}
+                        <span className="alert-msg">{a.message}</span>
+                      </div>
+                      {a.ackable ? (
+                        <button
+                          type="button"
+                          className="btn sm alert-ack"
+                          disabled={acking === ackKey}
+                          onClick={() => void hideAlert(a.code, a.target)}
+                        >
+                          Скрыть
+                        </button>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
             </>
           ) : (

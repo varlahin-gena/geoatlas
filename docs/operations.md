@@ -142,7 +142,7 @@ Native `BACKUP` / `RESTORE` на отдельный Docker-том `clickhouse-ba
 | По умолчанию в бэкап | `traffic_logs`, `geo_ranges`, `reputation_ranges`, `parse_errors`, `system_metrics`, `traffic_edges_*`                   |
 | Рядом                | `*.auth.tgz` — снимок `/app/data` (users, retention, feeds, schedule); без `geo_index.snap`, `.ga_backend.lock`, `*.tmp` |
 
-Backend и ClickHouse пишут в `clickhouse-backups` под **одним uid 101**. Сервис `volume-perms` при старте делает `chown 101:101` на томах `clickhouse-backups` и `auth-users` (миграция со старого backend uid 10001).
+Backend и ClickHouse пишут в `clickhouse-backups` под **одним uid 101**. Сервис `volume-perms` при старте делает `chown 101:101` на томах `clickhouse-backups`, `auth-users`, `./certs` и `./syslog-ng.d` (миграция со старого backend uid 10001; запись `zz_connectors.conf` при Apply).
 
 **UI:** `/system` → вкладка **Резервное копирование** (administrator): список, статус, «Создать бэкап», расписание, **Подключить / Отключить / Удалить**. В списке колонка **Источник** — `вручную` / `по расписанию` (маркер `{name}.source` на томе; старые бэкапы без маркера — «—»).
 
@@ -237,7 +237,7 @@ docker compose exec clickhouse sh -c 'clickhouse-client --password "$CLICKHOUSE_
 - `.env`, `.admin_password_once`
 - `docker-compose.override.yml`, `install-profile.json`, `install-modules.json`
 - `certs/` (PEM)
-- `syslog-ng.d/zz_profile.conf`, `syslog-ng.d/zz_ingest_auth.conf`
+- `syslog-ng.d/zz_profile.conf`, `syslog-ng.d/01-ingest-auth.conf`
 - `clickhouse/users.d/zz_install_limits.xml`
 
 Образы пересобираются на сервере (`./start.sh`); нужен доступ к Docker Hub (базовые образы).

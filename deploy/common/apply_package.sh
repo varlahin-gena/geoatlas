@@ -22,6 +22,7 @@ install-profile.json
 install-modules.json
 clickhouse/users.d/zz_install_limits.xml
 syslog-ng.d/zz_profile.conf
+syslog-ng.d/01-ingest-auth.conf
 syslog-ng.d/zz_ingest_auth.conf
 EOF
 }
