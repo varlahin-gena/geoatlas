@@ -652,9 +652,10 @@
 
 .anomalies-table td.actions {
   display: table-cell;
-  width: 7.5rem;
+  width: 15rem;
   white-space: nowrap;
   vertical-align: middle;
+  text-align: right;
 }
 
 .anomaly-row-actions {

@@ -121,6 +121,7 @@ function AnomalyRowActions({
   onTogglePeers: () => void;
   onHide: () => void;
 }) {
+  const hasMore = canPeers || !acked;
   return (
     <div className="anomaly-row-actions">
       {item.fingerprint ? (
@@ -128,53 +129,53 @@ function AnomalyRowActions({
           Разбор
         </Link>
       ) : null}
-      <details className="anomaly-more">
-        <summary className="btn sm ghost">Ещё</summary>
-        <div className="anomaly-more-menu" role="menu">
-          {canPeers ? (
-            <button
-              type="button"
-              role="menuitem"
-              className="anomaly-more-item"
-              aria-expanded={expanded}
-              onClick={(e) => {
-                closeAnomalyMore(e.currentTarget);
-                onTogglePeers();
-              }}
-            >
-              {expanded ? 'Скрыть связи' : 'Связи'}
-            </button>
-          ) : null}
-          <Link
-            to={anomalyMapHref(item)}
-            role="menuitem"
-            className="anomaly-more-item"
-            onClick={(e) => {
-              closeAnomalyMore(e.currentTarget);
-              rememberMapAlert(item);
-            }}
-          >
-            На карте
-          </Link>
-          {!acked ? (
-            <>
-              <div className="anomaly-more-sep" role="separator" />
+      <Link
+        to={anomalyMapHref(item)}
+        className="btn sm"
+        onClick={() => {
+          rememberMapAlert(item);
+        }}
+      >
+        На карте
+      </Link>
+      {hasMore ? (
+        <details className="anomaly-more">
+          <summary className="btn sm ghost">Ещё</summary>
+          <div className="anomaly-more-menu" role="menu">
+            {canPeers ? (
               <button
                 type="button"
                 role="menuitem"
                 className="anomaly-more-item"
-                disabled={acking}
+                aria-expanded={expanded}
                 onClick={(e) => {
                   closeAnomalyMore(e.currentTarget);
-                  onHide();
+                  onTogglePeers();
                 }}
               >
-                Скрыть на 24 ч
+                {expanded ? 'Скрыть связи' : 'Связи'}
               </button>
-            </>
-          ) : null}
-        </div>
-      </details>
+            ) : null}
+            {!acked ? (
+              <>
+                {canPeers ? <div className="anomaly-more-sep" role="separator" /> : null}
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="anomaly-more-item"
+                  disabled={acking}
+                  onClick={(e) => {
+                    closeAnomalyMore(e.currentTarget);
+                    onHide();
+                  }}
+                >
+                  Скрыть на 24 ч
+                </button>
+              </>
+            ) : null}
+          </div>
+        </details>
+      ) : null}
     </div>
   );
 }
