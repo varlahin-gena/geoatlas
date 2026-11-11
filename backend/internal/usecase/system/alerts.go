@@ -155,7 +155,7 @@ func computeAlertsWithSLO(stats SystemStatsResponse, slo IngestSLO) []Alert {
 	}
 	for name, metrics := range stats.Containers {
 		if metrics["cpu_pct"] > 90 {
-			alerts = append(alerts, Alert{Level: "warn", Code: "cpu_high", Target: name, Message: "Контейнер " + name + ": CPU выше 90% — возможны задержки и дропы"})
+			alerts = append(alerts, Alert{Level: "warn", Code: "cpu_high", Target: name, Message: "Контейнер " + name + ": CPU >90% от ресурсов хоста — контейнер доминирует на машине; возможны задержки"})
 		}
 	}
 	alerts = append(alerts, syslogNGAlerts(stats, slo)...)
@@ -172,9 +172,9 @@ func computeAlertsWithSLO(stats SystemStatsResponse, slo IngestSLO) []Alert {
 		}
 		maxEPS := float64(stats.InstallProfile.Capacity.ExpectedEPSMax)
 		if rate > maxEPS*slo.CapacityCriticalRatio {
-			alerts = append(alerts, Alert{Level: "error", Code: "capacity_exceeded", Target: "pipeline", Message: "Входящий EPS выше лимита установленного профиля — текущий профиль не тянет нагрузку"})
+			alerts = append(alerts, Alert{Level: "error", Code: "capacity_exceeded", Target: "pipeline", Message: "Входящий EPS выше лимита профиля установки (expected_eps_max) — текущий профиль не тянет нагрузку"})
 		} else if rate > maxEPS*slo.CapacityWarnRatio {
-			alerts = append(alerts, Alert{Level: "warn", Code: "capacity_high", Target: "pipeline", Message: "Входящий EPS близок к лимиту установленного профиля — запас ёмкости заканчивается"})
+			alerts = append(alerts, Alert{Level: "warn", Code: "capacity_high", Target: "pipeline", Message: "Входящий EPS близок к лимиту профиля установки (expected_eps_max) — запас по EPS заканчивается"})
 		}
 	}
 	alerts = append(alerts, edgesAggAlerts(stats.EdgesAgg, time.Now().UTC())...)

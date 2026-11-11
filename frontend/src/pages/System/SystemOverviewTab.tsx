@@ -60,7 +60,7 @@ export function SystemOverviewTab({
           </h3>
           <div className="capacity-meter">
             <div className="meter-label">
-              Нагрузка к ёмкости:{' '}
+              Нагрузка к лимиту профиля (EPS):{' '}
               <span>
                 {fmtNumber(Math.round(eps))} / {fmtNumber(epsMax)} eps
               </span>
@@ -73,8 +73,8 @@ export function SystemOverviewTab({
             </div>
             <div className="capacity-hint">
               {capPct > 125
-                ? 'Нагрузка превышает расчётную ёмкость профиля — рассмотрите upgrade или ./scripts/tune-resources.sh'
-                : 'Нагрузка близка к лимиту профиля'}
+                ? 'Нагрузка превышает лимит EPS профиля — рассмотрите upgrade или ./scripts/tune-resources.sh'
+                : 'Нагрузка близка к лимиту EPS профиля'}
             </div>
           </div>
         </section>

@@ -70,14 +70,14 @@ export function useSystemCharts(
     mk(chartLag, 'Лаг ingest (сек)', ['Lag (sec)'], ['pipeline.ingest.lag_sec']);
     mk(
       chartCpu,
-      'CPU контейнеров (%)',
+      'CPU контейнеров (% хоста)',
       [...CONTAINERS],
       CONTAINERS.map((c) => `container.${c}.cpu_pct`),
       { isPercent: true },
     );
     mk(
       chartMem,
-      'Память контейнеров',
+      'Память контейнеров (без page cache)',
       [...CONTAINERS],
       CONTAINERS.map((c) => `container.${c}.mem_bytes`),
       { isBytes: true },
