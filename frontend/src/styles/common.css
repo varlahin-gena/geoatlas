@@ -561,9 +561,9 @@ th, td {
 }
 th {
   background: var(--panel-2);
-  color: var(--text-dim);
+  color: var(--text-muted);
   font-weight: 500;
-  font-size: 12px;
+  font-size: 10px;
   letter-spacing: 0.02em;
   white-space: nowrap;
 }

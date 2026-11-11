@@ -11,7 +11,6 @@ import (
 var (
 	ErrNotConfigured      = errors.New("auth not configured")
 	ErrInvalidCredentials = errors.New("invalid credentials")
-	ErrDisabled           = errors.New("user disabled")
 	ErrUnauthorized       = errors.New("unauthorized")
 	ErrSession            = errors.New("session error")
 )
@@ -55,9 +54,6 @@ func (s *Service) Login(username, password string) (LoginResult, error) {
 	user, ok := s.users.Authenticate(username, password)
 	if !ok || user == nil {
 		return LoginResult{}, ErrInvalidCredentials
-	}
-	if user.Disabled {
-		return LoginResult{}, ErrDisabled
 	}
 	token, sess, err := s.sessions.Issue(user.Username, user.Role, user.SessionVersion)
 	if err != nil {
@@ -142,13 +138,6 @@ func (s *Service) SetRole(username, role string) (domain.UserPublic, error) {
 		return domain.UserPublic{}, ErrNotConfigured
 	}
 	return s.users.SetRole(username, role)
-}
-
-func (s *Service) SetEnabled(username string, enabled bool, actor string) (domain.UserPublic, error) {
-	if s == nil || s.users == nil {
-		return domain.UserPublic{}, ErrNotConfigured
-	}
-	return s.users.SetEnabled(strings.TrimSpace(username), enabled, actor)
 }
 
 func (s *Service) SetFullName(username, fullName string) (domain.UserPublic, error) {

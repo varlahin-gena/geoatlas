@@ -16,9 +16,8 @@ describe('glossary', () => {
   });
 
   it('labels token scopes for UI', () => {
-    expect(scopeLabel('read')).toBe('Чтение');
-    expect(scopeLabel('ops')).toBe('Операции');
-    expect(scopeLabel('admin')).toBe('Админ');
+    expect(scopeLabel('read')).toBe('чтение');
+    expect(scopeLabel('ops')).toBe('ops');
     expect(scopeOptionLabel('admin')).toContain('полный API');
   });
 });

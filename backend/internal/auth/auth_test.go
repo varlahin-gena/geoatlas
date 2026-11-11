@@ -110,47 +110,8 @@ func TestUserAuthenticate(t *testing.T) {
 	if !ok || u.Username != "Admin" {
 		t.Fatalf("ok=%v user=%v", ok, u)
 	}
-	if !u.Public().Enabled {
-		t.Fatal("new user should be enabled")
-	}
 	if _, ok := store.Authenticate("admin", "wrong"); ok {
 		t.Fatal("wrong password accepted")
-	}
-}
-
-func TestSetEnabledLastAdminAndSelf(t *testing.T) {
-	hash, err := HashPassword("adminpass1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	store, err := NewUserStore(
-		User{Username: "admin", PasswordHash: string(hash), Role: RoleAdministrator},
-		User{Username: "op", PasswordHash: string(hash), Role: RoleOperator},
-		User{Username: "admin2", PasswordHash: string(hash), Role: RoleAdministrator},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := store.SetEnabled("admin", false, "admin"); !errors.Is(err, ErrSelfDisable) {
-		t.Fatalf("self disable: %v", err)
-	}
-	pub, err := store.SetEnabled("op", false, "admin")
-	if err != nil || pub.Enabled {
-		t.Fatalf("disable op: %+v %v", pub, err)
-	}
-	if _, err := store.SetEnabled("admin2", false, "admin"); err != nil {
-		t.Fatalf("disable second admin: %v", err)
-	}
-	if _, err := store.SetEnabled("admin", false, "op"); !errors.Is(err, ErrLastAdmin) {
-		t.Fatalf("last admin disable: %v", err)
-	}
-	sess := Session{Username: "op", Role: RoleOperator, Expires: time.Now().Add(time.Hour).Unix(), SessionVersion: 0}
-	if _, ok := LiveSession(store, sess); ok {
-		t.Fatal("disabled user session must fail")
-	}
-	pub, err = store.SetEnabled("op", true, "admin")
-	if err != nil || !pub.Enabled {
-		t.Fatalf("re-enable: %+v %v", pub, err)
 	}
 }
 
