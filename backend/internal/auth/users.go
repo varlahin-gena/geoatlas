@@ -25,6 +25,7 @@ var (
 	ErrInvalidRole        = errors.New("invalid role")
 	ErrLastAdmin          = errors.New("cannot remove or demote the last administrator")
 	ErrSelfDelete         = errors.New("cannot delete your own account")
+	ErrSelfDisable        = errors.New("cannot disable your own account")
 	ErrBadOldPassword     = errors.New("current password is incorrect")
 	ErrInvalidFullName    = errors.New("invalid full name")
 	ErrInvalidPreferences = errors.New("invalid preferences")
@@ -51,11 +52,13 @@ const (
 
 // User — локальная учётная запись (пароль хранится как bcrypt-хеш).
 type User struct {
-	Username           string `json:"username"`
-	FullName           string `json:"full_name,omitempty"`
-	PasswordHash       string `json:"password_hash"`
-	Role               string `json:"role"`
-	MustResetPassword  bool   `json:"must_reset_password"`
+	Username          string `json:"username"`
+	FullName          string `json:"full_name,omitempty"`
+	PasswordHash      string `json:"password_hash"`
+	Role              string `json:"role"`
+	MustResetPassword bool   `json:"must_reset_password"`
+	// Disabled — omitempty: старые users.json без поля остаются включёнными.
+	Disabled           bool   `json:"disabled,omitempty"`
 	GeoWizardDismissed bool   `json:"geo_wizard_dismissed,omitempty"`
 	Theme              string `json:"theme,omitempty"`        // light|dark; empty → DefaultTheme
 	MapGroupBy         string `json:"map_group_by,omitempty"` // see allowedMapGroupBy; empty → DefaultMapGroupBy
@@ -70,6 +73,7 @@ type UserPublic struct {
 	FullName           string `json:"full_name,omitempty"`
 	Role               string `json:"role"`
 	MustResetPassword  bool   `json:"must_reset_password"`
+	Enabled            bool   `json:"enabled"`
 	GeoWizardDismissed bool   `json:"geo_wizard_dismissed,omitempty"`
 	Theme              string `json:"theme,omitempty"`
 	MapGroupBy         string `json:"map_group_by,omitempty"`
@@ -82,6 +86,7 @@ func (u User) Public() UserPublic {
 		FullName:           u.FullName,
 		Role:               u.Role,
 		MustResetPassword:  u.MustResetPassword,
+		Enabled:            !u.Disabled,
 		GeoWizardDismissed: u.GeoWizardDismissed,
 		Theme:              u.Theme,
 		MapGroupBy:         u.MapGroupBy,
@@ -482,10 +487,46 @@ func (s *UserStore) SetRole(username, role string) (UserPublic, error) {
 	if u == nil {
 		return UserPublic{}, ErrUserNotFound
 	}
-	if u.Role == RoleAdministrator && role != RoleAdministrator && s.adminCountUnlocked() <= 1 {
+	if u.Role == RoleAdministrator && role != RoleAdministrator && !u.Disabled && s.enabledAdminCountUnlocked() <= 1 {
 		return UserPublic{}, ErrLastAdmin
 	}
 	u.Role = role
+	if err := s.persistUnlocked(); err != nil {
+		return UserPublic{}, err
+	}
+	return u.Public(), nil
+}
+
+// SetEnabled включает или выключает УЗ. Выключение последнего активного администратора
+// и выключение собственной УЗ запрещены. При выключении bump'ается session_version.
+func (s *UserStore) SetEnabled(username string, enabled bool, actorUsername string) (UserPublic, error) {
+	if s == nil {
+		return UserPublic{}, ErrUserNotFound
+	}
+	key := strings.ToLower(strings.TrimSpace(username))
+	actorKey := strings.ToLower(strings.TrimSpace(actorUsername))
+	if !enabled && key != "" && key == actorKey {
+		return UserPublic{}, ErrSelfDisable
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	u := s.byLower[key]
+	if u == nil {
+		return UserPublic{}, ErrUserNotFound
+	}
+	wantDisabled := !enabled
+	if u.Disabled == wantDisabled {
+		return u.Public(), nil
+	}
+	if wantDisabled {
+		if u.Role == RoleAdministrator && s.enabledAdminCountUnlocked() <= 1 {
+			return UserPublic{}, ErrLastAdmin
+		}
+		u.Disabled = true
+		u.SessionVersion++
+	} else {
+		u.Disabled = false
+	}
 	if err := s.persistUnlocked(); err != nil {
 		return UserPublic{}, err
 	}
@@ -642,7 +683,10 @@ func (s *UserStore) Delete(username, actorUsername string) error {
 	if u == nil {
 		return ErrUserNotFound
 	}
-	if u.Role == RoleAdministrator && s.adminCountUnlocked() <= 1 {
+	if u.Role == RoleAdministrator && !u.Disabled && s.enabledAdminCountUnlocked() <= 1 {
+		return ErrLastAdmin
+	}
+	if u.Role == RoleAdministrator && u.Disabled && s.enabledAdminCountUnlocked() == 0 && s.adminCountUnlocked() <= 1 {
 		return ErrLastAdmin
 	}
 	delete(s.byLower, key)
@@ -658,6 +702,16 @@ func (s *UserStore) adminCountUnlocked() int {
 	n := 0
 	for _, u := range s.byLower {
 		if u.Role == RoleAdministrator {
+			n++
+		}
+	}
+	return n
+}
+
+func (s *UserStore) enabledAdminCountUnlocked() int {
+	n := 0
+	for _, u := range s.byLower {
+		if u.Role == RoleAdministrator && !u.Disabled {
 			n++
 		}
 	}

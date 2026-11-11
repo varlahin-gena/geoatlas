@@ -20,20 +20,6 @@ body.page-admin .admin-main > .page-content:has(.settings-content) {
   flex-direction: column;
 }
 
-.geo-missing-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-bottom: 12px;
-}
-
-.geo-missing-hint {
-  max-width: 14rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .geo-danger-zone {
   margin-top: 20px;
   border-color: color-mix(in srgb, var(--red) 35%, var(--border));
