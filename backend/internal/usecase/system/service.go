@@ -409,11 +409,16 @@ func mergeLiveSyslogNG(resp *SystemStatsResponse, snap SyslogNGSnapshot, rates *
 	if resp.Health["syslogng"] == nil {
 		resp.Health["syslogng"] = map[string]any{}
 	}
+	h := resp.Health["syslogng"]
 	up := 0.0
 	if snap.Up {
 		up = 1
 	}
-	resp.Health["syslogng"]["up"] = up
+	h["up"] = up
+	if snap.Format != "" {
+		h["stats_format"] = snap.Format
+	}
+	h["connector_rows"] = float64(len(snap.Connectors))
 	if !snap.Up {
 		return
 	}
@@ -433,6 +438,10 @@ func mergeLiveSyslogNG(resp *SystemStatsResponse, snap SyslogNGSnapshot, rates *
 	p["drops_per_sec"] = dropsPerSec
 	mergeConnectorRows(resp, nil, snap.Connectors, nil)
 	p["events_per_sec"] = eventsPerSec
+	// csv + empty processed usually means conf still on 2.6.5 exporter settings
+	if snap.Format == "csv" || snap.ProcessedTotal == 0 {
+		h["stats_hint"] = "empty_or_csv: force-recreate syslog-ng (stat-format prometheus + stats-with-legacy)"
+	}
 }
 
 func mergeConnectorRows(resp *SystemStatsResponse, ingest []IngestConnectorSnapshot, syslog []SyslogConnectorSnapshot, recvRates map[string]float64) {

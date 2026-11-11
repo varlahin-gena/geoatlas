@@ -5,6 +5,21 @@
 
 ## [Unreleased]
 
+## [2.6.8] — 2026-11-11
+
+Тестовый / pre-release: syslog-ng stats scrape (prometheus + legacy) (не Latest).
+
+### Fixed
+- **syslog-ng.conf**: `stats-with-legacy(yes)` + явный prometheus; без recreate контейнера после 2.6.5 оставался пустой CSV → Syslog EPS/processed = 0.
+- **UI**: если processed=0 — подсказка recreate syslog-ng; health: `stats_format` / `stats_hint`.
+- **backend scrape**: timeout 3s.
+
+### Notes
+- OpenAPI API doc version: **1.20.0**
+- Продуктовая версия: **2.6.8** (тестовый пререлиз)
+- Схема ClickHouse: без изменений Ensure*.
+- **Обязательно:** `docker compose up -d --force-recreate syslog-ng backend frontend`
+
 ## [2.6.7] — 2026-11-11
 
 Тестовый / pre-release: Syslog processed (input_events без result=) (не Latest).
@@ -17,7 +32,6 @@
 - OpenAPI API doc version: **1.20.0**
 - Продуктовая версия: **2.6.7** (тестовый пререлиз)
 - Схема ClickHouse: без изменений Ensure*.
-- Достаточно обновить **backend** (+ frontend для подписей); syslog-ng conf из 2.6.6 (prometheus) ок.
 
 ## [2.6.6] — 2026-11-11
 
@@ -231,6 +245,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.6.8]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.8
 [2.6.7]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.7
 [2.6.6]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.6
 [2.6.5]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.5

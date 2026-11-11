@@ -73,8 +73,9 @@ export function SystemPipelineTab({
             <div className="stage-name">Syslog-NG</div>
             <div className="stage-value">{fmtNumber(syslogEps)} eps</div>
             <div className="stage-meta">
-              udp: {fmtNumber(syslogng.udp_processed)} · tcp:{' '}
-              {fmtNumber(syslogng.tcp_processed)} (processed)
+              {num(syslogng.udp_processed) + num(syslogng.tcp_processed) === 0
+                ? 'stats scrape пуст — recreate syslog-ng (prometheus+legacy)'
+                : `udp: ${fmtNumber(syslogng.udp_processed)} · tcp: ${fmtNumber(syslogng.tcp_processed)} (processed)`}
               {num(syslogng.queued) > 0
                 ? ` · q: ${fmtNumber(syslogng.queued)}${
                     syslogCap > 0 ? ` (${fmtPercent(syslogQueuePct)})` : ''

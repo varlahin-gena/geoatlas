@@ -22,6 +22,7 @@ type ConnectorSnap struct {
 
 // Snapshot — счётчики syslog-ng, нужные пайплайну (drops до backend).
 type Snapshot struct {
+	Format         string // "prometheus" | "csv"
 	DroppedTotal   float64
 	Queued         float64
 	ProcessedTotal float64
@@ -61,9 +62,13 @@ func Parse(body []byte) (Snapshot, error) {
 		return Snapshot{}, fmt.Errorf("empty syslog-ng stats body")
 	}
 	if looksPrometheus(trimmed) {
-		return parsePrometheus(trimmed), nil
+		snap := parsePrometheus(trimmed)
+		snap.Format = "prometheus"
+		return snap, nil
 	}
-	return parseCSV(trimmed), nil
+	snap := parseCSV(trimmed)
+	snap.Format = "csv"
+	return snap, nil
 }
 
 func looksPrometheus(body []byte) bool {
