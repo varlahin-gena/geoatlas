@@ -5,6 +5,110 @@
 
 ## [Unreleased]
 
+## [2.6.11] — 2026-11-11
+
+Тестовый / pre-release: HIG table layout на admin-страницах (не Latest).
+
+### Changed
+- **Admin UI (Apple HIG)**: `table-layout: fixed`, ellipsis, стабильная колонка действий и выровненные toolbars на Anomalies, Hunts, Connectors, ParseErrors, GeoMissing, GeoRanges, Users, ApiTokens; убран double-frame card/table; checkbox «Включена» без дублирующей подписи.
+
+### Notes
+- OpenAPI API doc version: **1.21.0**
+- Продуктовая версия: **2.6.11** (тестовый пререлиз)
+- Схема ClickHouse: без изменений Ensure*.
+- Достаточно `update.sh` 2.6.11 (recreate **frontend**).
+
+## [2.6.10] — 2026-11-11
+
+Тестовый / pre-release: HIG admin UI + enable/disable УЗ (не Latest).
+
+### Added
+- **Пользователи**: включение/выключение УЗ (`POST /api/users/{username}/enabled`); нельзя выключить себя и последнего активного администратора; выключение инвалидирует сессии; на логине — отказ для выключенной УЗ.
+
+### Changed
+- **Admin UI (Apple HIG)**: quieter actions, RU-копирайт, progressive disclosure и themed controls на Anomalies / Investigate / Hunts / Engine, Reputation, Connectors, ParseErrors, ParserTest, GeoMissing, GeoRanges, Users, ApiTokens, конструкторе поиска и `/system` → Резерв.
+- **Dozzle**: `amir20/dozzle` **v11.4.0 → v11.4.2** (recreate контейнера `dozzle`).
+- **scripts/load-test-connectors.ps1**: режим `-Soak` для длительного steady-нагрузки с периодическими сэмплами.
+
+### Notes
+- OpenAPI API doc version: **1.21.0**
+- Продуктовая версия: **2.6.10** (тестовый пререлиз)
+- Схема ClickHouse: без изменений Ensure*.
+- Достаточно `update.sh` 2.6.10 (recreate **backend** + **frontend**; при профиле dozzle — recreate `dozzle`).
+
+## [2.6.9] — 2026-11-11
+
+Тестовый / pre-release: Syslog processed из dst_network / delivered (не Latest).
+
+### Fixed
+- **pkg/syslogngstats**: на живом 4.12 scrape source `input_events` часто пуст; считаем legacy `syslogng_dst_network_processed` и `output_events_total{result="delivered"}` по `d_<id>_{udp|tcp}` (fallback, без double-count с source).
+
+### Notes
+- OpenAPI API doc version: **1.20.0**
+- Продуктовая версия: **2.6.9** (тестовый пререлиз)
+- Схема ClickHouse: без изменений Ensure*.
+- Достаточно `update.sh` 2.6.9 (или recreate **backend**); conf syslog-ng из 2.6.8 ок.
+- После старта гоняйте поток, затем смотрите Pipeline (сразу после recreate счётчики syslog-ng = 0).
+
+## [2.6.8] — 2026-11-11
+
+Тестовый / pre-release: syslog-ng stats scrape (prometheus + legacy) (не Latest).
+
+### Fixed
+- **syslog-ng.conf**: `stats-with-legacy(yes)` + явный prometheus; без recreate контейнера после 2.6.5 оставался пустой CSV → Syslog EPS/processed = 0.
+- **UI**: если processed=0 — подсказка recreate syslog-ng; health: `stats_format` / `stats_hint`.
+- **backend scrape**: timeout 3s.
+
+### Notes
+- OpenAPI API doc version: **1.20.0**
+- Продуктовая версия: **2.6.8** (тестовый пререлиз)
+- Схема ClickHouse: без изменений Ensure*.
+- **Обязательно:** `docker compose up -d --force-recreate syslog-ng backend frontend`
+
+## [2.6.7] — 2026-11-11
+
+Тестовый / pre-release: Syslog processed (input_events без result=) (не Latest).
+
+### Fixed
+- **pkg/syslogngstats**: `syslogng_input_events_total` часто **без** `result=` — раньше typ не становился `processed` → Syslog EPS=0 и processed 0/0, при этом q/drop уже читались.
+- **UI Syslog-NG**: meta udp/tcp берёт `syslogng.*_processed`, а не backend rate (не путать стадии).
+
+### Notes
+- OpenAPI API doc version: **1.20.0**
+- Продуктовая версия: **2.6.7** (тестовый пререлиз)
+- Схема ClickHouse: без изменений Ensure*.
+
+## [2.6.6] — 2026-11-11
+
+Тестовый / pre-release: Syslog processed по коннекторам (не Latest).
+
+### Fixed
+- **syslog-ng stats-exporter**: `stat-format("csv")` из 2.6.5 отдавал legacy-only (часто пусто); вернули **`prometheus`** — живые `input/output_events_total` с `s_<id>_udp|tcp`.
+- **pkg/syslogngstats**: CSV `SourceName=source` / `destination` (без подстроки `src`/`dst`) теперь атрибутируются.
+- **UI**: плитка Syslog-NG больше не подставляет backend EPS при пустом scrape.
+
+### Notes
+- OpenAPI API doc version: **1.20.0**
+- Продуктовая версия: **2.6.6** (тестовый пререлиз)
+- Схема ClickHouse: без изменений Ensure*.
+- После обновления: `docker compose up -d --force-recreate syslog-ng` (подхватить conf) + backend.
+
+## [2.6.5] — 2026-11-11
+
+Тестовый / pre-release: метрики Pipeline по syslog-коннекторам (не Latest).
+
+### Fixed
+- **Pipeline / коннекторы**: разбор Prometheus `input/output_events_*`; колонка Backend EPS.
+- **syslog-ng.conf**: `stat-format("csv")` — оказался ошибочным на 4.12 (исправлено в 2.6.6).
+
+### Changed
+- **UI Pipeline**: колонка Backend EPS (`received_per_sec`); заголовки без путаницы EPS vs накопленный processed/recv.
+
+### Notes
+- OpenAPI API doc version: **1.20.0**
+- Продуктовая версия: **2.6.5** (тестовый пререлиз)
+- Схема ClickHouse: без изменений Ensure*.
+
 ## [2.6.4] — 2026-11-10
 
 Тестовый / pre-release: CPU/память контейнеров как у Dozzle + ясные алерты EPS vs CPU (не Latest).
@@ -186,6 +290,13 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.6.11]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.11
+[2.6.10]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.10
+[2.6.9]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.9
+[2.6.8]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.8
+[2.6.7]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.7
+[2.6.6]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.6
+[2.6.5]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.5
 [2.6.4]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.4
 [2.6.3]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.3
 [2.6.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.2

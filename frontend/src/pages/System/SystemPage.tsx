@@ -144,7 +144,8 @@ export default function SystemPage() {
   const syslogngUpRaw = stats?.health?.syslogng?.up;
   const syslogngUp = syslogngUpRaw == null ? undefined : num(syslogngUpRaw as number);
   const syslogStageStatus = pipelineSyslogStatus(syslogng, syslogngUp, syslogngFifo, syslogngDropsPerSec);
-  const syslogEps = num(syslogng.events_per_sec) || eps;
+  // Do not mirror backend EPS — hides a dead/empty syslog-ng scrape.
+  const syslogEps = num(syslogng.events_per_sec);
   const edgesHint = edgesAggHint(edges);
   const edgesBadge = edges?.phase
     ? `${edges.state || 'idle'}/${edges.phase}`
@@ -181,7 +182,7 @@ export default function SystemPage() {
     <AdminLayout
       className="ga-system"
       title="Мониторинг системы"
-      subtitle={tabLabels[tab]}
+      subtitle={`· ${tabLabels[tab]}`}
       mainClassName="content"
       showSystemHealth={false}
       actions={

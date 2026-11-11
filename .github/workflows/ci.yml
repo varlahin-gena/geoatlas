@@ -748,8 +748,29 @@ jobs:
       - name: vite build
         run: npm run build
 
+      # --with-deps hits apt; azure.archive.ubuntu.com DNS flakes on GHA → other mirror + retry.
       - name: Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: |
+          set -euo pipefail
+          if [[ -f /etc/apt/sources.list.d/ubuntu.sources ]]; then
+            sudo sed -i 's|http://azure\.archive\.ubuntu\.com/ubuntu|http://archive.ubuntu.com/ubuntu|g' \
+              /etc/apt/sources.list.d/ubuntu.sources || true
+          fi
+          if [[ -f /etc/apt/sources.list ]]; then
+            sudo sed -i 's|http://azure\.archive\.ubuntu\.com/ubuntu|http://archive.ubuntu.com/ubuntu|g' \
+              /etc/apt/sources.list || true
+          fi
+          ok=0
+          for i in 1 2 3 4 5; do
+            echo "playwright install attempt ${i}/5"
+            if npx playwright install --with-deps chromium; then
+              ok=1
+              break
+            fi
+            echo "attempt ${i} failed; sleeping before retry"
+            sleep $((15 * i))
+          done
+          test "$ok" -eq 1
 
       - name: Playwright e2e (auth/CSRF/roles)
         run: npm run test:e2e

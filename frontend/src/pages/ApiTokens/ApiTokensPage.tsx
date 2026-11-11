@@ -6,6 +6,7 @@ import { ReauthField, ReauthModal } from '@/components/ReauthModal';
 import { useToast } from '@/components/Toast';
 import { scopeLabel, scopeOptionLabel, TERM } from '@/lib/glossary';
 import { fmtDate } from '@/lib/format';
+import './apiTokens.css';
 
 type ExpiryPreset = 'never' | '30d' | '90d' | '365d';
 
@@ -13,6 +14,12 @@ function expiryISO(preset: ExpiryPreset): string | undefined {
   if (preset === 'never') return undefined;
   const days = preset === '30d' ? 30 : preset === '90d' ? 90 : 365;
   return new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+function scopeClass(scope: string): string {
+  if (scope === 'admin') return 'api-tokens-scope is-admin';
+  if (scope === 'ops') return 'api-tokens-scope is-ops';
+  return 'api-tokens-scope';
 }
 
 export default function ApiTokensPage() {
@@ -90,6 +97,7 @@ export default function ApiTokensPage() {
   return (
     <SettingsLayout
       title="API-токены"
+      plainTitle
       actions={
         <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
           Создать токен
@@ -97,10 +105,13 @@ export default function ApiTokensPage() {
       }
     >
       <div className="page-content-inner narrow">
-        <p className="page-lead">Именованные токены для автоматизации и интеграций.</p>
-        <div className="card">
+        <p className="page-lead">
+          Именованные токены для автоматизации. Секрет показывается один раз; отзыв сразу закрывает
+          доступ.
+        </p>
+        <div className="card api-tokens-card">
           <div className="table-wrap">
-            <table>
+            <table className="api-tokens-table">
               <thead>
                 <tr>
                   <th scope="col">Имя</th>
@@ -129,7 +140,11 @@ export default function ApiTokensPage() {
                         title="Нет API-токенов"
                         description="Создайте именованный токен для автоматизации и интеграций."
                         action={
-                          <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
+                          <button
+                            type="button"
+                            className="btn primary"
+                            onClick={() => setCreateOpen(true)}
+                          >
                             Создать токен
                           </button>
                         }
@@ -139,35 +154,43 @@ export default function ApiTokensPage() {
                 ) : (
                   tokens.map((t) => (
                     <tr key={t.id}>
-                      <td>{t.name}</td>
                       <td>
-                        <span className="scope-badge" title={t.scope}>
+                        <span className="api-tokens-name" title={t.name}>
+                          {t.name}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={scopeClass(t.scope)} title={t.scope}>
                           {scopeLabel(t.scope)}
                         </span>
                       </td>
-                      <td>{fmtDate(t.created_at)}</td>
-                      <td>{t.expires_at ? fmtDate(t.expires_at) : '—'}</td>
+                      <td className="api-tokens-date">{fmtDate(t.created_at)}</td>
+                      <td className="api-tokens-date">
+                        {t.expires_at ? fmtDate(t.expires_at) : '—'}
+                      </td>
                       <td className="actions">
-                        <button
-                          type="button"
-                          className="btn"
-                          onClick={() => {
-                            setPendingAction({ type: 'rotate', id: t.id, name: t.name });
-                            setReauthPassword('');
-                          }}
-                        >
-                          Ротация
-                        </button>
-                        <button
-                          type="button"
-                          className="btn danger"
-                          onClick={() => {
-                            setPendingAction({ type: 'revoke', id: t.id, name: t.name });
-                            setReauthPassword('');
-                          }}
-                        >
-                          Отозвать
-                        </button>
+                        <div className="api-tokens-row-actions">
+                          <button
+                            type="button"
+                            className="btn sm"
+                            onClick={() => {
+                              setPendingAction({ type: 'rotate', id: t.id, name: t.name });
+                              setReauthPassword('');
+                            }}
+                          >
+                            Обновить секрет…
+                          </button>
+                          <button
+                            type="button"
+                            className="btn sm danger ghost"
+                            onClick={() => {
+                              setPendingAction({ type: 'revoke', id: t.id, name: t.name });
+                              setReauthPassword('');
+                            }}
+                          >
+                            Отозвать
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -175,9 +198,9 @@ export default function ApiTokensPage() {
               </tbody>
             </table>
           </div>
-          <p className="hint">
-            Env <code>API_AUTH_TOKEN</code> / <code>API_AUTH_PREVIOUS_TOKEN</code> по-прежнему дают
-            scope admin (без записи в этот список).
+          <p className="api-tokens-env-hint">
+            Переменные <code>API_AUTH_TOKEN</code> / <code>API_AUTH_PREVIOUS_TOKEN</code> дают
+            админ-доступ вне этого списка.
           </p>
         </div>
       </div>
@@ -185,14 +208,21 @@ export default function ApiTokensPage() {
       {createOpen ? (
         <div
           className="modal-backdrop show"
+          role="presentation"
           onClick={(e) => {
             if (e.target === e.currentTarget) closeCreateModal();
           }}
         >
           {secret ? (
-            <div className="modal" role="dialog" aria-modal="true" aria-labelledby="token-secret-title">
+            <div
+              className="modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="token-secret-title"
+              onClick={(e) => e.stopPropagation()}
+            >
               <h3 id="token-secret-title">{secretTitle}</h3>
-              <div className="secret-panel">
+              <div className="api-tokens-secret-panel">
                 <p>Секрет показывается один раз:</p>
                 <code>{secret}</code>
               </div>
@@ -223,11 +253,11 @@ export default function ApiTokensPage() {
               aria-modal="true"
               aria-labelledby="create-token-title"
               onSubmit={onCreate}
+              onClick={(e) => e.stopPropagation()}
             >
               <h3 id="create-token-title">Создать API-токен</h3>
-              <p className="hint" style={{ marginTop: 0 }}>
-                {TERM.scope}: <b>read</b> — карта; <b>ops</b> — ingest/upload; <b>admin</b> — как env
-                Bearer (полный API).
+              <p className="api-tokens-create-hint">
+                Область задаёт, к чему токен получит доступ: карта, загрузки или весь API.
               </p>
               <div className="field">
                 <label htmlFor="cName">Имя</label>
@@ -283,7 +313,7 @@ export default function ApiTokensPage() {
         open={!!pendingAction}
         title={
           pendingAction?.type === 'rotate'
-            ? `Ротация токена «${pendingAction.name}»`
+            ? `Обновить секрет «${pendingAction.name}»?`
             : `Отозвать токен «${pendingAction?.name ?? ''}»?`
         }
         message={
@@ -291,7 +321,7 @@ export default function ApiTokensPage() {
             ? 'Будет сгенерирован новый секрет. Старый сразу перестанет работать.'
             : 'Токен будет отозван без возможности восстановления.'
         }
-        confirmLabel={pendingAction?.type === 'rotate' ? 'Ротировать' : 'Отозвать'}
+        confirmLabel={pendingAction?.type === 'rotate' ? 'Обновить' : 'Отозвать'}
         busy={actionBusy}
         password={reauthPassword}
         onPasswordChange={setReauthPassword}
@@ -326,7 +356,6 @@ export default function ApiTokensPage() {
           })();
         }}
       />
-      <style>{`.actions { display: flex; flex-wrap: wrap; gap: 6px; }`}</style>
     </SettingsLayout>
   );
 }

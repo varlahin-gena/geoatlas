@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   deleteAllParseErrors,
@@ -9,7 +9,141 @@ import {
 import { SettingsLayout } from '@/components/SettingsLayout';
 import { EmptyState, TableSkeleton } from '@/components/Skeleton';
 import { useToast } from '@/components/Toast';
-import { fmtDate } from '@/lib/format';
+import { fmtDate, fmtNumber } from '@/lib/format';
+import {
+  parseErrorReasonCounts,
+  parseErrorReasonLabel,
+  shortParseErrorRaw,
+} from './parseErrorDisplay';
+import './parseErrors.css';
+
+type DeleteMode = { type: 'ids'; ids: string[] } | { type: 'all' };
+
+function useDialogA11y<T extends HTMLElement>(open: boolean, onDismiss: () => void) {
+  const ref = useRef<T | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const node = ref.current;
+    node?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onDismiss();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onDismiss]);
+  return ref;
+}
+
+function ConfirmDeleteModal({
+  mode,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  mode: DeleteMode;
+  busy: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const titleId = useId();
+  const dialogRef = useDialogA11y<HTMLDivElement>(true, onClose);
+  const isAll = mode.type === 'all';
+  const count = mode.type === 'ids' ? mode.ids.length : 0;
+
+  return (
+    <div
+      className="modal-backdrop show"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !busy) onClose();
+      }}
+    >
+      <div
+        ref={dialogRef}
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 id={titleId}>{isAll ? 'Удалить все записи?' : 'Удалить выбранные?'}</h3>
+        <p className="hint" style={{ marginBottom: 16 }}>
+          {isAll
+            ? 'Все нераспознанные строки будут удалены. Это нельзя отменить.'
+            : `Будет удалено записей: ${fmtNumber(count)}. Это нельзя отменить.`}
+        </p>
+        <div className="modal-actions">
+          <button type="button" className="btn" disabled={busy} onClick={onClose}>
+            Отмена
+          </button>
+          <button type="button" className="btn danger" disabled={busy} onClick={onConfirm}>
+            {busy ? 'Удаление…' : isAll ? 'Удалить все' : 'Удалить'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RawCell({ raw }: { raw?: string }) {
+  const [open, setOpen] = useState(false);
+  const full = (raw || '').trim();
+  const preview = shortParseErrorRaw(full);
+  if (!full) return <span>—</span>;
+  const needsToggle = full.replace(/\s+/g, ' ').trim().length > 72;
+
+  return (
+    <div className="pe-raw">
+      {!open ? (
+        <span className="pe-raw-preview" title={full}>
+          {preview}
+        </span>
+      ) : (
+        <pre className="pe-raw-full">{full}</pre>
+      )}
+      {needsToggle ? (
+        <button
+          type="button"
+          className="pe-raw-toggle"
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+        >
+          {open ? 'Свернуть' : 'Показать полностью'}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function ReasonCell({ reason }: { reason?: string }) {
+  const [open, setOpen] = useState(false);
+  const label = parseErrorReasonLabel(reason);
+  const full = (reason || '').trim();
+  const showToggle = Boolean(full && full !== label);
+
+  return (
+    <div className="pe-reason">
+      <span className="pe-reason-label" title={full || undefined}>
+        {label}
+      </span>
+      {showToggle ? (
+        <>
+          {' '}
+          <button
+            type="button"
+            className="pe-raw-toggle"
+            aria-expanded={open}
+            onClick={() => setOpen((v) => !v)}
+          >
+            {open ? 'Скрыть' : 'Подробнее'}
+          </button>
+          {open ? <span className="pe-reason-full">{full}</span> : null}
+        </>
+      ) : null}
+    </div>
+  );
+}
 
 export default function ParseErrorsPage() {
   const { toast } = useToast();
@@ -18,6 +152,8 @@ export default function ParseErrorsPage() {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<DeleteMode | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -26,7 +162,7 @@ export default function ParseErrorsPage() {
       setRows(data.errors || []);
       setSelected(new Set());
     } catch (e) {
-      toast(`Ошибка загрузки: ${e instanceof Error ? e.message : e}`, 'error');
+      toast(e instanceof Error ? e.message : 'Не удалось загрузить ошибки парсинга', 'error');
     } finally {
       setLoading(false);
     }
@@ -41,96 +177,166 @@ export default function ParseErrorsPage() {
     return () => window.clearTimeout(t);
   }, [load]);
 
+  const showVendor = useMemo(() => rows.some((r) => Boolean(r.vendor?.trim())), [rows]);
+  const clusters = useMemo(() => parseErrorReasonCounts(rows).slice(0, 4), [rows]);
+  const tableCols = 5 + (showVendor ? 1 : 0);
+
   async function deleteIds(ids: string[]) {
     if (!ids.length) return;
+    await deleteParseErrors(ids);
+    setRows((prev) => prev.filter((r) => !ids.includes(r.id)));
+    setSelected(new Set());
+    toast(`Удалено записей: ${fmtNumber(ids.length)}`, 'success');
+  }
+
+  async function confirmPendingDelete() {
+    if (!pendingDelete || deleteBusy) return;
+    setDeleteBusy(true);
     try {
-      await deleteParseErrors(ids);
-      setRows((prev) => prev.filter((r) => !ids.includes(r.id)));
-      setSelected(new Set());
-      toast(`Удалено записей: ${ids.length}`, 'success');
+      if (pendingDelete.type === 'all') {
+        await deleteAllParseErrors();
+        setRows([]);
+        setSelected(new Set());
+        toast('Таблица очищена', 'success');
+      } else {
+        await deleteIds(pendingDelete.ids);
+      }
+      setPendingDelete(null);
     } catch (e) {
-      toast(`Ошибка удаления: ${e instanceof Error ? e.message : e}`, 'error');
+      toast(e instanceof Error ? e.message : 'Не удалось удалить', 'error');
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
+  function openInParserTest(raw: string) {
+    try {
+      localStorage.setItem('nm.parserTest.prefill', raw || '');
+    } catch {
+      /* ignore */
+    }
+    window.open('/parser-test', '_blank', 'noopener,noreferrer');
+  }
+
+  const allSelected = rows.length > 0 && selected.size === rows.length;
+
   return (
-    <SettingsLayout title="Ошибки парсинга">
+    <SettingsLayout title="Ошибки парсинга" plainTitle>
       <div className="page-content-inner">
         <p className="page-lead">
-          Строки, которые ingest не разобрал. TTL 7 дней; можно удалить вручную.
+          Строки логов, которые не удалось разобрать. Хранятся 7 дней; лишнее можно удалить вручную.
         </p>
-        <div className="toolbar" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-          <input
-            placeholder="Поиск по строке или причине…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <select value={limit} onChange={(e) => setLimit(e.target.value)}>
-            {[50, 100, 200, 500].map((n) => (
-              <option key={n} value={String(n)}>
-                {n}
-              </option>
+
+        <p className="parse-errors-summary" role="status">
+          {rows.length ? (
+            <>
+              <span>{fmtNumber(rows.length)} на экране</span>
+              {search.trim() ? (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span className="hint">фильтр «{search.trim()}»</span>
+                </>
+              ) : null}
+            </>
+          ) : loading ? (
+            <span className="hint">Загрузка…</span>
+          ) : (
+            <span className="hint">Нет записей в выборке</span>
+          )}
+        </p>
+
+        {clusters.length > 1 ? (
+          <div className="parse-errors-clusters" aria-label="Частые причины">
+            {clusters.map((c) => (
+              <span key={c.label} className="parse-errors-chip">
+                <strong>{fmtNumber(c.count)}</strong>
+                {c.label}
+              </span>
             ))}
-          </select>
+          </div>
+        ) : null}
+
+        <div className="parse-errors-toolbar">
+          <div className="field parse-errors-search">
+            <label htmlFor="parse-errors-search">Поиск</label>
+            <input
+              id="parse-errors-search"
+              type="search"
+              placeholder="По строке или причине…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="field parse-errors-limit">
+            <label htmlFor="parse-errors-limit">Показать</label>
+            <select
+              id="parse-errors-limit"
+              value={limit}
+              onChange={(e) => setLimit(e.target.value)}
+            >
+              {[50, 100, 200, 500].map((n) => (
+                <option key={n} value={String(n)}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
           <button type="button" className="btn" onClick={() => void load()} disabled={loading}>
-            Обновить
+            {loading ? 'Обновление…' : 'Обновить'}
           </button>
-          <button
-            type="button"
-            className="btn"
-            disabled={!selected.size}
-            onClick={() => void deleteIds([...selected])}
-          >
-            Удалить выбранные{selected.size ? ` (${selected.size})` : ''}
-          </button>
-          <button
-            type="button"
-            className="btn danger"
-            onClick={async () => {
-              if (!confirm('Удалить ВСЕ нераспознанные строки? Действие необратимо.')) return;
-              try {
-                await deleteAllParseErrors();
-                setRows([]);
-                toast('Таблица очищена', 'success');
-              } catch (e) {
-                toast(`Ошибка очистки: ${e instanceof Error ? e.message : e}`, 'error');
-              }
-            }}
-          >
-            Удалить все
-          </button>
-          <span className="badge">{rows.length ? `Показано: ${rows.length}` : ''}</span>
+          <div className="parse-errors-actions">
+            <button
+              type="button"
+              className="btn"
+              disabled={!selected.size || deleteBusy}
+              onClick={() => setPendingDelete({ type: 'ids', ids: [...selected] })}
+            >
+              Удалить выбранные{selected.size ? ` (${fmtNumber(selected.size)})` : ''}
+            </button>
+            <button
+              type="button"
+              className="btn danger"
+              disabled={!rows.length || deleteBusy}
+              onClick={() => setPendingDelete({ type: 'all' })}
+            >
+              Удалить все
+            </button>
+          </div>
         </div>
+
         <div className="table-wrap card">
-          <table>
+          <table className="parse-errors-table">
             <thead>
               <tr>
                 <th scope="col">
                   <input
                     type="checkbox"
-                    checked={rows.length > 0 && selected.size === rows.length}
+                    checked={allSelected}
+                    aria-label="Выбрать все"
                     onChange={(e) => {
                       setSelected(e.target.checked ? new Set(rows.map((r) => r.id)) : new Set());
                     }}
                   />
                 </th>
                 <th scope="col">Время</th>
-                <th scope="col">Vendor</th>
+                {showVendor ? <th scope="col">Вендор</th> : null}
                 <th scope="col">Причина</th>
-                <th scope="col">Строка (raw)</th>
-                <th scope="col"> </th>
+                <th scope="col">Строка</th>
+                <th scope="col">
+                  <span className="visually-hidden">Действия</span>
+                </th>
               </tr>
             </thead>
             <tbody>
               {loading && !rows.length ? (
-                <TableSkeleton cols={6} rows={5} />
+                <TableSkeleton cols={tableCols} rows={5} />
               ) : !rows.length ? (
                 <tr>
-                  <td colSpan={6} className="empty">
+                  <td colSpan={tableCols} className="empty">
                     <EmptyState
                       compact
                       title="Нет нераспознанных строк"
-                      description="Ошибки парсинга появятся здесь, если syslog не удалось разобрать. Можно проверить пресеты в тесте парсеров."
+                      description="Ошибки появятся здесь, если syslog не удалось разобрать. Можно проверить пресеты в тесте парсеров."
                       action={
                         <Link className="btn" to="/parser-test">
                           Тест парсеров
@@ -146,6 +352,7 @@ export default function ParseErrorsPage() {
                       <input
                         type="checkbox"
                         checked={selected.has(r.id)}
+                        aria-label={`Выбрать запись ${fmtDate(r.timestamp)}`}
                         onChange={(e) => {
                           setSelected((prev) => {
                             const n = new Set(prev);
@@ -156,29 +363,35 @@ export default function ParseErrorsPage() {
                         }}
                       />
                     </td>
-                    <td>{fmtDate(r.timestamp)}</td>
-                    <td>{r.vendor || '—'}</td>
-                    <td>{r.reason}</td>
-                    <td className="raw">{r.raw}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn"
-                        title="Отправить строку в тест парсеров"
-                        onClick={() => {
-                          try {
-                            localStorage.setItem('nm.parserTest.prefill', r.raw || '');
-                          } catch {
-                            /* ignore */
-                          }
-                          window.open('/parser-test', '_blank');
-                        }}
-                      >
-                        → Тест
-                      </button>{' '}
-                      <button type="button" className="btn" onClick={() => void deleteIds([r.id])}>
-                        ✕
-                      </button>
+                    <td className="pe-time">{fmtDate(r.timestamp)}</td>
+                    {showVendor ? <td>{r.vendor || '—'}</td> : null}
+                    <td className="pe-reason-cell">
+                      <ReasonCell reason={r.reason} />
+                    </td>
+                    <td className="pe-raw-cell">
+                      <RawCell raw={r.raw} />
+                    </td>
+                    <td className="actions">
+                      <div className="parse-errors-row-actions">
+                        <button
+                          type="button"
+                          className="btn sm ghost"
+                          title="Открыть строку в тесте парсеров"
+                          onClick={() => openInParserTest(r.raw || '')}
+                        >
+                          В тест
+                        </button>
+                        <button
+                          type="button"
+                          className="btn sm danger ghost"
+                          aria-label="Удалить запись"
+                          title="Удалить запись"
+                          disabled={deleteBusy}
+                          onClick={() => setPendingDelete({ type: 'ids', ids: [r.id] })}
+                        >
+                          Удалить
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -187,6 +400,17 @@ export default function ParseErrorsPage() {
           </table>
         </div>
       </div>
+
+      {pendingDelete ? (
+        <ConfirmDeleteModal
+          mode={pendingDelete}
+          busy={deleteBusy}
+          onClose={() => {
+            if (!deleteBusy) setPendingDelete(null);
+          }}
+          onConfirm={() => void confirmPendingDelete()}
+        />
+      ) : null}
     </SettingsLayout>
   );
 }
