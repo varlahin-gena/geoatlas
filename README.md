@@ -69,7 +69,7 @@ Appliance: **IPv4-only**, один хост / один процесс backend, �
 | [Конфигурация](docs/configuration.md) | `.env`, секреты, модули |
 | [Обслуживание](docs/operations.md) | Запуск, профили, retention, бэкапы, логи, обновление |
 | [GeoIP](docs/geoip.md) | CSV, загрузка с сервера, 502/OOM |
-| [UI и HTTP API](docs/ui.md) | Страницы SPA, роли, OpenAPI **1.20.0** |
+| [UI и HTTP API](docs/ui.md) | Страницы SPA, роли, OpenAPI **1.21.0** |
 | [Репутация](docs/reputation.md) | Фиды и offline-списки |
 | [Аномалии](docs/anomalies.md) | Типы (в т.ч. byte_surge / beaconing / lateral), ack/assign, разбор |
 | [Разработка](docs/development.md) | Локальный стек из git |
@@ -86,7 +86,7 @@ Appliance: **IPv4-only**, один хост / один процесс backend, �
 | [OpenSSF Passing](docs/openssf-best-practices.md) | Шпаргалка Passing |
 | [OpenSSF Silver](docs/openssf-silver.md) | Шпаргалка Silver |
 
-Контракт REST: [`openapi.yaml`](openapi.yaml) (документ OpenAPI **1.20.0**).
+Контракт REST: [`openapi.yaml`](openapi.yaml) (документ OpenAPI **1.21.0**).
 
 ## Лицензия
 
@@ -122,6 +122,6 @@ Appliance: **IPv4-only**, один хост / один процесс backend, �
 | `deploy/` | установщики Ubuntu / Oracle Linux |
 | `docs/` | документация оператора и разработчика |
 | `scripts/` | CI, pack-release, бэкапы |
-| `openapi.yaml` | контракт HTTP API (OpenAPI **1.20.0**) |
+| `openapi.yaml` | контракт HTTP API (OpenAPI **1.21.0**) |
 
 Полное дерево: [docs/repo-layout.md](docs/repo-layout.md).

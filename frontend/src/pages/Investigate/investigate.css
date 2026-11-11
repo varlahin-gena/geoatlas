@@ -24,11 +24,32 @@
   color: var(--text-dim);
 }
 
+.investigate-headline {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
 .investigate-title {
   margin: 0;
   font-size: 18px;
   line-height: 1.35;
   font-weight: 600;
+}
+
+.investigate-detail {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.investigate-delta {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
 }
 
 .investigate-meta {
@@ -56,7 +77,26 @@
 .investigate-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  align-items: center;
+  gap: 12px;
+}
+
+.investigate-actions .btn.ghost,
+.investigate-more > summary.btn.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-dim);
+}
+
+.investigate-actions .btn.ghost:hover:not(:disabled),
+.investigate-more > summary.btn.ghost:hover {
+  background: var(--panel-3);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.investigate-more {
+  position: relative;
 }
 
 .anomaly-peers-toolbar {

@@ -124,12 +124,12 @@ export function SystemPipelineTab({
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>Syslog processed (udp/tcp)</th>
-                  <th>Syslog q / drop</th>
-                  <th>Backend EPS</th>
-                  <th>Backend recv</th>
-                  <th>Drop / auth</th>
-                  <th>Last event</th>
+                  <th>Принято syslog (UDP / TCP)</th>
+                  <th>Очередь / потери syslog</th>
+                  <th>Скорость backend, EPS</th>
+                  <th>Принято backend</th>
+                  <th>Отброшено / отказ auth</th>
+                  <th>Последнее событие</th>
                 </tr>
               </thead>
               <tbody>
@@ -156,8 +156,8 @@ export function SystemPipelineTab({
             </table>
           </div>
           <p className="hint">
-            Управление портами — в разделе Система → Коннекторы. Syslog processed — накопленные
-            счётчики source; Backend EPS — received/s с атрибуцией по маркеру; recv — накопительно.
+            Управление портами — в разделе Система → Коннекторы. Syslog — накопленные счётчики до
+            backend; скорость — EPS с атрибуцией по коннектору; очередь/потери — буфер syslog-ng.
           </p>
         </section>
       ) : null}

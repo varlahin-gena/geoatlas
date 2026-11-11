@@ -34,6 +34,10 @@
   .\load-test-connectors.ps1 -FindThreshold -StartEpsPerSender 250 -MaxEpsPerSender 8000 -StepEpsPerSender 250 -StepSec 45 -ApiToken '...'
 
 .EXAMPLE
+  # 1h steady soak at ~10k total EPS (2500 x 4 connectors), sample every 60s
+  .\load-test-connectors.ps1 -Soak -EpsPerSender 2500 -DurationSec 3600 -WorkersPerConnector 4 -Batch 50 -ApiToken $token
+
+.EXAMPLE
   .\load-test-connectors.ps1 -DryRun
 #>
 param(
@@ -51,6 +55,11 @@ param(
   [switch]$SkipMainUdp,
   [switch]$SkipBackupTcp,
   [switch]$DryRun,
+
+  # --- steady soak (-Soak): constant EPS, continuous sockets, periodic samples ---
+  [switch]$Soak,
+  [int]$SampleSec = 60,
+  [string]$SoakLog = '',
 
   # --- capacity ramp (-FindThreshold) ---
   [switch]$FindThreshold,
@@ -77,11 +86,13 @@ $Connectors = @(
 ) | Where-Object { -not $_.Skip }
 
 if ($Connectors.Count -eq 0) { throw 'All connectors skipped via -Skip* flags' }
+if ($FindThreshold -and $Soak) { throw 'Use either -FindThreshold or -Soak, not both' }
 if ($EpsPerSender -lt 1) { throw 'EpsPerSender must be >= 1' }
 if ($DurationSec -lt 1) { throw 'DurationSec must be >= 1' }
 if ($Batch -lt 1) { throw 'Batch must be >= 1' }
 if ($WorkersPerConnector -lt 1) { throw 'WorkersPerConnector must be >= 1' }
 if ($LinePoolSize -lt 100) { throw 'LinePoolSize must be >= 100' }
+if ($Soak -and $SampleSec -lt 5) { throw 'SampleSec must be >= 5' }
 
 function ConvertTo-UInt32Ip([string]$ip) {
   $parts = $ip.Split('.') | ForEach-Object { [uint32]$_ }
@@ -271,6 +282,10 @@ if ($DryRun) {
     Write-Host ("  total EPS range: {0} .. {1}" -f `
       ($StartEpsPerSender * $LogicalConnectors.Count), ($MaxEpsPerSender * $LogicalConnectors.Count))
     Write-Host ("  api={0} token={1}" -f $ApiBase, $(if ($ApiToken) { 'set' } else { 'MISSING (client-only ramp)' }))
+  } elseif ($Soak) {
+    Write-Host ("mode=Soak duration={0}s ({1:N1}h) eps/logical={2} total~{3} sample={4}s workers={5}" -f `
+      $DurationSec, ($DurationSec / 3600.0), $EpsPerSender,
+      ($EpsPerSender * $LogicalConnectors.Count), $SampleSec, $WorkersPerConnector)
   } else {
     Write-Host ("host={0} duration={1}s eps/logical={2} logical={3} total~{4} EPS" -f `
       $HostAddress, $DurationSec, $EpsPerSender, $LogicalConnectors.Count, ($EpsPerSender * $LogicalConnectors.Count))
@@ -494,6 +509,198 @@ function Show-BurstSummary {
   $aggEps = if ($avgElapsed -gt 0) { [math]::Round($totalSent / $avgElapsed, 1) } else { 0 }
   Write-Host ("{0}: sent={1} errors={2} ~{3} EPS aggregate" -f $Title, $totalSent, $totalErr, $aggEps)
   return [pscustomobject]@{ Sent = $totalSent; Errors = $totalErr; EpsActual = $aggEps; ElapsedSec = $avgElapsed }
+}
+
+# --------------- Soak: constant EPS, continuous sockets, timed samples ---------------
+if ($Soak) {
+  $nLogical = $LogicalConnectors.Count
+  $totalTarget = $EpsPerSender * $nLogical
+  $epsWorker = [Math]::Max(1, [int][Math]::Ceiling($EpsPerSender / [double]$WorkersPerConnector))
+  if (-not $SoakLog) {
+    $SoakLog = Join-Path $PSScriptRoot ("soak-{0:yyyyMMdd-HHmmss}.csv" -f (Get-Date))
+  }
+
+  Write-Host ''
+  Write-Host '== SOAK (steady EPS) =='
+  Write-Host ("host={0} duration={1}s ({2:N2}h) total~{3} EPS ({4}/logical x {5})" -f `
+    $HostAddress, $DurationSec, ($DurationSec / 3600.0), $totalTarget, $EpsPerSender, $nLogical)
+  Write-Host ("threads={0} (workers/conn={1}) batch={2} sample={3}s" -f `
+    $Connectors.Count, $WorkersPerConnector, $Batch, $SampleSec)
+  Write-Host ("log={0}" -f $SoakLog)
+  Write-Host 'MODE: fixed rate, sockets stay open for the whole soak (stable stream).'
+  foreach ($c in $LogicalConnectors) {
+    Write-Host ("  -> {0} ({1}) :{2}/{3}" -f $c.Name, $c.Id, $c.Port, $c.Proto)
+  }
+
+  if ($ApiToken) {
+    Write-Host ("probing {0}/api/ingest/stats ..." -f $ApiBase.TrimEnd('/'))
+    $probe = Get-IngestStatsSnapshot -TimeoutSec 30 -Retries 4
+    if ($null -eq $probe) {
+      Write-Warning 'API stats unreachable at start - continuing; samples may lack server metrics.'
+      $ApiToken = ''
+    } else {
+      Write-Host ("api ok: state={0} received={1} dropped={2}" -f `
+        $probe.state, $probe.received_total, $probe.dropped_total)
+    }
+  } else {
+    Write-Warning 'No -ApiToken: soak will log client EPS only. Pass token for recv/drop/queue.'
+  }
+
+  $control = [hashtable]::Synchronized(@{
+    EpsWorker = $epsWorker
+    Stop = $false
+    Sent = [long]0
+  })
+  $rsPool = [RunspaceFactory]::CreateRunspacePool(1, [Math]::Max(4, $Connectors.Count))
+  $rsPool.Open()
+  $jobs = @()
+  foreach ($c in $Connectors) {
+    $ps = [PowerShell]::Create()
+    $ps.RunspacePool = $rsPool
+    [void]$ps.AddScript($senderScript).AddParameters(@{
+      HostAddress = $HostAddress
+      Port = [int]$c.Port
+      Proto = [string]$c.Proto
+      Name = [string]$c.Name
+      Id = [string]$c.Id
+      Eps = $epsWorker
+      DurationSec = 0
+      Batch = $Batch
+      LinePool = $LinePool
+      Control = $control
+    })
+    $jobs += [pscustomobject]@{ PS = $ps; Handle = $ps.BeginInvoke(); Meta = $c }
+  }
+
+  'utc,elapsed_s,client_eps,recv_eps,drop_eps,queue_pct,lag_s,auth_delta,received_total,dropped_total,queue_depth,verdict' |
+    Set-Content -LiteralPath $SoakLog -Encoding UTF8
+
+  Write-Host ("soak workers started: {0}; warming 3s..." -f $jobs.Count)
+  Start-Sleep -Seconds 3
+
+  $samples = New-Object System.Collections.Generic.List[object]
+  $soakSw = [Diagnostics.Stopwatch]::StartNew()
+  $prevSnap = Get-IngestStatsSnapshot -TimeoutSec 15 -Retries 2
+  [System.Threading.Monitor]::Enter($control)
+  try { $prevSent = [long]$control['Sent'] } finally { [System.Threading.Monitor]::Exit($control) }
+  $prevT = $soakSw.Elapsed.TotalSeconds
+  $failHits = 0
+
+  try {
+    while ($soakSw.Elapsed.TotalSeconds -lt $DurationSec) {
+      $left = $DurationSec - $soakSw.Elapsed.TotalSeconds
+      $sleepFor = [Math]::Min($SampleSec, [Math]::Max(1, [int][Math]::Ceiling($left)))
+      Start-Sleep -Seconds $sleepFor
+
+      $nowT = $soakSw.Elapsed.TotalSeconds
+      $dt = [Math]::Max(0.001, $nowT - $prevT)
+      [System.Threading.Monitor]::Enter($control)
+      try { $curSent = [long]$control['Sent'] } finally { [System.Threading.Monitor]::Exit($control) }
+      $clientEps = [math]::Round(($curSent - $prevSent) / $dt, 1)
+      $snap = Get-IngestStatsSnapshot -TimeoutSec 15 -Retries 2
+
+      $recvEps = $null; $dropEps = $null; $queuePct = $null; $lag = $null; $authDelta = $null
+      $recvTotal = $null; $dropTotal = $null; $qDepth = $null
+      $verdict = 'ok'; $reason = ''
+
+      if ($null -ne $prevSnap -and $null -ne $snap) {
+        $recvEps = [math]::Round(([double]$snap.received_total - [double]$prevSnap.received_total) / $dt, 1)
+        $dropDelta = [double]$snap.dropped_total - [double]$prevSnap.dropped_total
+        $bufDelta = 0.0
+        if ($null -ne $snap.buffer_drops_total -and $null -ne $prevSnap.buffer_drops_total) {
+          $bufDelta = [double]$snap.buffer_drops_total - [double]$prevSnap.buffer_drops_total
+        }
+        $dropEps = [math]::Round(($dropDelta + $bufDelta) / $dt, 2)
+        $recvTotal = $snap.received_total
+        $dropTotal = $snap.dropped_total
+        $qDepth = $snap.queue_depth
+        $qCap = [double]$snap.queue_capacity
+        if ($qCap -gt 0) { $queuePct = [math]::Round(100.0 * [double]$qDepth / $qCap, 1) }
+        if ($recvEps -gt 0) {
+          $backlog = [double]$snap.received_total - [double]$snap.inserted_total
+          if ($backlog -lt 0) { $backlog = 0 }
+          $lag = [math]::Round($backlog / $recvEps, 1)
+        }
+        if ($null -ne $snap.auth_rejected_total -and $null -ne $prevSnap.auth_rejected_total) {
+          $authDelta = [double]$snap.auth_rejected_total - [double]$prevSnap.auth_rejected_total
+        }
+        if ($dropEps -gt $FailDropPerSec) { $verdict = 'warn'; $reason = ("drop/s={0}" -f $dropEps); $failHits++ }
+        elseif ($null -ne $queuePct -and $queuePct -ge $FailQueuePct) { $verdict = 'warn'; $reason = ("queue={0}%" -f $queuePct); $failHits++ }
+        elseif ($null -ne $lag -and $lag -gt $FailLagSec) { $verdict = 'warn'; $reason = ("lag={0}s" -f $lag); $failHits++ }
+        else { $failHits = 0 }
+      }
+
+      $row = [pscustomobject]@{
+        ElapsedSec = [math]::Round($nowT, 1)
+        ClientEps = $clientEps
+        RecvEps = $recvEps
+        DropEps = $dropEps
+        QueuePct = $queuePct
+        LagSec = $lag
+        Verdict = $verdict
+        Reason = $reason
+      }
+      $samples.Add($row)
+
+      $line = "{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11}" -f `
+        ([DateTime]::UtcNow.ToString('o')),
+        $row.ElapsedSec, $clientEps,
+        $(if ($null -ne $recvEps) { $recvEps } else { '' }),
+        $(if ($null -ne $dropEps) { $dropEps } else { '' }),
+        $(if ($null -ne $queuePct) { $queuePct } else { '' }),
+        $(if ($null -ne $lag) { $lag } else { '' }),
+        $(if ($null -ne $authDelta) { $authDelta } else { '' }),
+        $(if ($null -ne $recvTotal) { $recvTotal } else { '' }),
+        $(if ($null -ne $dropTotal) { $dropTotal } else { '' }),
+        $(if ($null -ne $qDepth) { $qDepth } else { '' }),
+        $verdict
+      Add-Content -LiteralPath $SoakLog -Value $line -Encoding UTF8
+
+      Write-Host ("  t={0,6:N0}s client={1,8} recv={2,8} drop={3,7} queue={4,6}% lag={5,5} => {6} {7}" -f `
+        $nowT, $clientEps,
+        $(if ($null -ne $recvEps) { $recvEps } else { '?' }),
+        $(if ($null -ne $dropEps) { $dropEps } else { '?' }),
+        $(if ($null -ne $queuePct) { $queuePct } else { '?' }),
+        $(if ($null -ne $lag) { $lag } else { '?' }),
+        $verdict, $reason)
+
+      $prevSnap = $snap
+      $prevSent = $curSent
+      $prevT = $nowT
+    }
+  } finally {
+    $control['Stop'] = $true
+    foreach ($j in $jobs) {
+      try { [void]$j.PS.EndInvoke($j.Handle) } catch { }
+      finally { $j.PS.Dispose() }
+    }
+    $rsPool.Close(); $rsPool.Dispose()
+    Write-Host 'soak workers stopped'
+  }
+
+  Write-Host ''
+  Write-Host '== soak summary =='
+  $avgClient = ($samples | Measure-Object -Property ClientEps -Average).Average
+  $minClient = ($samples | Measure-Object -Property ClientEps -Minimum).Minimum
+  $maxClient = ($samples | Measure-Object -Property ClientEps -Maximum).Maximum
+  $recvSamples = @($samples | Where-Object { $null -ne $_.RecvEps })
+  Write-Host ("target total EPS : {0}" -f $totalTarget)
+  Write-Host ("client EPS       : avg={0:N1} min={1:N1} max={2:N1} (jitter={3:N1})" -f `
+    $avgClient, $minClient, $maxClient, ($maxClient - $minClient))
+  if ($recvSamples.Count -gt 0) {
+    $avgRecv = ($recvSamples | Measure-Object -Property RecvEps -Average).Average
+    $minRecv = ($recvSamples | Measure-Object -Property RecvEps -Minimum).Minimum
+    $maxRecv = ($recvSamples | Measure-Object -Property RecvEps -Maximum).Maximum
+    $avgDrop = ($recvSamples | Where-Object { $null -ne $_.DropEps } | Measure-Object -Property DropEps -Average).Average
+    $maxQueue = ($recvSamples | Where-Object { $null -ne $_.QueuePct } | Measure-Object -Property QueuePct -Maximum).Maximum
+    $warnN = @($samples | Where-Object { $_.Verdict -ne 'ok' }).Count
+    Write-Host ("server recv EPS  : avg={0:N1} min={1:N1} max={2:N1}" -f $avgRecv, $minRecv, $maxRecv)
+    Write-Host ("drop/s avg       : {0:N2}   max queue%={1}" -f $avgDrop, $maxQueue)
+    Write-Host ("warn samples     : {0} / {1}" -f $warnN, $samples.Count)
+  }
+  Write-Host ("samples          : {0}  log={1}" -f $samples.Count, $SoakLog)
+  Write-Host 'Watch UI /system charts over the same window for CPU/lag correlation.'
+  exit 0
 }
 
 # --------------- FindThreshold: stepped ramp until SLO breach ---------------
@@ -751,6 +958,8 @@ Write-Host ''
 Write-Host 'Check on server:'
 Write-Host '  UI -> /system -> Pipeline (EPS / drops / per-connector)'
 Write-Host ''
-Write-Host 'Capacity ramp (continuous, no settle/reconnect gap):'
+Write-Host 'Steady 1h soak (~10k EPS, stable stream):'
+Write-Host '  .\load-test-connectors.ps1 -Soak -EpsPerSender 2500 -DurationSec 3600 -WorkersPerConnector 4 -Batch 50 -ApiToken $token'
+Write-Host 'Capacity ramp (continuous):'
 Write-Host '  .\load-test-connectors.ps1 -FindThreshold -ApiToken $token -WorkersPerConnector 4 -Batch 200 -SettleSec 0'
 

@@ -5,6 +5,24 @@
 
 ## [Unreleased]
 
+## [2.6.10] — 2026-11-11
+
+Тестовый / pre-release: HIG admin UI + enable/disable УЗ (не Latest).
+
+### Added
+- **Пользователи**: включение/выключение УЗ (`POST /api/users/{username}/enabled`); нельзя выключить себя и последнего активного администратора; выключение инвалидирует сессии; на логине — отказ для выключенной УЗ.
+
+### Changed
+- **Admin UI (Apple HIG)**: quieter actions, RU-копирайт, progressive disclosure и themed controls на Anomalies / Investigate / Hunts / Engine, Reputation, Connectors, ParseErrors, ParserTest, GeoMissing, GeoRanges, Users, ApiTokens, конструкторе поиска и `/system` → Резерв.
+- **Dozzle**: `amir20/dozzle` **v11.4.0 → v11.4.2** (recreate контейнера `dozzle`).
+- **scripts/load-test-connectors.ps1**: режим `-Soak` для длительного steady-нагрузки с периодическими сэмплами.
+
+### Notes
+- OpenAPI API doc version: **1.21.0**
+- Продуктовая версия: **2.6.10** (тестовый пререлиз)
+- Схема ClickHouse: без изменений Ensure*.
+- Достаточно `update.sh` 2.6.10 (recreate **backend** + **frontend**; при профиле dozzle — recreate `dozzle`).
+
 ## [2.6.9] — 2026-11-11
 
 Тестовый / pre-release: Syslog processed из dst_network / delivered (не Latest).
@@ -259,6 +277,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.6.10]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.10
 [2.6.9]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.9
 [2.6.8]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.8
 [2.6.7]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.7

@@ -182,7 +182,7 @@ export default function SystemPage() {
     <AdminLayout
       className="ga-system"
       title="Мониторинг системы"
-      subtitle={tabLabels[tab]}
+      subtitle={`· ${tabLabels[tab]}`}
       mainClassName="content"
       showSystemHealth={false}
       actions={
