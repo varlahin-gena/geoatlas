@@ -123,8 +123,9 @@ export function SystemPipelineTab({
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>Syslog EPS (udp/tcp)</th>
+                  <th>Syslog processed (udp/tcp)</th>
                   <th>Syslog q / drop</th>
+                  <th>Backend EPS</th>
                   <th>Backend recv</th>
                   <th>Drop / auth</th>
                   <th>Last event</th>
@@ -142,6 +143,7 @@ export function SystemPipelineTab({
                     <td>
                       {fmtNumber(c.syslog_queued)} / {fmtNumber(c.syslog_dropped)}
                     </td>
+                    <td>{fmtNumber(c.received_per_sec)}</td>
                     <td>{fmtNumber(c.received_total)}</td>
                     <td>
                       {fmtNumber(c.dropped_total)} / {fmtNumber(c.auth_rejected_total)}
@@ -153,8 +155,8 @@ export function SystemPipelineTab({
             </table>
           </div>
           <p className="hint">
-            Управление портами — в разделе Система → Коннекторы. Цифры syslog — накопленные processed
-            (не EPS/s); backend — received/drops с атрибуцией.
+            Управление портами — в разделе Система → Коннекторы. Syslog processed — накопленные
+            счётчики source; Backend EPS — received/s с атрибуцией по маркеру; recv — накопительно.
           </p>
         </section>
       ) : null}

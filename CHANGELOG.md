@@ -5,6 +5,23 @@
 
 ## [Unreleased]
 
+## [2.6.5] — 2026-11-11
+
+Тестовый / pre-release: метрики Pipeline по syslog-коннекторам (не Latest).
+
+### Fixed
+- **Pipeline / коннекторы**: `stats-exporter` без `stat-format` отдавал Prometheus `input/output_events_*`, парсер ждал CSV/legacy → Syslog processed по строкам оставался `0/0`, а плитка Syslog-NG зеркалила backend EPS.
+- **syslog-ng.conf**: явно `stat-format("csv")` для стабильного scrape.
+- **pkg/syslogngstats**: разбор нового Prometheus (`input_events_total` / `output_events_total` + `result=`).
+
+### Changed
+- **UI Pipeline**: колонка Backend EPS (`received_per_sec`); заголовки без путаницы EPS vs накопленный processed/recv.
+
+### Notes
+- OpenAPI API doc version: **1.20.0**
+- Продуктовая версия: **2.6.5** (тестовый пререлиз)
+- Схема ClickHouse: без изменений Ensure*.
+
 ## [2.6.4] — 2026-11-10
 
 Тестовый / pre-release: CPU/память контейнеров как у Dozzle + ясные алерты EPS vs CPU (не Latest).
@@ -186,6 +203,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.6.5]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.5
 [2.6.4]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.4
 [2.6.3]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.3
 [2.6.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.2

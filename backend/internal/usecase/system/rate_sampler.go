@@ -21,6 +21,9 @@ type RateSampler struct {
 	prevSyslogProc int64
 	prevSyslogTS   time.Time
 
+	prevConnRecv map[string]int64
+	prevConnTS   time.Time
+
 	healthPrevDrop    int64
 	healthPrevBufDrop int64
 	healthPrevTS      time.Time
@@ -68,6 +71,41 @@ func (r *RateSampler) ObserveRates(snap IngestSnapshot) map[string]float64 {
 	rate["drops_per_sec"] = delta(snap.DroppedTotal, prevDrop)
 	rate["buffer_drops_per_sec"] = delta(snap.BufferDropsTotal, prevBufDrop)
 	return rate
+}
+
+// ObserveConnectorRates returns per-connector received/sec between observations.
+func (r *RateSampler) ObserveConnectorRates(conns []IngestConnectorSnapshot) map[string]float64 {
+	out := map[string]float64{}
+	if r == nil {
+		return out
+	}
+	now := time.Now()
+	cur := make(map[string]int64, len(conns))
+	for _, c := range conns {
+		if c.ID == "" {
+			continue
+		}
+		cur[c.ID] = c.ReceivedTotal
+	}
+	r.mu.Lock()
+	prevTS, prev := r.prevConnTS, r.prevConnRecv
+	r.prevConnRecv, r.prevConnTS = cur, now
+	r.mu.Unlock()
+	if prevTS.IsZero() || prev == nil {
+		return out
+	}
+	dt := now.Sub(prevTS).Seconds()
+	if dt <= 0 {
+		return out
+	}
+	for id, n := range cur {
+		delta := float64(n - prev[id])
+		if delta < 0 {
+			delta = 0
+		}
+		out[id] = delta / dt
+	}
+	return out
 }
 
 // ObserveSyslogNG returns syslog-ng drop and processed rates between scrapes.

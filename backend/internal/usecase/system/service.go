@@ -398,7 +398,11 @@ func mergeLiveIngestStats(resp *SystemStatsResponse, ingestStats IngestSnapshot,
 			p["lag_sec"] = backlog / eventRate
 		}
 	}
-	mergeConnectorRows(resp, ingestStats.Connectors, nil)
+	connRates := map[string]float64{}
+	if rates != nil {
+		connRates = rates.ObserveConnectorRates(ingestStats.Connectors)
+	}
+	mergeConnectorRows(resp, ingestStats.Connectors, nil, connRates)
 }
 
 func mergeLiveSyslogNG(resp *SystemStatsResponse, snap SyslogNGSnapshot, rates *RateSampler) {
@@ -427,11 +431,11 @@ func mergeLiveSyslogNG(resp *SystemStatsResponse, snap SyslogNGSnapshot, rates *
 		dropsPerSec, eventsPerSec = rates.ObserveSyslogNG(snap.DroppedTotal, snap.ProcessedTotal)
 	}
 	p["drops_per_sec"] = dropsPerSec
-	mergeConnectorRows(resp, nil, snap.Connectors)
+	mergeConnectorRows(resp, nil, snap.Connectors, nil)
 	p["events_per_sec"] = eventsPerSec
 }
 
-func mergeConnectorRows(resp *SystemStatsResponse, ingest []IngestConnectorSnapshot, syslog []SyslogConnectorSnapshot) {
+func mergeConnectorRows(resp *SystemStatsResponse, ingest []IngestConnectorSnapshot, syslog []SyslogConnectorSnapshot, recvRates map[string]float64) {
 	if resp == nil {
 		return
 	}
@@ -452,6 +456,9 @@ func mergeConnectorRows(resp *SystemStatsResponse, ingest []IngestConnectorSnaps
 		row.DroppedTotal = c.DroppedTotal
 		row.AuthRejectedTotal = c.AuthRejectedTotal
 		row.LastEventAt = c.LastEventAt
+		if recvRates != nil {
+			row.ReceivedPerSec = recvRates[c.ID]
+		}
 		byID[c.ID] = row
 	}
 	for _, c := range syslog {

@@ -88,12 +88,13 @@ func parseCSV(body []byte) Snapshot {
 		// или SourceName;SourceId;SourceInstance;Type;Number     (5)
 		srcName := strings.ToLower(fields[0])
 		srcID := strings.ToLower(fields[1])
+		instance := strings.ToLower(fields[2])
 		typ := strings.ToLower(fields[len(fields)-2])
 		num, err := strconv.ParseFloat(strings.TrimSpace(fields[len(fields)-1]), 64)
 		if err != nil {
 			continue
 		}
-		applyStat(&snap, srcName, srcID, typ, num)
+		applyStat(&snap, srcName, bestStatID(srcID, instance), typ, num)
 	}
 	return snap
 }
@@ -111,14 +112,40 @@ func parsePrometheus(body []byte) Snapshot {
 		if !ok {
 			continue
 		}
-		id := strings.ToLower(labels["id"] + labels["source"] + labels["stat_instance"])
+		id := bestStatID(
+			strings.ToLower(labels["id"]),
+			strings.ToLower(labels["source"]),
+			strings.ToLower(labels["stat_instance"]),
+			strings.ToLower(labels["driver_instance"]),
+		)
 		applyStat(&snap, strings.ToLower(name), id, metricType(name, labels), value)
 	}
 	return snap
 }
 
+func bestStatID(candidates ...string) string {
+	fallback := ""
+	for _, c := range candidates {
+		c = strings.TrimSpace(c)
+		if c == "" {
+			continue
+		}
+		if fallback == "" {
+			fallback = c
+		}
+		if id, _ := parseConnectorSourceID(c); id != "" {
+			return c
+		}
+	}
+	return fallback
+}
+
 func metricType(name string, labels map[string]string) string {
 	if t := strings.ToLower(labels["stat_type"]); t != "" {
+		return t
+	}
+	// New prometheus metrics use result="processed|dropped|queued|delivered".
+	if t := strings.ToLower(labels["result"]); t != "" {
 		return t
 	}
 	n := strings.ToLower(name)
@@ -138,8 +165,13 @@ func applyStat(snap *Snapshot, srcName, srcID, typ string, num float64) {
 	if num < 0 {
 		return
 	}
-	isSrc := strings.Contains(srcName, "src") || strings.Contains(srcName, "_src_")
-	isDst := strings.Contains(srcName, "dst") || strings.Contains(srcName, "_dst_")
+	isSrc := strings.Contains(srcName, "src") ||
+		strings.Contains(srcName, "_src_") ||
+		strings.Contains(srcName, "input_events")
+	isDst := strings.Contains(srcName, "dst") ||
+		strings.Contains(srcName, "_dst_") ||
+		strings.Contains(srcName, "output_events") ||
+		strings.Contains(srcName, "destination")
 	connID, proto := parseConnectorSourceID(srcID)
 	if connID == "" {
 		connID, proto = parseConnectorSourceID(srcName)

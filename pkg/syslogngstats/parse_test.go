@@ -106,3 +106,38 @@ func TestParseEmpty(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestParsePrometheusInputOutputEvents(t *testing.T) {
+	// Default stats-exporter format in syslog-ng 4.9+ (without --with-legacy-metrics).
+	body := []byte(`# TYPE syslogng_input_events_total counter
+syslogng_input_events_total{id="s_default_udp#0",result="processed"} 1000
+syslogng_input_events_total{id="s_default_tcp#0",result="processed"} 500
+syslogng_input_events_total{id="s_id_1515_udp#0",result="processed"} 200
+syslogng_input_events_total{id="s_id_5516_tcp#0",result="processed"} 300
+syslogng_output_events_total{id="d_id_1515_udp#0",driver_instance="tcp,backend:1514",result="dropped"} 4
+syslogng_output_events_total{id="d_id_5516_tcp#0",driver_instance="tcp,backend:1514",result="queued"} 9
+syslogng_output_events_total{id="d_id_5516_tcp#0",driver_instance="tcp,backend:1514",result="delivered"} 300
+`)
+	snap, err := Parse(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snap.UDPProcessed != 1200 || snap.TCPProcessed != 800 || snap.ProcessedTotal != 2000 {
+		t.Fatalf("totals %+v", snap)
+	}
+	if snap.DroppedTotal != 4 || snap.Queued != 9 {
+		t.Fatalf("dst dropped=%v queued=%v", snap.DroppedTotal, snap.Queued)
+	}
+	def := snap.Connectors["default"]
+	if def == nil || def.UDPProcessed != 1000 || def.TCPProcessed != 500 {
+		t.Fatalf("default %+v", def)
+	}
+	c1515 := snap.Connectors["id_1515"]
+	if c1515 == nil || c1515.UDPProcessed != 200 || c1515.Dropped != 4 {
+		t.Fatalf("id_1515 %+v", c1515)
+	}
+	c5516 := snap.Connectors["id_5516"]
+	if c5516 == nil || c5516.TCPProcessed != 300 || c5516.Queued != 9 {
+		t.Fatalf("id_5516 %+v", c5516)
+	}
+}
