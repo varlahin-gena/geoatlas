@@ -398,18 +398,27 @@ func mergeLiveIngestStats(resp *SystemStatsResponse, ingestStats IngestSnapshot,
 			p["lag_sec"] = backlog / eventRate
 		}
 	}
-	mergeConnectorRows(resp, ingestStats.Connectors, nil)
+	connRates := map[string]float64{}
+	if rates != nil {
+		connRates = rates.ObserveConnectorRates(ingestStats.Connectors)
+	}
+	mergeConnectorRows(resp, ingestStats.Connectors, nil, connRates)
 }
 
 func mergeLiveSyslogNG(resp *SystemStatsResponse, snap SyslogNGSnapshot, rates *RateSampler) {
 	if resp.Health["syslogng"] == nil {
 		resp.Health["syslogng"] = map[string]any{}
 	}
+	h := resp.Health["syslogng"]
 	up := 0.0
 	if snap.Up {
 		up = 1
 	}
-	resp.Health["syslogng"]["up"] = up
+	h["up"] = up
+	if snap.Format != "" {
+		h["stats_format"] = snap.Format
+	}
+	h["connector_rows"] = float64(len(snap.Connectors))
 	if !snap.Up {
 		return
 	}
@@ -427,11 +436,15 @@ func mergeLiveSyslogNG(resp *SystemStatsResponse, snap SyslogNGSnapshot, rates *
 		dropsPerSec, eventsPerSec = rates.ObserveSyslogNG(snap.DroppedTotal, snap.ProcessedTotal)
 	}
 	p["drops_per_sec"] = dropsPerSec
-	mergeConnectorRows(resp, nil, snap.Connectors)
+	mergeConnectorRows(resp, nil, snap.Connectors, nil)
 	p["events_per_sec"] = eventsPerSec
+	// csv + empty processed usually means conf still on 2.6.5 exporter settings
+	if snap.Format == "csv" || snap.ProcessedTotal == 0 {
+		h["stats_hint"] = "empty_or_csv: force-recreate syslog-ng (stat-format prometheus + stats-with-legacy)"
+	}
 }
 
-func mergeConnectorRows(resp *SystemStatsResponse, ingest []IngestConnectorSnapshot, syslog []SyslogConnectorSnapshot) {
+func mergeConnectorRows(resp *SystemStatsResponse, ingest []IngestConnectorSnapshot, syslog []SyslogConnectorSnapshot, recvRates map[string]float64) {
 	if resp == nil {
 		return
 	}
@@ -452,6 +465,9 @@ func mergeConnectorRows(resp *SystemStatsResponse, ingest []IngestConnectorSnaps
 		row.DroppedTotal = c.DroppedTotal
 		row.AuthRejectedTotal = c.AuthRejectedTotal
 		row.LastEventAt = c.LastEventAt
+		if recvRates != nil {
+			row.ReceivedPerSec = recvRates[c.ID]
+		}
 		byID[c.ID] = row
 	}
 	for _, c := range syslog {

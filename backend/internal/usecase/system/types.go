@@ -10,6 +10,7 @@ import (
 type ConnectorPipelineRow struct {
 	ID                string  `json:"id"`
 	ReceivedTotal     int64   `json:"received_total"`
+	ReceivedPerSec    float64 `json:"received_per_sec"`
 	DroppedTotal      int64   `json:"dropped_total"`
 	AuthRejectedTotal int64   `json:"auth_rejected_total"`
 	LastEventAt       string  `json:"last_event_at,omitempty"`

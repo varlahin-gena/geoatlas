@@ -50,6 +50,8 @@ export default function LoginPage() {
       if (err instanceof ApiError) {
         if (err.message === 'invalid credentials') {
           setError('Неверный логин или пароль');
+        } else if (/account disabled/i.test(err.message)) {
+          setError('Учётная запись отключена');
         } else if (/too many attempts/i.test(err.message)) {
           setError('Слишком много попыток — подождите и попробуйте снова');
         } else {

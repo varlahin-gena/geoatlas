@@ -1,4 +1,5 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   createGeoRange,
   exportGeoRanges,
@@ -11,15 +12,8 @@ import { useToast } from '@/components/Toast';
 import { TERM } from '@/lib/glossary';
 import { fmtNumber } from '@/lib/format';
 import { buildPeriodQuery } from '@/pages/Map/mapConstants';
-
-const KIND_LABELS: Record<string, string> = {
-  public_unknown: 'public',
-  private: 'private',
-  loopback: 'loopback',
-  link_local: 'link-local',
-  multicast: 'multicast',
-  invalid: 'invalid',
-};
+import { geoMissingKindLabel, geoMissingLogPlace } from './geoMissingDisplay';
+import './geoMissing.css';
 
 function ipv4ToUint(ip: string): number | null {
   const parts = String(ip || '').trim().split('.');
@@ -81,14 +75,32 @@ function summarizeLocal(list: MissingRow[]): Summary {
   };
 }
 
+function useDialogA11y<T extends HTMLElement>(open: boolean, onDismiss: () => void) {
+  const ref = useRef<T | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const node = ref.current;
+    const preferred = node?.querySelector<HTMLElement>('input, button');
+    (preferred ?? node)?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onDismiss();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onDismiss]);
+  return ref;
+}
+
 export default function GeoMissingPage() {
   const { toast } = useToast();
+  const titleId = useId();
   const [period, setPeriod] = useState('12h');
   const [limit, setLimit] = useState('500');
   const [kind, setKind] = useState('all');
   const [search, setSearch] = useState('');
   const [rows, setRows] = useState<MissingRow[]>([]);
   const [summary, setSummary] = useState<Summary>({});
+  const [loading, setLoading] = useState(true);
   const [editIp, setEditIp] = useState<string | null>(null);
   const [form, setForm] = useState({
     network: '',
@@ -98,16 +110,19 @@ export default function GeoMissingPage() {
     lat: '',
     lon: '',
   });
+  const dialogRef = useDialogA11y<HTMLFormElement>(Boolean(editIp), () => setEditIp(null));
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
-      // SoT: minutes=/hours=/days= — not period=.
       const periodQs = buildPeriodQuery(period, '', '').replace(/^&/, '');
       const data = await fetchGeoMissing(`${periodQs}&limit=${encodeURIComponent(limit)}`);
       setRows(data.items || []);
       setSummary(data.summary || {});
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Ошибка', 'error');
+      toast(e instanceof Error ? e.message : 'Не удалось загрузить IP без координат', 'error');
+    } finally {
+      setLoading(false);
     }
   }, [period, limit, toast]);
 
@@ -137,6 +152,9 @@ export default function GeoMissingPage() {
     return summarizeLocal(filtered);
   }, [summary, filtered, kind, search]);
 
+  const publicFocus = displaySummary.public_focus || displaySummary.by_kind?.public_unknown || 0;
+  const showPublicBanner = publicFocus > 0;
+
   async function exportCsv() {
     try {
       const res = await exportGeoRanges();
@@ -153,7 +171,7 @@ export default function GeoMissingPage() {
       URL.revokeObjectURL(url);
       toast('GeoIP CSV скачан', 'success');
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Ошибка экспорта', 'error');
+      toast(e instanceof Error ? e.message : 'Не удалось выгрузить CSV', 'error');
     }
   }
 
@@ -165,7 +183,16 @@ export default function GeoMissingPage() {
     }
     try {
       await navigator.clipboard.writeText(ips.join('\n'));
-      toast(`Скопировано IP: ${ips.length}`, 'success');
+      toast(`Скопировано IP: ${fmtNumber(ips.length)}`, 'success');
+    } catch {
+      toast('Не удалось скопировать', 'error');
+    }
+  }
+
+  async function copyIp(ip: string) {
+    try {
+      await navigator.clipboard.writeText(ip);
+      toast('IP скопирован', 'success');
     } catch {
       toast('Не удалось скопировать', 'error');
     }
@@ -186,7 +213,7 @@ export default function GeoMissingPage() {
       return;
     }
     if (!Number.isFinite(body.lat) || !Number.isFinite(body.lon)) {
-      toast('Укажите Latitude и Longitude', 'error');
+      toast('Укажите широту и долготу', 'error');
       return;
     }
     try {
@@ -206,26 +233,28 @@ export default function GeoMissingPage() {
         setSummary(summarizeLocal(next));
       }
       toast(
-        `Добавлено: ${net}${data.ranges != null ? ` (всего диапазонов: ${data.ranges})` : ''}${
-          removed ? `; убрано из списка: ${removed}` : ''
+        `Добавлено: ${net}${data.ranges != null ? ` (всего диапазонов: ${fmtNumber(data.ranges)})` : ''}${
+          removed ? `; убрано из списка: ${fmtNumber(removed)}` : ''
         }`,
         'success',
       );
       setEditIp(null);
       void load();
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Ошибка', 'error');
+      toast(err instanceof Error ? err.message : 'Не удалось сохранить диапазон', 'error');
     }
   }
 
   const by = displaySummary.by_kind || {};
 
   return (
-    <SettingsLayout title="IP без координат"
+    <SettingsLayout
+      title="IP без координат"
+      plainTitle
       actions={
         <>
           <button type="button" className="btn" onClick={() => void copyPublic()}>
-            Копировать public IP
+            Копировать публичные IP
           </button>
           <button type="button" className="btn" onClick={() => void exportCsv()}>
             Выгрузить GeoIP CSV
@@ -237,120 +266,162 @@ export default function GeoMissingPage() {
         <p className="page-lead">
           Уникальные IP без координат. Публичные — в базу GeoIP; приватные на карте обычно не нужны.
         </p>
+
         <div className="geo-missing-summary">
-          <div>
+          <div className="geo-missing-stat">
             <div className="hint">Уникальных IP</div>
             <b>{fmtNumber(displaySummary.unique_ips)}</b>
           </div>
-          <div>
-            <div className="hint">Событий (показано)</div>
+          <div className="geo-missing-stat">
+            <div className="hint">Событий</div>
             <b>{fmtNumber(displaySummary.events)}</b>
           </div>
-          <div>
+          <div className="geo-missing-stat is-focus">
             <div className="hint">Публичных без geo</div>
-            <b>{fmtNumber(displaySummary.public_focus || by.public_unknown || 0)}</b>
+            <b>{fmtNumber(publicFocus)}</b>
           </div>
-          <div>
+          <div className="geo-missing-stat">
             <div className="hint">Приватных</div>
             <b>{fmtNumber(by.private || 0)}</b>
           </div>
         </div>
-        <div className="toolbar" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-          <input
-            placeholder={`Поиск по IP или ${TERM.peer.toLowerCase()}…`}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <select value={period} onChange={(e) => setPeriod(e.target.value)}>
-            <option value="15m">15 мин</option>
-            <option value="1h">1 час</option>
-            <option value="6h">6 часов</option>
-            <option value="12h">12 часов</option>
-            <option value="1d">1 день</option>
-            <option value="3d">3 дня</option>
-            <option value="7d">7 дней</option>
-          </select>
-          <select value={kind} onChange={(e) => setKind(e.target.value)}>
-            <option value="all">Все типы</option>
-            <option value="public_unknown">Только публичные</option>
-            <option value="private">Приватные</option>
-            <option value="loopback">Loopback</option>
-            <option value="link_local">Link-local</option>
-            <option value="multicast">Multicast</option>
-            <option value="invalid">Некорректные</option>
-          </select>
-          <select value={limit} onChange={(e) => setLimit(e.target.value)}>
-            {[200, 500, 1000, 2000].map((n) => (
-              <option key={n} value={String(n)}>
-                {n}
-              </option>
-            ))}
-          </select>
-          <button type="button" className="btn" onClick={() => void load()}>
-            Обновить
+
+        {showPublicBanner ? (
+          <p className="geo-missing-banner" role="status">
+            Публичные IP без GeoIP — добавьте диапазон в базу (кнопка «В базу» в строке). Страна в
+            логе может быть подсказкой, но не заменяет запись в базе.
+          </p>
+        ) : null}
+
+        <div className="geo-missing-toolbar">
+          <div className="field geo-missing-search">
+            <label htmlFor="geo-missing-search">Поиск</label>
+            <input
+              id="geo-missing-search"
+              type="search"
+              placeholder={`IP или ${TERM.peer.toLowerCase()}…`}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="geo-missing-period">Период</label>
+            <select
+              id="geo-missing-period"
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+            >
+              <option value="15m">15 мин</option>
+              <option value="1h">1 час</option>
+              <option value="6h">6 часов</option>
+              <option value="12h">12 часов</option>
+              <option value="1d">1 день</option>
+              <option value="3d">3 дня</option>
+              <option value="7d">7 дней</option>
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="geo-missing-kind">Тип</label>
+            <select id="geo-missing-kind" value={kind} onChange={(e) => setKind(e.target.value)}>
+              <option value="all">Все типы</option>
+              <option value="public_unknown">Только публичные</option>
+              <option value="private">Приватные</option>
+              <option value="loopback">Loopback</option>
+              <option value="link_local">Link-local</option>
+              <option value="multicast">Multicast</option>
+              <option value="invalid">Некорректные</option>
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="geo-missing-limit">Лимит</label>
+            <select
+              id="geo-missing-limit"
+              value={limit}
+              onChange={(e) => setLimit(e.target.value)}
+            >
+              {[200, 500, 1000, 2000].map((n) => (
+                <option key={n} value={String(n)}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button type="button" className="btn" disabled={loading} onClick={() => void load()}>
+            {loading ? 'Обновление…' : 'Обновить'}
           </button>
-          <span className="badge">{filtered.length ? `Показано: ${filtered.length}` : ''}</span>
         </div>
+
         <div className="card table-wrap">
-          <table>
+          <table className="geo-missing-table">
             <thead>
               <tr>
                 <th scope="col">IP</th>
                 <th scope="col">Тип</th>
-                <th scope="col">Событий</th>
-                <th scope="col">as src/dst</th>
+                <th scope="col" className="num">
+                  Событий
+                </th>
+                <th scope="col" className="num">
+                  Направление
+                </th>
                 <th scope="col" title={TERM.peerHint}>
                   {TERM.peer}
                 </th>
-                <th scope="col">Log geo</th>
-                <th scope="col">Подсказка</th>
-                <th scope="col"> </th>
+                <th scope="col">В логе</th>
+                <th scope="col">
+                  <span className="visually-hidden">Действия</span>
+                </th>
               </tr>
             </thead>
             <tbody>
-              {!filtered.length ? (
+              {loading && !rows.length ? (
                 <tr>
-                  <td colSpan={8} className="empty">
-                    Нет IP без geo за выбранный период / фильтр
+                  <td colSpan={7} className="empty">
+                    Загрузка…
+                  </td>
+                </tr>
+              ) : !filtered.length ? (
+                <tr>
+                  <td colSpan={7} className="empty">
+                    <div className="geo-missing-empty">
+                      <p>Нет IP без координат за выбранный период и фильтр.</p>
+                      <p className="hint">
+                        Смените период или тип — либо откройте{' '}
+                        <Link to="/geo-ranges">базу GeoIP</Link>.
+                      </p>
+                    </div>
                   </td>
                 </tr>
               ) : (
                 filtered.map((r) => (
                   <tr key={r.ip}>
-                    <td className="mono">
-                      {r.ip}{' '}
-                      <button
-                        type="button"
-                        className="btn"
-                        style={{ padding: '2px 8px', fontSize: 11 }}
-                        onClick={async () => {
-                          try {
-                            await navigator.clipboard.writeText(r.ip);
-                            toast('IP скопирован', 'success');
-                          } catch {
-                            toast('Не удалось скопировать', 'error');
-                          }
-                        }}
-                      >
-                        копир.
-                      </button>
-                    </td>
-                    <td>{KIND_LABELS[r.kind || ''] || r.kind || '—'}</td>
                     <td>
+                      <div className="geo-missing-ip mono">
+                        <span>{r.ip}</span>
+                        <button
+                          type="button"
+                          className="btn sm ghost"
+                          aria-label={`Копировать ${r.ip}`}
+                          title="Копировать IP"
+                          onClick={() => void copyIp(r.ip)}
+                        >
+                          Копировать
+                        </button>
+                      </div>
+                    </td>
+                    <td>{geoMissingKindLabel(r.kind)}</td>
+                    <td className="num">
                       <b>{fmtNumber(r.count)}</b>
                     </td>
-                    <td>
+                    <td className="num" title="источник / назначение">
                       {fmtNumber(r.as_src)} / {fmtNumber(r.as_dst)}
                     </td>
                     <td className="mono">{r.sample_peer || '—'}</td>
-                    <td>{[r.log_city, r.log_country].filter(Boolean).join(', ') || '—'}</td>
-                    <td className="hint geo-missing-hint" title={r.action_hint || undefined}>
-                      {r.action_hint || '—'}
-                    </td>
-                    <td>
+                    <td>{geoMissingLogPlace(r.log_city, r.log_country)}</td>
+                    <td className="actions">
                       <button
                         type="button"
-                        className="btn"
+                        className="btn sm"
+                        title={r.action_hint || 'Добавить диапазон в базу GeoIP'}
                         onClick={() => {
                           setEditIp(r.ip);
                           setForm({
@@ -363,7 +434,7 @@ export default function GeoMissingPage() {
                           });
                         }}
                       >
-                        добавить в базу
+                        В базу
                       </button>
                     </td>
                   </tr>
@@ -373,28 +444,39 @@ export default function GeoMissingPage() {
           </table>
         </div>
       </div>
+
       {editIp ? (
         <div
           className="modal-backdrop show"
+          role="presentation"
           onClick={(e) => e.target === e.currentTarget && setEditIp(null)}
         >
-          <form className="modal" role="dialog" aria-modal="true" onSubmit={onSave}>
-            <h3>Добавить GeoIP: {editIp}</h3>
+          <form
+            ref={dialogRef}
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            tabIndex={-1}
+            onSubmit={(e) => void onSave(e)}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id={titleId}>Добавить в GeoIP: {editIp}</h3>
             {(
               [
-                ['network', 'Network'],
-                ['country', 'Country'],
-                ['region', 'Region'],
-                ['city', 'City'],
-                ['lat', 'Latitude'],
-                ['lon', 'Longitude'],
+                ['network', 'Сеть'],
+                ['country', 'Страна'],
+                ['region', 'Регион'],
+                ['city', 'Город'],
+                ['lat', 'Широта'],
+                ['lon', 'Долгота'],
               ] as const
             ).map(([k, label]) => (
               <div className="field" key={k}>
-                <label htmlFor={k}>{label}</label>
+                <label htmlFor={`geo-add-${k}`}>{label}</label>
                 <input
-                  id={k}
-                  required={k === 'network' || k === 'country' || k === 'region' || k === 'city' || k === 'lat' || k === 'lon'}
+                  id={`geo-add-${k}`}
+                  required
                   value={form[k]}
                   onChange={(e) => setForm({ ...form, [k]: e.target.value })}
                 />

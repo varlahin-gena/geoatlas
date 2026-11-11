@@ -1,0 +1,151 @@
+.connectors-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: baseline;
+  margin: 0 0 14px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.connectors-summary .hint {
+  margin: 0;
+  font-weight: 400;
+  font-size: 13px;
+}
+
+.connectors-details {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.connectors-details summary {
+  cursor: pointer;
+  user-select: none;
+}
+
+.connectors-details summary:hover {
+  color: var(--text);
+}
+
+.connectors-details[open] summary {
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.connectors-details p {
+  margin: 0 0 6px;
+  line-height: 1.45;
+  max-width: 48rem;
+}
+
+.connectors-details code {
+  font-size: 12px;
+}
+
+.connectors-dirty {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  font-size: 13px;
+}
+
+.connectors-dirty .btn.primary {
+  margin-left: auto;
+}
+
+.connectors-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.connectors-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.connectors-table th,
+.connectors-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.connectors-table th {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.connectors-table .mono {
+  font-variant-numeric: tabular-nums;
+}
+
+.connectors-table .conn-name {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  align-items: center;
+  font-weight: 500;
+}
+
+.connectors-builtin {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.connectors-table .btn.sm {
+  padding: 4px 10px;
+  font-size: 12px;
+  min-height: 28px;
+}
+
+.connectors-table .btn.sm.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-dim);
+}
+
+.connectors-table .btn.sm.ghost:hover:not(:disabled) {
+  background: var(--panel-3);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.connectors-table .btn.sm.danger.ghost {
+  color: var(--red);
+}
+
+.connectors-table .btn.sm.danger.ghost:hover:not(:disabled) {
+  background: rgba(248, 81, 73, 0.12);
+  border-color: rgba(248, 81, 73, 0.35);
+  color: var(--red);
+}
+
+.connectors-form .form-row {
+  align-items: flex-end;
+}
+
+.connectors-form .field-hint {
+  margin-top: 2px;
+}

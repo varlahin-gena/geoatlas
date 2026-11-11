@@ -30,6 +30,30 @@ center;;received;a;processed;150
 	}
 }
 
+func TestParseCSVSourceGroupName(t *testing.T) {
+	// syslog-ng-ctl often emits SourceName=source (not src.*) — must still attribute.
+	body := []byte(`source;s_default_udp;;a;processed;111
+source;s_id_1515_tcp#0;;a;processed;222
+destination;d_id_1515_tcp;;a;dropped;7
+destination;d_id_1515_tcp;;a;queued;3
+`)
+	snap, err := Parse(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snap.UDPProcessed != 111 || snap.TCPProcessed != 222 || snap.ProcessedTotal != 333 {
+		t.Fatalf("processed %+v", snap)
+	}
+	def := snap.Connectors["default"]
+	if def == nil || def.UDPProcessed != 111 {
+		t.Fatalf("default %+v", def)
+	}
+	c := snap.Connectors["id_1515"]
+	if c == nil || c.TCPProcessed != 222 || c.Dropped != 7 || c.Queued != 3 {
+		t.Fatalf("id_1515 %+v", c)
+	}
+}
+
 func TestParsePrometheus(t *testing.T) {
 	body := []byte(`# TYPE syslogng_src_processed counter
 syslogng_src_processed{id="s_udp#0"} 20
@@ -104,5 +128,97 @@ func TestParseConnectorSourceIDStripsInstance(t *testing.T) {
 func TestParseEmpty(t *testing.T) {
 	if _, err := Parse(nil); err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestParsePrometheusInputOutputEvents(t *testing.T) {
+	// Default stats-exporter format in syslog-ng 4.9+ (without --with-legacy-metrics).
+	body := []byte(`# TYPE syslogng_input_events_total counter
+syslogng_input_events_total{id="s_default_udp#0",result="processed"} 1000
+syslogng_input_events_total{id="s_default_tcp#0",result="processed"} 500
+syslogng_input_events_total{id="s_id_1515_udp#0",result="processed"} 200
+syslogng_input_events_total{id="s_id_5516_tcp#0",result="processed"} 300
+syslogng_output_events_total{id="d_id_1515_udp#0",driver_instance="tcp,backend:1514",result="dropped"} 4
+syslogng_output_events_total{id="d_id_5516_tcp#0",driver_instance="tcp,backend:1514",result="queued"} 9
+syslogng_output_events_total{id="d_id_5516_tcp#0",driver_instance="tcp,backend:1514",result="delivered"} 300
+`)
+	snap, err := Parse(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snap.UDPProcessed != 1200 || snap.TCPProcessed != 800 || snap.ProcessedTotal != 2000 {
+		t.Fatalf("totals %+v", snap)
+	}
+	if snap.DroppedTotal != 4 || snap.Queued != 9 {
+		t.Fatalf("dst dropped=%v queued=%v", snap.DroppedTotal, snap.Queued)
+	}
+	def := snap.Connectors["default"]
+	if def == nil || def.UDPProcessed != 1000 || def.TCPProcessed != 500 {
+		t.Fatalf("default %+v", def)
+	}
+	c1515 := snap.Connectors["id_1515"]
+	if c1515 == nil || c1515.UDPProcessed != 200 || c1515.Dropped != 4 {
+		t.Fatalf("id_1515 %+v", c1515)
+	}
+	c5516 := snap.Connectors["id_5516"]
+	if c5516 == nil || c5516.TCPProcessed != 300 || c5516.Queued != 9 {
+		t.Fatalf("id_5516 %+v", c5516)
+	}
+}
+
+func TestParsePrometheusInputEventsOmitsResult(t *testing.T) {
+	// Real 4.10+ exporter samples often omit result= on input_events_total.
+	body := []byte(`syslogng_input_events_total{id="s_default_udp#0"} 111
+syslogng_input_events_total{id="s_default_tcp#0"} 222
+syslogng_input_events_total{id="s_id_1515_udp#0"} 333
+syslogng_output_events_total{id="d_id_1515_udp#0",driver_instance="tcp,backend:1514",result="queued"} 5
+`)
+	snap, err := Parse(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snap.UDPProcessed != 444 || snap.TCPProcessed != 222 || snap.ProcessedTotal != 666 {
+		t.Fatalf("totals udp=%v tcp=%v all=%v", snap.UDPProcessed, snap.TCPProcessed, snap.ProcessedTotal)
+	}
+	def := snap.Connectors["default"]
+	if def == nil || def.UDPProcessed != 111 || def.TCPProcessed != 222 {
+		t.Fatalf("default %+v", def)
+	}
+	c := snap.Connectors["id_1515"]
+	if c == nil || c.UDPProcessed != 333 || c.Queued != 5 {
+		t.Fatalf("id_1515 %+v", c)
+	}
+}
+
+func TestParsePrometheusDestNetworkProcessedFallback(t *testing.T) {
+	// Live 2.6.8 scrape on 4.12: source input often absent; legacy dest counters present.
+	body := []byte(`syslogng_dst_network_processed{id="d_default_udp#0",stat_instance="tcp,backend:1514"} 1000
+syslogng_dst_network_processed{id="d_default_tcp#0",stat_instance="tcp,backend:1514"} 500
+syslogng_dst_network_processed{id="d_id_1515_udp#0",stat_instance="tcp,backend:1514"} 200
+syslogng_output_events_total{transport="tcp",address="backend:1514",driver="afsocket",id="d_id_5516_tcp#0",result="delivered"} 300
+syslogng_output_events_total{transport="tcp",address="backend:1514",driver="afsocket",id="d_id_5516_tcp#0",result="queued"} 2
+syslogng_center_processed{stat_instance="received"} 9999
+`)
+	snap, err := Parse(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snap.Format != "prometheus" {
+		t.Fatalf("format %q", snap.Format)
+	}
+	if snap.UDPProcessed != 1200 || snap.TCPProcessed != 800 || snap.ProcessedTotal != 2000 {
+		t.Fatalf("totals udp=%v tcp=%v all=%v", snap.UDPProcessed, snap.TCPProcessed, snap.ProcessedTotal)
+	}
+	def := snap.Connectors["default"]
+	if def == nil || def.UDPProcessed != 1000 || def.TCPProcessed != 500 {
+		t.Fatalf("default %+v", def)
+	}
+	c1515 := snap.Connectors["id_1515"]
+	if c1515 == nil || c1515.UDPProcessed != 200 {
+		t.Fatalf("id_1515 %+v", c1515)
+	}
+	c5516 := snap.Connectors["id_5516"]
+	if c5516 == nil || c5516.TCPProcessed != 300 || c5516.Queued != 2 {
+		t.Fatalf("id_5516 %+v", c5516)
 	}
 }
