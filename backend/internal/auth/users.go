@@ -52,11 +52,11 @@ const (
 
 // User — локальная учётная запись (пароль хранится как bcrypt-хеш).
 type User struct {
-	Username           string `json:"username"`
-	FullName           string `json:"full_name,omitempty"`
-	PasswordHash       string `json:"password_hash"`
-	Role               string `json:"role"`
-	MustResetPassword  bool   `json:"must_reset_password"`
+	Username          string `json:"username"`
+	FullName          string `json:"full_name,omitempty"`
+	PasswordHash      string `json:"password_hash"`
+	Role              string `json:"role"`
+	MustResetPassword bool   `json:"must_reset_password"`
 	// Disabled — omitempty: старые users.json без поля остаются включёнными.
 	Disabled           bool   `json:"disabled,omitempty"`
 	GeoWizardDismissed bool   `json:"geo_wizard_dismissed,omitempty"`
