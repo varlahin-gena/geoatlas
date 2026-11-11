@@ -89,7 +89,7 @@ build_or_pull build geoatlas-clickhouse:latest -f clickhouse/Dockerfile clickhou
 
 # Third-party runtime images from docker-compose.yml.
 build_or_pull pull alpine:3.23
-build_or_pull pull amir20/dozzle:v11.4.2
+build_or_pull pull amir20/dozzle:v11.4.0
 
 : >"${OUT}/manifest.txt"
 save_one geoatlas-backend:latest
@@ -98,7 +98,7 @@ save_one geoatlas-frontend:latest
 save_one geoatlas-syslog-ng:latest
 save_one geoatlas-clickhouse:latest
 save_one alpine:3.23
-save_one amir20/dozzle:v11.4.2
+save_one amir20/dozzle:v11.4.0
 
 log "готово: ${OUT}/manifest.txt"
 wc -l <"${OUT}/manifest.txt" | awk '{print "[export-images] образов: " $1}'

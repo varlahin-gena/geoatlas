@@ -1,16 +1,13 @@
 import type { AnomalyEvent } from '@/api/anomalies';
-import { fmtDate, fmtNumber } from '@/lib/format';
 import { anomalyMapToView } from '@/pages/Map/useMapAnomalies';
 import { MAP_VIEW_DEFAULTS, serializeMapViewSearch } from '@/pages/Map/mapQuery';
 
-export type AnomalySortKey = 'detected_at' | 'event_count';
-export type AnomalySortDir = 'asc' | 'desc';
-
-export type AnomalyDescriptionParts = {
-  subject: string;
-  detail?: string;
-  delta?: string;
-};
+export const ANOMALY_SEVERITY_OPTIONS = [
+  { value: '', label: 'Любая важность' },
+  { value: 'high', label: 'Критично' },
+  { value: 'warn', label: 'Предупреждение' },
+  { value: 'info', label: 'Информация' },
+] as const;
 
 export const ANOMALY_CODE_OPTIONS = [
   { value: '', label: 'Все типы' },
@@ -112,182 +109,12 @@ export function matchesAnomalySearch(item: AnomalyEvent, query: string): boolean
     item.dst_ip,
     item.src_country,
     item.dst_country,
-    item.src_city,
-    item.dst_city,
     item.device,
   ]
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
   return hay.includes(q);
-}
-
-function detailRecord(item: AnomalyEvent): Record<string, unknown> | undefined {
-  const d = item.detail;
-  if (!d || typeof d !== 'object' || Array.isArray(d)) return undefined;
-  return d as Record<string, unknown>;
-}
-
-function detailString(detail: Record<string, unknown> | undefined, key: string): string {
-  const v = detail?.[key];
-  return typeof v === 'string' ? v.trim() : '';
-}
-
-function detailNumber(detail: Record<string, unknown> | undefined, key: string): number | undefined {
-  const v = detail?.[key];
-  if (typeof v === 'number' && Number.isFinite(v)) return v;
-  if (typeof v === 'string' && v.trim() !== '') {
-    const n = Number(v);
-    if (Number.isFinite(n)) return n;
-  }
-  return undefined;
-}
-
-function stripCodePrefix(title: string, codeLabel: string): string {
-  const t = title.trim();
-  const label = codeLabel.trim();
-  if (!t || !label) return t;
-  if (t.toLowerCase().startsWith(label.toLowerCase())) {
-    return t.slice(label.length).replace(/^[\s.:—\-–]+/u, '').trim();
-  }
-  return t;
-}
-
-/** Structured description for the table: place / range / surge delta. */
-export function formatAnomalyDescription(item: AnomalyEvent): AnomalyDescriptionParts {
-  const detail = detailRecord(item);
-  const code = (item.code || '').trim();
-  const network = detailString(detail, 'network') || (item.device || '').trim();
-  const label = detailString(detail, 'label');
-  const curr =
-    detailNumber(detail, 'blocked_current') ??
-    detailNumber(detail, 'bytes_current') ??
-    detailNumber(detail, 'current');
-  const prev =
-    detailNumber(detail, 'blocked_previous') ??
-    detailNumber(detail, 'bytes_previous') ??
-    detailNumber(detail, 'previous');
-  const windowMin = detailNumber(detail, 'window_minutes');
-
-  if (code === 'blocked_surge' || code === 'byte_surge') {
-    const subject = label || network || stripCodePrefix(item.title || '', eventCodeLabel(item)) || '—';
-    const detailLine = label && network && label !== network ? network : undefined;
-    let delta: string | undefined;
-    if (curr !== undefined && prev !== undefined) {
-      const win = windowMin && windowMin > 0 ? ` за ${windowMin} мин` : '';
-      delta = `${fmtNumber(curr)}${win} · было ${fmtNumber(prev)}`;
-    }
-    return { subject, detail: detailLine, delta };
-  }
-
-  const subject =
-    stripCodePrefix(item.title || '', eventCodeLabel(item)) ||
-    item.title?.trim() ||
-    '—';
-  return { subject };
-}
-
-/** Endpoint label: IP first, then city/country, then optional network fallback. */
-export function anomalyEndpointLabel(
-  ip?: string | null,
-  city?: string | null,
-  country?: string | null,
-  fallback?: string | null,
-): string {
-  const addr = (ip || '').trim();
-  if (addr) return addr;
-  const place = [city, country].map((p) => (p || '').trim()).filter(Boolean).join(', ');
-  if (place) return place;
-  const fb = (fallback || '').trim();
-  return fb || '';
-}
-
-/** Compact window label; full range stays in title. */
-export function formatAnomalyWindow(
-  start?: string | null,
-  end?: string | null,
-): { label: string; title: string } {
-  const fullStart = start ? fmtDate(start) : '—';
-  const fullEnd = end ? fmtDate(end) : '—';
-  const title = `${fullStart} → ${fullEnd}`;
-  if (!start && !end) return { label: '—', title: '' };
-
-  const ds = start ? new Date(start) : null;
-  const de = end ? new Date(end) : null;
-  if (
-    ds &&
-    de &&
-    !Number.isNaN(ds.getTime()) &&
-    !Number.isNaN(de.getTime()) &&
-    ds.getFullYear() === de.getFullYear() &&
-    ds.getMonth() === de.getMonth() &&
-    ds.getDate() === de.getDate()
-  ) {
-    const hm = (d: Date) =>
-      d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-    return { label: `${hm(ds)}–${hm(de)}`, title };
-  }
-  return { label: title, title };
-}
-
-/** Human scope line for peers panel (API path stays in title attribute). */
-export function anomalyPeersScopeLabel(item: AnomalyEvent, hours: number): string {
-  const parts = [`Связи за ${hours} ч`];
-  const q = anomalyEventsQuery(item).trim();
-  if (!q) return parts[0];
-  for (const token of q.split(/\s+/).filter(Boolean)) {
-    const m = /^([a-z_]+):(.+)$/i.exec(token);
-    if (!m) {
-      parts.push(token);
-      continue;
-    }
-    const key = m[1].toLowerCase();
-    const val = m[2];
-    if (key === 'city') parts.push(`город ${val}`);
-    else if (key === 'src') parts.push(`источник ${val}`);
-    else if (key === 'dst') parts.push(`назначение ${val}`);
-    else if (key === 'country') parts.push(`страна ${val}`);
-    else parts.push(`${key}:${val}`);
-  }
-  return parts.join(' · ');
-}
-
-export function anomalyNetworkFallback(item: AnomalyEvent): string {
-  const detail = detailRecord(item);
-  return detailString(detail, 'network') || (item.device || '').trim();
-}
-
-export function compareAnomalies(
-  a: AnomalyEvent,
-  b: AnomalyEvent,
-  key: AnomalySortKey,
-  dir: AnomalySortDir,
-): number {
-  let cmp = 0;
-  if (key === 'event_count') {
-    cmp = (a.event_count || 0) - (b.event_count || 0);
-  } else {
-    const ta = Date.parse(a.detected_at || '');
-    const tb = Date.parse(b.detected_at || '');
-    const na = Number.isFinite(ta) ? ta : 0;
-    const nb = Number.isFinite(tb) ? tb : 0;
-    cmp = na - nb;
-  }
-  if (cmp === 0) {
-    cmp = (a.fingerprint || '').localeCompare(b.fingerprint || '');
-  }
-  return dir === 'asc' ? cmp : -cmp;
-}
-
-export function nextAnomalySort(
-  currentKey: AnomalySortKey,
-  currentDir: AnomalySortDir,
-  nextKey: AnomalySortKey,
-): { key: AnomalySortKey; dir: AnomalySortDir } {
-  if (currentKey === nextKey) {
-    return { key: currentKey, dir: currentDir === 'desc' ? 'asc' : 'desc' };
-  }
-  return { key: nextKey, dir: 'desc' };
 }
 
 /** Hours for GET /api/events from anomaly map.period or window. */

@@ -833,53 +833,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/users/{username}/enabled": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Включить или выключить УЗ
-         * @description Нельзя выключить собственную УЗ и последнего активного администратора.
-         *     Выключение инвалидирует сессии пользователя.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    username: string;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["AuthSetEnabledRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["AuthUserPublic"];
-                    };
-                };
-                400: components["responses"]["ValidationError"];
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/users/{username}/reset-password": {
         parameters: {
             query?: never;
@@ -5679,11 +5632,7 @@ export interface components {
             /** @enum {string} */
             role: "administrator" | "operator" | "dashboard";
             must_reset_password?: boolean;
-            enabled: boolean;
             created_at?: string;
-        };
-        AuthSetEnabledRequest: {
-            enabled: boolean;
         };
         AuthUserList: {
             users?: components["schemas"]["AuthUserPublic"][];

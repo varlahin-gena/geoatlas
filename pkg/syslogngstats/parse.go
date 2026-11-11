@@ -22,7 +22,6 @@ type ConnectorSnap struct {
 
 // Snapshot — счётчики syslog-ng, нужные пайплайну (drops до backend).
 type Snapshot struct {
-	Format         string // "prometheus" | "csv"
 	DroppedTotal   float64
 	Queued         float64
 	ProcessedTotal float64
@@ -62,13 +61,9 @@ func Parse(body []byte) (Snapshot, error) {
 		return Snapshot{}, fmt.Errorf("empty syslog-ng stats body")
 	}
 	if looksPrometheus(trimmed) {
-		snap := parsePrometheus(trimmed)
-		snap.Format = "prometheus"
-		return snap, nil
+		return parsePrometheus(trimmed), nil
 	}
-	snap := parseCSV(trimmed)
-	snap.Format = "csv"
-	return snap, nil
+	return parseCSV(trimmed), nil
 }
 
 func looksPrometheus(body []byte) bool {
@@ -93,28 +88,17 @@ func parseCSV(body []byte) Snapshot {
 		// или SourceName;SourceId;SourceInstance;Type;Number     (5)
 		srcName := strings.ToLower(fields[0])
 		srcID := strings.ToLower(fields[1])
-		instance := strings.ToLower(fields[2])
 		typ := strings.ToLower(fields[len(fields)-2])
 		num, err := strconv.ParseFloat(strings.TrimSpace(fields[len(fields)-1]), 64)
 		if err != nil {
 			continue
 		}
-		applyStat(&snap, srcName, bestStatID(srcID, instance), typ, num, true)
+		applyStat(&snap, srcName, srcID, typ, num)
 	}
 	return snap
 }
 
 func parsePrometheus(body []byte) Snapshot {
-	// Prefer source counters; if none (common on 4.12 live scrapes), fall back to
-	// destination forwarded counts (dst_network_processed / output delivered).
-	snap := parsePrometheusPass(body, false)
-	if snap.ProcessedTotal == 0 {
-		snap = parsePrometheusPass(body, true)
-	}
-	return snap
-}
-
-func parsePrometheusPass(body []byte, allowDestProcessed bool) Snapshot {
 	var snap Snapshot
 	sc := bufio.NewScanner(bytes.NewReader(body))
 	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -127,72 +111,18 @@ func parsePrometheusPass(body []byte, allowDestProcessed bool) Snapshot {
 		if !ok {
 			continue
 		}
-		id := bestStatID(
-			strings.ToLower(labels["id"]),
-			strings.ToLower(labels["source"]),
-			strings.ToLower(labels["stat_instance"]),
-			strings.ToLower(labels["driver_instance"]),
-		)
-		if _, proto := parseConnectorSourceID(id); proto == "" {
-			if tr := protoFromLabels(labels); tr != "" {
-				base := id
-				if i := strings.IndexByte(base, '#'); i >= 0 {
-					base = base[:i]
-				}
-				if (strings.HasPrefix(base, "s_") || strings.HasPrefix(base, "d_")) &&
-					!strings.HasSuffix(base, "_udp") && !strings.HasSuffix(base, "_tcp") {
-					id = base + "_" + tr
-				}
-			}
-		}
-		applyStat(&snap, strings.ToLower(name), id, metricType(name, labels), value, allowDestProcessed)
+		id := strings.ToLower(labels["id"] + labels["source"] + labels["stat_instance"])
+		applyStat(&snap, strings.ToLower(name), id, metricType(name, labels), value)
 	}
 	return snap
-}
-
-func protoFromLabels(labels map[string]string) string {
-	for _, k := range []string{"transport", "driver", "driver_instance"} {
-		v := strings.ToLower(labels[k])
-		switch {
-		case v == "udp" || strings.Contains(v, ".udp") || strings.HasSuffix(v, "udp"):
-			return "udp"
-		case v == "tcp" || strings.Contains(v, "tcp") || strings.Contains(v, "stream"):
-			return "tcp"
-		}
-	}
-	return ""
-}
-
-func bestStatID(candidates ...string) string {
-	fallback := ""
-	for _, c := range candidates {
-		c = strings.TrimSpace(c)
-		if c == "" {
-			continue
-		}
-		if fallback == "" {
-			fallback = c
-		}
-		if id, _ := parseConnectorSourceID(c); id != "" {
-			return c
-		}
-	}
-	return fallback
 }
 
 func metricType(name string, labels map[string]string) string {
 	if t := strings.ToLower(labels["stat_type"]); t != "" {
 		return t
 	}
-	// New prometheus metrics use result="processed|dropped|queued|delivered".
-	// input_events_total often omits result entirely (4.10+ blog samples).
-	if t := strings.ToLower(labels["result"]); t != "" {
-		return t
-	}
 	n := strings.ToLower(name)
 	switch {
-	case strings.Contains(n, "input_events"):
-		return "processed"
 	case strings.Contains(n, "dropped"):
 		return "dropped"
 	case strings.Contains(n, "queued"):
@@ -204,23 +134,12 @@ func metricType(name string, labels map[string]string) string {
 	}
 }
 
-func applyStat(snap *Snapshot, srcName, srcID, typ string, num float64, allowDestProcessed bool) {
+func applyStat(snap *Snapshot, srcName, srcID, typ string, num float64) {
 	if num < 0 {
 		return
 	}
-	// "source" (CSV group) does NOT contain substring "src" — check explicitly.
-	isSrc := srcName == "source" ||
-		strings.HasPrefix(srcName, "src.") ||
-		strings.Contains(srcName, "input_events") ||
-		strings.Contains(srcName, "syslogng_src") ||
-		strings.Contains(srcName, "syslogng_source") ||
-		strings.Contains(srcName, "_src_")
-	isDst := srcName == "destination" ||
-		strings.HasPrefix(srcName, "dst.") ||
-		strings.Contains(srcName, "output_events") ||
-		strings.Contains(srcName, "syslogng_dst") ||
-		strings.Contains(srcName, "syslogng_destination") ||
-		strings.Contains(srcName, "_dst_")
+	isSrc := strings.Contains(srcName, "src") || strings.Contains(srcName, "_src_")
+	isDst := strings.Contains(srcName, "dst") || strings.Contains(srcName, "_dst_")
 	connID, proto := parseConnectorSourceID(srcID)
 	if connID == "" {
 		connID, proto = parseConnectorSourceID(srcName)
@@ -242,43 +161,26 @@ func applyStat(snap *Snapshot, srcName, srcID, typ string, num float64, allowDes
 				cs.Queued += num
 			}
 		}
-	case "delivered":
-		// output_events_total{result="delivered"} — forwarded to backend.
-		if allowDestProcessed {
-			addProcessed(snap, connID, proto, srcID, num, true)
-		}
 	case "processed":
+		if !isSrc {
+			return
+		}
 		if strings.Contains(srcName, "center") || strings.Contains(srcID, "center") {
 			return
 		}
-		if isSrc {
-			addProcessed(snap, connID, proto, srcID, num, false)
-			return
-		}
-		// 4.12 legacy: syslogng_dst_network_processed{id="d_default_udp#0"} …
-		if allowDestProcessed && (isDst || strings.HasPrefix(srcID, "d_")) {
-			addProcessed(snap, connID, proto, srcID, num, true)
-		}
-	}
-}
-
-func addProcessed(snap *Snapshot, connID, proto, srcID string, num float64, _ bool) {
-	switch {
-	case proto == "udp",
-		strings.Contains(srcID, "_udp"),
-		strings.Contains(srcID, "s_udp"):
-		snap.UDPProcessed += num
-		snap.ProcessedTotal += num
-		if connID != "" {
-			ensureConnector(snap, connID).UDPProcessed += num
-		}
-	case proto == "tcp",
-		strings.Contains(srcID, "_tcp"),
-		strings.Contains(srcID, "s_tcp"):
-		snap.TCPProcessed += num
-		snap.ProcessedTotal += num
-		if connID != "" {
-			ensureConnector(snap, connID).TCPProcessed += num
+		switch {
+		case proto == "udp" || strings.Contains(srcID, "s_udp") || (strings.Contains(srcID, "udp") && !strings.Contains(srcID, "backend")):
+			snap.UDPProcessed += num
+			snap.ProcessedTotal += num
+			if connID != "" {
+				ensureConnector(snap, connID).UDPProcessed += num
+			}
+		case proto == "tcp" || strings.Contains(srcID, "s_tcp") || (strings.Contains(srcID, "tcp") && !strings.Contains(srcID, "backend")):
+			snap.TCPProcessed += num
+			snap.ProcessedTotal += num
+			if connID != "" {
+				ensureConnector(snap, connID).TCPProcessed += num
+			}
 		}
 	}
 }

@@ -24,9 +24,9 @@ func (a *SyslogNGAdapter) Snapshot(ctx context.Context) (system.SyslogNGSnapshot
 	}
 	client := a.Client
 	if client == nil {
-		client = &http.Client{Timeout: 3 * time.Second}
+		client = &http.Client{Timeout: time.Second}
 	}
-	reqCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	reqCtx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 	raw, err := syslogngstats.Fetch(reqCtx, client, a.URL)
 	if err != nil {
@@ -34,7 +34,6 @@ func (a *SyslogNGAdapter) Snapshot(ctx context.Context) (system.SyslogNGSnapshot
 	}
 	out := system.SyslogNGSnapshot{
 		Up:             true,
-		Format:         raw.Format,
 		DroppedTotal:   int64(raw.DroppedTotal),
 		Queued:         int64(raw.Queued),
 		ProcessedTotal: int64(raw.ProcessedTotal),

@@ -20,7 +20,7 @@ func (s stubUsers) Get(string) (auth.UserPublic, bool) {
 	if s.missing {
 		return auth.UserPublic{}, false
 	}
-	return auth.UserPublic{Username: "u", Role: s.role, Enabled: true}, true
+	return auth.UserPublic{Username: "u", Role: s.role}, true
 }
 func (s stubUsers) SessionVersion(string) (int64, bool) {
 	if s.missing {

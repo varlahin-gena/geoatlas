@@ -12,7 +12,6 @@ export type EdgesAgg = components['schemas']['SystemEdgesAgg'];
 export interface ConnectorPipelineRow {
   id: string;
   received_total?: number;
-  received_per_sec?: number;
   dropped_total?: number;
   auth_rejected_total?: number;
   last_event_at?: string;

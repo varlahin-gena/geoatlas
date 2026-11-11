@@ -134,7 +134,7 @@ func TestWriteUserStoreErrorBranches(t *testing.T) {
 	cases := []error{
 		auth.ErrUserExists, auth.ErrUserNotFound, auth.ErrInvalidUsername, auth.ErrInvalidPassword,
 		auth.ErrInvalidRole, auth.ErrInvalidFullName, auth.ErrLastAdmin, auth.ErrSelfDelete,
-		auth.ErrSelfDisable, auth.ErrBadOldPassword, usecaseauth.ErrNotConfigured, errIngestUnavailable,
+		auth.ErrBadOldPassword, usecaseauth.ErrNotConfigured, errIngestUnavailable,
 	}
 	for _, e := range cases {
 		rec := httptest.NewRecorder()

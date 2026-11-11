@@ -4,11 +4,7 @@ import { fetchMapEvents } from '@/api/events';
 import type { MapLine } from '@/api/eventsTypes';
 import { fmtNumber } from '@/lib/format';
 import { COPY, TERM } from '@/lib/glossary';
-import {
-  anomalyEventsHours,
-  anomalyEventsQuery,
-  anomalyPeersScopeLabel,
-} from './anomalyDisplay';
+import { anomalyEventsHours, anomalyEventsQuery } from './anomalyDisplay';
 
 export function AnomalyPeersPanel({
   item,
@@ -72,8 +68,8 @@ export function AnomalyPeersPanel({
     <div className="anomaly-peers-panel">
       <div className="anomaly-peers-head">
         <strong title={TERM.peerHint}>{COPY.peersHead}</strong>
-        <span className="hint" title={`/api/events · ${hours}ч · q=${q}`}>
-          {anomalyPeersScopeLabel(item, hours)}
+        <span className="hint">
+          /api/events · {hours}ч · q={q}
         </span>
         {toolbar ? <div className="anomaly-peers-toolbar">{toolbar}</div> : null}
       </div>

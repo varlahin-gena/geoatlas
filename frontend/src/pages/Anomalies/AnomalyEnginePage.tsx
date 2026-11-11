@@ -52,19 +52,6 @@ function thresholdsFromView(view: AnomalyEngineSettingsView): Required<AnomalyTh
   };
 }
 
-function formatScanDuration(raw?: string): string {
-  if (!raw) return '—';
-  const m = /^([\d.]+)\s*ms$/i.exec(raw.trim());
-  if (m) return `${m[1]} мс`;
-  return raw;
-}
-
-function fieldPreviewValue(field: ThresholdFieldMeta, value: number): string {
-  if (field.unit === 'bytes') return fmtBytes(value);
-  if (field.step && field.step < 1) return String(value).replace('.', ',');
-  return fmtNumber(value);
-}
-
 function StatusPanel({ status }: { status: AnomalyScanStatus | null }) {
   if (!status) return null;
   return (
@@ -76,7 +63,7 @@ function StatusPanel({ status }: { status: AnomalyScanStatus | null }) {
           <dd>{status.learning ? 'да' : 'нет'}</dd>
         </div>
         <div>
-          <dt>Сети предприятия</dt>
+          <dt>Enterprise-сети</dt>
           <dd>{fmtNumber(status.enterprise_nets ?? 0)}</dd>
         </div>
         {(status.enterprise_nets ?? 0) === 0 ? (
@@ -84,20 +71,20 @@ function StatusPanel({ status }: { status: AnomalyScanStatus | null }) {
             <dt>Подсказка</dt>
             <dd className="hint">
               Отметьте сети в <Link to="/geo-ranges">базе GeoIP</Link> → «Сети предприятия», иначе
-              сканер пропускает запуски.
+              сканер пропускает тики.
             </dd>
           </div>
         ) : null}
         <div>
-          <dt>Последний успешный запуск</dt>
+          <dt>Последний успешный тик</dt>
           <dd>{status.last_ok ? fmtDate(status.last_ok) : '—'}</dd>
         </div>
         <div>
           <dt>Длительность</dt>
-          <dd>{formatScanDuration(status.last_duration)}</dd>
+          <dd>{status.last_duration || '—'}</dd>
         </div>
         <div>
-          <dt>Алертов за запуск</dt>
+          <dt>Вставлено</dt>
           <dd>{fmtNumber(status.last_inserted ?? 0)}</dd>
         </div>
         {status.last_skip ? (
@@ -113,12 +100,6 @@ function StatusPanel({ status }: { status: AnomalyScanStatus | null }) {
           </div>
         ) : null}
       </dl>
-      {status.learning ? (
-        <p className="anomaly-learning-note" role="status">
-          Обучение · «новая страна» и «периодическая связь» пока не ищутся. Длительность задаётся в
-          параметрах ниже.
-        </p>
-      ) : null}
     </section>
   );
 }
@@ -161,52 +142,30 @@ function DetectorCard({
   onChange: (patch: Partial<AnomalyThresholds>) => void;
 }) {
   const adviceId = useId();
-  const fieldsId = useId();
-  const [adviceOpen, setAdviceOpen] = useState(false);
-  const [fieldsOpen, setFieldsOpen] = useState(false);
-  const preview = detector.fields
-    .slice(0, 2)
-    .map((f) => `${f.label}: ${fieldPreviewValue(f, thresholds[f.key])}`)
-    .join(' · ');
+  const [open, setOpen] = useState(false);
 
   return (
-    <article className={`thresholds-detector${fieldsOpen ? ' is-editing' : ''}`}>
+    <article className="thresholds-detector">
       <header className="thresholds-detector-head">
         <div className="thresholds-detector-titles">
           <h4 className="thresholds-detector-title">{detector.title}</h4>
           <div className="thresholds-detector-meta">
-            <code className="thresholds-code" title={detector.code}>
-              {detector.code}
-            </code>
+            <code className="thresholds-code">{detector.code}</code>
             <span className="thresholds-window">{detector.window}</span>
           </div>
-          {!fieldsOpen && preview ? (
-            <p className="thresholds-detector-summary">{preview}</p>
-          ) : null}
         </div>
-        <div className="thresholds-detector-actions">
-          <button
-            type="button"
-            className="btn sm ghost"
-            aria-expanded={adviceOpen}
-            aria-controls={adviceId}
-            onClick={() => setAdviceOpen((v) => !v)}
-          >
-            {adviceOpen ? 'Скрыть справку' : 'Как настроить'}
-          </button>
-          <button
-            type="button"
-            className="btn sm"
-            aria-expanded={fieldsOpen}
-            aria-controls={fieldsId}
-            onClick={() => setFieldsOpen((v) => !v)}
-          >
-            {fieldsOpen ? 'Свернуть' : 'Изменить'}
-          </button>
-        </div>
+        <button
+          type="button"
+          className="btn sm thresholds-advice-toggle"
+          aria-expanded={open}
+          aria-controls={adviceId}
+          onClick={() => setOpen((v) => !v)}
+        >
+          {open ? 'Скрыть' : 'Как настроить'}
+        </button>
       </header>
 
-      {adviceOpen ? (
+      {open ? (
         <div id={adviceId} className="thresholds-detector-advice">
           <p>{detector.summary}</p>
           <p>
@@ -215,18 +174,16 @@ function DetectorCard({
         </div>
       ) : null}
 
-      {fieldsOpen ? (
-        <div id={fieldsId} className="form-row thresholds-detector-fields">
-          {detector.fields.map((field) => (
-            <ThresholdField
-              key={field.key}
-              field={field}
-              value={thresholds[field.key]}
-              onChange={(v) => onChange({ [field.key]: v })}
-            />
-          ))}
-        </div>
-      ) : null}
+      <div className="form-row thresholds-detector-fields">
+        {detector.fields.map((field) => (
+          <ThresholdField
+            key={field.key}
+            field={field}
+            value={thresholds[field.key]}
+            onChange={(v) => onChange({ [field.key]: v })}
+          />
+        ))}
+      </div>
     </article>
   );
 }
@@ -246,7 +203,6 @@ function ThresholdsPanel({
   onChange: (next: Required<AnomalyThresholds>) => void;
   onReset: () => void;
 }) {
-  const [openGroup, setOpenGroup] = useState(DETECTOR_THRESHOLD_GROUPS[0]?.id || 'scanning');
   const set = (patch: Partial<AnomalyThresholds>) => onChange({ ...thresholds, ...patch });
 
   return (
@@ -259,7 +215,7 @@ function ThresholdsPanel({
             {customized
               ? ' Сейчас используются переопределённые значения.'
               : ' Показаны значения по умолчанию профиля.'}{' '}
-            Откройте категорию и нажмите «Изменить», чтобы править числа.
+            Подробности детектора — в «Как настроить».
           </p>
         </div>
         <button type="button" className="btn sm" onClick={onReset} disabled={!defaults}>
@@ -268,50 +224,24 @@ function ThresholdsPanel({
       </div>
 
       <div className="thresholds-categories">
-        {DETECTOR_THRESHOLD_GROUPS.map((group) => {
-          const expanded = openGroup === group.id;
-          const panelId = `threshold-group-${group.id}`;
-          return (
-            <section
-              key={group.id}
-              className={`thresholds-category${expanded ? ' is-open' : ''}`}
-            >
-              <header className="thresholds-category-head">
-                <button
-                  type="button"
-                  className="thresholds-category-toggle"
-                  aria-expanded={expanded}
-                  aria-controls={panelId}
-                  onClick={() => setOpenGroup(expanded ? '' : group.id)}
-                >
-                  <span className="thresholds-category-title">{group.title}</span>
-                  <span className="thresholds-category-count">
-                    {group.detectors.length}{' '}
-                    {group.detectors.length === 1 ? 'детектор' : 'детектора'}
-                  </span>
-                  <span className="thresholds-category-chevron" aria-hidden="true">
-                    {expanded ? '▾' : '▸'}
-                  </span>
-                </button>
-                {expanded ? (
-                  <p className="thresholds-category-blurb">{group.blurb}</p>
-                ) : null}
-              </header>
-              {expanded ? (
-                <div id={panelId} className="thresholds-category-grid">
-                  {group.detectors.map((detector) => (
-                    <DetectorCard
-                      key={detector.id}
-                      detector={detector}
-                      thresholds={thresholds}
-                      onChange={set}
-                    />
-                  ))}
-                </div>
-              ) : null}
-            </section>
-          );
-        })}
+        {DETECTOR_THRESHOLD_GROUPS.map((group) => (
+          <section key={group.id} className="thresholds-category">
+            <header className="thresholds-category-head">
+              <h4 className="thresholds-category-title">{group.title}</h4>
+              <p className="thresholds-category-blurb">{group.blurb}</p>
+            </header>
+            <div className="thresholds-category-grid">
+              {group.detectors.map((detector) => (
+                <DetectorCard
+                  key={detector.id}
+                  detector={detector}
+                  thresholds={thresholds}
+                  onChange={set}
+                />
+              ))}
+            </div>
+          </section>
+        ))}
       </div>
     </section>
   );
@@ -367,10 +297,6 @@ export default function AnomalyEnginePage() {
     setThresholds(defaults);
     setThresholdCustomized(false);
     setSettings((prev) => ({ ...prev, new_country_min_share: defaults.new_country_min_share }));
-    toast(
-      `Пороги профиля ${view.install_profile || 'medium'} — нажмите «Сохранить»`,
-      'success',
-    );
   };
 
   const onSave = async (e: FormEvent) => {
@@ -395,8 +321,8 @@ export default function AnomalyEnginePage() {
     <AdminLayout title="Движок аномалий">
       <div className="page-intro">
         <p>
-          Параметры сканера и пороги детекторов. Журнал алертов — на странице{' '}
-          <Link to="/anomalies">Аномалии</Link>. Сети предприятия задаются в{' '}
+          Параметры сканера, пороги детекторов и подавление повторов. Журнал алертов — на странице{' '}
+          <Link to="/anomalies">Аномалии</Link>. Enterprise-сети задаются в{' '}
           <Link to="/geo-ranges">базе GeoIP</Link>.
         </p>
       </div>
@@ -423,9 +349,9 @@ export default function AnomalyEnginePage() {
                 className="btn"
                 onClick={() => void load()}
                 disabled={loading || saving}
-                title="Отменить несохранённые правки и загрузить настройки с сервера"
+                title="Перезагрузить настройки с сервера"
               >
-                Перезагрузить с сервера
+                С сервера
               </button>
             </div>
 
@@ -441,7 +367,7 @@ export default function AnomalyEnginePage() {
             </label>
 
             <div className="form-row">
-              <label className="anomaly-engine-field">
+              <label>
                 Интервал сканирования (мин)
                 <input
                   type="number"
@@ -453,8 +379,8 @@ export default function AnomalyEnginePage() {
                   }
                 />
               </label>
-              <label className="anomaly-engine-field">
-                Дней обучения
+              <label>
+                Дней обучения baseline
                 <input
                   type="number"
                   min={1}
@@ -463,8 +389,8 @@ export default function AnomalyEnginePage() {
                   onChange={(e) => setSettings({ ...settings, learning_days: Number(e.target.value) })}
                 />
               </label>
-              <label className="anomaly-engine-field">
-                Скрытие алерта (часов)
+              <label>
+                Подавление ack (часов)
                 <input
                   type="number"
                   min={1}
@@ -481,7 +407,7 @@ export default function AnomalyEnginePage() {
                 checked={settings.include_private}
                 onChange={(e) => setSettings({ ...settings, include_private: e.target.checked })}
               />
-              Учитывать частные адреса (10/8, 172.16/12, 192.168/16) в детекторах
+              Учитывать частные IP (RFC1918) в детекторах
             </label>
 
             {settings.updated_at ? (

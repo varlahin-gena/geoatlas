@@ -63,7 +63,6 @@ type SyslogConnectorSnapshot struct {
 // SyslogNGSnapshot is live stats-exporter data (drops/queue before backend ingest).
 type SyslogNGSnapshot struct {
 	Up             bool
-	Format         string // "prometheus" | "csv" | ""
 	DroppedTotal   int64
 	Queued         int64
 	ProcessedTotal int64
