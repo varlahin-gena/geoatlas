@@ -5,6 +5,19 @@
 
 ## [Unreleased]
 
+## [2.6.11] — 2026-11-11
+
+Тестовый / pre-release: HIG table layout на admin-страницах (не Latest).
+
+### Changed
+- **Admin UI (Apple HIG)**: `table-layout: fixed`, ellipsis, стабильная колонка действий и выровненные toolbars на Anomalies, Hunts, Connectors, ParseErrors, GeoMissing, GeoRanges, Users, ApiTokens; убран double-frame card/table; checkbox «Включена» без дублирующей подписи.
+
+### Notes
+- OpenAPI API doc version: **1.21.0**
+- Продуктовая версия: **2.6.11** (тестовый пререлиз)
+- Схема ClickHouse: без изменений Ensure*.
+- Достаточно `update.sh` 2.6.11 (recreate **frontend**).
+
 ## [2.6.10] — 2026-11-11
 
 Тестовый / pre-release: HIG admin UI + enable/disable УЗ (не Latest).
@@ -277,6 +290,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.6.11]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.11
 [2.6.10]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.10
 [2.6.9]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.9
 [2.6.8]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.8
