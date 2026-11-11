@@ -165,3 +165,27 @@ syslogng_output_events_total{id="d_id_5516_tcp#0",driver_instance="tcp,backend:1
 		t.Fatalf("id_5516 %+v", c5516)
 	}
 }
+
+func TestParsePrometheusInputEventsOmitsResult(t *testing.T) {
+	// Real 4.10+ exporter samples often omit result= on input_events_total.
+	body := []byte(`syslogng_input_events_total{id="s_default_udp#0"} 111
+syslogng_input_events_total{id="s_default_tcp#0"} 222
+syslogng_input_events_total{id="s_id_1515_udp#0"} 333
+syslogng_output_events_total{id="d_id_1515_udp#0",driver_instance="tcp,backend:1514",result="queued"} 5
+`)
+	snap, err := Parse(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snap.UDPProcessed != 444 || snap.TCPProcessed != 222 || snap.ProcessedTotal != 666 {
+		t.Fatalf("totals udp=%v tcp=%v all=%v", snap.UDPProcessed, snap.TCPProcessed, snap.ProcessedTotal)
+	}
+	def := snap.Connectors["default"]
+	if def == nil || def.UDPProcessed != 111 || def.TCPProcessed != 222 {
+		t.Fatalf("default %+v", def)
+	}
+	c := snap.Connectors["id_1515"]
+	if c == nil || c.UDPProcessed != 333 || c.Queued != 5 {
+		t.Fatalf("id_1515 %+v", c)
+	}
+}

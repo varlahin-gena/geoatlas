@@ -5,6 +5,20 @@
 
 ## [Unreleased]
 
+## [2.6.7] — 2026-11-11
+
+Тестовый / pre-release: Syslog processed (input_events без result=) (не Latest).
+
+### Fixed
+- **pkg/syslogngstats**: `syslogng_input_events_total` часто **без** `result=` — раньше typ не становился `processed` → Syslog EPS=0 и processed 0/0, при этом q/drop уже читались.
+- **UI Syslog-NG**: meta udp/tcp берёт `syslogng.*_processed`, а не backend rate (не путать стадии).
+
+### Notes
+- OpenAPI API doc version: **1.20.0**
+- Продуктовая версия: **2.6.7** (тестовый пререлиз)
+- Схема ClickHouse: без изменений Ensure*.
+- Достаточно обновить **backend** (+ frontend для подписей); syslog-ng conf из 2.6.6 (prometheus) ок.
+
 ## [2.6.6] — 2026-11-11
 
 Тестовый / pre-release: Syslog processed по коннекторам (не Latest).
@@ -217,6 +231,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.6.7]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.7
 [2.6.6]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.6
 [2.6.5]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.5
 [2.6.4]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.4

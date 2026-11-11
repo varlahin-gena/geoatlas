@@ -73,8 +73,8 @@ export function SystemPipelineTab({
             <div className="stage-name">Syslog-NG</div>
             <div className="stage-value">{fmtNumber(syslogEps)} eps</div>
             <div className="stage-meta">
-              udp: {fmtNumber(rate.udp_events_per_sec)}/s · tcp:{' '}
-              {fmtNumber(rate.tcp_events_per_sec)}/s
+              udp: {fmtNumber(syslogng.udp_processed)} · tcp:{' '}
+              {fmtNumber(syslogng.tcp_processed)} (processed)
               {num(syslogng.queued) > 0
                 ? ` · q: ${fmtNumber(syslogng.queued)}${
                     syslogCap > 0 ? ` (${fmtPercent(syslogQueuePct)})` : ''

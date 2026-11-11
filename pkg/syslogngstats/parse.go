@@ -118,9 +118,34 @@ func parsePrometheus(body []byte) Snapshot {
 			strings.ToLower(labels["stat_instance"]),
 			strings.ToLower(labels["driver_instance"]),
 		)
+		if _, proto := parseConnectorSourceID(id); proto == "" {
+			if tr := protoFromLabels(labels); tr != "" {
+				base := id
+				if i := strings.IndexByte(base, '#'); i >= 0 {
+					base = base[:i]
+				}
+				if (strings.HasPrefix(base, "s_") || strings.HasPrefix(base, "d_")) &&
+					!strings.HasSuffix(base, "_udp") && !strings.HasSuffix(base, "_tcp") {
+					id = base + "_" + tr
+				}
+			}
+		}
 		applyStat(&snap, strings.ToLower(name), id, metricType(name, labels), value)
 	}
 	return snap
+}
+
+func protoFromLabels(labels map[string]string) string {
+	for _, k := range []string{"transport", "driver", "driver_instance"} {
+		v := strings.ToLower(labels[k])
+		switch {
+		case v == "udp" || strings.Contains(v, ".udp") || strings.HasSuffix(v, "udp"):
+			return "udp"
+		case v == "tcp" || strings.Contains(v, "tcp") || strings.Contains(v, "stream"):
+			return "tcp"
+		}
+	}
+	return ""
 }
 
 func bestStatID(candidates ...string) string {
@@ -145,11 +170,14 @@ func metricType(name string, labels map[string]string) string {
 		return t
 	}
 	// New prometheus metrics use result="processed|dropped|queued|delivered".
+	// input_events_total often omits result entirely (4.10+ blog samples).
 	if t := strings.ToLower(labels["result"]); t != "" {
 		return t
 	}
 	n := strings.ToLower(name)
 	switch {
+	case strings.Contains(n, "input_events"):
+		return "processed"
 	case strings.Contains(n, "dropped"):
 		return "dropped"
 	case strings.Contains(n, "queued"):
