@@ -5,6 +5,20 @@
 
 ## [Unreleased]
 
+## [2.6.9] — 2026-11-11
+
+Тестовый / pre-release: Syslog processed из dst_network / delivered (не Latest).
+
+### Fixed
+- **pkg/syslogngstats**: на живом 4.12 scrape source `input_events` часто пуст; считаем legacy `syslogng_dst_network_processed` и `output_events_total{result="delivered"}` по `d_<id>_{udp|tcp}` (fallback, без double-count с source).
+
+### Notes
+- OpenAPI API doc version: **1.20.0**
+- Продуктовая версия: **2.6.9** (тестовый пререлиз)
+- Схема ClickHouse: без изменений Ensure*.
+- Достаточно `update.sh` 2.6.9 (или recreate **backend**); conf syslog-ng из 2.6.8 ок.
+- После старта гоняйте поток, затем смотрите Pipeline (сразу после recreate счётчики syslog-ng = 0).
+
 ## [2.6.8] — 2026-11-11
 
 Тестовый / pre-release: syslog-ng stats scrape (prometheus + legacy) (не Latest).
@@ -245,6 +259,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.6.9]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.9
 [2.6.8]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.8
 [2.6.7]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.7
 [2.6.6]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.6
