@@ -7,16 +7,12 @@ export function SettingsLayout({
   title,
   children,
   actions,
-  plainTitle = false,
 }: {
   title: string;
   children: ReactNode;
   actions?: ReactNode;
-  /** When true, use title as-is (sidebar already shows Settings). */
-  plainTitle?: boolean;
 }) {
-  const heading =
-    plainTitle || title.startsWith('Настройки') ? title : `Настройки · ${title}`;
+  const heading = title.startsWith('Настройки') ? title : `Настройки · ${title}`;
 
   return (
     <AdminLayout title={heading} actions={actions}>

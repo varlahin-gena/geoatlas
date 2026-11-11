@@ -143,9 +143,6 @@ func LiveSession(users UserLookup, sess Session) (Session, bool) {
 	if !ok {
 		return Session{}, false
 	}
-	if !pub.Enabled {
-		return Session{}, false
-	}
 	sv, ok := users.SessionVersion(sess.Username)
 	if !ok || sess.SessionVersion != sv {
 		return Session{}, false

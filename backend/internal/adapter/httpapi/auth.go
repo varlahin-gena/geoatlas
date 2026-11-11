@@ -63,10 +63,6 @@ type setFullNameRequest struct {
 	FullName string `json:"full_name"`
 }
 
-type setEnabledRequest struct {
-	Enabled *bool `json:"enabled"`
-}
-
 type geoWizardDismissRequest struct {
 	Dismissed *bool `json:"dismissed"`
 }
@@ -167,21 +163,6 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		})
 		time.Sleep(200 * time.Millisecond)
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "invalid credentials"})
-		return
-	}
-	if errors.Is(err, usecaseauth.ErrDisabled) {
-		lim.RecordFailure(ip, req.Username)
-		writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
-			Actor:        req.Username,
-			Action:       "auth.login.failed",
-			ResourceType: "session",
-			ResourceID:   req.Username,
-			Result:       "failed",
-			IP:           ip,
-			Details:      map[string]any{"reason": "disabled"},
-		})
-		time.Sleep(200 * time.Millisecond)
-		writeJSON(w, http.StatusForbidden, map[string]any{"error": "account disabled"})
 		return
 	}
 	if errors.Is(err, usecaseauth.ErrNotConfigured) {
@@ -619,9 +600,6 @@ func (h *UsersHandler) Directory(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]string, 0, len(users))
 	for _, u := range users {
-		if !u.Enabled {
-			continue
-		}
 		item := map[string]string{"username": u.Username}
 		if fn := strings.TrimSpace(u.FullName); fn != "" {
 			item["full_name"] = fn
@@ -714,58 +692,6 @@ func (h *UsersHandler) SetRole(w http.ResponseWriter, r *http.Request) {
 		Result:       "succeeded",
 		IP:           clientIPFromRequest(r),
 		Details:      map[string]any{"role": pub.Role},
-	})
-	writeJSON(w, http.StatusOK, pub)
-}
-
-func (h *UsersHandler) SetEnabled(w http.ResponseWriter, r *http.Request) {
-	if h.authModuleDisabled(w) {
-		return
-	}
-	if h.authUC == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "auth not configured"})
-		return
-	}
-	username := r.PathValue("username")
-	var req setEnabledRequest
-	if !decodeJSONBody(w, r, &req, defaultJSONBodyLimit) {
-		return
-	}
-	if req.Enabled == nil {
-		writeBadRequest(w, "enabled is required")
-		return
-	}
-	actor := ""
-	if sess, ok := SessionFromContext(r.Context()); ok {
-		actor = sess.Username
-	} else if sess, err := SessionFromRequest(r, h.sessions); err == nil {
-		actor = sess.Username
-	}
-	pub, err := h.authUC.SetEnabled(username, *req.Enabled, actor)
-	if err != nil {
-		writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
-			Actor:        actorFromRequest(r),
-			Action:       "auth.user.enable_change",
-			ResourceType: "user",
-			ResourceID:   username,
-			Result:       "failed",
-			IP:           clientIPFromRequest(r),
-			Details:      map[string]any{"error": err.Error(), "enabled": *req.Enabled},
-		})
-		writeUserStoreError(w, err)
-		return
-	}
-	if !*req.Enabled && h.sessionRegistry != nil {
-		_, _ = h.sessionRegistry.RevokeUser(username)
-	}
-	writeAuditEvent(r.Context(), h.logs, usecaseaudit.AuditEvent{
-		Actor:        actorFromRequest(r),
-		Action:       "auth.user.enable_change",
-		ResourceType: "user",
-		ResourceID:   pub.Username,
-		Result:       "succeeded",
-		IP:           clientIPFromRequest(r),
-		Details:      map[string]any{"enabled": pub.Enabled},
 	})
 	writeJSON(w, http.StatusOK, pub)
 }
@@ -927,8 +853,6 @@ func writeUserStoreError(w http.ResponseWriter, err error) {
 		writeBadRequest(w, "cannot remove or demote the last administrator")
 	case errors.Is(err, auth.ErrSelfDelete):
 		writeBadRequest(w, "cannot delete your own account")
-	case errors.Is(err, auth.ErrSelfDisable):
-		writeBadRequest(w, "cannot disable your own account")
 	case errors.Is(err, auth.ErrBadOldPassword):
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "current password is incorrect"})
 	case errors.Is(err, usecaseauth.ErrNotConfigured):

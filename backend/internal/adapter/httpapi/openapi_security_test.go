@@ -19,7 +19,6 @@ var mutationPaths = []struct {
 	{"post", "/api/users"},
 	{"post", "/api/users/{username}/role"},
 	{"post", "/api/users/{username}/full-name"},
-	{"post", "/api/users/{username}/enabled"},
 	{"post", "/api/users/{username}/reset-password"},
 	{"post", "/api/tokens"},
 	{"post", "/api/anomalies/{fingerprint}/assign"},

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: ГеоАтлас API
-  version: "1.21.0"
+  version: "1.20.0"
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
@@ -378,33 +378,6 @@ paths:
       responses:
         "200":
           description: OK
-        "400":
-          $ref: "#/components/responses/ValidationError"
-  /api/users/{username}/enabled:
-    post:
-      tags: [auth]
-      summary: Включить или выключить УЗ
-      description: |
-        Нельзя выключить собственную УЗ и последнего активного администратора.
-        Выключение инвалидирует сессии пользователя.
-      parameters:
-        - name: username
-          in: path
-          required: true
-          schema: { type: string, minLength: 1, maxLength: 128 }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/AuthSetEnabledRequest"
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AuthUserPublic"
         "400":
           $ref: "#/components/responses/ValidationError"
   /api/users/{username}/reset-password:
@@ -3301,22 +3274,14 @@ components:
 
     AuthUserPublic:
       type: object
-      required: [username, role, enabled]
+      required: [username, role]
       additionalProperties: false
       properties:
         username: { type: string, maxLength: 128 }
         full_name: { type: string, maxLength: 256 }
         role: { type: string, enum: [administrator, operator, dashboard] }
         must_reset_password: { type: boolean }
-        enabled: { type: boolean }
         created_at: { type: string, maxLength: 64 }
-
-    AuthSetEnabledRequest:
-      type: object
-      required: [enabled]
-      additionalProperties: false
-      properties:
-        enabled: { type: boolean }
 
     AuthUserList:
       type: object

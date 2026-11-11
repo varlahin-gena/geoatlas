@@ -504,17 +504,14 @@ label.checkbox input { width: 16px; height: 16px; accent-color: var(--accent); }
 .btn-secondary:hover { background: var(--panel-3); color: var(--text); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn svg { width: 15px; height: 15px; }
-.row-actions {
+.row-actions,
+td.actions {
   display: inline-flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-}
-
-td.actions {
   width: 1%;
   white-space: nowrap;
-  vertical-align: middle;
 }
 
 .toolbar {
@@ -564,9 +561,9 @@ th, td {
 }
 th {
   background: var(--panel-2);
-  color: var(--text-dim);
+  color: var(--text-muted);
   font-weight: 500;
-  font-size: 12px;
+  font-size: 10px;
   letter-spacing: 0.02em;
   white-space: nowrap;
 }

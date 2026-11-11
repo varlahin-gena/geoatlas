@@ -31,16 +31,4 @@ describe('SettingsLayout', () => {
     expect(screen.queryByLabelText('Разделы настроек')).toBeNull();
     expect(screen.getByText('тело')).toBeTruthy();
   });
-
-  it('keeps plain title when requested', () => {
-    render(
-      <MemoryRouter initialEntries={['/connectors']}>
-        <SettingsLayout title="Коннекторы" plainTitle>
-          <p>тело</p>
-        </SettingsLayout>
-      </MemoryRouter>,
-    );
-    expect(screen.getByText('Коннекторы')).toBeTruthy();
-    expect(screen.queryByText('Настройки · Коннекторы')).toBeNull();
-  });
 });
