@@ -30,6 +30,30 @@ center;;received;a;processed;150
 	}
 }
 
+func TestParseCSVSourceGroupName(t *testing.T) {
+	// syslog-ng-ctl often emits SourceName=source (not src.*) — must still attribute.
+	body := []byte(`source;s_default_udp;;a;processed;111
+source;s_id_1515_tcp#0;;a;processed;222
+destination;d_id_1515_tcp;;a;dropped;7
+destination;d_id_1515_tcp;;a;queued;3
+`)
+	snap, err := Parse(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snap.UDPProcessed != 111 || snap.TCPProcessed != 222 || snap.ProcessedTotal != 333 {
+		t.Fatalf("processed %+v", snap)
+	}
+	def := snap.Connectors["default"]
+	if def == nil || def.UDPProcessed != 111 {
+		t.Fatalf("default %+v", def)
+	}
+	c := snap.Connectors["id_1515"]
+	if c == nil || c.TCPProcessed != 222 || c.Dropped != 7 || c.Queued != 3 {
+		t.Fatalf("id_1515 %+v", c)
+	}
+}
+
 func TestParsePrometheus(t *testing.T) {
 	body := []byte(`# TYPE syslogng_src_processed counter
 syslogng_src_processed{id="s_udp#0"} 20

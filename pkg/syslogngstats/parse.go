@@ -165,13 +165,19 @@ func applyStat(snap *Snapshot, srcName, srcID, typ string, num float64) {
 	if num < 0 {
 		return
 	}
-	isSrc := strings.Contains(srcName, "src") ||
-		strings.Contains(srcName, "_src_") ||
-		strings.Contains(srcName, "input_events")
-	isDst := strings.Contains(srcName, "dst") ||
-		strings.Contains(srcName, "_dst_") ||
+	// "source" (CSV group) does NOT contain substring "src" — check explicitly.
+	isSrc := srcName == "source" ||
+		strings.HasPrefix(srcName, "src.") ||
+		strings.Contains(srcName, "input_events") ||
+		strings.Contains(srcName, "syslogng_src") ||
+		strings.Contains(srcName, "syslogng_source") ||
+		strings.Contains(srcName, "_src_")
+	isDst := srcName == "destination" ||
+		strings.HasPrefix(srcName, "dst.") ||
 		strings.Contains(srcName, "output_events") ||
-		strings.Contains(srcName, "destination")
+		strings.Contains(srcName, "syslogng_dst") ||
+		strings.Contains(srcName, "syslogng_destination") ||
+		strings.Contains(srcName, "_dst_")
 	connID, proto := parseConnectorSourceID(srcID)
 	if connID == "" {
 		connID, proto = parseConnectorSourceID(srcName)

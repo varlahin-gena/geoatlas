@@ -5,14 +5,28 @@
 
 ## [Unreleased]
 
+## [2.6.6] — 2026-11-11
+
+Тестовый / pre-release: Syslog processed по коннекторам (не Latest).
+
+### Fixed
+- **syslog-ng stats-exporter**: `stat-format("csv")` из 2.6.5 отдавал legacy-only (часто пусто); вернули **`prometheus`** — живые `input/output_events_total` с `s_<id>_udp|tcp`.
+- **pkg/syslogngstats**: CSV `SourceName=source` / `destination` (без подстроки `src`/`dst`) теперь атрибутируются.
+- **UI**: плитка Syslog-NG больше не подставляет backend EPS при пустом scrape.
+
+### Notes
+- OpenAPI API doc version: **1.20.0**
+- Продуктовая версия: **2.6.6** (тестовый пререлиз)
+- Схема ClickHouse: без изменений Ensure*.
+- После обновления: `docker compose up -d --force-recreate syslog-ng` (подхватить conf) + backend.
+
 ## [2.6.5] — 2026-11-11
 
 Тестовый / pre-release: метрики Pipeline по syslog-коннекторам (не Latest).
 
 ### Fixed
-- **Pipeline / коннекторы**: `stats-exporter` без `stat-format` отдавал Prometheus `input/output_events_*`, парсер ждал CSV/legacy → Syslog processed по строкам оставался `0/0`, а плитка Syslog-NG зеркалила backend EPS.
-- **syslog-ng.conf**: явно `stat-format("csv")` для стабильного scrape.
-- **pkg/syslogngstats**: разбор нового Prometheus (`input_events_total` / `output_events_total` + `result=`).
+- **Pipeline / коннекторы**: разбор Prometheus `input/output_events_*`; колонка Backend EPS.
+- **syslog-ng.conf**: `stat-format("csv")` — оказался ошибочным на 4.12 (исправлено в 2.6.6).
 
 ### Changed
 - **UI Pipeline**: колонка Backend EPS (`received_per_sec`); заголовки без путаницы EPS vs накопленный processed/recv.
@@ -203,6 +217,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.6.6]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.6
 [2.6.5]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.5
 [2.6.4]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.4
 [2.6.3]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.3
