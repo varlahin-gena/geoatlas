@@ -277,7 +277,8 @@ export default function ConnectorsPage() {
             {rows.length}/{maxConnectors}{' '}
             {maxConnectors === 1 ? 'коннектор' : 'коннекторов'}
           </span>
-          <span className="hint">· {portRangeHint}</span>
+          <span aria-hidden="true">·</span>
+          <span className="hint">{portRangeHint}</span>
         </p>
 
         <details className="connectors-details">
@@ -347,11 +348,13 @@ export default function ConnectorsPage() {
                       <tr key={c.id}>
                         <td>
                           <div className="conn-name">
-                            <span>{c.name}</span>
+                            <span title={c.name}>{c.name}</span>
                             {c.builtin ? <span className="connectors-builtin">Встроенный</span> : null}
                           </div>
                         </td>
-                        <td className="mono">{c.id}</td>
+                        <td className="mono" title={c.id}>
+                          {c.id}
+                        </td>
                         <td className="mono">{c.port}</td>
                         <td>{connectorProtocolsLabel(c.protocols)}</td>
                         <td>
@@ -368,25 +371,27 @@ export default function ConnectorsPage() {
                           </button>
                         </td>
                         <td className="actions">
-                          <button
-                            type="button"
-                            className="btn sm ghost"
-                            disabled={busy}
-                            title="Выкл → вкл в конфиге"
-                            onClick={() => void onRestart(c)}
-                          >
-                            Перезапуск
-                          </button>
-                          {!c.builtin ? (
+                          <div className="connectors-row-actions">
                             <button
                               type="button"
-                              className="btn sm danger ghost"
+                              className="btn sm ghost"
                               disabled={busy}
-                              onClick={() => setPendingDelete(c)}
+                              title="Выкл → вкл в конфиге"
+                              onClick={() => void onRestart(c)}
                             >
-                              Удалить
+                              Перезапуск
                             </button>
-                          ) : null}
+                            {!c.builtin ? (
+                              <button
+                                type="button"
+                                className="btn sm danger ghost"
+                                disabled={busy}
+                                onClick={() => setPendingDelete(c)}
+                              >
+                                Удалить
+                              </button>
+                            ) : null}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -400,7 +405,7 @@ export default function ConnectorsPage() {
         <section className="card connectors-form">
           <h2>Добавить коннектор</h2>
           <form className="form-row" onSubmit={(e) => void onCreate(e)}>
-            <div className="field">
+            <div className="field field-name">
               <label htmlFor="connector-name">Имя</label>
               <input
                 id="connector-name"
@@ -410,7 +415,7 @@ export default function ConnectorsPage() {
                 required
               />
             </div>
-            <div className="field">
+            <div className="field field-port">
               <label htmlFor="connector-port">Порт</label>
               <input
                 id="connector-port"
@@ -427,7 +432,7 @@ export default function ConnectorsPage() {
                 </span>
               ) : null}
             </div>
-            <div className="field">
+            <div className="field field-protocols">
               <label htmlFor="connector-protocols">Протоколы</label>
               <select
                 id="connector-protocols"
@@ -439,7 +444,7 @@ export default function ConnectorsPage() {
                 <option value="tcp">TCP</option>
               </select>
             </div>
-            <div className="field">
+            <div className="field field-id">
               <label htmlFor="connector-id">ID</label>
               <input
                 id="connector-id"
@@ -452,9 +457,14 @@ export default function ConnectorsPage() {
                 autoComplete="off"
               />
             </div>
-            <button type="submit" className="btn" disabled={rows.length >= maxConnectors}>
-              Добавить
-            </button>
+            <div className="field field-submit">
+              <span className="field-submit-label" aria-hidden="true">
+                &nbsp;
+              </span>
+              <button type="submit" className="btn" disabled={rows.length >= maxConnectors}>
+                Добавить
+              </button>
+            </div>
           </form>
         </section>
       </div>

@@ -3,7 +3,9 @@
 }
 
 .hunts-table {
+  table-layout: fixed;
   width: 100%;
+  min-width: 720px;
   border-collapse: collapse;
   font-size: var(--density-font-table, 12px);
 }
@@ -13,7 +15,7 @@
   text-align: left;
   padding: 10px 12px;
   border-bottom: 1px solid var(--border);
-  vertical-align: top;
+  vertical-align: middle;
 }
 
 .hunts-table th {
@@ -25,8 +27,40 @@
   white-space: nowrap;
 }
 
+.hunts-table th:nth-child(1),
+.hunts-table td:nth-child(1) {
+  width: 28%;
+}
+
+.hunts-table th:nth-child(2),
+.hunts-table td:nth-child(2) {
+  width: 22%;
+}
+
+.hunts-table th:nth-child(3),
+.hunts-table td:nth-child(3) {
+  width: 12%;
+}
+
+.hunts-table th:nth-child(4),
+.hunts-table td:nth-child(4) {
+  width: 18%;
+}
+
+.hunts-table th:nth-child(5),
+.hunts-table td:nth-child(5) {
+  width: 12.5rem;
+}
+
 .hunts-table tbody tr:hover {
   background: var(--panel-2);
+}
+
+.hunts-table td.actions {
+  display: table-cell;
+  width: 12.5rem;
+  white-space: nowrap;
+  vertical-align: middle;
 }
 
 .hunt-name-cell {
@@ -34,7 +68,19 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;
-  min-width: 160px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.hunt-title,
+.hunt-subtitle,
+.hunt-notes,
+.hunt-query-cell,
+.hunt-meta-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .hunt-title {
@@ -45,6 +91,7 @@
 
 .hunt-subtitle {
   font-size: 12px;
+  line-height: 1.35;
   color: var(--text-dim);
 }
 
@@ -63,9 +110,17 @@
 
 .hunt-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 12px;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.hunts-table .btn.sm {
+  min-height: 28px;
+  font-size: 12px;
+  padding: 5px 10px;
+  white-space: nowrap;
 }
 
 .hunt-actions .btn.sm.ghost,
@@ -73,6 +128,7 @@
   background: transparent;
   border-color: transparent;
   color: var(--text-dim);
+  min-width: 28px;
   min-height: 28px;
   font-size: 12px;
   padding: 5px 8px;
@@ -113,6 +169,7 @@
 .hunt-more-item {
   display: block;
   width: 100%;
+  box-sizing: border-box;
   margin: 0;
   padding: 8px 10px;
   border: none;
@@ -122,6 +179,7 @@
   font: inherit;
   font-size: 12px;
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
 }
 

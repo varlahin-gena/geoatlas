@@ -31,8 +31,7 @@
 
 .anomaly-summary-chip.is-active {
   border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 18%, var(--panel-2));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel-2));
 }
 
 .anomaly-summary-label {
@@ -398,9 +397,33 @@
 .anomaly-toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px 12px;
   margin-bottom: 12px;
   align-items: center;
+}
+
+.anomaly-toolbar-search,
+.anomaly-toolbar-filters,
+.anomaly-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.anomaly-toolbar-search {
+  flex: 1 1 220px;
+  min-width: 180px;
+  max-width: 360px;
+}
+
+.anomaly-toolbar-filters {
+  flex: 1 1 auto;
+}
+
+.anomaly-toolbar-actions {
+  margin-left: auto;
 }
 
 .anomaly-toolbar-control,
@@ -413,12 +436,14 @@
   font: inherit;
   font-size: 13px;
   min-height: 32px;
+  box-sizing: border-box;
 }
 
 .anomaly-toolbar input.anomaly-toolbar-control[type='search'] {
-  flex: 1 1 220px;
-  min-width: 180px;
-  max-width: 360px;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
 }
 
 .anomaly-toolbar-control:focus,
@@ -431,6 +456,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-height: 32px;
   font-size: 13px;
   color: var(--text-dim);
   white-space: nowrap;
@@ -444,9 +470,74 @@
   margin-bottom: 12px;
 }
 
+.anomalies-table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 960px;
+}
+
+.anomalies-table th,
+.anomalies-table td {
+  vertical-align: middle;
+}
+
+.anomalies-table th:nth-child(1),
+.anomalies-table td:nth-child(1) {
+  width: 6.5rem;
+}
+
+.anomalies-table th:nth-child(2),
+.anomalies-table td:nth-child(2) {
+  width: 6.25rem;
+}
+
+.anomalies-table th:nth-child(3),
+.anomalies-table td:nth-child(3) {
+  width: 8.5rem;
+}
+
+.anomalies-table .anomaly-type-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.anomalies-table th:nth-child(4),
+.anomalies-table td:nth-child(4) {
+  width: auto;
+}
+
+.anomalies-table th:nth-child(5),
+.anomalies-table td:nth-child(5),
+.anomalies-table th:nth-child(6),
+.anomalies-table td:nth-child(6) {
+  width: 7.5rem;
+}
+
+.anomalies-table th:nth-child(7),
+.anomalies-table td:nth-child(7) {
+  width: 8rem;
+}
+
+.anomalies-table th:nth-child(8),
+.anomalies-table td:nth-child(8) {
+  width: 5.5rem;
+}
+
+.anomalies-table th:nth-child(9),
+.anomalies-table td:nth-child(9) {
+  width: 5rem;
+}
+
+.anomalies-table th:nth-child(10),
+.anomalies-table td:nth-child(10) {
+  width: 7.5rem;
+}
+
 .anomalies-table .anomaly-title-cell {
-  max-width: 360px;
+  min-width: 0;
   line-height: 1.35;
+  vertical-align: top;
 }
 
 .anomaly-desc {
@@ -454,13 +545,22 @@
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  max-width: 100%;
+}
+
+.anomaly-desc-subject,
+.anomaly-desc-detail,
+.anomaly-desc-delta,
+.anomaly-endpoint-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .anomaly-desc-subject {
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
-  overflow-wrap: anywhere;
 }
 
 .anomaly-desc-detail {
@@ -475,7 +575,7 @@
 }
 
 .anomaly-empty-cell {
-  color: var(--text-muted);
+  color: var(--text-dim);
 }
 
 .anomalies-table .mono {
@@ -488,7 +588,8 @@
 }
 
 .anomaly-assignee-select {
-  max-width: 140px;
+  width: 100%;
+  max-width: 100%;
   min-height: 28px;
   font-size: 12px;
   padding: 4px 8px;
@@ -549,15 +650,19 @@
   color: var(--text-muted);
 }
 
-.anomalies-table .actions {
+.anomalies-table td.actions {
+  display: table-cell;
+  width: 7.5rem;
   white-space: nowrap;
+  vertical-align: middle;
 }
 
 .anomaly-row-actions {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 12px;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .anomalies-table .btn.sm {
@@ -571,8 +676,9 @@
   background: transparent;
   border-color: transparent;
   color: var(--text-dim);
-  padding-left: 4px;
-  padding-right: 4px;
+  min-width: 28px;
+  padding-left: 8px;
+  padding-right: 8px;
 }
 
 .anomaly-row-actions .btn.sm.ghost:hover {
@@ -609,6 +715,7 @@
 .anomaly-more-item {
   display: block;
   width: 100%;
+  box-sizing: border-box;
   margin: 0;
   padding: 8px 10px;
   border: none;
@@ -618,7 +725,12 @@
   font: inherit;
   font-size: 12px;
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
+}
+
+a.anomaly-more-item {
+  color: var(--text);
 }
 
 .anomaly-more-item:hover:not(:disabled) {

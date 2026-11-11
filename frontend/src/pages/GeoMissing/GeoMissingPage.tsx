@@ -304,7 +304,7 @@ export default function GeoMissingPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <div className="field">
+          <div className="field geo-missing-period">
             <label htmlFor="geo-missing-period">Период</label>
             <select
               id="geo-missing-period"
@@ -320,7 +320,7 @@ export default function GeoMissingPage() {
               <option value="7d">7 дней</option>
             </select>
           </div>
-          <div className="field">
+          <div className="field geo-missing-kind">
             <label htmlFor="geo-missing-kind">Тип</label>
             <select id="geo-missing-kind" value={kind} onChange={(e) => setKind(e.target.value)}>
               <option value="all">Все типы</option>
@@ -332,7 +332,7 @@ export default function GeoMissingPage() {
               <option value="invalid">Некорректные</option>
             </select>
           </div>
-          <div className="field">
+          <div className="field geo-missing-limit">
             <label htmlFor="geo-missing-limit">Лимит</label>
             <select
               id="geo-missing-limit"
@@ -392,53 +392,60 @@ export default function GeoMissingPage() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((r) => (
-                  <tr key={r.ip}>
-                    <td>
-                      <div className="geo-missing-ip mono">
-                        <span>{r.ip}</span>
+                filtered.map((r) => {
+                  const place = geoMissingLogPlace(r.log_city, r.log_country);
+                  return (
+                    <tr key={r.ip}>
+                      <td>
+                        <div className="geo-missing-ip mono">
+                          <span title={r.ip}>{r.ip}</span>
+                          <button
+                            type="button"
+                            className="btn sm ghost"
+                            aria-label={`Копировать ${r.ip}`}
+                            title="Копировать IP"
+                            onClick={() => void copyIp(r.ip)}
+                          >
+                            Копировать
+                          </button>
+                        </div>
+                      </td>
+                      <td className="geo-missing-meta">{geoMissingKindLabel(r.kind)}</td>
+                      <td className="num">
+                        <b>{fmtNumber(r.count)}</b>
+                      </td>
+                      <td className="num" title="источник / назначение">
+                        {fmtNumber(r.as_src)} / {fmtNumber(r.as_dst)}
+                      </td>
+                      <td className="mono geo-missing-meta" title={r.sample_peer || undefined}>
+                        {r.sample_peer || '—'}
+                      </td>
+                      <td className="geo-missing-meta" title={place !== '—' ? place : undefined}>
+                        {place}
+                      </td>
+                      <td className="actions">
                         <button
                           type="button"
-                          className="btn sm ghost"
-                          aria-label={`Копировать ${r.ip}`}
-                          title="Копировать IP"
-                          onClick={() => void copyIp(r.ip)}
+                          className="btn sm"
+                          title={r.action_hint || 'Добавить диапазон в базу GeoIP'}
+                          onClick={() => {
+                            setEditIp(r.ip);
+                            setForm({
+                              network: r.ip,
+                              country: r.log_country || '',
+                              region: '',
+                              city: r.log_city || '',
+                              lat: '',
+                              lon: '',
+                            });
+                          }}
                         >
-                          Копировать
+                          В базу
                         </button>
-                      </div>
-                    </td>
-                    <td>{geoMissingKindLabel(r.kind)}</td>
-                    <td className="num">
-                      <b>{fmtNumber(r.count)}</b>
-                    </td>
-                    <td className="num" title="источник / назначение">
-                      {fmtNumber(r.as_src)} / {fmtNumber(r.as_dst)}
-                    </td>
-                    <td className="mono">{r.sample_peer || '—'}</td>
-                    <td>{geoMissingLogPlace(r.log_city, r.log_country)}</td>
-                    <td className="actions">
-                      <button
-                        type="button"
-                        className="btn sm"
-                        title={r.action_hint || 'Добавить диапазон в базу GeoIP'}
-                        onClick={() => {
-                          setEditIp(r.ip);
-                          setForm({
-                            network: r.ip,
-                            country: r.log_country || '',
-                            region: '',
-                            city: r.log_city || '',
-                            lat: '',
-                            lon: '',
-                          });
-                        }}
-                      >
-                        В базу
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

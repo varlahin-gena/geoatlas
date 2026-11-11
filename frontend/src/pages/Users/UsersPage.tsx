@@ -140,7 +140,7 @@ export default function UsersPage() {
           хотя бы один активный администратор.
         </p>
 
-        <div className="card">
+        <div className="card users-card">
           <div className="table-wrap">
             <table className="users-table">
               <thead>
@@ -219,8 +219,8 @@ export default function UsersPage() {
                         </td>
                         <td>
                           <span className="users-login-cell">
-                            <b>{u.username}</b>
-                            {isSelf ? <span className="badge">вы</span> : null}
+                            <b title={u.username}>{u.username}</b>
+                            {isSelf ? <span className="badge">Вы</span> : null}
                             {u.must_reset_password ? (
                               <span className="badge reset">сброс при входе</span>
                             ) : null}
@@ -271,7 +271,9 @@ export default function UsersPage() {
                                 ? 'Нельзя выключить собственную учётную запись'
                                 : lastActiveAdmin
                                   ? 'Должен остаться хотя бы один активный администратор'
-                                  : undefined
+                                  : enabled
+                                    ? 'Включена'
+                                    : 'Выключена'
                             }
                           >
                             <input
@@ -286,12 +288,9 @@ export default function UsersPage() {
                               }
                               onChange={(e) => void onToggleEnabled(u, e.target.checked)}
                             />
-                            <span className="users-enable-label">
-                              {enabled ? 'Включена' : 'Выключена'}
-                            </span>
                           </label>
                         </td>
-                        <td>{fmtDate(u.created_at)}</td>
+                        <td className="users-date">{fmtDate(u.created_at)}</td>
                         <td className="actions">
                           <div className="users-row-actions">
                             <button

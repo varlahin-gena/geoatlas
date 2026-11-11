@@ -98,6 +98,12 @@ function EpisodesPanel({
   );
 }
 
+function closeAnomalyMore(target: EventTarget | null) {
+  const root =
+    target instanceof Element ? (target.closest('details') as HTMLDetailsElement | null) : null;
+  if (root) root.open = false;
+}
+
 function AnomalyRowActions({
   item,
   acked,
@@ -122,43 +128,53 @@ function AnomalyRowActions({
           Разбор
         </Link>
       ) : null}
-      {canPeers ? (
-        <button
-          type="button"
-          className="btn sm ghost"
-          aria-expanded={expanded}
-          onClick={onTogglePeers}
-        >
-          {expanded ? 'Скрыть связи' : 'Связи'}
-        </button>
-      ) : null}
-      <Link
-        to={anomalyMapHref(item)}
-        className="btn sm ghost"
-        onClick={() => rememberMapAlert(item)}
-      >
-        На карте
-      </Link>
-          {!acked ? (
-        <details className="anomaly-more">
-          <summary className="btn sm ghost">Ещё</summary>
-          <div className="anomaly-more-menu" role="menu">
+      <details className="anomaly-more">
+        <summary className="btn sm ghost">Ещё</summary>
+        <div className="anomaly-more-menu" role="menu">
+          {canPeers ? (
             <button
               type="button"
               role="menuitem"
               className="anomaly-more-item"
-              disabled={acking}
+              aria-expanded={expanded}
               onClick={(e) => {
-                const root = (e.currentTarget.closest('details') as HTMLDetailsElement | null);
-                if (root) root.open = false;
-                onHide();
+                closeAnomalyMore(e.currentTarget);
+                onTogglePeers();
               }}
             >
-              Скрыть на 24 ч
+              {expanded ? 'Скрыть связи' : 'Связи'}
             </button>
-          </div>
-        </details>
-      ) : null}
+          ) : null}
+          <Link
+            to={anomalyMapHref(item)}
+            role="menuitem"
+            className="anomaly-more-item"
+            onClick={(e) => {
+              closeAnomalyMore(e.currentTarget);
+              rememberMapAlert(item);
+            }}
+          >
+            На карте
+          </Link>
+          {!acked ? (
+            <>
+              <div className="anomaly-more-sep" role="separator" />
+              <button
+                type="button"
+                role="menuitem"
+                className="anomaly-more-item"
+                disabled={acking}
+                onClick={(e) => {
+                  closeAnomalyMore(e.currentTarget);
+                  onHide();
+                }}
+              >
+                Скрыть на 24 ч
+              </button>
+            </>
+          ) : null}
+        </div>
+      </details>
     </div>
   );
 }
@@ -167,9 +183,19 @@ function AnomalyDescriptionCell({ item }: { item: AnomalyEvent }) {
   const parts = formatAnomalyDescription(item);
   return (
     <div className="anomaly-desc">
-      <div className="anomaly-desc-subject">{parts.subject}</div>
-      {parts.detail ? <div className="anomaly-desc-detail mono">{parts.detail}</div> : null}
-      {parts.delta ? <div className="anomaly-desc-delta">{parts.delta}</div> : null}
+      <div className="anomaly-desc-subject" title={parts.subject}>
+        {parts.subject}
+      </div>
+      {parts.detail ? (
+        <div className="anomaly-desc-detail mono" title={parts.detail}>
+          {parts.detail}
+        </div>
+      ) : null}
+      {parts.delta ? (
+        <div className="anomaly-desc-delta" title={parts.delta}>
+          {parts.delta}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -436,66 +462,72 @@ export default function AnomaliesPage() {
         ) : null}
 
         <div className="toolbar anomaly-toolbar">
-          <input
-            type="search"
-            className="anomaly-toolbar-control"
-            placeholder="Поиск по заголовку, IP, стране…"
-            aria-label="Поиск по заголовку, IP, стране"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <div className="anomaly-toolbar-search">
+            <input
+              type="search"
+              className="anomaly-toolbar-control"
+              placeholder="Поиск по заголовку, IP, стране…"
+              aria-label="Поиск по заголовку, IP, стране"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
           {searchActive ? (
             <span className="hint anomaly-search-count" role="status">
               Найдено: {fmtNumber(filtered.length)}
             </span>
           ) : null}
-          <select
-            className="anomaly-toolbar-control"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            aria-label="Тип"
-          >
-            {ANOMALY_CODE_OPTIONS.map((opt) => (
-              <option key={opt.value || 'all'} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          <select
-            className="anomaly-toolbar-control"
-            value={sinceHours}
-            onChange={(e) => setSinceHours(e.target.value)}
-            aria-label="Период"
-          >
-            {ANOMALY_SINCE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          <select
-            className="anomaly-toolbar-control"
-            value={limit}
-            onChange={(e) => setLimit(e.target.value)}
-            aria-label="Лимит"
-          >
-            {[50, 100, 200].map((n) => (
-              <option key={n} value={String(n)}>
-                до {n}
-              </option>
-            ))}
-          </select>
-          <label className="checkbox anomaly-include-acked">
-            <input
-              type="checkbox"
-              checked={includeAcked}
-              onChange={(e) => setIncludeAcked(e.target.checked)}
-            />
-            <span>Со скрытыми</span>
-          </label>
-          <button type="button" className="btn" onClick={() => void load()} disabled={loading}>
-            Обновить
-          </button>
+          <div className="anomaly-toolbar-filters">
+            <select
+              className="anomaly-toolbar-control"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              aria-label="Тип"
+            >
+              {ANOMALY_CODE_OPTIONS.map((opt) => (
+                <option key={opt.value || 'all'} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <select
+              className="anomaly-toolbar-control"
+              value={sinceHours}
+              onChange={(e) => setSinceHours(e.target.value)}
+              aria-label="Период"
+            >
+              {ANOMALY_SINCE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <select
+              className="anomaly-toolbar-control"
+              value={limit}
+              onChange={(e) => setLimit(e.target.value)}
+              aria-label="Лимит"
+            >
+              {[50, 100, 200].map((n) => (
+                <option key={n} value={String(n)}>
+                  до {n}
+                </option>
+              ))}
+            </select>
+            <label className="checkbox anomaly-include-acked">
+              <input
+                type="checkbox"
+                checked={includeAcked}
+                onChange={(e) => setIncludeAcked(e.target.checked)}
+              />
+              <span>Со скрытыми</span>
+            </label>
+          </div>
+          <div className="anomaly-toolbar-actions">
+            <button type="button" className="btn" onClick={() => void load()} disabled={loading}>
+              Обновить
+            </button>
+          </div>
         </div>
 
         <div className="table-wrap">
@@ -624,20 +656,31 @@ export default function AnomaliesPage() {
                       <td title={item.detected_at ? fmtDate(item.detected_at) : undefined}>
                         {relTime(item.detected_at)}
                       </td>
-                      <td>{eventCodeLabel(item)}</td>
+                      <td className="anomaly-type-cell" title={eventCodeLabel(item)}>
+                        {eventCodeLabel(item)}
+                      </td>
                       <td className="anomaly-title-cell">
                         <AnomalyDescriptionCell item={item} />
                       </td>
                       <td
-                        className={
+                        className={[
+                          'anomaly-endpoint-cell',
                           item.src_ip || (networkFallback && srcLabel === networkFallback)
                             ? 'mono'
-                            : undefined
-                        }
+                            : undefined,
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                        title={srcLabel || undefined}
                       >
                         {srcLabel ? srcLabel : <span className="anomaly-empty-cell">—</span>}
                       </td>
-                      <td className={item.dst_ip ? 'mono' : undefined}>
+                      <td
+                        className={['anomaly-endpoint-cell', item.dst_ip ? 'mono' : undefined]
+                          .filter(Boolean)
+                          .join(' ')}
+                        title={dstLabel || undefined}
+                      >
                         {dstLabel ? dstLabel : <span className="anomaly-empty-cell">—</span>}
                       </td>
                       <td>

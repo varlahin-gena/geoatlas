@@ -1,5 +1,7 @@
 .api-tokens-table {
+  table-layout: fixed;
   width: 100%;
+  min-width: 640px;
   border-collapse: collapse;
   font-size: 13px;
 }
@@ -19,22 +21,59 @@
   white-space: nowrap;
 }
 
-.api-tokens-table td.actions {
+.api-tokens-table th:nth-child(1),
+.api-tokens-table td:nth-child(1) {
+  width: 22%;
+}
+
+.api-tokens-table th:nth-child(2),
+.api-tokens-table td:nth-child(2) {
+  width: 6.5rem;
+}
+
+.api-tokens-table th:nth-child(3),
+.api-tokens-table td:nth-child(3),
+.api-tokens-table th:nth-child(4),
+.api-tokens-table td:nth-child(4) {
+  width: 9.5rem;
+}
+
+.api-tokens-name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
-  width: 1%;
+  font-weight: 600;
+}
+
+.api-tokens-date {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.api-tokens-table td.actions {
+  display: table-cell;
+  width: 14rem;
+  white-space: nowrap;
+  vertical-align: middle;
+  text-align: right;
 }
 
 .api-tokens-row-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  display: inline-flex;
+  flex-wrap: nowrap;
   align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 .api-tokens-table .btn.sm {
   padding: 4px 10px;
   font-size: 12px;
   min-height: 28px;
+  white-space: nowrap;
 }
 
 .api-tokens-table .btn.sm.ghost {
@@ -83,12 +122,24 @@
   color: var(--text);
 }
 
+.api-tokens-card.card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.api-tokens-card .table-wrap {
+  border: none;
+  border-radius: 0;
+}
+
 .api-tokens-env-hint {
-  margin: 12px 14px 14px;
+  margin: 0;
+  padding: 12px 14px 14px;
   font-size: 12px;
   color: var(--text-dim);
   line-height: 1.45;
   max-width: 42rem;
+  border-top: 1px solid var(--border);
 }
 
 .api-tokens-env-hint code {
@@ -115,4 +166,11 @@
   font-size: 12px;
   color: var(--text);
   user-select: all;
+}
+
+.api-tokens-create-hint {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-dim);
 }

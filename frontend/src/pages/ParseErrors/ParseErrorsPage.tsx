@@ -124,7 +124,9 @@ function ReasonCell({ reason }: { reason?: string }) {
 
   return (
     <div className="pe-reason">
-      <span title={full || undefined}>{label}</span>
+      <span className="pe-reason-label" title={full || undefined}>
+        {label}
+      </span>
       {showToggle ? (
         <>
           {' '}
@@ -229,7 +231,12 @@ export default function ParseErrorsPage() {
           {rows.length ? (
             <>
               <span>{fmtNumber(rows.length)} на экране</span>
-              {search.trim() ? <span className="hint">· фильтр «{search.trim()}»</span> : null}
+              {search.trim() ? (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span className="hint">фильтр «{search.trim()}»</span>
+                </>
+              ) : null}
             </>
           ) : loading ? (
             <span className="hint">Загрузка…</span>
@@ -358,31 +365,33 @@ export default function ParseErrorsPage() {
                     </td>
                     <td className="pe-time">{fmtDate(r.timestamp)}</td>
                     {showVendor ? <td>{r.vendor || '—'}</td> : null}
-                    <td>
+                    <td className="pe-reason-cell">
                       <ReasonCell reason={r.reason} />
                     </td>
-                    <td>
+                    <td className="pe-raw-cell">
                       <RawCell raw={r.raw} />
                     </td>
                     <td className="actions">
-                      <button
-                        type="button"
-                        className="btn sm ghost"
-                        title="Открыть строку в тесте парсеров"
-                        onClick={() => openInParserTest(r.raw || '')}
-                      >
-                        В тест
-                      </button>
-                      <button
-                        type="button"
-                        className="btn sm danger ghost"
-                        aria-label="Удалить запись"
-                        title="Удалить запись"
-                        disabled={deleteBusy}
-                        onClick={() => setPendingDelete({ type: 'ids', ids: [r.id] })}
-                      >
-                        Удалить
-                      </button>
+                      <div className="parse-errors-row-actions">
+                        <button
+                          type="button"
+                          className="btn sm ghost"
+                          title="Открыть строку в тесте парсеров"
+                          onClick={() => openInParserTest(r.raw || '')}
+                        >
+                          В тест
+                        </button>
+                        <button
+                          type="button"
+                          className="btn sm danger ghost"
+                          aria-label="Удалить запись"
+                          title="Удалить запись"
+                          disabled={deleteBusy}
+                          onClick={() => setPendingDelete({ type: 'ids', ids: [r.id] })}
+                        >
+                          Удалить
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))

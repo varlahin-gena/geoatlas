@@ -109,7 +109,7 @@ export default function ApiTokensPage() {
           Именованные токены для автоматизации. Секрет показывается один раз; отзыв сразу закрывает
           доступ.
         </p>
-        <div className="card">
+        <div className="card api-tokens-card">
           <div className="table-wrap">
             <table className="api-tokens-table">
               <thead>
@@ -154,14 +154,20 @@ export default function ApiTokensPage() {
                 ) : (
                   tokens.map((t) => (
                     <tr key={t.id}>
-                      <td>{t.name}</td>
+                      <td>
+                        <span className="api-tokens-name" title={t.name}>
+                          {t.name}
+                        </span>
+                      </td>
                       <td>
                         <span className={scopeClass(t.scope)} title={t.scope}>
                           {scopeLabel(t.scope)}
                         </span>
                       </td>
-                      <td>{fmtDate(t.created_at)}</td>
-                      <td>{t.expires_at ? fmtDate(t.expires_at) : '—'}</td>
+                      <td className="api-tokens-date">{fmtDate(t.created_at)}</td>
+                      <td className="api-tokens-date">
+                        {t.expires_at ? fmtDate(t.expires_at) : '—'}
+                      </td>
                       <td className="actions">
                         <div className="api-tokens-row-actions">
                           <button
@@ -250,7 +256,7 @@ export default function ApiTokensPage() {
               onClick={(e) => e.stopPropagation()}
             >
               <h3 id="create-token-title">Создать API-токен</h3>
-              <p className="hint" style={{ marginTop: 0 }}>
+              <p className="api-tokens-create-hint">
                 Область задаёт, к чему токен получит доступ: карта, загрузки или весь API.
               </p>
               <div className="field">

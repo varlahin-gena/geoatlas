@@ -620,8 +620,8 @@ export default function GeoRangesPage() {
               </button>
             </div>
             {(entSearch.trim() || entIP.trim()) ? (
-              <div className="card table-wrap" style={{ marginBottom: 16 }}>
-                <table className="geo-ranges-table">
+              <div className="card table-wrap geo-ranges-hits">
+                <table className="geo-ranges-table is-hits">
                   <thead>
                     <tr>
                       <th scope="col">Сеть</th>
@@ -655,10 +655,18 @@ export default function GeoRangesPage() {
                     ) : (
                       entHits.map((r) => (
                         <tr key={`${r.network}-${r.start_ip}-${r.end_ip}`}>
-                          <td className="mono">{r.network}</td>
-                          <td>{r.country}</td>
-                          <td>{r.region}</td>
-                          <td>{r.city}</td>
+                          <td className="mono geo-cell" title={r.network}>
+                            {r.network}
+                          </td>
+                          <td className="geo-cell" title={r.country || undefined}>
+                            {r.country}
+                          </td>
+                          <td className="geo-cell" title={r.region || undefined}>
+                            {r.region}
+                          </td>
+                          <td className="geo-cell" title={r.city || undefined}>
+                            {r.city}
+                          </td>
                           <td className="actions">
                             {isMarked(r) ? (
                               <span className="hint">уже отмечен</span>
@@ -731,7 +739,7 @@ export default function GeoRangesPage() {
               </form>
             ) : null}
             <div className="card table-wrap">
-              <table className="geo-ranges-table">
+              <table className="geo-ranges-table is-marked">
                 <thead>
                   <tr>
                     <th scope="col">Сеть</th>
@@ -765,10 +773,18 @@ export default function GeoRangesPage() {
                   ) : (
                     filteredMarked.map((n) => (
                       <tr key={`${n.start_ip}-${n.end_ip}`}>
-                        <td className="mono">{n.network}</td>
-                        <td>{n.label}</td>
-                        <td>{n.country}</td>
-                        <td>{n.city}</td>
+                        <td className="mono geo-cell" title={n.network}>
+                          {n.network}
+                        </td>
+                        <td className="geo-cell" title={n.label || undefined}>
+                          {n.label}
+                        </td>
+                        <td className="geo-cell" title={n.country || undefined}>
+                          {n.country}
+                        </td>
+                        <td className="geo-cell" title={n.city || undefined}>
+                          {n.city}
+                        </td>
                         <td className="actions">
                           <button
                             type="button"
@@ -846,7 +862,7 @@ export default function GeoRangesPage() {
               </button>
             </div>
             <div className="card table-wrap">
-              <table className="geo-ranges-table">
+              <table className="geo-ranges-table is-base">
                 <thead>
                   <tr>
                     <th scope="col">Сеть</th>
@@ -891,12 +907,20 @@ export default function GeoRangesPage() {
                         key={`${r.network}-${r.start_ip}-${r.end_ip}`}
                         className={ipLookupActive ? 'ip-hit-row' : undefined}
                       >
-                        <td className="mono">{r.network}</td>
-                        <td>{r.country}</td>
-                        <td>{r.region}</td>
-                        <td>{r.city}</td>
-                        <td className="mono">{r.lat}</td>
-                        <td className="mono">{r.lon}</td>
+                        <td className="mono geo-cell" title={r.network}>
+                          {r.network}
+                        </td>
+                        <td className="geo-cell" title={r.country || undefined}>
+                          {r.country}
+                        </td>
+                        <td className="geo-cell" title={r.region || undefined}>
+                          {r.region}
+                        </td>
+                        <td className="geo-cell" title={r.city || undefined}>
+                          {r.city}
+                        </td>
+                        <td className="mono geo-cell">{r.lat}</td>
+                        <td className="mono geo-cell">{r.lon}</td>
                         <td className="actions">
                           <button
                             type="button"

@@ -429,17 +429,37 @@ export default function HuntsPage() {
                     <tr key={h.id}>
                       <td>
                         <div className="hunt-name-cell">
-                          <strong className="hunt-title">{title}</strong>
-                          <span className="hunt-subtitle">{subtitle}</span>
+                          <strong className="hunt-title" title={title}>
+                            {title}
+                          </strong>
+                          <span className="hunt-subtitle" title={subtitle}>
+                            {subtitle}
+                          </span>
                           {h.schedule?.enabled ? (
                             <span className="hunt-badge">по расписанию</span>
                           ) : null}
-                          {h.notes ? <span className="hint hunt-notes">{h.notes}</span> : null}
+                          {h.notes ? (
+                            <span className="hint hunt-notes" title={h.notes}>
+                              {h.notes}
+                            </span>
+                          ) : null}
                         </div>
                       </td>
-                      <td>{huntQueryLabel(h.map)}</td>
-                      <td>{huntScheduleSummary(h)}</td>
-                      <td title={last.title ? fmtDate(last.title) : undefined}>{lastRunText}</td>
+                      <td
+                        className="hunt-query-cell"
+                        title={huntQueryLabel(h.map) || undefined}
+                      >
+                        {huntQueryLabel(h.map)}
+                      </td>
+                      <td className="hunt-meta-cell" title={huntScheduleSummary(h)}>
+                        {huntScheduleSummary(h)}
+                      </td>
+                      <td
+                        className="hunt-meta-cell"
+                        title={last.title ? fmtDate(last.title) : lastRunText}
+                      >
+                        {lastRunText}
+                      </td>
                       <td className="actions">
                         <div className="hunt-actions">
                           <Link to={huntMapHref(h)} className="btn sm primary">

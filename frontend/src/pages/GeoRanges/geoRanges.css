@@ -42,7 +42,7 @@
 .geo-ranges-summary {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 12px;
+  gap: 10px;
   margin: 0 0 14px;
 }
 
@@ -54,18 +54,21 @@
 }
 
 .geo-ranges-stat.is-focus {
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
-  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
 }
 
 .geo-ranges-stat .hint {
   margin: 0 0 4px;
   font-size: 12px;
+  color: var(--text-dim);
 }
 
 .geo-ranges-stat b {
+  display: block;
   font-size: 20px;
   font-weight: 650;
+  line-height: 1.2;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
 }
@@ -79,7 +82,7 @@
 .geo-ranges-toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 10px 12px;
   align-items: flex-end;
   margin-bottom: 14px;
 }
@@ -91,14 +94,18 @@
 .geo-ranges-search-text {
   flex: 1 1 220px;
   min-width: 180px;
+  max-width: 360px;
 }
 
 .geo-ranges-search-ip {
   flex: 1 1 180px;
   min-width: 160px;
+  max-width: 280px;
 }
 
-.geo-ranges-toolbar input {
+.geo-ranges-toolbar input,
+.geo-ranges-toolbar > .btn,
+.geo-ranges-toolbar > button.btn {
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -107,6 +114,10 @@
   font: inherit;
   font-size: 13px;
   min-height: 32px;
+  box-sizing: border-box;
+}
+
+.geo-ranges-toolbar input {
   width: 100%;
 }
 
@@ -115,8 +126,16 @@
   outline: none;
 }
 
+.geo-ranges-toolbar > .btn.primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-color: var(--accent);
+}
+
 .geo-ranges-table {
+  table-layout: fixed;
   width: 100%;
+  min-width: 640px;
   border-collapse: collapse;
   font-size: 13px;
 }
@@ -136,10 +155,52 @@
   white-space: nowrap;
 }
 
+.geo-ranges-table.is-base th:nth-child(1),
+.geo-ranges-table.is-base td:nth-child(1),
+.geo-ranges-table.is-hits th:nth-child(1),
+.geo-ranges-table.is-hits td:nth-child(1) {
+  width: 22%;
+}
+
+.geo-ranges-table.is-base th:nth-child(5),
+.geo-ranges-table.is-base td:nth-child(5),
+.geo-ranges-table.is-base th:nth-child(6),
+.geo-ranges-table.is-base td:nth-child(6) {
+  width: 5.5rem;
+}
+
+.geo-ranges-table.is-marked th:nth-child(1),
+.geo-ranges-table.is-marked td:nth-child(1) {
+  width: 24%;
+}
+
+.geo-ranges-table.is-marked th:nth-child(2),
+.geo-ranges-table.is-marked td:nth-child(2) {
+  width: auto;
+}
+
+.geo-ranges-table.is-marked th:nth-child(3),
+.geo-ranges-table.is-marked td:nth-child(3),
+.geo-ranges-table.is-marked th:nth-child(4),
+.geo-ranges-table.is-marked td:nth-child(4) {
+  width: 8rem;
+}
+
+.geo-ranges-table .geo-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.geo-ranges-table .mono {
+  font-variant-numeric: tabular-nums;
+}
+
 .geo-ranges-table .btn.sm {
   padding: 4px 10px;
   font-size: 12px;
   min-height: 28px;
+  white-space: nowrap;
 }
 
 .geo-ranges-table .btn.sm.ghost {
@@ -179,11 +240,22 @@
   letter-spacing: -0.01em;
 }
 
+.geo-ranges-hits {
+  margin-bottom: 16px;
+}
+
 .geo-ranges-table tr.ip-hit-row td {
   background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 .geo-ranges-table td.actions {
+  display: table-cell;
+  width: 6.5rem;
   white-space: nowrap;
-  width: 1%;
+  vertical-align: middle;
+  text-align: right;
+}
+
+.geo-danger-zone {
+  margin-top: 16px;
 }

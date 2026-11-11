@@ -1,5 +1,7 @@
 .users-table {
+  table-layout: fixed;
   width: 100%;
+  min-width: 720px;
   border-collapse: collapse;
   font-size: 13px;
 }
@@ -19,10 +21,37 @@
   white-space: nowrap;
 }
 
+.users-table th:nth-child(1),
+.users-table td:nth-child(1) {
+  width: 22%;
+}
+
+.users-table th:nth-child(2),
+.users-table td:nth-child(2) {
+  width: 8.5rem;
+}
+
+.users-table th:nth-child(3),
+.users-table td:nth-child(3) {
+  width: 10rem;
+}
+
+.users-table th:nth-child(4),
+.users-table td:nth-child(4) {
+  width: 4.5rem;
+  text-align: center;
+}
+
+.users-table th:nth-child(5),
+.users-table td:nth-child(5) {
+  width: 9.5rem;
+}
+
 .users-fio-input,
 .users-table select {
   width: 100%;
-  min-width: 140px;
+  max-width: 100%;
+  box-sizing: border-box;
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -44,22 +73,34 @@
   cursor: not-allowed;
 }
 
-.users-table td.actions {
+.users-table .users-date {
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  width: 1%;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.users-table td.actions {
+  display: table-cell;
+  width: 13.5rem;
+  white-space: nowrap;
+  vertical-align: middle;
+  text-align: right;
 }
 
 .users-row-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  display: inline-flex;
+  flex-wrap: nowrap;
   align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 .users-table .btn.sm {
   padding: 4px 10px;
   font-size: 12px;
   min-height: 28px;
+  white-space: nowrap;
 }
 
 .users-table .btn.sm.ghost {
@@ -87,8 +128,10 @@
 .users-enable {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   min-height: 28px;
+  min-width: 28px;
 }
 
 .users-enable input[type='checkbox'] {
@@ -103,20 +146,19 @@
   opacity: 0.55;
 }
 
-.users-enable-label {
-  font-size: 13px;
-  color: var(--text);
-}
-
-.users-enable.is-off .users-enable-label {
-  color: var(--text-dim);
-}
-
 .users-login-cell {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+  max-width: 100%;
+}
+
+.users-login-cell b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .users-row-disabled td {
@@ -126,4 +168,14 @@
 .users-row-disabled .users-fio-input,
 .users-row-disabled select {
   opacity: 1;
+}
+
+.users-card.card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.users-card .table-wrap {
+  border: none;
+  border-radius: 0;
 }
