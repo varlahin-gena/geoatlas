@@ -28,11 +28,11 @@ export const COPY = {
 export function scopeLabel(scope: string): string {
   switch (scope) {
     case 'read':
-      return 'Чтение';
+      return 'чтение';
     case 'ops':
-      return 'Операции';
+      return 'ops';
     case 'admin':
-      return 'Админ';
+      return 'admin';
     default:
       return scope;
   }
@@ -41,10 +41,10 @@ export function scopeLabel(scope: string): string {
 export function scopeOptionLabel(scope: 'read' | 'ops' | 'admin'): string {
   switch (scope) {
     case 'read':
-      return 'Чтение — карта и просмотр';
+      return 'чтение — карта';
     case 'ops':
-      return 'Операции — ingest и загрузки';
+      return 'ops — ingest/upload';
     case 'admin':
-      return 'Админ — полный API';
+      return 'admin — полный API';
   }
 }

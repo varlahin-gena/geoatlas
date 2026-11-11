@@ -22,8 +22,8 @@ export const SEARCH_BUILDER_FIELD_GROUPS: SearchBuilderFieldGroup[] = [
 ];
 
 export const SEARCH_EXAMPLE_CHIPS = [
-  { label: 'Действие = allow', query: 'action=allow' },
-  { label: 'Действие ≠ deny', query: 'action!=deny' },
+  { label: 'Action = allow', query: 'action=allow' },
+  { label: 'Action != deny', query: 'action!=deny' },
   { label: 'МСЭ + страна', query: 'device:fw1 AND src_country:Россия' },
   { label: 'Заблокировано', query: 'action=blocked' },
   {

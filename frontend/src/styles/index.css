@@ -293,7 +293,8 @@ html[data-theme="light"] body.page-map .sidebar {
 .topbar .search-builder-actions {
     display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
 }
-.topbar .search-builder-actions button {
+.topbar .search-builder-actions button,
+.topbar .search-builder-remove {
     background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
     border-radius: 6px; padding: 5px 8px; font-size: 12px; cursor: pointer;
 }
@@ -312,28 +313,11 @@ html[data-theme="light"] body.page-map .sidebar {
   background: transparent;
   color: var(--text-muted);
 }
-.topbar .search-builder-actions button:hover {
+.topbar .search-builder-actions button:hover,
+.topbar .search-builder-remove:hover {
     border-color: var(--accent); color: var(--accent);
 }
-.topbar .search-builder-actions button:disabled {
-    opacity: 0.45; cursor: not-allowed;
-}
-.topbar .search-builder-remove {
-    background: transparent;
-    color: var(--text-dim);
-    border: 1px solid transparent;
-    border-radius: 6px;
-    padding: 4px 8px;
-    font-size: 12px;
-    min-height: 28px;
-    cursor: pointer;
-    white-space: nowrap;
-}
-.topbar .search-builder-remove:hover:not(:disabled) {
-    background: rgba(248, 81, 73, 0.12);
-    border-color: rgba(248, 81, 73, 0.35);
-    color: var(--red);
-}
+.topbar .search-builder-actions button:disabled,
 .topbar .search-builder-remove:disabled {
     opacity: 0.45; cursor: not-allowed;
 }
@@ -361,19 +345,8 @@ html[data-theme="light"] body.page-map .sidebar {
     gap: 8px;
     align-items: center;
 }
-.topbar .search-builder-row.is-group {
-    grid-template-columns: 72px 70px minmax(0, 1fr) auto;
-    align-items: start;
-}
-.topbar .search-builder-row.is-group .search-builder-group {
-    min-width: 0;
-}
-.topbar .search-builder-row.is-group > .search-builder-remove {
-    margin-top: 8px;
-}
 .topbar .search-builder-row-nested {
-    grid-template-columns: 70px minmax(120px, 160px) 88px minmax(0, 1fr) auto;
-    align-items: center;
+    grid-template-columns: 70px 160px 88px minmax(0, 1fr) auto;
 }
 .topbar .search-builder-group {
     border: 1px solid var(--border);
@@ -383,7 +356,6 @@ html[data-theme="light"] body.page-map .sidebar {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    min-width: 0;
 }
 .topbar .search-builder-group-head {
     display: flex;

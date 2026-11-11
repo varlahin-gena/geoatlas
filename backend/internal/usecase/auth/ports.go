@@ -15,7 +15,6 @@ type UserRepository interface {
 	List() []domain.UserPublic
 	Create(username, password, role, fullName string, mustReset bool) (domain.UserPublic, error)
 	SetRole(username, role string) (domain.UserPublic, error)
-	SetEnabled(username string, enabled bool, actorUsername string) (domain.UserPublic, error)
 	SetFullName(username, fullName string) (domain.UserPublic, error)
 	SetGeoWizardDismissed(username string, dismissed bool) (domain.UserPublic, error)
 	SetPreferences(username string, patch domain.PreferencesPatch) (domain.UserPublic, error)

@@ -24,7 +24,6 @@
 }
 
 :root {
-  color-scheme: dark;
   --font-sans: Geist, ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'Geist Mono', ui-monospace, monospace;
   --ease-out: cubic-bezier(0.32, 0.72, 0, 1);
@@ -82,7 +81,6 @@
 }
 
 html[data-theme="light"] {
-  color-scheme: light;
   --bg: #f4f4f4;
   --panel: #ffffff;
   --panel-2: #eeeeee;

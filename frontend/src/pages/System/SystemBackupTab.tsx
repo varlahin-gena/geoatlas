@@ -10,7 +10,7 @@ import {
 } from '@/api/system';
 import { ContentSkeleton, EmptyState } from '@/components/Skeleton';
 import { useToast } from '@/components/Toast';
-import { auditActionLabel, formatDRMessage } from '@/lib/auditFormat';
+import { formatDRMessage } from '@/lib/auditFormat';
 import { fmtDate, fmtNumber } from '@/lib/format';
 import { usePolling } from '@/lib/usePolling';
 import { fmtBytes } from './systemFormat';
@@ -20,48 +20,6 @@ const TZ_PRESETS = ['Europe/Moscow', 'UTC', 'Europe/Berlin', 'Asia/Yekaterinburg
 
 function pad2(n: number) {
   return String(n).padStart(2, '0');
-}
-
-function formatBackupState(state?: string): string {
-  switch ((state || '').toLowerCase()) {
-    case 'idle':
-      return 'простаивает';
-    case 'running':
-      return 'выполняется';
-    case 'ok':
-      return 'готово';
-    case 'error':
-      return 'ошибка';
-    default:
-      return state || '—';
-  }
-}
-
-function formatBackupMessage(message?: string): string {
-  const m = (message || '').trim();
-  if (!m) return '—';
-  const map: Record<string, string> = {
-    'not started': 'ещё не запускался',
-    starting: 'запуск…',
-    unavailable: 'недоступно',
-  };
-  return map[m.toLowerCase()] || m;
-}
-
-function formatDRStatus(status?: string): string {
-  switch ((status || '').toLowerCase()) {
-    case 'ok':
-    case 'success':
-    case 'succeeded':
-      return 'успех';
-    case 'failed':
-    case 'error':
-      return 'ошибка';
-    case 'running':
-      return 'выполняется';
-    default:
-      return status || '—';
-  }
 }
 
 function normalizeSched(s: BackupSchedule | undefined | null): BackupSchedule {
@@ -281,36 +239,23 @@ export function SystemBackupTab() {
           </button>
         </div>
         <p className="hint">
-          Снимки на томе <code>clickhouse-backups</code>. «Подключить» открывает shadow{' '}
-          <code>ga_bak_*</code> на карте; live не меняется.
+          Снимки на томе <code>clickhouse-backups</code>. «Подключить» — shadow <code>ga_bak_*</code>{' '}
+          для карты (Прямой эфир / Резерв); live не меняется. Полный restore:{' '}
+          <code>./scripts/restore-clickhouse.sh &lt;name&gt;</code>
         </p>
-        <details className="details-toggle">
-          <summary>Полное восстановление и kill-switch</summary>
-          <p className="hint">
-            Полный restore: <code>./scripts/restore-clickhouse.sh &lt;name&gt;</code>. Kill-switch:{' '}
-            <code>BACKUP_ENABLED=0</code>. При включённом расписании внешний cron{' '}
-            <code>scripts/backup-clickhouse.sh</code> не обязателен.
-          </p>
-        </details>
         {loading && !cat ? <ContentSkeleton label="Загрузка backup…" /> : null}
         {cat ? (
           <div className="kv-grid cols-2">
             <div className="kv-row">
               <span className="k">Статус</span>
               <span className="v">
-                {formatBackupState(
-                  typeof status?.state === 'string' ? status.state : undefined,
-                )}
+                {String(status?.state || '—')}
                 {status?.name ? ` · ${String(status.name)}` : ''}
               </span>
             </div>
             <div className="kv-row">
               <span className="k">Сообщение</span>
-              <span className="v">
-                {formatBackupMessage(
-                  typeof status?.message === 'string' ? status.message : undefined,
-                )}
-              </span>
+              <span className="v">{String(status?.message || '—')}</span>
             </div>
             <div className="kv-row">
               <span className="k">Каталог</span>
@@ -319,7 +264,7 @@ export function SystemBackupTab() {
             <div className="kv-row">
               <span className="k">Политика</span>
               <span className="v">
-                хранить {fmtNumber(cat.keep)} · рёбра {cat.include_edges ? 'да' : 'нет'} · auth{' '}
+                keep {fmtNumber(cat.keep)} · edges {cat.include_edges ? 'да' : 'нет'} · auth{' '}
                 {cat.include_auth ? 'да' : 'нет'}
               </span>
             </div>
@@ -391,16 +336,21 @@ export function SystemBackupTab() {
           </span>
         </div>
         <p className="hint">
-          Ежедневный автобэкап в выбранном поясе — в нём же «След. авто» и «Последний авто».
+          Ежедневный автобэкап в указанное время выбранного пояса (в нём же «Применено» /
+          «След. авто» / «Последний авто»). При включённом расписании внешний cron{' '}
+          <code>scripts/backup-clickhouse.sh</code> не обязателен. Kill-switch:{' '}
+          <code>BACKUP_ENABLED=0</code>.
         </p>
         <p className="hint" style={{ marginTop: 8 }}>
           {dirty ? (
-            <>Есть несохранённые правки — нажмите «Сохранить», чтобы применить.</>
+            <>
+              Черновик отличается от сохранённого. Нажмите «Сохранить расписание», чтобы применить.
+            </>
           ) : savedSched.updated_at ? (
             <>
               Применено: {fmtDate(savedSched.updated_at, savedSched.timezone)}
               {savedSched.enabled
-                ? ` · ${formatLocalTime(savedSched)} · хранить ${fmtNumber(savedSched.keep)}`
+                ? ` · активно · ${formatLocalTime(savedSched)} · keep ${fmtNumber(savedSched.keep)}`
                 : ' · автобэкап выключен'}
             </>
           ) : (
@@ -486,7 +436,7 @@ export function SystemBackupTab() {
             </span>
           </div>
           <div className="kv-row">
-            <span className="k">Хранить снимков</span>
+            <span className="k">Глубина (keep)</span>
             <span className="v">
               <input
                 type="number"
@@ -496,12 +446,11 @@ export function SystemBackupTab() {
                 onChange={(e) =>
                   setSched((s) => ({ ...s, keep: Math.min(90, Math.max(1, Number(e.target.value) || 1)) }))
                 }
-                aria-label="Сколько последних снимков хранить"
               />
             </span>
           </div>
           <div className="kv-row">
-            <span className="k">Рёбра</span>
+            <span className="k">Edges</span>
             <span className="v">
               <label className="toggle" style={{ margin: 0 }}>
                 <input
@@ -514,7 +463,7 @@ export function SystemBackupTab() {
             </span>
           </div>
           <div className="kv-row">
-            <span className="k">Auth-снимок</span>
+            <span className="k">Auth tarball</span>
             <span className="v">
               <label className="toggle" style={{ margin: 0 }}>
                 <input
@@ -539,11 +488,11 @@ export function SystemBackupTab() {
         <div style={{ marginTop: 12, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <button
             type="button"
-            className={dirty ? 'btn primary' : 'btn'}
+            className="btn primary"
             disabled={savingSchedule || cat?.enabled === false || !dirty}
             onClick={() => void saveSchedule()}
           >
-            {savingSchedule ? 'Сохранение…' : 'Сохранить'}
+            {savingSchedule ? 'Сохранение…' : dirty ? 'Сохранить и применить' : 'Нет изменений'}
           </button>
           {dirty ? (
             <button
@@ -555,7 +504,7 @@ export function SystemBackupTab() {
                 setTzCustom(!TZ_PRESETS.includes(savedSched.timezone || ''));
               }}
             >
-              Отменить
+              Отменить правки
             </button>
           ) : null}
         </div>
@@ -565,7 +514,7 @@ export function SystemBackupTab() {
         <h3 className="card-title">Список бэкапов</h3>
         <p className="hint">
           Время — пояс расписания (<code>{savedSched.timezone || sched.timezone || 'UTC'}</code>).
-          Auth-снимок — <code>/app/data</code> (<code>*.auth.tgz</code>), не трафик.
+          Auth — снимок <code>/app/data</code> (<code>*.auth.tgz</code>), не трафик.
         </p>
         {backups.length === 0 ? (
           <EmptyState
@@ -588,7 +537,7 @@ export function SystemBackupTab() {
                   <th scope="col">Источник</th>
                   <th scope="col">Размер</th>
                   <th scope="col" title="Снимок /app/data (*.auth.tgz), не ClickHouse-таблицы">
-                    Auth-снимок
+                    Auth
                   </th>
                   <th scope="col">Состояние</th>
                   <th scope="col">Действия</th>
@@ -631,7 +580,7 @@ export function SystemBackupTab() {
                           ) : (
                             <button
                               type="button"
-                              className="btn"
+                              className="btn primary"
                               disabled={rowBusy}
                               onClick={() => void attach(b)}
                             >
@@ -671,7 +620,7 @@ export function SystemBackupTab() {
           <h3 className="card-title" style={{ margin: 0 }}>
             История DR
           </h3>
-          <span className="hint">Последние 50 событий</span>
+          <span className="hint">Последние 50 событий backup / подключение / удаление / расписание</span>
         </div>
         {!history.length ? (
           <EmptyState
@@ -697,9 +646,9 @@ export function SystemBackupTab() {
                   <tr key={`${item.timestamp || 't'}-${item.action || 'a'}-${idx}`}>
                     <td>{fmtDate(item.timestamp, savedSched.timezone || sched.timezone)}</td>
                     <td>{item.actor || 'system'}</td>
-                    <td title={item.action || undefined}>{auditActionLabel(item.action)}</td>
+                    <td className="mono">{item.action || '—'}</td>
                     <td>{item.target || '—'}</td>
-                    <td>{formatDRStatus(item.status)}</td>
+                    <td>{item.status || '—'}</td>
                     <td>{formatDRMessage(item)}</td>
                   </tr>
                 ))}

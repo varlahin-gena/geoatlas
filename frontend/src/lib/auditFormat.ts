@@ -66,10 +66,10 @@ function formatScheduleChangeDetails(d: Record<string, unknown>): string {
     parts.push(`TZ: ${d.timezone}`);
   }
   if (typeof d.keep === 'number') {
-    parts.push(`хранить: ${d.keep}`);
+    parts.push(`keep: ${d.keep}`);
   }
   if (typeof d.include_edges === 'boolean') {
-    parts.push(`рёбра: ${formatBool(d.include_edges)}`);
+    parts.push(`edges: ${formatBool(d.include_edges)}`);
   }
   if (typeof d.include_auth === 'boolean') {
     parts.push(`auth: ${formatBool(d.include_auth)}`);

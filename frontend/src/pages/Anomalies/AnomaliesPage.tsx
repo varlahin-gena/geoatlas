@@ -17,21 +17,16 @@ import { COPY } from '@/lib/glossary';
 import { fmtDate, fmtNumber } from '@/lib/format';
 import {
   ANOMALY_CODE_OPTIONS,
+  ANOMALY_SEVERITY_OPTIONS,
   ANOMALY_SINCE_OPTIONS,
   anomalyCodeLabel,
-  anomalyEndpointLabel,
   anomalyMapHref,
-  compareAnomalies,
   eventCodeLabel,
-  formatAnomalyDescription,
   investigateHref,
   matchesAnomalySearch,
-  nextAnomalySort,
   relTime,
   severityLabel,
   sinceIsoHoursAgo,
-  type AnomalySortDir,
-  type AnomalySortKey,
 } from './anomalyDisplay';
 import { AnomalyPeersPanel } from './AnomalyPeersPanel';
 import { rememberMapAlert } from '@/pages/Map/AnomalyActiveBanner';
@@ -125,7 +120,7 @@ function AnomalyRowActions({
       {canPeers ? (
         <button
           type="button"
-          className="btn sm ghost"
+          className="btn sm"
           aria-expanded={expanded}
           onClick={onTogglePeers}
         >
@@ -134,42 +129,16 @@ function AnomalyRowActions({
       ) : null}
       <Link
         to={anomalyMapHref(item)}
-        className="btn sm ghost"
+        className="btn sm"
         onClick={() => rememberMapAlert(item)}
       >
         На карте
       </Link>
-          {!acked ? (
-        <details className="anomaly-more">
-          <summary className="btn sm ghost">Ещё</summary>
-          <div className="anomaly-more-menu" role="menu">
-            <button
-              type="button"
-              role="menuitem"
-              className="anomaly-more-item"
-              disabled={acking}
-              onClick={(e) => {
-                const root = (e.currentTarget.closest('details') as HTMLDetailsElement | null);
-                if (root) root.open = false;
-                onHide();
-              }}
-            >
-              Скрыть на 24 ч
-            </button>
-          </div>
-        </details>
+      {!acked ? (
+        <button type="button" className="btn sm danger" disabled={acking} onClick={onHide}>
+          Скрыть на 24 ч
+        </button>
       ) : null}
-    </div>
-  );
-}
-
-function AnomalyDescriptionCell({ item }: { item: AnomalyEvent }) {
-  const parts = formatAnomalyDescription(item);
-  return (
-    <div className="anomaly-desc">
-      <div className="anomaly-desc-subject">{parts.subject}</div>
-      {parts.detail ? <div className="anomaly-desc-detail mono">{parts.detail}</div> : null}
-      {parts.delta ? <div className="anomaly-desc-delta">{parts.delta}</div> : null}
     </div>
   );
 }
@@ -187,8 +156,6 @@ export default function AnomaliesPage() {
   const [includeAcked, setIncludeAcked] = useState(false);
   const [limit, setLimit] = useState('100');
   const [search, setSearch] = useState('');
-  const [sortKey, setSortKey] = useState<AnomalySortKey>('detected_at');
-  const [sortDir, setSortDir] = useState<AnomalySortDir>('desc');
   const [acking, setAcking] = useState<string | null>(null);
   const [assigning, setAssigning] = useState<string | null>(null);
   const [expandedFp, setExpandedFp] = useState<string | null>(null);
@@ -255,18 +222,6 @@ export default function AnomaliesPage() {
     () => rows.filter((row) => matchesAnomalySearch(row, search)),
     [rows, search],
   );
-
-  const sorted = useMemo(() => {
-    const list = [...filtered];
-    list.sort((a, b) => compareAnomalies(a, b, sortKey, sortDir));
-    return list;
-  }, [filtered, sortKey, sortDir]);
-
-  function onSort(nextKey: AnomalySortKey) {
-    const next = nextAnomalySort(sortKey, sortDir, nextKey);
-    setSortKey(next.key);
-    setSortDir(next.dir);
-  }
 
   const showSummary =
     (summary?.high || 0) > 0 ||
@@ -383,6 +338,10 @@ export default function AnomaliesPage() {
   return (
     <AdminLayout title="Аномалии">
       <div className="page-content-inner wide">
+        <p className="page-lead">
+          Алерты сканера за период. Скрытие прячет алерт на 24 часа.
+        </p>
+
         {moduleOff ? (
           <p className="hint warn-banner">Модуль аномалий отключён на сервере (ANOMALY_ENABLED).</p>
         ) : null}
@@ -411,7 +370,7 @@ export default function AnomaliesPage() {
               aria-pressed={severity === 'high'}
               onClick={() => toggleSeverityFilter('high')}
             >
-              <span className="anomaly-summary-label">Критично</span>
+              <span className="hint">Критично</span>
               <strong className="sev-high">{fmtNumber(summary?.high || 0)}</strong>
             </button>
             <button
@@ -420,7 +379,7 @@ export default function AnomaliesPage() {
               aria-pressed={severity === 'warn'}
               onClick={() => toggleSeverityFilter('warn')}
             >
-              <span className="anomaly-summary-label">Предупреждения</span>
+              <span className="hint">Предупреждения</span>
               <strong className="sev-warn">{fmtNumber(summary?.warn || 0)}</strong>
             </button>
             <button
@@ -429,7 +388,7 @@ export default function AnomaliesPage() {
               aria-pressed={!severity}
               onClick={() => setSeverity('')}
             >
-              <span className="anomaly-summary-label">Всего открытых</span>
+              <span className="hint">Всего открытых</span>
               <strong>{fmtNumber(summary?.total || 0)}</strong>
             </button>
           </div>
@@ -438,7 +397,6 @@ export default function AnomaliesPage() {
         <div className="toolbar anomaly-toolbar">
           <input
             type="search"
-            className="anomaly-toolbar-control"
             placeholder="Поиск по заголовку, IP, стране…"
             aria-label="Поиск по заголовку, IP, стране"
             value={search}
@@ -449,36 +407,28 @@ export default function AnomaliesPage() {
               Найдено: {fmtNumber(filtered.length)}
             </span>
           ) : null}
-          <select
-            className="anomaly-toolbar-control"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            aria-label="Тип"
-          >
+          <select value={severity} onChange={(e) => setSeverity(e.target.value)} aria-label="Важность">
+            {ANOMALY_SEVERITY_OPTIONS.map((opt) => (
+              <option key={opt.value || 'all'} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <select value={code} onChange={(e) => setCode(e.target.value)} aria-label="Тип">
             {ANOMALY_CODE_OPTIONS.map((opt) => (
               <option key={opt.value || 'all'} value={opt.value}>
                 {opt.label}
               </option>
             ))}
           </select>
-          <select
-            className="anomaly-toolbar-control"
-            value={sinceHours}
-            onChange={(e) => setSinceHours(e.target.value)}
-            aria-label="Период"
-          >
+          <select value={sinceHours} onChange={(e) => setSinceHours(e.target.value)} aria-label="Период">
             {ANOMALY_SINCE_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>
             ))}
           </select>
-          <select
-            className="anomaly-toolbar-control"
-            value={limit}
-            onChange={(e) => setLimit(e.target.value)}
-            aria-label="Лимит"
-          >
+          <select value={limit} onChange={(e) => setLimit(e.target.value)} aria-label="Лимит">
             {[50, 100, 200].map((n) => (
               <option key={n} value={String(n)}>
                 до {n}
@@ -503,53 +453,13 @@ export default function AnomaliesPage() {
             <thead>
               <tr>
                 <th scope="col">Важность</th>
-                <th
-                  scope="col"
-                  aria-sort={
-                    sortKey === 'detected_at'
-                      ? sortDir === 'asc'
-                        ? 'ascending'
-                        : 'descending'
-                      : 'none'
-                  }
-                >
-                  <button
-                    type="button"
-                    className={`anomaly-sort-btn${sortKey === 'detected_at' ? ' is-active' : ''}`}
-                    onClick={() => onSort('detected_at')}
-                  >
-                    Обнаружено
-                    <span className="anomaly-sort-ind" aria-hidden="true">
-                      {sortKey === 'detected_at' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                    </span>
-                  </button>
-                </th>
+                <th scope="col">Обнаружено</th>
                 <th scope="col">Тип</th>
                 <th scope="col">Описание</th>
                 <th scope="col">Источник</th>
                 <th scope="col">Цель</th>
                 <th scope="col">Исполнитель</th>
-                <th
-                  scope="col"
-                  aria-sort={
-                    sortKey === 'event_count'
-                      ? sortDir === 'asc'
-                        ? 'ascending'
-                        : 'descending'
-                      : 'none'
-                  }
-                >
-                  <button
-                    type="button"
-                    className={`anomaly-sort-btn${sortKey === 'event_count' ? ' is-active' : ''}`}
-                    onClick={() => onSort('event_count')}
-                  >
-                    Событий
-                    <span className="anomaly-sort-ind" aria-hidden="true">
-                      {sortKey === 'event_count' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                    </span>
-                  </button>
-                </th>
+                <th scope="col">Событий</th>
                 <th scope="col">Статус</th>
                 <th scope="col">
                   <span className="visually-hidden">Действия</span>
@@ -557,9 +467,9 @@ export default function AnomaliesPage() {
               </tr>
             </thead>
             <tbody>
-              {loading && sorted.length === 0 ? (
+              {loading && filtered.length === 0 ? (
                 <TableSkeleton cols={10} rows={6} />
-              ) : sorted.length === 0 ? (
+              ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="empty">
                     <EmptyState
@@ -585,30 +495,11 @@ export default function AnomaliesPage() {
                   </td>
                 </tr>
               ) : (
-                sorted.map((item) => {
+                filtered.map((item) => {
                   const fp = item.fingerprint || item.title;
                   const acked = Boolean(item.acknowledged);
                   const expanded = expandedFp === item.fingerprint;
                   const canPeers = Boolean(item.src_ip || item.map?.q);
-                  const detail =
-                    item.detail && typeof item.detail === 'object' && !Array.isArray(item.detail)
-                      ? (item.detail as Record<string, unknown>)
-                      : undefined;
-                  const networkFallback =
-                    (typeof detail?.network === 'string' && detail.network.trim()) ||
-                    (item.device || '').trim() ||
-                    undefined;
-                  const srcLabel = anomalyEndpointLabel(
-                    item.src_ip,
-                    item.src_city,
-                    item.src_country,
-                    networkFallback,
-                  );
-                  const dstLabel = anomalyEndpointLabel(
-                    item.dst_ip,
-                    item.dst_city,
-                    item.dst_country,
-                  );
                   return (
                     <Fragment key={fp}>
                       <tr
@@ -625,21 +516,9 @@ export default function AnomaliesPage() {
                         {relTime(item.detected_at)}
                       </td>
                       <td>{eventCodeLabel(item)}</td>
-                      <td className="anomaly-title-cell">
-                        <AnomalyDescriptionCell item={item} />
-                      </td>
-                      <td
-                        className={
-                          item.src_ip || (networkFallback && srcLabel === networkFallback)
-                            ? 'mono'
-                            : undefined
-                        }
-                      >
-                        {srcLabel ? srcLabel : <span className="anomaly-empty-cell">—</span>}
-                      </td>
-                      <td className={item.dst_ip ? 'mono' : undefined}>
-                        {dstLabel ? dstLabel : <span className="anomaly-empty-cell">—</span>}
-                      </td>
+                      <td className="anomaly-title-cell">{item.title}</td>
+                      <td className="mono">{item.src_ip || '—'}</td>
+                      <td className="mono">{item.dst_ip || '—'}</td>
                       <td>
                         {acked ? (
                           <span
@@ -671,7 +550,7 @@ export default function AnomaliesPage() {
                           </select>
                         )}
                       </td>
-                      <td className="mono">{fmtNumber(item.event_count || 0)}</td>
+                      <td>{fmtNumber(item.event_count || 0)}</td>
                       <td>
                         {acked
                           ? item.ack_by

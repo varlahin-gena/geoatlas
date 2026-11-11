@@ -2,7 +2,6 @@ package auth
 
 import (
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
@@ -59,19 +58,6 @@ func (f *fakeUsers) SetRole(username, role string) (domain.UserPublic, error) {
 		return domain.UserPublic{}, domain.ErrUserNotFound
 	}
 	f.user.Role = role
-	return f.user.Public(), nil
-}
-func (f *fakeUsers) SetEnabled(username string, enabled bool, actorUsername string) (domain.UserPublic, error) {
-	if f.err != nil {
-		return domain.UserPublic{}, f.err
-	}
-	if f.user == nil || f.user.Username != username {
-		return domain.UserPublic{}, domain.ErrUserNotFound
-	}
-	if !enabled && strings.EqualFold(username, actorUsername) {
-		return domain.UserPublic{}, domain.ErrSelfDisable
-	}
-	f.user.Disabled = !enabled
 	return f.user.Public(), nil
 }
 func (f *fakeUsers) SetFullName(username, fullName string) (domain.UserPublic, error) {
@@ -171,14 +157,6 @@ func TestLoginInvalid(t *testing.T) {
 	_, err := svc.Login("admin", "bad")
 	if !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("want ErrInvalidCredentials, got %v", err)
-	}
-}
-
-func TestLoginDisabled(t *testing.T) {
-	svc := New(&fakeUsers{user: &domain.User{Username: "admin", Role: domain.RoleAdministrator, Disabled: true}}, &fakeSessions{})
-	_, err := svc.Login("admin", "ok")
-	if !errors.Is(err, ErrDisabled) {
-		t.Fatalf("want ErrDisabled, got %v", err)
 	}
 }
 
@@ -325,9 +303,6 @@ func TestAdminCRUDNotConfigured(t *testing.T) {
 	}
 	if _, err := svc.SetRole("u", "r"); !errors.Is(err, ErrNotConfigured) {
 		t.Fatalf("role: %v", err)
-	}
-	if _, err := svc.SetEnabled("u", false, "a"); !errors.Is(err, ErrNotConfigured) {
-		t.Fatalf("enabled: %v", err)
 	}
 	if _, err := svc.SetFullName("u", "n"); !errors.Is(err, ErrNotConfigured) {
 		t.Fatalf("name: %v", err)
