@@ -3,13 +3,6 @@ import { fmtDate, fmtNumber } from '@/lib/format';
 import { anomalyMapToView } from '@/pages/Map/useMapAnomalies';
 import { MAP_VIEW_DEFAULTS, serializeMapViewSearch } from '@/pages/Map/mapQuery';
 
-export const ANOMALY_SEVERITY_OPTIONS = [
-  { value: '', label: 'Любая важность' },
-  { value: 'high', label: 'Критично' },
-  { value: 'warn', label: 'Предупреждение' },
-  { value: 'info', label: 'Информация' },
-] as const;
-
 export type AnomalySortKey = 'detected_at' | 'event_count';
 export type AnomalySortDir = 'asc' | 'desc';
 

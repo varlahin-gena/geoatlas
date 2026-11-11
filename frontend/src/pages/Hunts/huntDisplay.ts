@@ -36,7 +36,7 @@ export function huntGroupLabel(groupBy?: string): string {
   return GROUP_LABELS[g] || g || MAP_GROUP_BY_LABELS[MAP_GROUP_BY_DEFAULT];
 }
 
-export function huntGroupPrep(groupBy?: string): string {
+function huntGroupPrep(groupBy?: string): string {
   const g = (groupBy || MAP_GROUP_BY_DEFAULT).trim();
   return GROUP_PREP[g] || huntGroupLabel(g);
 }
