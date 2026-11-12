@@ -5,6 +5,24 @@
 
 ## [Unreleased]
 
+## [2.6.12] — 2026-11-12
+
+Тестовый / pre-release: финальный Apple Design UI-проход + возврат 2.6.11 после revert (не Latest).
+
+### Fixed
+- **SPA loading**: retry/timeout для lazy-chunk’ов, UI восстановления при зависшем Suspense, таймаут проверки сессии `/api/auth/me`.
+- **Возврат 2.6.11**: повторно накатываем HIG admin table layout и связанные изменения после revert PR #165 на `main`.
+
+### Changed
+- **Admin UI (Apple HIG)**: table density 13px / комфортный row padding; muted-бейджи для parse-errors/geo-missing (красный только у аномалий); форма «Добавить фид» на Репутации — в модалке; HIG-полировка Users/TLS.
+- **Карта**: русские `title`/`aria-label` у контролов MapLibre (zoom, compass, attribution).
+
+### Notes
+- OpenAPI API doc version: **1.21.0**
+- Продуктовая версия: **2.6.12** (тестовый пререлиз)
+- Схема ClickHouse: без изменений Ensure*.
+- Достаточно `update.sh` 2.6.12 (recreate **frontend**; при первом подъёме после revert — также **backend** как для 2.6.10/2.6.11).
+
 ## [2.6.11] — 2026-11-11
 
 Тестовый / pre-release: HIG table layout на admin-страницах (не Latest).
@@ -290,6 +308,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.6.12]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.12
 [2.6.11]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.11
 [2.6.10]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.10
 [2.6.9]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.9
