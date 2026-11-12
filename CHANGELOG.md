@@ -5,6 +5,19 @@
 
 ## [Unreleased]
 
+## [2.6.15] — 2026-11-12
+
+Тестовый / pre-release: команды страниц из шапки в контент (не Latest).
+
+### Changed
+- **Шапка админки**: кнопки страниц («Создать токен», загрузка и выгрузка GeoIP, фиды репутации) стоят под вводным текстом, справа, как «Создать» на «Пользователях». В шапке остаются название, учётная запись и «Система OK».
+
+### Notes
+- OpenAPI API doc version: **1.21.0**
+- Продуктовая версия: **2.6.15** (тестовый пререлиз)
+- Схема ClickHouse: без изменений Ensure*.
+- Достаточно `update.sh` 2.6.15 (recreate **frontend**).
+
 ## [2.6.14] — 2026-11-12
 
 Тестовый / pre-release: Коннекторы без горизонтального скролла (не Latest).
@@ -340,6 +353,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.6.15]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.15
 [2.6.14]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.14
 [2.6.13]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.13
 [2.6.12]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.12
