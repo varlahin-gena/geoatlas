@@ -9,7 +9,7 @@
 #   source   — package
 #   ref      — vX.Y.Z
 #   commit   — пусто (на сервере нет git)
-#   display  — строка для UI («v2.6.0»)
+#   display  — строка для UI («v2.7.0»)
 
 _ga_meta_log() { echo "[$(date +'%F %T')] [install-meta] $*"; }
 

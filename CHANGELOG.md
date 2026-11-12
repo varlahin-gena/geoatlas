@@ -5,230 +5,34 @@
 
 ## [Unreleased]
 
-## [2.6.15] — 2026-11-12
 
-Тестовый / pre-release: команды страниц из шапки в контент (не Latest).
+## [2.7.0] — 2026-11-12
 
-### Changed
-- **Шапка админки**: кнопки страниц («Создать токен», загрузка и выгрузка GeoIP, фиды репутации) стоят под вводным текстом, справа, как «Создать» на «Пользователях». В шапке остаются название, учётная запись и «Система OK».
-
-### Notes
-- OpenAPI API doc version: **1.21.0**
-- Продуктовая версия: **2.6.15** (тестовый пререлиз)
-- Схема ClickHouse: без изменений Ensure*.
-- Достаточно `update.sh` 2.6.15 (recreate **frontend**).
-
-## [2.6.14] — 2026-11-12
-
-Тестовый / pre-release: Коннекторы без горизонтального скролла (не Latest).
-
-### Fixed
-- **Коннекторы**: действия строки в меню «⋯» (Изменить / Перезапуск / Удалить); убран лишний горизонтальный скролл таблицы.
-
-### Notes
-- OpenAPI API doc version: **1.21.0**
-- Продуктовая версия: **2.6.14** (тестовый пререлиз)
-- Схема ClickHouse: без изменений Ensure*.
-- Достаточно `update.sh` 2.6.14 (recreate **frontend**).
-
-## [2.6.13] — 2026-11-12
-
-Тестовый / pre-release: Users more-меню + правка коннекторов (не Latest).
+Минор: стабильный пакет после train 2.6.1–2.6.15 — multi-port syslog connectors, dismiss system alerts, HIG admin UI, Pipeline/syslog metrics.
 
 ### Added
-- **Коннекторы**: кнопка «Изменить» — имя, порт и протоколы без пересоздания (ID неизменен; дальше «Применить»).
-
-### Fixed
-- **Пользователи**: выпадающее меню «⋯» больше не обрезается рамкой таблицы/карточки.
-
-### Changed
-- **Коннекторы**: подсказка про `GA_CONNECTOR_EXTRA_PORTS` показывается, когда диапазон реально задан.
-
-### Notes
-- OpenAPI API doc version: **1.21.0**
-- Продуктовая версия: **2.6.13** (тестовый пререлиз)
-- Схема ClickHouse: без изменений Ensure*.
-- Достаточно `update.sh` 2.6.13 (recreate **frontend**).
-
-## [2.6.12] — 2026-11-12
-
-Тестовый / pre-release: финальный Apple Design UI-проход + возврат 2.6.11 после revert (не Latest).
-
-### Fixed
-- **SPA loading**: retry/timeout для lazy-chunk’ов, UI восстановления при зависшем Suspense, таймаут проверки сессии `/api/auth/me`.
-- **Возврат 2.6.11**: повторно накатываем HIG admin table layout и связанные изменения после revert PR #165 на `main`.
-
-### Changed
-- **Admin UI (Apple HIG)**: table density 13px / комфортный row padding; muted-бейджи для parse-errors/geo-missing (красный только у аномалий); форма «Добавить фид» на Репутации — в модалке; HIG-полировка Users/TLS.
-- **Карта**: русские `title`/`aria-label` у контролов MapLibre (zoom, compass, attribution).
-
-### Notes
-- OpenAPI API doc version: **1.21.0**
-- Продуктовая версия: **2.6.12** (тестовый пререлиз)
-- Схема ClickHouse: без изменений Ensure*.
-- Достаточно `update.sh` 2.6.12 (recreate **frontend**; при первом подъёме после revert — также **backend** как для 2.6.10/2.6.11).
-
-## [2.6.11] — 2026-11-11
-
-Тестовый / pre-release: HIG table layout на admin-страницах (не Latest).
-
-### Changed
-- **Admin UI (Apple HIG)**: `table-layout: fixed`, ellipsis, стабильная колонка действий и выровненные toolbars на Anomalies, Hunts, Connectors, ParseErrors, GeoMissing, GeoRanges, Users, ApiTokens; убран double-frame card/table; checkbox «Включена» без дублирующей подписи.
-
-### Notes
-- OpenAPI API doc version: **1.21.0**
-- Продуктовая версия: **2.6.11** (тестовый пререлиз)
-- Схема ClickHouse: без изменений Ensure*.
-- Достаточно `update.sh` 2.6.11 (recreate **frontend**).
-
-## [2.6.10] — 2026-11-11
-
-Тестовый / pre-release: HIG admin UI + enable/disable УЗ (не Latest).
-
-### Added
-- **Пользователи**: включение/выключение УЗ (`POST /api/users/{username}/enabled`); нельзя выключить себя и последнего активного администратора; выключение инвалидирует сессии; на логине — отказ для выключенной УЗ.
-
-### Changed
-- **Admin UI (Apple HIG)**: quieter actions, RU-копирайт, progressive disclosure и themed controls на Anomalies / Investigate / Hunts / Engine, Reputation, Connectors, ParseErrors, ParserTest, GeoMissing, GeoRanges, Users, ApiTokens, конструкторе поиска и `/system` → Резерв.
-- **Dozzle**: `amir20/dozzle` **v11.4.0 → v11.4.2** (recreate контейнера `dozzle`).
-- **scripts/load-test-connectors.ps1**: режим `-Soak` для длительного steady-нагрузки с периодическими сэмплами.
-
-### Notes
-- OpenAPI API doc version: **1.21.0**
-- Продуктовая версия: **2.6.10** (тестовый пререлиз)
-- Схема ClickHouse: без изменений Ensure*.
-- Достаточно `update.sh` 2.6.10 (recreate **backend** + **frontend**; при профиле dozzle — recreate `dozzle`).
-
-## [2.6.9] — 2026-11-11
-
-Тестовый / pre-release: Syslog processed из dst_network / delivered (не Latest).
-
-### Fixed
-- **pkg/syslogngstats**: на живом 4.12 scrape source `input_events` часто пуст; считаем legacy `syslogng_dst_network_processed` и `output_events_total{result="delivered"}` по `d_<id>_{udp|tcp}` (fallback, без double-count с source).
-
-### Notes
-- OpenAPI API doc version: **1.20.0**
-- Продуктовая версия: **2.6.9** (тестовый пререлиз)
-- Схема ClickHouse: без изменений Ensure*.
-- Достаточно `update.sh` 2.6.9 (или recreate **backend**); conf syslog-ng из 2.6.8 ок.
-- После старта гоняйте поток, затем смотрите Pipeline (сразу после recreate счётчики syslog-ng = 0).
-
-## [2.6.8] — 2026-11-11
-
-Тестовый / pre-release: syslog-ng stats scrape (prometheus + legacy) (не Latest).
-
-### Fixed
-- **syslog-ng.conf**: `stats-with-legacy(yes)` + явный prometheus; без recreate контейнера после 2.6.5 оставался пустой CSV → Syslog EPS/processed = 0.
-- **UI**: если processed=0 — подсказка recreate syslog-ng; health: `stats_format` / `stats_hint`.
-- **backend scrape**: timeout 3s.
-
-### Notes
-- OpenAPI API doc version: **1.20.0**
-- Продуктовая версия: **2.6.8** (тестовый пререлиз)
-- Схема ClickHouse: без изменений Ensure*.
-- **Обязательно:** `docker compose up -d --force-recreate syslog-ng backend frontend`
-
-## [2.6.7] — 2026-11-11
-
-Тестовый / pre-release: Syslog processed (input_events без result=) (не Latest).
-
-### Fixed
-- **pkg/syslogngstats**: `syslogng_input_events_total` часто **без** `result=` — раньше typ не становился `processed` → Syslog EPS=0 и processed 0/0, при этом q/drop уже читались.
-- **UI Syslog-NG**: meta udp/tcp берёт `syslogng.*_processed`, а не backend rate (не путать стадии).
-
-### Notes
-- OpenAPI API doc version: **1.20.0**
-- Продуктовая версия: **2.6.7** (тестовый пререлиз)
-- Схема ClickHouse: без изменений Ensure*.
-
-## [2.6.6] — 2026-11-11
-
-Тестовый / pre-release: Syslog processed по коннекторам (не Latest).
-
-### Fixed
-- **syslog-ng stats-exporter**: `stat-format("csv")` из 2.6.5 отдавал legacy-only (часто пусто); вернули **`prometheus`** — живые `input/output_events_total` с `s_<id>_udp|tcp`.
-- **pkg/syslogngstats**: CSV `SourceName=source` / `destination` (без подстроки `src`/`dst`) теперь атрибутируются.
-- **UI**: плитка Syslog-NG больше не подставляет backend EPS при пустом scrape.
-
-### Notes
-- OpenAPI API doc version: **1.20.0**
-- Продуктовая версия: **2.6.6** (тестовый пререлиз)
-- Схема ClickHouse: без изменений Ensure*.
-- После обновления: `docker compose up -d --force-recreate syslog-ng` (подхватить conf) + backend.
-
-## [2.6.5] — 2026-11-11
-
-Тестовый / pre-release: метрики Pipeline по syslog-коннекторам (не Latest).
-
-### Fixed
-- **Pipeline / коннекторы**: разбор Prometheus `input/output_events_*`; колонка Backend EPS.
-- **syslog-ng.conf**: `stat-format("csv")` — оказался ошибочным на 4.12 (исправлено в 2.6.6).
-
-### Changed
-- **UI Pipeline**: колонка Backend EPS (`received_per_sec`); заголовки без путаницы EPS vs накопленный processed/recv.
-
-### Notes
-- OpenAPI API doc version: **1.20.0**
-- Продуктовая версия: **2.6.5** (тестовый пререлиз)
-- Схема ClickHouse: без изменений Ensure*.
-
-## [2.6.4] — 2026-11-10
-
-Тестовый / pre-release: CPU/память контейнеров как у Dozzle + ясные алерты EPS vs CPU (не Latest).
-
-### Changed
-- **stats-collector CPU**: `cpu_pct` нормализован к хосту (100% = все ядра), как host-шкала Dozzle; порог `cpu_high` >90% теперь про долю машины, а не «>0.9 ядра».
-- **stats-collector память**: `mem_bytes` = Docker/Dozzle `usage − inactive_file` (без reclaimable page cache); ClickHouse больше не раздувается за счёт file cache.
-- **Алерты / UI**: тексты `cpu_high` / `capacity_*` явно разделяют CPU хоста и лимит EPS профиля; подписи «EPS профиля», график CPU «% хоста», память «без page cache».
-
-### Notes
-- OpenAPI API doc version: **1.20.0**
-- Продуктовая версия: **2.6.4** (тестовый пререлиз)
-- Схема ClickHouse: без изменений Ensure*.
-
-## [2.6.3] — 2026-11-10
-
-Тестовый / pre-release: map ClickHouse CPU + dismiss system warn-алертов (не Latest).
-
-### Added
+- **Syslog connectors** (multi-port): CRUD в UI `/connectors`, Apply → `syslog-ng.d/zz_connectors.conf` + reload; порты `5514-5529`; per-connector метрики на `/system` → Pipeline; `traffic_logs.connector_id`; API `/api/connectors*`.
 - **System alerts dismiss**: скрытие warn-алертов на `/system` (`POST/DELETE /api/system/alerts/ack`); error-алерты скрыть нельзя.
+- **Пользователи**: включение/выключение УЗ (`POST /api/users/{username}/enabled`); нельзя выключить себя и последнего активного администратора.
+- **Коннекторы**: «Изменить» (имя/порт/протоколы без пересоздания) и «Перезапуск»; статус ВКЛ/ВЫКЛ по `enabled` + `last_event_at`.
+- **scripts/load-test-connectors.ps1**: режим `-Soak` для длительной нагрузки.
 
 ### Changed
-- **Карта**: минимальный период **1h** (убраны пресеты 15m/30m); legacy `minutes=` / `period=*m` поднимаются до часов.
-- **Карта / ClickHouse**: окна часов читают `traffic_edges_hourly` при готовности pre-agg; JOIN к `ga_geo_enrich_ip` только если lookup непустой (`ANY LEFT JOIN`, filter-before-join).
-- **Карта / search**: без `concat_ws` — OR по колонкам; IP/port fast-path (`toIPv4OrNull` / равенство портов); debounce поиска 500ms; один in-flight GetMap на сессию (новый отменяет предыдущий).
+- **Admin UI (Apple HIG)**: table density, quieter actions, progressive disclosure, page commands из шапки в контент, More-меню на Users/Connectors, форма «Добавить фид» в модалке.
+- **Карта**: минимальный период **1h**; окна часов читают `traffic_edges_hourly`; быстрее поиск (debounce, IP/port fast-path, один in-flight GetMap).
+- **stats-collector**: CPU как доля хоста (шкала Dozzle); память `usage − inactive_file`; тексты алертов EPS vs CPU разделены.
+- **Dozzle**: **v11.4.2**; Pipeline: колонка Backend EPS и корректный scrape syslog-ng (prometheus + legacy).
 
 ### Fixed
-- **Коннекторы Apply**: `volume-perms` выставляет владельца `./syslog-ng.d` на uid 101, иначе backend не мог записать `zz_connectors.conf` (permission denied → 500).
+- **syslog-ng stats**: `stats-with-legacy(yes)`, attribution `input/output_events` и `dst_network` / delivered; UI больше не подставляет backend EPS при пустом scrape.
+- **Коннекторы Apply**: `volume-perms` на `./syslog-ng.d` (uid 101).
+- **SPA**: retry/timeout lazy-chunks и проверки сессии; клипы меню и лишний x-scroll таблиц.
 
 ### Notes
-- OpenAPI API doc version: **1.20.0**
-- Продуктовая версия: **2.6.3** (тестовый пререлиз)
-- Схема ClickHouse: без изменений Ensure*.
-
-## [2.6.2] — 2026-11-09
-
-Тестовый / pre-release: HIG-полировка UI Коннекторы (не Latest).
-
-### Changed
-- **Коннекторы** (`/connectors`): иконка PlugsConnected в сайдбаре; компактный help; форма на dark `.field`; «Применить» на странице с dirty-state; живой статус ВКЛ/ВЫКЛ (зелёный / серый / красный по `enabled` + `last_event_at`); кнопка «Перезапуск» (выкл→вкл); таблица в общем settings-стиле.
-
-### Notes
-- OpenAPI API doc version: **1.20.0**
-- Продуктовая версия: **2.6.2** (тестовый пререлиз)
-- Схема ClickHouse: без изменений Ensure*.
-
-## [2.6.1] — 2026-11-09
-
-Тестовый / pre-release: multi-port syslog connectors для обкатки на сервере (не Latest).
-
-### Added
-- **Syslog connectors** (multi-port): CRUD в UI `/connectors`, Apply → `syslog-ng.d/zz_connectors.conf` + reload agent; pre-publish ports `5514-5529`; per-connector метрики на `/system` → Pipeline; колонка `traffic_logs.connector_id`; API `/api/connectors*`; `scripts/sync-syslog-firewall.sh`.
-
-### Notes
-- OpenAPI API doc version: **1.20.0**
-- Продуктовая версия: **2.6.1** (тестовый пререлиз)
+- OpenAPI API doc version: **1.21.0**
+- Продуктовая версия: **2.7.0**
 - Схема ClickHouse: `EnsureTrafficLogsConnectorID` (`connector_id`).
+- Обновление с 2.6.0: `update.sh` 2.7.0 (recreate **backend** + **frontend** + **syslog-ng**; при профиле dozzle — recreate `dozzle`; stats-collector при смене метрик CPU/mem).
 
 ## [2.6.0] — 2026-11-03
 
@@ -353,21 +157,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
-[2.6.15]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.15
-[2.6.14]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.14
-[2.6.13]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.13
-[2.6.12]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.12
-[2.6.11]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.11
-[2.6.10]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.10
-[2.6.9]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.9
-[2.6.8]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.8
-[2.6.7]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.7
-[2.6.6]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.6
-[2.6.5]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.5
-[2.6.4]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.4
-[2.6.3]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.3
-[2.6.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.2
-[2.6.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.1
+[2.7.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.0
 [2.6.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.0
 [2.5.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.0
 [2.0.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.0.0
