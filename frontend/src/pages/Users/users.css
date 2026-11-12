@@ -47,19 +47,6 @@
   width: 9.5rem;
 }
 
-.users-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  margin: 0 0 14px;
-}
-
-.users-toolbar .btn {
-  min-height: 32px;
-}
-
 .users-fio-input,
 .users-table select {
   width: 100%;

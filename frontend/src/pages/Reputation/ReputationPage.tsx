@@ -509,10 +509,13 @@ export default function ReputationPage() {
   const activeColSpan = 5 + (showFormatCol ? 1 : 0) + (showErrorCol ? 1 : 0);
 
   return (
-    <AdminLayout
-      title="Репутация IP"
-      actions={
-        <>
+    <AdminLayout title="Репутация IP">
+      <div className="page-content-inner">
+        <p className="page-lead">
+          Подключите списки вредоносных IP — они обновляются по расписанию и участвуют в проверке
+          репутации на карте и в аномалиях.
+        </p>
+        <div className="page-actions">
           <button type="button" className="btn" onClick={() => void load()} disabled={loading}>
             Обновить таблицу
           </button>
@@ -534,14 +537,7 @@ export default function ReputationPage() {
           >
             {refreshBusy ? 'Скачивание…' : 'Скачать фиды сейчас'}
           </button>
-        </>
-      }
-    >
-      <div className="page-content-inner">
-        <p className="page-lead">
-          Подключите списки вредоносных IP — они обновляются по расписанию и участвуют в проверке
-          репутации на карте и в аномалиях.
-        </p>
+        </div>
 
         <p className="reputation-summary" role="status">
           {activeRows.length ? (

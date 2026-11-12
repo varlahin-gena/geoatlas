@@ -95,20 +95,17 @@ export default function ApiTokensPage() {
   }
 
   return (
-    <SettingsLayout
-      title="API-токены"
-      plainTitle
-      actions={
-        <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
-          Создать токен
-        </button>
-      }
-    >
+    <SettingsLayout title="API-токены" plainTitle>
       <div className="page-content-inner narrow">
         <p className="page-lead">
           Именованные токены для автоматизации. Секрет показывается один раз; отзыв сразу закрывает
           доступ.
         </p>
+        <div className="page-actions">
+          <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
+            Создать токен
+          </button>
+        </div>
         <div className="card api-tokens-card">
           <div className="table-wrap">
             <table className="api-tokens-table">

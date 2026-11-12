@@ -379,6 +379,20 @@ body.page-admin .admin-main > .content {
   margin: 0 auto;
 }
 .page-content-inner.narrow { max-width: 960px; }
+
+/* Команды страницы — в контенте, справа, как на «Пользователях». */
+.page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+
+.page-actions .btn {
+  min-height: 32px;
+}
 .page-content h1,
 .content h1 {
   font-size: 18px;

@@ -145,7 +145,7 @@ export default function TlsPage() {
           <code>auto</code>). PEM пишутся в том <code>./certs</code>.
         </p>
 
-        <div className="tls-toolbar">
+        <div className="page-actions">
           <button type="button" className="btn" onClick={() => void load()} disabled={loading}>
             {loading ? 'Обновление…' : 'Обновить'}
           </button>

@@ -1,16 +1,3 @@
-.tls-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  margin: 0 0 14px;
-}
-
-.tls-toolbar .btn {
-  min-height: 32px;
-}
-
 .tls-card.card {
   margin-bottom: 14px;
 }

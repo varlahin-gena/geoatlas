@@ -476,11 +476,13 @@ export default function GeoRangesPage() {
         : null;
 
   return (
-    <SettingsLayout
-      title="База GeoIP"
-      plainTitle
-      actions={
-        <>
+    <SettingsLayout title="База GeoIP" plainTitle>
+      <div className="page-content-inner">
+        <p className="page-lead">
+          База координат по IP-диапазонам. Правка строки — «Изменить»; полная замена — очистка ниже,
+          затем загрузка CSV.
+        </p>
+        <div className="page-actions">
           <input
             ref={geoFileRef}
             type="file"
@@ -526,14 +528,7 @@ export default function GeoRangesPage() {
           >
             Выгрузить CSV
           </button>
-        </>
-      }
-    >
-      <div className="page-content-inner">
-        <p className="page-lead">
-          База координат по IP-диапазонам. Правка строки — «Изменить»; полная замена — очистка ниже,
-          затем загрузка CSV.
-        </p>
+        </div>
         <nav className="geo-ranges-tabs" role="tablist" aria-label="Разделы базы GeoIP">
           <button
             type="button"

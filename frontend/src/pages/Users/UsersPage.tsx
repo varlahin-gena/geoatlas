@@ -132,7 +132,7 @@ export default function UsersPage() {
           хотя бы один активный администратор.
         </p>
 
-        <div className="users-toolbar">
+        <div className="page-actions">
           <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
             Создать
           </button>

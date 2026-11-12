@@ -248,24 +248,19 @@ export default function GeoMissingPage() {
   const by = displaySummary.by_kind || {};
 
   return (
-    <SettingsLayout
-      title="IP без координат"
-      plainTitle
-      actions={
-        <>
+    <SettingsLayout title="IP без координат" plainTitle>
+      <div className="page-content-inner">
+        <p className="page-lead">
+          Уникальные IP без координат. Публичные — в базу GeoIP; приватные на карте обычно не нужны.
+        </p>
+        <div className="page-actions">
           <button type="button" className="btn" onClick={() => void copyPublic()}>
             Копировать публичные IP
           </button>
           <button type="button" className="btn" onClick={() => void exportCsv()}>
             Выгрузить GeoIP CSV
           </button>
-        </>
-      }
-    >
-      <div className="page-content-inner">
-        <p className="page-lead">
-          Уникальные IP без координат. Публичные — в базу GeoIP; приватные на карте обычно не нужны.
-        </p>
+        </div>
 
         <div className="geo-missing-summary">
           <div className="geo-missing-stat">
