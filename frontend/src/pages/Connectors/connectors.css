@@ -74,7 +74,7 @@
 .connectors-table {
   table-layout: fixed;
   width: 100%;
-  min-width: 560px;
+  min-width: 0;
   border-collapse: collapse;
   font-size: 13px;
 }
@@ -94,34 +94,38 @@
   white-space: nowrap;
 }
 
+/* Flexible name column; fixed utility columns sized to fit narrow settings pane without x-scroll. */
 .connectors-table th:nth-child(1),
 .connectors-table td:nth-child(1) {
-  width: 28%;
+  width: auto;
 }
 
 .connectors-table th:nth-child(2),
 .connectors-table td:nth-child(2) {
-  width: 18%;
+  width: 7rem;
 }
 
 .connectors-table th:nth-child(3),
 .connectors-table td:nth-child(3) {
-  width: 4.5rem;
+  width: 3.75rem;
 }
 
 .connectors-table th:nth-child(4),
 .connectors-table td:nth-child(4) {
-  width: 6.5rem;
+  width: 5.5rem;
 }
 
 .connectors-table th:nth-child(5),
 .connectors-table td:nth-child(5) {
-  width: 6.5rem;
+  width: 5.5rem;
 }
 
+.connectors-table th:nth-child(6),
 .connectors-table td.actions {
   display: table-cell;
-  width: 14.5rem;
+  width: 2.75rem;
+  padding-left: 4px;
+  padding-right: 8px;
   white-space: nowrap;
   vertical-align: middle;
   text-align: right;
@@ -133,6 +137,99 @@
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
+}
+
+.connectors-more {
+  position: relative;
+}
+
+.connectors-more > summary {
+  list-style: none;
+}
+
+.connectors-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.connectors-more-trigger {
+  min-width: 28px;
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 16px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-dim);
+}
+
+.connectors-more-trigger:hover {
+  background: var(--panel-3);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.connectors-more[open] > .connectors-more-trigger {
+  background: var(--panel-3);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.connectors-more-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: var(--z-dropdown);
+  min-width: 168px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.connectors-table tbody tr:has(.connectors-more[open]) {
+  position: relative;
+  z-index: calc(var(--z-dropdown) + 1);
+}
+
+.connectors-more-item {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.connectors-more-item:hover:not(:disabled) {
+  background: var(--panel-3);
+}
+
+.connectors-more-item.is-danger {
+  color: var(--red);
+}
+
+.connectors-more-item.is-danger:hover:not(:disabled) {
+  background: rgba(248, 81, 73, 0.12);
+}
+
+.connectors-more-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.connectors-more-sep {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border);
 }
 
 .connectors-table .mono {
@@ -178,26 +275,20 @@
   white-space: nowrap;
 }
 
-.connectors-table .btn.sm.ghost {
-  background: transparent;
-  border-color: transparent;
-  color: var(--text-dim);
+.connectors-card.card {
+  padding: 0;
+  overflow: visible;
 }
 
-.connectors-table .btn.sm.ghost:hover:not(:disabled) {
-  background: var(--panel-3);
-  border-color: var(--border);
-  color: var(--text);
+.connectors-card .table-wrap {
+  border: none;
+  border-radius: 10px;
+  /* No idle horizontal scrollbar; cells ellipsis instead of forcing x-scroll. */
+  overflow: hidden;
 }
 
-.connectors-table .btn.sm.danger.ghost {
-  color: var(--red);
-}
-
-.connectors-table .btn.sm.danger.ghost:hover:not(:disabled) {
-  background: rgba(248, 81, 73, 0.12);
-  border-color: rgba(248, 81, 73, 0.35);
-  color: var(--red);
+.connectors-card:has(.connectors-more[open]) .table-wrap {
+  overflow: visible;
 }
 
 .connectors-form .form-row {

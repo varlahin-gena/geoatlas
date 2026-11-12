@@ -461,7 +461,7 @@ export default function ConnectorsPage() {
           <div className="connectors-toolbar">{applyButton}</div>
         )}
 
-        <div className="card">
+        <div className="card connectors-card">
           <div className="table-wrap">
             <table className="connectors-table">
               <thead>
@@ -522,34 +522,61 @@ export default function ConnectorsPage() {
                         </td>
                         <td className="actions">
                           <div className="connectors-row-actions">
-                            <button
-                              type="button"
-                              className="btn sm ghost"
-                              disabled={busy}
-                              title="Имя, порт и протоколы"
-                              onClick={() => setPendingEdit(c)}
-                            >
-                              Изменить
-                            </button>
-                            <button
-                              type="button"
-                              className="btn sm ghost"
-                              disabled={busy}
-                              title="Выкл → вкл в конфиге"
-                              onClick={() => void onRestart(c)}
-                            >
-                              Перезапуск
-                            </button>
-                            {!c.builtin ? (
-                              <button
-                                type="button"
-                                className="btn sm danger ghost"
-                                disabled={busy}
-                                onClick={() => setPendingDelete(c)}
+                            <details className="connectors-more">
+                              <summary
+                                className="btn sm ghost connectors-more-trigger"
+                                aria-label={`Действия для ${c.name}`}
                               >
-                                Удалить
-                              </button>
-                            ) : null}
+                                …
+                              </summary>
+                              <div className="connectors-more-menu" role="menu">
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  className="connectors-more-item"
+                                  disabled={busy}
+                                  onClick={(e) => {
+                                    const root = e.currentTarget.closest('details');
+                                    if (root instanceof HTMLDetailsElement) root.open = false;
+                                    setPendingEdit(c);
+                                  }}
+                                >
+                                  Изменить…
+                                </button>
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  className="connectors-more-item"
+                                  disabled={busy}
+                                  title="Выкл → вкл в конфиге"
+                                  onClick={(e) => {
+                                    const root = e.currentTarget.closest('details');
+                                    if (root instanceof HTMLDetailsElement) root.open = false;
+                                    void onRestart(c);
+                                  }}
+                                >
+                                  Перезапуск
+                                </button>
+                                {!c.builtin ? (
+                                  <>
+                                    <div className="connectors-more-sep" role="separator" />
+                                    <button
+                                      type="button"
+                                      role="menuitem"
+                                      className="connectors-more-item is-danger"
+                                      disabled={busy}
+                                      onClick={(e) => {
+                                        const root = e.currentTarget.closest('details');
+                                        if (root instanceof HTMLDetailsElement) root.open = false;
+                                        setPendingDelete(c);
+                                      }}
+                                    >
+                                      Удалить
+                                    </button>
+                                  </>
+                                ) : null}
+                              </div>
+                            </details>
                           </div>
                         </td>
                       </tr>
