@@ -145,6 +145,7 @@
   color: var(--text);
 }
 
+/* Pull-down menu must float above table content (HIG popovers). */
 .users-more-menu {
   position: absolute;
   right: 0;
@@ -156,6 +157,11 @@
   border-radius: 8px;
   background: var(--panel);
   box-shadow: var(--shadow);
+}
+
+.users-table tbody tr:has(.users-more[open]) {
+  position: relative;
+  z-index: calc(var(--z-dropdown) + 1);
 }
 
 .users-more-item {
@@ -244,10 +250,17 @@
 
 .users-card.card {
   padding: 0;
-  overflow: hidden;
+  /* visible so the row More menu is not clipped by the card frame */
+  overflow: visible;
 }
 
 .users-card .table-wrap {
   border: none;
-  border-radius: 0;
+  border-radius: 10px;
+  overflow: auto;
+}
+
+/* While a pull-down is open, drop the scroll clip so the menu can paint above rows. */
+.users-card:has(.users-more[open]) .table-wrap {
+  overflow: visible;
 }

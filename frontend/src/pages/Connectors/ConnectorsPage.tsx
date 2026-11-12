@@ -87,6 +87,120 @@ function DeleteConnectorModal({
   );
 }
 
+function EditConnectorModal({
+  connector,
+  busy,
+  portMin,
+  portMax,
+  onClose,
+  onSave,
+}: {
+  connector: Connector;
+  busy: boolean;
+  portMin: number;
+  portMax: number;
+  onClose: () => void;
+  onSave: (patch: {
+    name: string;
+    port: number;
+    protocols: ConnectorProtocols;
+  }) => void;
+}) {
+  const titleId = useId();
+  const dialogRef = useDialogA11y<HTMLFormElement>(true, onClose);
+  const [name, setName] = useState(connector.name);
+  const [port, setPort] = useState(String(connector.port));
+  const [protocols, setProtocols] = useState<ConnectorProtocols>(
+    connector.protocols === 'udp' || connector.protocols === 'tcp' ? connector.protocols : 'both',
+  );
+
+  return (
+    <div
+      className="modal-backdrop show"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !busy) onClose();
+      }}
+    >
+      <form
+        ref={dialogRef}
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (busy) return;
+          onSave({
+            name: name.trim(),
+            port: Number(port),
+            protocols,
+          });
+        }}
+      >
+        <h3 id={titleId}>Изменить коннектор</h3>
+        <p className="hint" style={{ marginBottom: 16 }}>
+          ID <code>{connector.id}</code> нельзя сменить. После сохранения нажмите «Применить».
+        </p>
+        <div className="field">
+          <label htmlFor="connector-edit-name">Имя</label>
+          <input
+            id="connector-edit-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            maxLength={128}
+            disabled={busy}
+            autoFocus
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="connector-edit-port">Порт</label>
+          <input
+            id="connector-edit-port"
+            value={port}
+            onChange={(e) => setPort(e.target.value)}
+            type="number"
+            min={connector.builtin ? 514 : portMin > 0 ? portMin : 1024}
+            max={connector.builtin ? 514 : portMax > 0 ? portMax : 65535}
+            required
+            disabled={busy || !!connector.builtin}
+            title={connector.builtin ? 'У встроенного коннектора порт всегда 514' : undefined}
+          />
+          {!connector.builtin && portMin > 0 ? (
+            <span className="field-hint">
+              {portMin}–{portMax}
+            </span>
+          ) : null}
+        </div>
+        <div className="field">
+          <label htmlFor="connector-edit-protocols">Протоколы</label>
+          <select
+            id="connector-edit-protocols"
+            value={protocols}
+            onChange={(e) => setProtocols(e.target.value as ConnectorProtocols)}
+            disabled={busy}
+          >
+            <option value="both">UDP+TCP</option>
+            <option value="udp">UDP</option>
+            <option value="tcp">TCP</option>
+          </select>
+        </div>
+        <div className="modal-actions">
+          <button type="button" className="btn" disabled={busy} onClick={onClose}>
+            Отмена
+          </button>
+          <button type="submit" className="btn primary" disabled={busy}>
+            {busy ? 'Сохранение…' : 'Сохранить'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 export default function ConnectorsPage() {
   const { toast } = useToast();
   const [rows, setRows] = useState<Connector[]>([]);
@@ -99,6 +213,8 @@ export default function ConnectorsPage() {
   const [lastEventById, setLastEventById] = useState<Record<string, string>>({});
   const [pendingDelete, setPendingDelete] = useState<Connector | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [pendingEdit, setPendingEdit] = useState<Connector | null>(null);
+  const [editBusy, setEditBusy] = useState(false);
   const [id, setId] = useState('');
   const [name, setName] = useState('');
   const [port, setPort] = useState('');
@@ -221,6 +337,35 @@ export default function ConnectorsPage() {
     }
   }
 
+  async function confirmEdit(patch: {
+    name: string;
+    port: number;
+    protocols: ConnectorProtocols;
+  }) {
+    if (!pendingEdit || editBusy) return;
+    setEditBusy(true);
+    setRowBusy(pendingEdit.id);
+    try {
+      const body: Parameters<typeof updateConnector>[1] = {
+        name: patch.name,
+        protocols: patch.protocols,
+      };
+      if (!pendingEdit.builtin) {
+        body.port = patch.port;
+      }
+      await updateConnector(pendingEdit.id, body);
+      setDirty(true);
+      toast('Сохранено — примените изменения', 'success');
+      setPendingEdit(null);
+      await load();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Не удалось изменить коннектор', 'error');
+    } finally {
+      setEditBusy(false);
+      setRowBusy(null);
+    }
+  }
+
   async function onApply() {
     if (!dirty) return;
     setApplyBusy(true);
@@ -288,16 +433,21 @@ export default function ConnectorsPage() {
             Pipeline. Статус «Жив» означает события за последние{' '}
             {Math.round(CONNECTOR_LIVE_WINDOW_MS / 60_000)} мин.
           </p>
-          {extraPorts.min <= 0 ? (
+          {extraPorts.min > 0 ? (
+            <p>
+              Лимит {maxConnectors} = встроенный 514 + порты{' '}
+              <code>
+                {extraPorts.min}–{extraPorts.max}
+              </code>{' '}
+              из <code>GA_CONNECTOR_EXTRA_PORTS</code> (compose публикует этот range заранее).
+              После смены range/портов при необходимости обновите firewall (
+              <code>scripts/sync-syslog-firewall.sh</code> или <code>GA_SYSLOG_ALLOW_FROM</code>).
+            </p>
+          ) : (
             <p>
               Чтобы добавить порты, задайте <code>GA_CONNECTOR_EXTRA_PORTS</code> и опубликуйте
               диапазон в compose; для firewall —{' '}
               <code>scripts/sync-syslog-firewall.sh</code> или <code>GA_SYSLOG_ALLOW_FROM</code>.
-            </p>
-          ) : (
-            <p>
-              После новых портов при необходимости обновите firewall (
-              <code>scripts/sync-syslog-firewall.sh</code> или <code>GA_SYSLOG_ALLOW_FROM</code>).
             </p>
           )}
         </details>
@@ -372,6 +522,15 @@ export default function ConnectorsPage() {
                         </td>
                         <td className="actions">
                           <div className="connectors-row-actions">
+                            <button
+                              type="button"
+                              className="btn sm ghost"
+                              disabled={busy}
+                              title="Имя, порт и протоколы"
+                              onClick={() => setPendingEdit(c)}
+                            >
+                              Изменить
+                            </button>
                             <button
                               type="button"
                               className="btn sm ghost"
@@ -468,6 +627,19 @@ export default function ConnectorsPage() {
           </form>
         </section>
       </div>
+
+      {pendingEdit ? (
+        <EditConnectorModal
+          connector={pendingEdit}
+          busy={editBusy}
+          portMin={extraPorts.min}
+          portMax={extraPorts.max}
+          onClose={() => {
+            if (!editBusy) setPendingEdit(null);
+          }}
+          onSave={(patch) => void confirmEdit(patch)}
+        />
+      ) : null}
 
       {pendingDelete ? (
         <DeleteConnectorModal
