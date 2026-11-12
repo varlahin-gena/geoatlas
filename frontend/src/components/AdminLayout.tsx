@@ -2,8 +2,6 @@ import { useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AdminSidebar, SystemHealthPill, UserMenu } from './Shell';
 
-export { PageLoading } from './Skeleton';
-
 export function AdminLayout({
   title,
   subtitle,

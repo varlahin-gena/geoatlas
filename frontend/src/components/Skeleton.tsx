@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 
 /** After this, Suspense fallback offers reload instead of an endless shimmer. */
-export const PAGE_LOADING_STUCK_MS = 10_000;
+const PAGE_LOADING_STUCK_MS = 10_000;
 
 /** Shimmer line block. */
 function SkeletonLine({
