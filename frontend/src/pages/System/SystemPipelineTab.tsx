@@ -73,8 +73,9 @@ export function SystemPipelineTab({
             <div className="stage-name">Syslog-NG</div>
             <div className="stage-value">{fmtNumber(syslogEps)} eps</div>
             <div className="stage-meta">
-              udp: {fmtNumber(rate.udp_events_per_sec)}/s · tcp:{' '}
-              {fmtNumber(rate.tcp_events_per_sec)}/s
+              {num(syslogng.udp_processed) + num(syslogng.tcp_processed) === 0
+                ? 'stats scrape пуст — recreate syslog-ng (prometheus+legacy)'
+                : `udp: ${fmtNumber(syslogng.udp_processed)} · tcp: ${fmtNumber(syslogng.tcp_processed)} (processed)`}
               {num(syslogng.queued) > 0
                 ? ` · q: ${fmtNumber(syslogng.queued)}${
                     syslogCap > 0 ? ` (${fmtPercent(syslogQueuePct)})` : ''
@@ -123,11 +124,12 @@ export function SystemPipelineTab({
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>Syslog EPS (udp/tcp)</th>
-                  <th>Syslog q / drop</th>
-                  <th>Backend recv</th>
-                  <th>Drop / auth</th>
-                  <th>Last event</th>
+                  <th>Принято syslog (UDP / TCP)</th>
+                  <th>Очередь / потери syslog</th>
+                  <th>Скорость backend, EPS</th>
+                  <th>Принято backend</th>
+                  <th>Отброшено / отказ auth</th>
+                  <th>Последнее событие</th>
                 </tr>
               </thead>
               <tbody>
@@ -142,6 +144,7 @@ export function SystemPipelineTab({
                     <td>
                       {fmtNumber(c.syslog_queued)} / {fmtNumber(c.syslog_dropped)}
                     </td>
+                    <td>{fmtNumber(c.received_per_sec)}</td>
                     <td>{fmtNumber(c.received_total)}</td>
                     <td>
                       {fmtNumber(c.dropped_total)} / {fmtNumber(c.auth_rejected_total)}
@@ -153,8 +156,8 @@ export function SystemPipelineTab({
             </table>
           </div>
           <p className="hint">
-            Управление портами — в разделе Система → Коннекторы. Цифры syslog — накопленные processed
-            (не EPS/s); backend — received/drops с атрибуцией.
+            Управление портами — в разделе Система → Коннекторы. Syslog — накопленные счётчики до
+            backend; скорость — EPS с атрибуцией по коннектору; очередь/потери — буфер syslog-ng.
           </p>
         </section>
       ) : null}

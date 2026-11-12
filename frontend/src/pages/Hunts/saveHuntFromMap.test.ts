@@ -12,7 +12,18 @@ describe('suggestHuntName', () => {
     ).toBe('1 день');
   });
 
-  it('adds search / country / filter hints', () => {
+  it('puts city from query first', () => {
+    expect(
+      suggestHuntName({
+        period: '1h',
+        group_by: 'city',
+        filter: 'blocked',
+        query: 'city:Новосибирск',
+      }),
+    ).toBe('Новосибирск · заблокированные');
+  });
+
+  it('uses country when query has no place key', () => {
     expect(
       suggestHuntName({
         period: '1h',
@@ -21,7 +32,25 @@ describe('suggestHuntName', () => {
         query: '10.0.0.1',
         country: 'RU',
       }),
-    ).toBe('1 час · поиск · RU · заблокированные');
+    ).toBe('RU · заблокированные');
+  });
+});
+
+describe('huntSnapshotLines query wording', () => {
+  it('humanizes city query', () => {
+    expect(
+      huntSnapshotLines({
+        period: '1h',
+        group_by: 'city',
+        filter: 'blocked',
+        query: 'city:Омск',
+      }),
+    ).toEqual([
+      'Период: 1 час',
+      'Группировка: Город',
+      'Фильтр: заблокированные',
+      'Поиск: город Омск',
+    ]);
   });
 });
 

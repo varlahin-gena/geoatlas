@@ -312,7 +312,7 @@ services:
   # docker.sock RW нужен для start/stop/restart (DOZZLE_ENABLE_ACTIONS).
   # Shell не включаем. Actions также открывают remove/update в UI Dozzle.
   dozzle:
-    image: amir20/dozzle:v11.4.0
+    image: amir20/dozzle:v11.4.2
     container_name: dozzle
     profiles: ["dozzle"]
     expose:

@@ -16,10 +16,14 @@ import { fmtDate, fmtNumber } from '@/lib/format';
 import { AnomalyPeersPanel } from '@/pages/Anomalies/AnomalyPeersPanel';
 import {
   absoluteAppHref,
+  anomalyEndpointLabel,
   anomalyEventsQuery,
   anomalyMapHref,
+  anomalyNetworkFallback,
   downloadTextFile,
   eventCodeLabel,
+  formatAnomalyDescription,
+  formatAnomalyWindow,
   investigateHref,
   investigationTemplateName,
   peersLinesToCsv,
@@ -30,6 +34,7 @@ import { rememberMapAlert } from '@/pages/Map/AnomalyActiveBanner';
 import { mapViewToHuntState } from '@/pages/Hunts/huntMapState';
 import type { HuntMapState } from '@/api/hunts';
 import { SaveHuntModal } from '@/pages/Hunts/SaveHuntModal';
+import '@/pages/Anomalies/anomalies.css';
 import './investigate.css';
 
 async function findAnomalyByFingerprint(
@@ -178,9 +183,14 @@ export default function InvestigatePage() {
             }
           : prev,
       );
-      toast(closer ? `Алерт закрыт (${personLabel(closer) || closer})` : 'Алерт закрыт', 'success');
+      toast(
+        closer
+          ? `Алерт скрыт на 24 ч (${personLabel(closer) || closer})`
+          : 'Алерт скрыт на 24 ч',
+        'success',
+      );
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Не удалось закрыть алерт', 'error');
+      toast(e instanceof Error ? e.message : 'Не удалось скрыть алерт', 'error');
     } finally {
       setAcking(false);
     }
@@ -234,6 +244,17 @@ export default function InvestigatePage() {
   const acked = Boolean(item?.acknowledged);
   const mapHref = item ? anomalyMapHref(item) : '/';
   const workspaceHref = alertFp ? investigateHref(alertFp) : '/anomalies';
+  const desc = item ? formatAnomalyDescription(item) : null;
+  const windowLabel = item
+    ? formatAnomalyWindow(item.window_start, item.window_end)
+    : { label: '—', title: '' };
+  const networkFallback = item ? anomalyNetworkFallback(item) : '';
+  const srcLabel = item
+    ? anomalyEndpointLabel(item.src_ip, item.src_city, item.src_country, networkFallback)
+    : '';
+  const dstLabel = item
+    ? anomalyEndpointLabel(item.dst_ip, item.dst_city, item.dst_country)
+    : '';
 
   if (!alertFp) {
     return <Navigate to="/anomalies" replace />;
@@ -242,11 +263,6 @@ export default function InvestigatePage() {
   return (
     <AdminLayout title="Разбор инцидента">
       <div className="page-content-inner wide">
-        <p className="page-lead">
-          Рабочее место расследования по одному алерту: контекст, связи из карты, ack/assign и
-          выгрузка. Карта открывается deep-link’ом без встраивания.
-        </p>
-
         <p className="investigate-back">
           <Link to="/anomalies">← К списку аномалий</Link>
         </p>
@@ -260,7 +276,7 @@ export default function InvestigatePage() {
           </p>
         ) : null}
 
-        {item ? (
+        {item && desc ? (
           <section className="investigate-card">
             <div className="investigate-card-head">
               <span className={`anomaly-sev-badge sev-${item.severity || 'warn'}`}>
@@ -271,35 +287,47 @@ export default function InvestigatePage() {
                 {item.detected_at ? fmtDate(item.detected_at) : '—'}
               </span>
             </div>
-            <h2 className="investigate-title">{item.title || 'Без заголовка'}</h2>
+            <div className="investigate-headline">
+              <h2 className="investigate-title">{desc.subject}</h2>
+              {desc.detail ? <p className="investigate-detail mono">{desc.detail}</p> : null}
+              {desc.delta ? <p className="investigate-delta">{desc.delta}</p> : null}
+            </div>
             <dl className="investigate-meta">
-              <div>
-                <dt>Источник</dt>
-                <dd className="mono">{item.src_ip || '—'}</dd>
-              </div>
-              <div>
-                <dt>Цель</dt>
-                <dd className="mono">{item.dst_ip || '—'}</dd>
-              </div>
+              {srcLabel ? (
+                <div>
+                  <dt>Источник</dt>
+                  <dd
+                    className={
+                      item.src_ip || (networkFallback && srcLabel === networkFallback)
+                        ? 'mono'
+                        : undefined
+                    }
+                  >
+                    {srcLabel}
+                  </dd>
+                </div>
+              ) : null}
+              {dstLabel ? (
+                <div>
+                  <dt>Цель</dt>
+                  <dd className={item.dst_ip ? 'mono' : undefined}>{dstLabel}</dd>
+                </div>
+              ) : null}
               <div>
                 <dt>Событий</dt>
-                <dd>{fmtNumber(item.event_count || 0)}</dd>
+                <dd className="mono">{fmtNumber(item.event_count || 0)}</dd>
               </div>
               <div>
                 <dt>Окно</dt>
-                <dd className="hint">
-                  {item.window_start ? fmtDate(item.window_start) : '—'}
-                  {' → '}
-                  {item.window_end ? fmtDate(item.window_end) : '—'}
-                </dd>
+                <dd title={windowLabel.title || undefined}>{windowLabel.label}</dd>
               </div>
               <div>
                 <dt>Статус</dt>
                 <dd>
                   {acked
                     ? item.ack_by
-                      ? `Закрыт (${personLabel(item.ack_by) || item.ack_by})`
-                      : 'Закрыт'
+                      ? `Скрыт (${personLabel(item.ack_by) || item.ack_by})`
+                      : 'Скрыт'
                     : 'Открыт'}
                 </dd>
               </div>
@@ -334,58 +362,87 @@ export default function InvestigatePage() {
             <div className="investigate-actions">
               <Link
                 to={mapHref}
-                className="btn"
+                className="btn primary"
                 onClick={() => rememberMapAlert(item)}
               >
                 На карте
               </Link>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => void copyText('Ссылка на разбор', absoluteAppHref(workspaceHref))}
-              >
-                Копировать ссылку на разбор
-              </button>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => void copyText('Ссылка на карту', absoluteAppHref(mapHref))}
-              >
-                Копировать ссылку на карту
-              </button>
-              <button
-                type="button"
-                className="btn"
-                disabled={savingTpl || !anomalyEventsQuery(item)}
-                onClick={() => void onSaveTemplate()}
-              >
-                Сохранить как шаблон поиска
-              </button>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => {
-                  const m = item.map;
-                  setHuntDraft(
-                    mapViewToHuntState({
-                      period: m?.period || '1d',
-                      periodFrom: '',
-                      periodTo: '',
-                      groupBy: m?.group || 'city',
-                      filter: (m?.filter as 'all' | 'allowed' | 'blocked') || 'all',
-                      search: m?.q || anomalyEventsQuery(item) || '',
-                      focusedCountry: m?.country || null,
-                    }),
-                  );
-                }}
-              >
-                Сохранить как охоту
-              </button>
               {!acked ? (
-                <button type="button" className="btn" disabled={acking} onClick={() => void hideAlert()}>
-                  Закрыть алерт
+                <button
+                  type="button"
+                  className="btn ghost"
+                  disabled={acking}
+                  onClick={() => void hideAlert()}
+                >
+                  Скрыть на 24 ч
                 </button>
               ) : null}
+              <details className="anomaly-more investigate-more">
+                <summary className="btn ghost">Ещё</summary>
+                <div className="anomaly-more-menu" role="menu">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="anomaly-more-item"
+                    onClick={(e) => {
+                      const root = e.currentTarget.closest('details') as HTMLDetailsElement | null;
+                      if (root) root.open = false;
+                      void copyText('Ссылка на разбор', absoluteAppHref(workspaceHref));
+                    }}
+                  >
+                    Копировать ссылку на разбор
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="anomaly-more-item"
+                    onClick={(e) => {
+                      const root = e.currentTarget.closest('details') as HTMLDetailsElement | null;
+                      if (root) root.open = false;
+                      void copyText('Ссылка на карту', absoluteAppHref(mapHref));
+                    }}
+                  >
+                    Копировать ссылку на карту
+                  </button>
+                  <div className="anomaly-more-sep" role="separator" />
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="anomaly-more-item"
+                    disabled={savingTpl || !anomalyEventsQuery(item)}
+                    onClick={(e) => {
+                      const root = e.currentTarget.closest('details') as HTMLDetailsElement | null;
+                      if (root) root.open = false;
+                      void onSaveTemplate();
+                    }}
+                  >
+                    Сохранить как шаблон поиска
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="anomaly-more-item"
+                    onClick={(e) => {
+                      const root = e.currentTarget.closest('details') as HTMLDetailsElement | null;
+                      if (root) root.open = false;
+                      const m = item.map;
+                      setHuntDraft(
+                        mapViewToHuntState({
+                          period: m?.period || '1d',
+                          periodFrom: '',
+                          periodTo: '',
+                          groupBy: m?.group || 'city',
+                          filter: (m?.filter as 'all' | 'allowed' | 'blocked') || 'all',
+                          search: m?.q || anomalyEventsQuery(item) || '',
+                          focusedCountry: m?.country || null,
+                        }),
+                      );
+                    }}
+                  >
+                    Сохранить как охоту
+                  </button>
+                </div>
+              </details>
             </div>
 
             {related.length ? (
