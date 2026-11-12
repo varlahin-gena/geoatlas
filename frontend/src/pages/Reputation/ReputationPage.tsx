@@ -1,4 +1,13 @@
-import { FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type RefObject,
+} from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetchRaw } from '@/api/client';
 import {
@@ -113,6 +122,156 @@ function DeleteListModal({
   );
 }
 
+function AddFeedModal({
+  busy,
+  uploadName,
+  name,
+  url,
+  category,
+  format,
+  fileInputRef,
+  onClose,
+  onChangeName,
+  onChangeUrl,
+  onChangeCategory,
+  onChangeFormat,
+  onSubmit,
+  onPickFile,
+}: {
+  busy: boolean;
+  uploadName: string;
+  name: string;
+  url: string;
+  category: string;
+  format: string;
+  fileInputRef: RefObject<HTMLInputElement | null>;
+  onClose: () => void;
+  onChangeName: (v: string) => void;
+  onChangeUrl: (v: string) => void;
+  onChangeCategory: (v: string) => void;
+  onChangeFormat: (v: string) => void;
+  onSubmit: (e: FormEvent) => void;
+  onPickFile: (file: File) => void;
+}) {
+  const titleId = useId();
+  const dialogRef = useDialogA11y<HTMLDivElement>(true, () => {
+    if (!busy) onClose();
+  });
+
+  return (
+    <div
+      className="modal-backdrop show"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !busy) onClose();
+      }}
+    >
+      <div
+        ref={dialogRef}
+        className="modal reputation-add-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 id={titleId}>Добавить фид</h3>
+        <p className="hint reputation-add-lead">
+          URL подтянется по расписанию или кнопкой «Скачать фиды сейчас». CSV можно загрузить сразу.
+        </p>
+        <form className="reputation-add-form" onSubmit={onSubmit}>
+          <div className="field">
+            <label htmlFor="rep-feed-name">Имя</label>
+            <input
+              id="rep-feed-name"
+              required
+              value={name}
+              onChange={(e) => onChangeName(e.target.value)}
+              placeholder="my_blocklist"
+              autoComplete="off"
+              autoFocus
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="rep-feed-url">URL</label>
+            <input
+              id="rep-feed-url"
+              required
+              type="url"
+              value={url}
+              onChange={(e) => onChangeUrl(e.target.value)}
+              placeholder="https://…"
+              autoComplete="off"
+            />
+          </div>
+          <div className="reputation-add-row">
+            <div className="field">
+              <label htmlFor="rep-feed-cat">Категория</label>
+              <select
+                id="rep-feed-cat"
+                value={category}
+                onChange={(e) => onChangeCategory(e.target.value)}
+              >
+                {REPUTATION_CATEGORY_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="rep-feed-fmt">Формат</label>
+              <select
+                id="rep-feed-fmt"
+                value={format}
+                onChange={(e) => onChangeFormat(e.target.value)}
+              >
+                {REPUTATION_FORMAT_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="modal-actions">
+            <button type="button" className="btn" disabled={busy} onClick={onClose}>
+              Отмена
+            </button>
+            <button type="submit" className="btn primary" disabled={busy}>
+              Добавить
+            </button>
+          </div>
+        </form>
+
+        <div className="reputation-upload">
+          <span className="reputation-upload-label">Или загрузите CSV вручную</span>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,text/csv,text/plain"
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              if (file) onPickFile(file);
+            }}
+          />
+          <button
+            type="button"
+            className="btn"
+            disabled={busy}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            Выбрать CSV…
+          </button>
+          {uploadName ? <span className="reputation-upload-name">{uploadName}</span> : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ReputationPage() {
   const { toast } = useToast();
   const { reputationEnabled } = useAuth();
@@ -131,6 +290,21 @@ export default function ReputationPage() {
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [uploadName, setUploadName] = useState('');
   const [lastRefreshAt, setLastRefreshAt] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addBusy, setAddBusy] = useState(false);
+
+  function resetAddForm() {
+    setName('');
+    setUrl('');
+    setCategory('attacks');
+    setFormat('netset');
+  }
+
+  function closeAddModal() {
+    if (addBusy || uploadName) return;
+    setAddOpen(false);
+    resetAddForm();
+  }
 
   const activeNames = useMemo(
     () => new Set(feeds.map((f) => f.name).filter(Boolean)),
@@ -223,19 +397,24 @@ export default function ReputationPage() {
 
   async function onAddFeed(e: FormEvent) {
     e.preventDefault();
+    if (addBusy) return;
+    setAddBusy(true);
     try {
+      const feedName = name.trim();
       await addFeedBody({
-        name: name.trim(),
+        name: feedName,
         url: url.trim(),
         category: category.trim() || 'unknown',
         format: format || 'netset',
       });
-      toast(`Фид «${name.trim()}» добавлен. Нажмите «Скачать фиды сейчас».`, 'success');
-      setName('');
-      setUrl('');
+      toast(`Фид «${feedName}» добавлен. Нажмите «Скачать фиды сейчас».`, 'success');
+      setAddOpen(false);
+      resetAddForm();
       void load();
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Не удалось добавить фид', 'error');
+    } finally {
+      setAddBusy(false);
     }
   }
 
@@ -317,6 +496,8 @@ export default function ReputationPage() {
       };
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       toast(`Загружено диапазонов: ${fmtNumber(data.ranges || 0)}`, 'success');
+      setAddOpen(false);
+      resetAddForm();
       void load();
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Не удалось загрузить файл', 'error');
@@ -334,6 +515,16 @@ export default function ReputationPage() {
         <>
           <button type="button" className="btn" onClick={() => void load()} disabled={loading}>
             Обновить таблицу
+          </button>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              resetAddForm();
+              setAddOpen(true);
+            }}
+          >
+            Добавить фид
           </button>
           <button
             type="button"
@@ -371,7 +562,7 @@ export default function ReputationPage() {
             </>
           ) : (
             <span className="hint">
-              Списки ещё не загружены — добавьте фид, выберите пресет или загрузите CSV.
+              Списки ещё не загружены — добавьте фид, выберите пресет из каталога или загрузите CSV.
             </span>
           )}
         </p>
@@ -386,89 +577,6 @@ export default function ReputationPage() {
             Форматы: <code>netset</code> / plain, <code>spamhaus_json</code>, <code>csv_ip</code>.
           </p>
         </details>
-
-        <div className="card reputation-card reputation-form">
-          <h2>Добавить фид</h2>
-          <form className="form-row" onSubmit={(e) => void onAddFeed(e)}>
-            <div className="field">
-              <label htmlFor="rep-feed-name">Имя</label>
-              <input
-                id="rep-feed-name"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="my_blocklist"
-                autoComplete="off"
-              />
-            </div>
-            <div className="field field-url">
-              <label htmlFor="rep-feed-url">URL</label>
-              <input
-                id="rep-feed-url"
-                required
-                type="url"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://…"
-                autoComplete="off"
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="rep-feed-cat">Категория</label>
-              <select
-                id="rep-feed-cat"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-              >
-                {REPUTATION_CATEGORY_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="rep-feed-fmt">Формат</label>
-              <select
-                id="rep-feed-fmt"
-                value={format}
-                onChange={(e) => setFormat(e.target.value)}
-              >
-                {REPUTATION_FORMAT_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button type="submit" className="btn primary">
-              Добавить
-            </button>
-          </form>
-
-          <div className="reputation-upload">
-            <span className="reputation-upload-label">Или загрузите CSV вручную</span>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,text/csv,text/plain"
-              hidden
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                e.target.value = '';
-                if (file) void onUploadFile(file);
-              }}
-            />
-            <button
-              type="button"
-              className="btn"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              Выбрать CSV…
-            </button>
-            {uploadName ? <span className="reputation-upload-name">{uploadName}</span> : null}
-          </div>
-        </div>
 
         <div className="card reputation-card">
           <h2>Активные списки</h2>
@@ -499,7 +607,19 @@ export default function ReputationPage() {
                       <EmptyState
                         compact
                         title="Нет активных списков"
-                        description="Добавьте URL-фид выше, выберите пресет из каталога или загрузите CSV."
+                        description="Добавьте URL-фид, выберите пресет из каталога или загрузите CSV."
+                        action={
+                          <button
+                            type="button"
+                            className="btn primary"
+                            onClick={() => {
+                              resetAddForm();
+                              setAddOpen(true);
+                            }}
+                          >
+                            Добавить фид
+                          </button>
+                        }
                       />
                     </td>
                   </tr>
@@ -620,6 +740,25 @@ export default function ReputationPage() {
           </div>
         </div>
       </div>
+
+      {addOpen ? (
+        <AddFeedModal
+          busy={addBusy || Boolean(uploadName)}
+          uploadName={uploadName}
+          name={name}
+          url={url}
+          category={category}
+          format={format}
+          fileInputRef={fileInputRef}
+          onClose={closeAddModal}
+          onChangeName={setName}
+          onChangeUrl={setUrl}
+          onChangeCategory={setCategory}
+          onChangeFormat={setFormat}
+          onSubmit={(e) => void onAddFeed(e)}
+          onPickFile={(file) => void onUploadFile(file)}
+        />
+      ) : null}
 
       {pendingDelete ? (
         <DeleteListModal

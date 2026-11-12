@@ -47,6 +47,19 @@
   width: 9.5rem;
 }
 
+.users-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+
+.users-toolbar .btn {
+  min-height: 32px;
+}
+
 .users-fio-input,
 .users-table select {
   width: 100%;
@@ -82,7 +95,7 @@
 
 .users-table td.actions {
   display: table-cell;
-  width: 13.5rem;
+  width: 3.25rem;
   white-space: nowrap;
   vertical-align: middle;
   text-align: right;
@@ -96,33 +109,92 @@
   gap: 6px;
 }
 
-.users-table .btn.sm {
-  padding: 4px 10px;
-  font-size: 12px;
-  min-height: 28px;
-  white-space: nowrap;
+.users-more {
+  position: relative;
 }
 
-.users-table .btn.sm.ghost {
+.users-more > summary {
+  list-style: none;
+}
+
+.users-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.users-more-trigger {
+  min-width: 28px;
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 16px;
+  line-height: 1;
+  letter-spacing: 0.04em;
   background: transparent;
   border-color: transparent;
   color: var(--text-dim);
 }
 
-.users-table .btn.sm.ghost:hover:not(:disabled) {
+.users-more-trigger:hover {
   background: var(--panel-3);
   border-color: var(--border);
   color: var(--text);
 }
 
-.users-table .btn.sm.danger.ghost {
+.users-more[open] > .users-more-trigger {
+  background: var(--panel-3);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.users-more-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: var(--z-dropdown);
+  min-width: 180px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.users-more-item {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.users-more-item:hover:not(:disabled) {
+  background: var(--panel-3);
+}
+
+.users-more-item.is-danger {
   color: var(--red);
 }
 
-.users-table .btn.sm.danger.ghost:hover:not(:disabled) {
+.users-more-item.is-danger:hover:not(:disabled) {
   background: rgba(248, 81, 73, 0.12);
-  border-color: rgba(248, 81, 73, 0.35);
-  color: var(--red);
+}
+
+.users-more-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.users-more-sep {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border);
 }
 
 .users-enable {

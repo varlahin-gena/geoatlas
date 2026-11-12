@@ -267,3 +267,24 @@ export function formatNavBadge(count: number, cap = 99): string | null {
   if (count > cap) return `${cap}+`;
   return String(Math.floor(count));
 }
+
+/**
+ * Sidebar badge tone: critical (anomalies) vs muted data-quality queues.
+ * Keeps red reserved for open threats so parse-error "99+" does not compete.
+ */
+export type NavBadgeTone = 'danger' | 'muted';
+
+export function navBadgeTone(href: string): NavBadgeTone {
+  return href === '/anomalies' ? 'danger' : 'muted';
+}
+
+/** Section header badge: danger if any child is danger, else muted. */
+export function sectionBadgeTone(
+  section: NavGroupSection,
+  badges: Record<string, string | null | undefined>,
+): NavBadgeTone {
+  for (const item of section.items) {
+    if (badges[item.href] && navBadgeTone(item.href) === 'danger') return 'danger';
+  }
+  return 'muted';
+}

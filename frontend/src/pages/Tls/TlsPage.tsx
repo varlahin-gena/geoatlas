@@ -138,22 +138,21 @@ export default function TlsPage() {
     ['0', 'false', 'no', 'off'].includes(String(status.https_enabled || '').trim().toLowerCase());
 
   return (
-    <SettingsLayout
-      title="HTTPS-сертификаты"
-      actions={
-        <button type="button" className="btn" onClick={() => void load()} disabled={loading}>
-          Обновить
-        </button>
-      }
-    >
+    <SettingsLayout title="HTTPS-сертификаты" plainTitle>
       <div className="page-content-inner narrow">
         <p className="page-lead">
           Режим — <code>HTTPS_ENABLED</code> в <code>.env</code> (<code>0</code> / <code>1</code> /{' '}
           <code>auto</code>). PEM пишутся в том <code>./certs</code>.
         </p>
 
+        <div className="tls-toolbar">
+          <button type="button" className="btn" onClick={() => void load()} disabled={loading}>
+            {loading ? 'Обновление…' : 'Обновить'}
+          </button>
+        </div>
+
         {!status?.configured ? (
-          <p className="hint warn-banner">
+          <p className="tls-banner" role="status">
             Управление сертификатами через веб недоступно: не смонтирован{' '}
             <code>TLS_CERT_DIR</code> в backend. Положите PEM вручную в <code>certs/</code> на
             сервере или разверните стек через Docker Compose с томом <code>./certs</code>.
@@ -161,7 +160,7 @@ export default function TlsPage() {
         ) : null}
 
         {status?.configured && !status.writable ? (
-          <p className="hint warn-banner">
+          <p className="tls-banner" role="status">
             Каталог сертификатов смонтирован, но недоступен для записи процессу backend (uid 101).
             На хосте: <code>sudo chown -R 101:101 certs</code>, затем перезапустите стек (
             <code>./start.sh</code>). Форма загрузки скрыта, пока каталог не станет writable.
@@ -169,17 +168,19 @@ export default function TlsPage() {
         ) : null}
 
         {httpsOff ? (
-          <p className="hint warn-banner">
+          <p className="tls-banner" role="status">
             В конфигурации сейчас <code>HTTPS_ENABLED=0</code> (только HTTP). Загрузка PEM всё
             равно возможна; чтобы включить HTTPS, выставьте <code>HTTPS_ENABLED=auto</code> или{' '}
             <code>1</code> в <code>.env</code> и перезапустите стек.
           </p>
         ) : null}
 
-        <div className="card">
-          <h2>Текущий статус</h2>
+        <section className="card tls-card" aria-labelledby="tls-status-title">
+          <h2 id="tls-status-title" className="card-title">
+            Текущий статус
+          </h2>
           {loading && !status ? (
-            <p className="hint">Загрузка…</p>
+            <p className="tls-status-note">Загрузка…</p>
           ) : (
             <dl className="tls-status-grid">
               <div>
@@ -212,8 +213,16 @@ export default function TlsPage() {
               <div>
                 <dt>Файлы на диске</dt>
                 <dd>
-                  {status?.cert_present ? 'fullchain.pem' : '—'} /{' '}
-                  {status?.key_present ? 'privkey.pem' : '—'}
+                  <span className="tls-files">
+                    <span
+                      className={`tls-file-chip${status?.cert_present ? ' is-present' : ''}`}
+                    >
+                      fullchain.pem
+                    </span>
+                    <span className={`tls-file-chip${status?.key_present ? ' is-present' : ''}`}>
+                      privkey.pem
+                    </span>
+                  </span>
                 </dd>
               </div>
             </dl>
@@ -236,7 +245,9 @@ export default function TlsPage() {
                   {cert.days_left != null ? ` (${cert.days_left} дн.)` : ''}
                 </strong>
               </div>
-              {cert.self_signed ? <p className="hint warn-banner">Самоподписанный сертификат</p> : null}
+              {cert.self_signed ? (
+                <p className="tls-banner tls-banner-inline">Самоподписанный сертификат</p>
+              ) : null}
               {cert.sans?.length ? (
                 <p className="hint">
                   SAN: {cert.sans.slice(0, 8).join(', ')}
@@ -245,23 +256,32 @@ export default function TlsPage() {
               ) : null}
             </div>
           ) : status?.configured ? (
-            <p className="hint">
-              Сертификат ещё не загружен — HTTPS включится после добавления PEM и перезапуска
-              frontend (при режиме auto или вкл.).
+            <p className="tls-status-note">
+              Сертификат ещё не загружен — HTTPS включится после добавления PEM и применения
+              конфигурации (при режиме auto или вкл.).
             </p>
           ) : null}
 
           {status?.configured ? (
-            <button type="button" className="btn" disabled={busy} onClick={() => void onReload()}>
-              Применить / перезагрузить nginx
-            </button>
+            <div className="tls-card-actions">
+              <button type="button" className="btn" disabled={busy} onClick={() => void onReload()}>
+                Применить
+              </button>
+              <span className="hint">Перезагружает nginx с текущими PEM на диске</span>
+            </div>
           ) : null}
-        </div>
+        </section>
 
         {canUpload ? (
-          <form className="card tls-upload-form" onSubmit={(e) => void onSubmit(e)}>
-            <h2>Загрузить сертификат</h2>
-            <p className="hint">
+          <form
+            className="card tls-card tls-upload-form"
+            aria-labelledby="tls-upload-title"
+            onSubmit={(e) => void onSubmit(e)}
+          >
+            <h2 id="tls-upload-title" className="card-title">
+              Загрузить сертификат
+            </h2>
+            <p className="tls-upload-lead">
               Выберите <code>fullchain.pem</code> и <code>privkey.pem</code>, затем сохраните.
             </p>
 
@@ -282,26 +302,42 @@ export default function TlsPage() {
               onChange={(e) => void onPickKey(e.target.files?.[0] || null)}
             />
 
-            <div className="tls-upload-actions">
-              <button
-                type="button"
-                className="btn"
-                disabled={busy}
-                onClick={() => certInputRef.current?.click()}
-              >
-                {certName ? `Сертификат: ${certName}` : 'Выбрать fullchain.pem'}
-              </button>
-              <button
-                type="button"
-                className="btn"
-                disabled={busy}
-                onClick={() => keyInputRef.current?.click()}
-              >
-                {keyName ? `Ключ: ${keyName}` : 'Выбрать privkey.pem'}
-              </button>
+            <div className="tls-pick-row">
+              <div className="tls-pick">
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={busy}
+                  onClick={() => certInputRef.current?.click()}
+                >
+                  Выбрать сертификат…
+                </button>
+                <span className={`tls-pick-name${certName ? ' is-ready' : ''}`} title={certName || undefined}>
+                  {certName || 'fullchain.pem ещё не выбран'}
+                </span>
+              </div>
+              <div className="tls-pick">
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={busy}
+                  onClick={() => keyInputRef.current?.click()}
+                >
+                  Выбрать ключ…
+                </button>
+                <span className={`tls-pick-name${keyName ? ' is-ready' : ''}`} title={keyName || undefined}>
+                  {keyName || 'privkey.pem ещё не выбран'}
+                </span>
+              </div>
             </div>
-            <ReauthField value={reauthPassword} onChange={setReauthPassword} id="tlsReauthPassword" />
-            <div className="tls-upload-actions">
+
+            <ReauthField
+              value={reauthPassword}
+              onChange={setReauthPassword}
+              id="tlsReauthPassword"
+              label="Пароль"
+            />
+            <div className="tls-card-actions">
               <button type="submit" className="btn primary" disabled={!canSave}>
                 {busy ? 'Сохранение…' : 'Сохранить сертификаты'}
               </button>

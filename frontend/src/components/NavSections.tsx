@@ -4,8 +4,10 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   isNavActive,
   NAV_SECTION_ICONS,
+  navBadgeTone,
   navItemTitle,
   sectionBadgeTitle,
+  sectionBadgeTone,
   sectionBadgeTotal,
   splitNavItems,
   type NavGroupSection,
@@ -35,7 +37,9 @@ function NavLinkItem({
     <>
       <NavIcon kind={NAV_ICONS[item.href] || 'map'} />
       <span className="label">{item.label}</span>
-      {badge ? <span className="side-btn-badge">{badge}</span> : null}
+      {badge ? (
+        <span className={`side-btn-badge is-${navBadgeTone(item.href)}`}>{badge}</span>
+      ) : null}
     </>
   );
 
@@ -166,6 +170,7 @@ function NavSectionBlock({
   const [flyoutOpen, setFlyoutOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const badge = sectionBadgeTotal(section, badges);
+  const badgeTone = sectionBadgeTone(section, badges);
   const hasActive = useMemo(
     () => section.items.some((item) => isNavActive(item, pathname)),
     [section.items, pathname],
@@ -191,7 +196,7 @@ function NavSectionBlock({
           onClick={() => setFlyoutOpen((v) => !v)}
         >
           <NavIcon kind={iconKind} />
-          {badge ? <span className="side-btn-badge">{badge}</span> : null}
+          {badge ? <span className={`side-btn-badge is-${badgeTone}`}>{badge}</span> : null}
         </button>
         {flyoutOpen ? (
           <SectionFlyout

@@ -125,20 +125,18 @@ export default function UsersPage() {
   }
 
   return (
-    <SettingsLayout
-      title="Пользователи"
-      plainTitle
-      actions={
-        <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
-          Создать
-        </button>
-      }
-    >
+    <SettingsLayout title="Пользователи" plainTitle>
       <div className="page-content-inner narrow">
         <p className="page-lead">
           Учётные записи входа в интерфейс. Выключенная запись не входит в систему; должен остаться
           хотя бы один активный администратор.
         </p>
+
+        <div className="users-toolbar">
+          <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
+            Создать
+          </button>
+        </div>
 
         <div className="card users-card">
           <div className="table-wrap">
@@ -293,24 +291,43 @@ export default function UsersPage() {
                         <td className="users-date">{fmtDate(u.created_at)}</td>
                         <td className="actions">
                           <div className="users-row-actions">
-                            <button
-                              type="button"
-                              className="btn sm"
-                              onClick={() => setResetTarget(u.username)}
-                            >
-                              Сбросить пароль…
-                            </button>
-                            <button
-                              type="button"
-                              className="btn sm danger ghost"
-                              disabled={isSelf}
-                              onClick={() => {
-                                setDeleteTarget(u.username);
-                                setDeleteReauth('');
-                              }}
-                            >
-                              Удалить
-                            </button>
+                            <details className="users-more">
+                              <summary
+                                className="btn sm ghost users-more-trigger"
+                                aria-label={`Действия для ${u.username}`}
+                              >
+                                …
+                              </summary>
+                              <div className="users-more-menu" role="menu">
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  className="users-more-item"
+                                  onClick={(e) => {
+                                    const root = e.currentTarget.closest('details');
+                                    if (root instanceof HTMLDetailsElement) root.open = false;
+                                    setResetTarget(u.username);
+                                  }}
+                                >
+                                  Сбросить пароль…
+                                </button>
+                                <div className="users-more-sep" role="separator" />
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  className="users-more-item is-danger"
+                                  disabled={isSelf}
+                                  onClick={(e) => {
+                                    const root = e.currentTarget.closest('details');
+                                    if (root instanceof HTMLDetailsElement) root.open = false;
+                                    setDeleteTarget(u.username);
+                                    setDeleteReauth('');
+                                  }}
+                                >
+                                  Удалить
+                                </button>
+                              </div>
+                            </details>
                           </div>
                         </td>
                       </tr>

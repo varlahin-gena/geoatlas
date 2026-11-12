@@ -1,4 +1,7 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+
+/** After this, Suspense fallback offers reload instead of an endless shimmer. */
+export const PAGE_LOADING_STUCK_MS = 10_000;
 
 /** Shimmer line block. */
 function SkeletonLine({
@@ -87,6 +90,48 @@ export function PageSkeleton({ label = 'Загрузка…' }: { label?: string
       </div>
     </div>
   );
+}
+
+/** Suspense fallback: skeleton, then recovery actions if the chunk never resolves. */
+export function PageLoading({
+  label = 'Загрузка…',
+  stuckAfterMs = PAGE_LOADING_STUCK_MS,
+}: {
+  label?: string;
+  /** Test seam: shorten or disable (0) the stuck timeout. */
+  stuckAfterMs?: number;
+}) {
+  const [stuck, setStuck] = useState(false);
+  const [waitKey, setWaitKey] = useState(0);
+
+  useEffect(() => {
+    if (stuckAfterMs <= 0) return;
+    setStuck(false);
+    const timer = window.setTimeout(() => setStuck(true), stuckAfterMs);
+    return () => window.clearTimeout(timer);
+  }, [stuckAfterMs, waitKey]);
+
+  if (stuck) {
+    return (
+      <div className="page-loading-stuck" role="alert" data-testid="page-loading-stuck">
+        <strong>Загрузка занимает слишком много времени</strong>
+        <p className="page-loading-stuck-desc">
+          Возможно, сеть прервалась или обновилась версия интерфейса. Можно подождать ещё или
+          перезагрузить страницу.
+        </p>
+        <div className="page-loading-stuck-actions">
+          <button type="button" className="btn" onClick={() => setWaitKey((k) => k + 1)}>
+            Подождать ещё
+          </button>
+          <button type="button" className="btn primary" onClick={() => window.location.reload()}>
+            Перезагрузить страницу
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return <PageSkeleton label={label} />;
 }
 
 export function EmptyState({

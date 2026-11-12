@@ -33,17 +33,24 @@ export class ErrorBoundary extends Component<Props, State> {
     const { error } = this.state;
     if (!error) return this.props.children;
 
+    const chunkFail = /загрузить|таймаут|Failed to fetch dynamically|Loading chunk/i.test(
+      error.message || '',
+    );
+
     return (
-      <div className="page-loading" role="alert" style={{ flexDirection: 'column', gap: 12, padding: 24 }}>
+      <div className="page-loading-stuck" role="alert">
         <strong>Что-то сломалось{this.props.label ? `: ${this.props.label}` : ''}</strong>
-        <p style={{ margin: 0, opacity: 0.8, maxWidth: 480, textAlign: 'center' }}>
+        <p className="page-loading-stuck-desc">
           {error.message || 'Неизвестная ошибка рендера'}
+          {chunkFail
+            ? ' Часто помогает полная перезагрузка после обновления сервера.'
+            : null}
         </p>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div className="page-loading-stuck-actions">
           <button type="button" className="btn" onClick={this.reset}>
             Попробовать снова
           </button>
-          <button type="button" className="btn" onClick={() => window.location.reload()}>
+          <button type="button" className="btn primary" onClick={() => window.location.reload()}>
             Перезагрузить страницу
           </button>
         </div>

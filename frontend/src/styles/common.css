@@ -186,12 +186,19 @@ body.page-admin .admin-main {
   min-width: 16px;
   padding: 0 5px;
   border-radius: 6px;
-  background: rgba(248, 81, 73, 0.2);
-  color: var(--red);
   font-size: 10px;
   font-weight: 700;
   line-height: 16px;
   text-align: center;
+}
+.side-btn-badge.is-danger {
+  background: color-mix(in srgb, var(--red) 22%, transparent);
+  color: var(--red);
+}
+.side-btn-badge.is-muted {
+  background: color-mix(in srgb, var(--text-muted) 22%, transparent);
+  color: var(--text-dim);
+  font-weight: 600;
 }
 .app.sidebar-collapsed .side-btn .label { display: none; }
 .app.sidebar-collapsed .side-btn {
@@ -555,10 +562,10 @@ body.page-admin .search-box svg {
   overflow: auto;
   -webkit-overflow-scrolling: touch;
 }
-table { width: 100%; border-collapse: collapse; font-size: var(--density-font-table, 12px); }
+table { width: 100%; border-collapse: collapse; font-size: var(--density-font-table, 13px); }
 th, td {
   text-align: left;
-  padding: var(--density-row-pad-y, 4px) var(--density-row-pad-x, 8px);
+  padding: var(--density-row-pad-y, 6px) var(--density-row-pad-x, 8px);
   border-bottom: 1px solid var(--border);
   vertical-align: top;
 }
@@ -747,6 +754,34 @@ tbody tr:hover { background: var(--panel-2); }
   min-height: 40vh;
   color: var(--text-muted);
   font-size: 14px;
+}
+
+.page-loading-stuck {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 100%;
+  min-height: 100dvh;
+  padding: 24px;
+  box-sizing: border-box;
+  background: var(--bg);
+  color: var(--text);
+  text-align: center;
+}
+.page-loading-stuck-desc {
+  margin: 0;
+  max-width: 28rem;
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1.45;
+}
+.page-loading-stuck-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
 }
 
 @keyframes skeletonPulse {

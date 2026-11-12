@@ -73,10 +73,10 @@
   --map-land-rgb: 39, 39, 39;
   --map-outline-rgb: 19, 18, 9;
 
-  /* UI density — compact. */
-  --density-row-pad-y: 4px;
+  /* UI density — comfortable desktop default (≥13px table text). */
+  --density-row-pad-y: 6px;
   --density-row-pad-x: 8px;
-  --density-font-table: 12px;
+  --density-font-table: 13px;
   --density-summary-gap: 8px;
   --density-summary-pad: 6px 10px;
 }

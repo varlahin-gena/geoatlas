@@ -46,13 +46,35 @@
   font-size: 12px;
 }
 
-.reputation-form .form-row {
-  align-items: flex-end;
+.reputation-add-modal {
+  max-width: 440px;
+  width: min(440px, calc(100vw - 32px));
 }
 
-.reputation-form .field-url {
-  flex: 1 1 240px;
-  min-width: 240px;
+.reputation-add-lead {
+  margin: 0 0 14px;
+}
+
+.reputation-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reputation-add-form .field {
+  margin: 0;
+}
+
+.reputation-add-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 480px) {
+  .reputation-add-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .reputation-upload {
