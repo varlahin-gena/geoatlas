@@ -1,0 +1,352 @@
+.connectors-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  align-items: baseline;
+  margin: 0 0 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.connectors-summary .hint {
+  margin: 0;
+  font-weight: 400;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.connectors-details {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.connectors-details summary {
+  cursor: pointer;
+  user-select: none;
+}
+
+.connectors-details summary:hover {
+  color: var(--text);
+}
+
+.connectors-details[open] summary {
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.connectors-details p {
+  margin: 0 0 6px;
+  line-height: 1.45;
+  max-width: 48rem;
+}
+
+.connectors-details code {
+  font-size: 12px;
+}
+
+.connectors-dirty {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  font-size: 13px;
+}
+
+.connectors-dirty .btn.primary {
+  margin-left: auto;
+}
+
+.connectors-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.connectors-table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 0;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.connectors-table th,
+.connectors-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.connectors-table th {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* Flexible name column; fixed utility columns sized to fit narrow settings pane without x-scroll. */
+.connectors-table th:nth-child(1),
+.connectors-table td:nth-child(1) {
+  width: auto;
+}
+
+.connectors-table th:nth-child(2),
+.connectors-table td:nth-child(2) {
+  width: 7rem;
+}
+
+.connectors-table th:nth-child(3),
+.connectors-table td:nth-child(3) {
+  width: 3.75rem;
+}
+
+.connectors-table th:nth-child(4),
+.connectors-table td:nth-child(4) {
+  width: 5.5rem;
+}
+
+.connectors-table th:nth-child(5),
+.connectors-table td:nth-child(5) {
+  width: 5.5rem;
+}
+
+.connectors-table th:nth-child(6),
+.connectors-table td.actions {
+  display: table-cell;
+  width: 2.75rem;
+  padding-left: 4px;
+  padding-right: 8px;
+  white-space: nowrap;
+  vertical-align: middle;
+  text-align: right;
+}
+
+.connectors-row-actions {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.connectors-more {
+  position: relative;
+}
+
+.connectors-more > summary {
+  list-style: none;
+}
+
+.connectors-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.connectors-more-trigger {
+  min-width: 28px;
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 16px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-dim);
+}
+
+.connectors-more-trigger:hover {
+  background: var(--panel-3);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.connectors-more[open] > .connectors-more-trigger {
+  background: var(--panel-3);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.connectors-more-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: var(--z-dropdown);
+  min-width: 168px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.connectors-table tbody tr:has(.connectors-more[open]) {
+  position: relative;
+  z-index: calc(var(--z-dropdown) + 1);
+}
+
+.connectors-more-item {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.connectors-more-item:hover:not(:disabled) {
+  background: var(--panel-3);
+}
+
+.connectors-more-item.is-danger {
+  color: var(--red);
+}
+
+.connectors-more-item.is-danger:hover:not(:disabled) {
+  background: rgba(248, 81, 73, 0.12);
+}
+
+.connectors-more-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.connectors-more-sep {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border);
+}
+
+.connectors-table .mono {
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connectors-table .conn-name {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  align-items: center;
+  font-weight: 500;
+  min-width: 0;
+}
+
+.connectors-table .conn-name > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.connectors-builtin {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 1px 7px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.connectors-table .btn.sm {
+  padding: 4px 10px;
+  font-size: 12px;
+  min-height: 28px;
+  white-space: nowrap;
+}
+
+.connectors-card.card {
+  padding: 0;
+  overflow: visible;
+}
+
+.connectors-card .table-wrap {
+  border: none;
+  border-radius: 10px;
+  /* No idle horizontal scrollbar; cells ellipsis instead of forcing x-scroll. */
+  overflow: hidden;
+}
+
+.connectors-card:has(.connectors-more[open]) .table-wrap {
+  overflow: visible;
+}
+
+.connectors-form .form-row {
+  align-items: flex-start;
+  gap: 10px 12px;
+}
+
+.connectors-form .field {
+  min-width: 110px;
+}
+
+.connectors-form .field-name {
+  flex: 1 1 140px;
+  min-width: 140px;
+}
+
+.connectors-form .field-port {
+  flex: 0 0 5.5rem;
+  min-width: 5.5rem;
+  max-width: 5.5rem;
+}
+
+.connectors-form .field-protocols {
+  flex: 0 0 7.5rem;
+  min-width: 7.5rem;
+}
+
+.connectors-form .field-id {
+  flex: 1 1 110px;
+  min-width: 110px;
+}
+
+.connectors-form .field-submit {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.connectors-form .field-submit-label {
+  display: block;
+  font-size: 11px;
+  line-height: 1.2;
+  min-height: 1.2em;
+  margin-bottom: 0;
+}
+
+.connectors-form .field input,
+.connectors-form .field select,
+.connectors-form .field-submit .btn {
+  min-height: 32px;
+  box-sizing: border-box;
+}
+
+.connectors-form .field input,
+.connectors-form .field select {
+  width: 100%;
+}
+
+.connectors-form .field-hint {
+  margin-top: 2px;
+  line-height: 1.2;
+}

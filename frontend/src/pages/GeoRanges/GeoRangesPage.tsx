@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { apiFetchRaw } from '@/api/client';
 import {
@@ -17,6 +17,7 @@ import { SettingsLayout } from '@/components/SettingsLayout';
 import { EmptyState, TableSkeleton } from '@/components/Skeleton';
 import { useToast } from '@/components/Toast';
 import { fmtNumber } from '@/lib/format';
+import './geoRanges.css';
 
 function isIPv4(s: string): boolean {
   const m = String(s || '')
@@ -133,6 +134,8 @@ export default function GeoRangesPage() {
   const [showManualAdd, setShowManualAdd] = useState(false);
   const [entSearchTick, setEntSearchTick] = useState(0);
   const [markedFilter, setMarkedFilter] = useState('');
+  const [clearOpen, setClearOpen] = useState(false);
+  const clearTitleId = useId();
 
   const load = useCallback(async () => {
     const resolved = resolveGeoSearch(q, ipSearch);
@@ -304,7 +307,7 @@ export default function GeoRangesPage() {
   async function markRange(r: GeoRange) {
     const network = (r.network || '').trim();
     if (!network) {
-      toast('Нет поля Network', 'error');
+      toast('Нет поля «Сеть»', 'error');
       return;
     }
     setEntBusy(true);
@@ -390,7 +393,7 @@ export default function GeoRangesPage() {
       return;
     }
     if (!Number.isFinite(body.lat) || !Number.isFinite(body.lon)) {
-      toast('Укажите Latitude и Longitude', 'error');
+      toast('Укажите широту и долготу', 'error');
       return;
     }
     try {
@@ -404,16 +407,6 @@ export default function GeoRangesPage() {
   }
 
   async function clearDatabase() {
-    if (
-      !window.confirm(
-        'Удалить всю базу GeoIP?\nКарта останется без координат, пока вы снова не загрузите CSV.',
-      )
-    ) {
-      return;
-    }
-      if (!window.confirm('Точно очистить? Вернуть базу можно только новой загрузкой CSV.')) {
-      return;
-    }
     setBusy(true);
     try {
       const data = await clearGeoRanges();
@@ -421,6 +414,7 @@ export default function GeoRangesPage() {
         `База очищена (было в индексе: ${fmtNumber(Number(data.index_before) || 0)}). Можно загрузить CSV.`,
         'success',
       );
+      setClearOpen(false);
       void load();
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Ошибка очистки', 'error');
@@ -474,16 +468,26 @@ export default function GeoRangesPage() {
     }
   }
 
+  const sliceHint =
+    !ipLookupActive && !textSearchActive && totalInDb > shownCount
+      ? `На экране первые ${fmtNumber(shownCount || rows.length)} из ${fmtNumber(totalInDb)} — уточните страну или IP.`
+      : truncated && textSearchActive
+        ? `Показаны первые ${fmtNumber(shownCount)} из ${fmtNumber(filteredCount)} по запросу.`
+        : null;
+
   return (
-    <SettingsLayout
-      title="База GeoIP"
-      actions={
-        <>
+    <SettingsLayout title="База GeoIP" plainTitle>
+      <div className="page-content-inner">
+        <p className="page-lead">
+          База координат по IP-диапазонам. Правка строки — «Изменить»; полная замена — очистка ниже,
+          затем загрузка CSV.
+        </p>
+        <div className="page-actions">
           <input
             ref={geoFileRef}
             type="file"
             accept=".csv,text/csv"
-            style={{ display: 'none' }}
+            className="visually-hidden"
             onChange={(e) => {
               const f = e.target.files?.[0];
               if (f) void uploadCsv(f);
@@ -500,7 +504,7 @@ export default function GeoRangesPage() {
           </button>
           <button
             type="button"
-            className="btn primary"
+            className="btn"
             disabled={busy}
             onClick={async () => {
               try {
@@ -524,18 +528,12 @@ export default function GeoRangesPage() {
           >
             Выгрузить CSV
           </button>
-        </>
-      }
-    >
-      <div className="page-content-inner">
-        <p className="page-lead">
-          Диапазоны в geo_ranges. Точечные правки — «изменить»; полная замена — очистка ниже, затем CSV.
-        </p>
-        <nav className="toolbar" role="tablist" aria-label="Разделы базы GeoIP" style={{ gap: 8, marginBottom: 16 }}>
+        </div>
+        <nav className="geo-ranges-tabs" role="tablist" aria-label="Разделы базы GeoIP">
           <button
             type="button"
             role="tab"
-            className={tab === 'base' ? 'btn primary' : 'btn'}
+            className={`btn${tab === 'base' ? ' is-active' : ''}`}
             aria-selected={tab === 'base'}
             onClick={() => setTab('base')}
           >
@@ -544,7 +542,7 @@ export default function GeoRangesPage() {
           <button
             type="button"
             role="tab"
-            className={tab === 'enterprise' ? 'btn primary' : 'btn'}
+            className={`btn${tab === 'enterprise' ? ' is-active' : ''}`}
             aria-selected={tab === 'enterprise'}
             onClick={() => setTab('enterprise')}
           >
@@ -553,18 +551,17 @@ export default function GeoRangesPage() {
         </nav>
         {tab === 'enterprise' ? (
           <>
-            <p className="hint" style={{ marginTop: 0 }}>
-              Отметьте диапазоны своей организации. Без отмеченных сетей детектор аномалий не работает;
-              с отметками все алерты учитывают только трафик с/на эти подсети. «Скрыть» подавляет
-              повтор по каждой сети отдельно. Пометки не сбрасываются при заливке GeoIP CSV.
+            <p className="geo-ranges-hint-block">
+              Отметьте сети организации. Без них детектор аномалий не запускается; с отметками алерты
+              учитывают только трафик с/на эти подсети. Пометки сохраняются при загрузке GeoIP CSV.
             </p>
-            <div className="summary" style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
-              <div>
+            <div className="geo-ranges-summary">
+              <div className="geo-ranges-stat is-focus">
                 <div className="hint">Отмечено</div>
                 <b>{enterprise.length}</b>
               </div>
-              <div>
-                <div className="hint">Показано</div>
+              <div className="geo-ranges-stat">
+                <div className="hint">Показано в поиске</div>
                 <b>
                   {entSearch.trim() || entIP.trim()
                     ? fmtNumber(entShown || entHits.length)
@@ -572,37 +569,41 @@ export default function GeoRangesPage() {
                 </b>
               </div>
               {entFiltered > entShown && (entSearch.trim() || entIP.trim()) ? (
-                <div>
+                <div className="geo-ranges-stat">
                   <div className="hint">Найдено</div>
                   <b>{fmtNumber(entFiltered)}</b>
                 </div>
               ) : null}
             </div>
-            <div className="toolbar" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-              <input
-                placeholder="По тексту: страна, регион, город…"
-                value={entSearch}
-                onChange={(e) => setEntSearch(e.target.value)}
-                style={{ minWidth: 240 }}
-                aria-label="Поиск по текстовым полям"
-              />
-              <input
-                placeholder="IP или подсеть (CIDR / range)…"
-                value={entIP}
-                onChange={(e) => setEntIP(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    setEntSearchTick((n) => n + 1);
-                  }
-                }}
-                style={{ minWidth: 200 }}
-                aria-label="Поиск по IP или подсети"
-              />
+            <div className="geo-ranges-toolbar">
+              <div className="field geo-ranges-search-text">
+                <label htmlFor="geo-ent-text">Текст</label>
+                <input
+                  id="geo-ent-text"
+                  placeholder="Страна, регион, город…"
+                  value={entSearch}
+                  onChange={(e) => setEntSearch(e.target.value)}
+                />
+              </div>
+              <div className="field geo-ranges-search-ip">
+                <label htmlFor="geo-ent-ip">IP или подсеть</label>
+                <input
+                  id="geo-ent-ip"
+                  placeholder="CIDR или диапазон…"
+                  value={entIP}
+                  onChange={(e) => setEntIP(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      setEntSearchTick((n) => n + 1);
+                    }
+                  }}
+                />
+              </div>
               {entStatus ? <span className="hint">{entStatus}</span> : null}
               {entTruncated && (entSearch.trim() || entIP.trim()) ? (
                 <span className="hint">
-                  показаны первые {fmtNumber(entShown)} из {fmtNumber(entFiltered)}
+                  первые {fmtNumber(entShown)} из {fmtNumber(entFiltered)}
                 </span>
               ) : null}
               <button
@@ -614,14 +615,14 @@ export default function GeoRangesPage() {
               </button>
             </div>
             {(entSearch.trim() || entIP.trim()) ? (
-              <div className="card table-wrap" style={{ marginBottom: 16 }}>
-                <table>
+              <div className="card table-wrap geo-ranges-hits">
+                <table className="geo-ranges-table is-hits">
                   <thead>
                     <tr>
-                      <th scope="col">Network</th>
-                      <th scope="col">Country</th>
-                      <th scope="col">Region</th>
-                      <th scope="col">City</th>
+                      <th scope="col">Сеть</th>
+                      <th scope="col">Страна</th>
+                      <th scope="col">Регион</th>
+                      <th scope="col">Город</th>
                       <th scope="col">
                         <span className="visually-hidden">Действия</span>
                       </th>
@@ -649,17 +650,25 @@ export default function GeoRangesPage() {
                     ) : (
                       entHits.map((r) => (
                         <tr key={`${r.network}-${r.start_ip}-${r.end_ip}`}>
-                          <td className="mono">{r.network}</td>
-                          <td>{r.country}</td>
-                          <td>{r.region}</td>
-                          <td>{r.city}</td>
-                          <td>
+                          <td className="mono geo-cell" title={r.network}>
+                            {r.network}
+                          </td>
+                          <td className="geo-cell" title={r.country || undefined}>
+                            {r.country}
+                          </td>
+                          <td className="geo-cell" title={r.region || undefined}>
+                            {r.region}
+                          </td>
+                          <td className="geo-cell" title={r.city || undefined}>
+                            {r.city}
+                          </td>
+                          <td className="actions">
                             {isMarked(r) ? (
                               <span className="hint">уже отмечен</span>
                             ) : (
                               <button
                                 type="button"
-                                className="btn primary"
+                                className="btn sm"
                                 disabled={entBusy}
                                 onClick={() => void markRange(r)}
                               >
@@ -674,15 +683,17 @@ export default function GeoRangesPage() {
                 </table>
               </div>
             ) : null}
-            <h2 style={{ fontSize: 16, margin: '8px 0' }}>Отмеченные сети</h2>
-            <div className="toolbar" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-              <input
-                placeholder="Поиск: подпись, город, сеть…"
-                value={markedFilter}
-                onChange={(e) => setMarkedFilter(e.target.value)}
-                style={{ minWidth: 260 }}
-                aria-label="Поиск по отмеченным сетям"
-              />
+            <h2 className="geo-ranges-section-title">Отмеченные сети</h2>
+            <div className="geo-ranges-toolbar">
+              <div className="field geo-ranges-search-text">
+                <label htmlFor="geo-marked-filter">Поиск в отмеченных</label>
+                <input
+                  id="geo-marked-filter"
+                  placeholder="Подпись, город, сеть…"
+                  value={markedFilter}
+                  onChange={(e) => setMarkedFilter(e.target.value)}
+                />
+              </div>
               {markedFilter.trim() ? (
                 <span className="hint">
                   показано {fmtNumber(filteredMarked.length)} из {fmtNumber(enterprise.length)}
@@ -698,38 +709,38 @@ export default function GeoRangesPage() {
               </button>
             </div>
             {showManualAdd ? (
-              <form
-                className="toolbar"
-                style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}
-                onSubmit={addManual}
-              >
-                <input
-                  placeholder="CIDR или IP, например 10.20.0.0/16"
-                  value={manualNet}
-                  onChange={(e) => setManualNet(e.target.value)}
-                  style={{ minWidth: 240 }}
-                  aria-label="CIDR или IP для отметки"
-                />
-                <input
-                  placeholder="Подпись (офис, ЦОД…)"
-                  value={manualLabel}
-                  onChange={(e) => setManualLabel(e.target.value)}
-                  style={{ minWidth: 160 }}
-                  aria-label="Подпись сети"
-                />
+              <form className="geo-ranges-toolbar" onSubmit={addManual}>
+                <div className="field geo-ranges-search-text">
+                  <label htmlFor="geo-manual-net">CIDR или IP</label>
+                  <input
+                    id="geo-manual-net"
+                    placeholder="Например 10.20.0.0/16"
+                    value={manualNet}
+                    onChange={(e) => setManualNet(e.target.value)}
+                  />
+                </div>
+                <div className="field geo-ranges-search-ip">
+                  <label htmlFor="geo-manual-label">Подпись</label>
+                  <input
+                    id="geo-manual-label"
+                    placeholder="Офис, ЦОД…"
+                    value={manualLabel}
+                    onChange={(e) => setManualLabel(e.target.value)}
+                  />
+                </div>
                 <button type="submit" className="btn primary" disabled={entBusy}>
                   Отметить
                 </button>
               </form>
             ) : null}
             <div className="card table-wrap">
-              <table>
+              <table className="geo-ranges-table is-marked">
                 <thead>
                   <tr>
-                    <th scope="col">Network</th>
+                    <th scope="col">Сеть</th>
                     <th scope="col">Подпись</th>
-                    <th scope="col">Country</th>
-                    <th scope="col">City</th>
+                    <th scope="col">Страна</th>
+                    <th scope="col">Город</th>
                     <th scope="col">
                       <span className="visually-hidden">Действия</span>
                     </th>
@@ -757,14 +768,22 @@ export default function GeoRangesPage() {
                   ) : (
                     filteredMarked.map((n) => (
                       <tr key={`${n.start_ip}-${n.end_ip}`}>
-                        <td className="mono">{n.network}</td>
-                        <td>{n.label}</td>
-                        <td>{n.country}</td>
-                        <td>{n.city}</td>
-                        <td>
+                        <td className="mono geo-cell" title={n.network}>
+                          {n.network}
+                        </td>
+                        <td className="geo-cell" title={n.label || undefined}>
+                          {n.label}
+                        </td>
+                        <td className="geo-cell" title={n.country || undefined}>
+                          {n.country}
+                        </td>
+                        <td className="geo-cell" title={n.city || undefined}>
+                          {n.city}
+                        </td>
+                        <td className="actions">
                           <button
                             type="button"
-                            className="btn danger"
+                            className="btn sm danger ghost"
                             disabled={entBusy}
                             onClick={() => void unmarkNet(n)}
                           >
@@ -780,121 +799,138 @@ export default function GeoRangesPage() {
           </>
         ) : (
           <>
-        {totalInDb >= 400_000 ? (
-          <p className="hint" style={{ marginBottom: 12, color: 'var(--warn, #b45309)' }}>
-            В базе уже {fmtNumber(totalInDb)} диапазонов
-            {uploadMaxRanges > 0 ? ` (лимит загрузки ≈ ${fmtNumber(uploadMaxRanges)})` : ''}.
-            Повторная загрузка без очистки, скорее всего, не пройдёт.
-            {uploadMaxBytes > 0
-              ? ` Лимит размера файла: ${(uploadMaxBytes / (1024 * 1024)).toFixed(0)} МиБ.`
-              : ''}
-          </p>
-        ) : null}
-        <div className="summary" style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
-          <div>
-            <div className="hint">Диапазонов в базе</div>
-            <b>{fmtNumber(totalInDb || rows.length)}</b>
-          </div>
-          <div>
-            <div className="hint">Показано</div>
-            <b>{fmtNumber(shownCount || rows.length)}</b>
-          </div>
-          {textSearchActive && filteredCount > shownCount ? (
-            <div>
-              <div className="hint">Найдено</div>
-              <b>{fmtNumber(filteredCount)}</b>
+            {totalInDb >= 400_000 ? (
+              <p className="geo-ranges-capacity" role="status">
+                В базе уже {fmtNumber(totalInDb)} диапазонов
+                {uploadMaxRanges > 0 ? ` (лимит загрузки ≈ ${fmtNumber(uploadMaxRanges)})` : ''}.
+                Повторная загрузка без очистки, скорее всего, не пройдёт.
+                {uploadMaxBytes > 0
+                  ? ` Лимит размера файла: ${(uploadMaxBytes / (1024 * 1024)).toFixed(0)} МиБ.`
+                  : ''}
+              </p>
+            ) : null}
+            <div className="geo-ranges-summary">
+              <div className="geo-ranges-stat is-focus">
+                <div className="hint">Диапазонов в базе</div>
+                <b>{fmtNumber(totalInDb || rows.length)}</b>
+              </div>
+              <div className="geo-ranges-stat">
+                <div className="hint">Показано</div>
+                <b>{fmtNumber(shownCount || rows.length)}</b>
+              </div>
+              {textSearchActive && filteredCount > shownCount ? (
+                <div className="geo-ranges-stat">
+                  <div className="hint">Найдено</div>
+                  <b>{fmtNumber(filteredCount)}</b>
+                </div>
+              ) : null}
             </div>
-          ) : null}
-        </div>
-        <div className="toolbar" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-          <input
-            placeholder="По тексту: страна, регион, город…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            style={{ minWidth: 240 }}
-            aria-label="Поиск по текстовым полям"
-          />
-          <input
-            placeholder="IP или подсеть (CIDR / range)…"
-            value={ipSearch}
-            onChange={(e) => setIpSearch(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                void load();
-              }
-            }}
-            style={{ minWidth: 200 }}
-            aria-label="Поиск по IP или подсети"
-          />
-          {ipStatus.text ? <span className="hint">{ipStatus.text}</span> : null}
-          {truncated && textSearchActive ? (
-            <span className="hint">показаны первые {fmtNumber(shownCount)} из {fmtNumber(filteredCount)}</span>
-          ) : null}
-          <button type="button" className="btn" onClick={() => void load()}>
-            Обновить
-          </button>
-        </div>
-        <div className="card table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Network</th>
-                <th scope="col">Country</th>
-                <th scope="col">Region</th>
-                <th scope="col">City</th>
-                <th scope="col">Latitude</th>
-                <th scope="col">Longitude</th>
-                <th scope="col">
-                  <span className="visually-hidden">Действия</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rangesLoading ? (
-                <TableSkeleton cols={7} rows={5} />
-              ) : !rows.length ? (
-                <tr>
-                  <td colSpan={7} className="empty">
-                    <EmptyState
-                      compact
-                      title={
-                        ipLookupActive
-                          ? 'Нет совпадений по IP/подсети'
-                          : textSearchActive
-                            ? 'Нет диапазонов по запросу'
-                            : 'База GeoIP пуста'
-                      }
-                      description={
-                        ipLookupActive
-                          ? 'IP/подсеть не входит ни в один диапазон базы GeoIP.'
-                          : textSearchActive
-                            ? 'Измените текстовый запрос или очистите фильтр.'
-                            : 'Загрузите CSV или добавьте диапазоны со страницы IP без координат.'
-                      }
-                    />
-                  </td>
-                </tr>
-              ) : (
-                rows.map((r) => (
-                  <tr key={`${r.network}-${r.start_ip}-${r.end_ip}`} className={ipLookupActive ? 'ip-hit-row' : undefined}>
-                    <td className="mono">{r.network}</td>
-                    <td>{r.country}</td>
-                    <td>{r.region}</td>
-                    <td>{r.city}</td>
-                    <td className="mono">{r.lat}</td>
-                    <td className="mono">{r.lon}</td>
-                    <td>
-                      <button type="button" className="btn" onClick={() => openEdit(r)}>
-                        изменить
-                      </button>
-                    </td>
+            {sliceHint ? <p className="geo-ranges-slice">{sliceHint}</p> : null}
+            <div className="geo-ranges-toolbar">
+              <div className="field geo-ranges-search-text">
+                <label htmlFor="geo-base-text">Текст</label>
+                <input
+                  id="geo-base-text"
+                  placeholder="Страна, регион, город…"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                />
+              </div>
+              <div className="field geo-ranges-search-ip">
+                <label htmlFor="geo-base-ip">IP или подсеть</label>
+                <input
+                  id="geo-base-ip"
+                  placeholder="CIDR или диапазон…"
+                  value={ipSearch}
+                  onChange={(e) => setIpSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      void load();
+                    }
+                  }}
+                />
+              </div>
+              {ipStatus.text ? <span className="hint">{ipStatus.text}</span> : null}
+              <button type="button" className="btn" onClick={() => void load()}>
+                Обновить
+              </button>
+            </div>
+            <div className="card table-wrap">
+              <table className="geo-ranges-table is-base">
+                <thead>
+                  <tr>
+                    <th scope="col">Сеть</th>
+                    <th scope="col">Страна</th>
+                    <th scope="col">Регион</th>
+                    <th scope="col">Город</th>
+                    <th scope="col">Широта</th>
+                    <th scope="col">Долгота</th>
+                    <th scope="col">
+                      <span className="visually-hidden">Действия</span>
+                    </th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody>
+                  {rangesLoading ? (
+                    <TableSkeleton cols={7} rows={5} />
+                  ) : !rows.length ? (
+                    <tr>
+                      <td colSpan={7} className="empty">
+                        <EmptyState
+                          compact
+                          title={
+                            ipLookupActive
+                              ? 'Нет совпадений по IP/подсети'
+                              : textSearchActive
+                                ? 'Нет диапазонов по запросу'
+                                : 'База GeoIP пуста'
+                          }
+                          description={
+                            ipLookupActive
+                              ? 'IP/подсеть не входит ни в один диапазон базы GeoIP.'
+                              : textSearchActive
+                                ? 'Измените текстовый запрос или очистите фильтр.'
+                                : 'Загрузите CSV или добавьте диапазоны со страницы IP без координат.'
+                          }
+                        />
+                      </td>
+                    </tr>
+                  ) : (
+                    rows.map((r) => (
+                      <tr
+                        key={`${r.network}-${r.start_ip}-${r.end_ip}`}
+                        className={ipLookupActive ? 'ip-hit-row' : undefined}
+                      >
+                        <td className="mono geo-cell" title={r.network}>
+                          {r.network}
+                        </td>
+                        <td className="geo-cell" title={r.country || undefined}>
+                          {r.country}
+                        </td>
+                        <td className="geo-cell" title={r.region || undefined}>
+                          {r.region}
+                        </td>
+                        <td className="geo-cell" title={r.city || undefined}>
+                          {r.city}
+                        </td>
+                        <td className="mono geo-cell">{r.lat}</td>
+                        <td className="mono geo-cell">{r.lon}</td>
+                        <td className="actions">
+                          <button
+                            type="button"
+                            className="btn sm"
+                            onClick={() => openEdit(r)}
+                          >
+                            Изменить
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
             <section className="card card-compact geo-danger-zone" aria-label="Опасная зона">
               <h3 className="card-title">Опасная зона</h3>
               <p className="hint">
@@ -905,7 +941,7 @@ export default function GeoRangesPage() {
                 type="button"
                 className="btn danger"
                 disabled={busy}
-                onClick={() => void clearDatabase()}
+                onClick={() => setClearOpen(true)}
               >
                 Очистить базу
               </button>
@@ -916,27 +952,35 @@ export default function GeoRangesPage() {
       {edit ? (
         <div
           className="modal-backdrop show"
+          role="presentation"
           onClick={(e) => e.target === e.currentTarget && setEdit(null)}
         >
-          <form className="modal" role="dialog" aria-modal="true" onSubmit={onSave}>
-            <h3>Изменить диапазон GeoIP</h3>
+          <form
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="geo-edit-title"
+            onSubmit={onSave}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="geo-edit-title">Изменить диапазон GeoIP</h3>
             <p className="hint" style={{ marginTop: 0 }}>
               Поля соответствуют шаблону CSV SIEM KUMA.
             </p>
             {(
               [
-                ['network', 'Network'],
-                ['country', 'Country'],
-                ['region', 'Region'],
-                ['city', 'City'],
-                ['lat', 'Latitude'],
-                ['lon', 'Longitude'],
+                ['network', 'Сеть'],
+                ['country', 'Страна'],
+                ['region', 'Регион'],
+                ['city', 'Город'],
+                ['lat', 'Широта'],
+                ['lon', 'Долгота'],
               ] as const
             ).map(([k, label]) => (
               <div className="field" key={k}>
-                <label htmlFor={k}>{label}</label>
+                <label htmlFor={`geo-edit-${k}`}>{label}</label>
                 <input
-                  id={k}
+                  id={`geo-edit-${k}`}
                   required
                   value={form[k]}
                   onChange={(e) => setForm({ ...form, [k]: e.target.value })}
@@ -952,6 +996,47 @@ export default function GeoRangesPage() {
               </button>
             </div>
           </form>
+        </div>
+      ) : null}
+      {clearOpen ? (
+        <div
+          className="modal-backdrop show"
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !busy) setClearOpen(false);
+          }}
+        >
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={clearTitleId}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id={clearTitleId}>Очистить базу GeoIP?</h3>
+            <p className="hint" style={{ marginBottom: 16 }}>
+              Будет удалено {fmtNumber(totalInDb || rows.length)} диапазонов. Карта останется без
+              координат, пока вы не загрузите CSV снова. Это нельзя отменить.
+            </p>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="btn"
+                disabled={busy}
+                onClick={() => setClearOpen(false)}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="btn danger"
+                disabled={busy}
+                onClick={() => void clearDatabase()}
+              >
+                {busy ? 'Очистка…' : 'Очистить базу'}
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
     </SettingsLayout>

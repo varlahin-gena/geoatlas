@@ -52,6 +52,9 @@ func (w *routeWiring) registerUserRoutes() {
 	w.handle("POST", "/api/users/{username}/full-name",
 		chain(http.HandlerFunc(w.users.SetFullName), w.adminMW, w.csrf, maxBytesMW(maxJSONBodySize)),
 	)
+	w.handle("POST", "/api/users/{username}/enabled",
+		chain(http.HandlerFunc(w.users.SetEnabled), w.adminMW, w.csrf, maxBytesMW(maxJSONBodySize)),
+	)
 	w.handle("POST", "/api/users/{username}/reset-password",
 		chain(http.HandlerFunc(w.users.ResetPassword), w.adminMW, w.csrf, maxBytesMW(maxJSONBodySize)),
 	)

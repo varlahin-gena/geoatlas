@@ -1,16 +1,17 @@
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   createUser,
   deleteUser,
   listUsers,
   resetUserPassword,
+  updateUserEnabled,
   updateUserFullName,
   updateUserRole,
   type UserRow,
 } from '@/api/users';
 import { useAuth } from '@/auth/AuthContext';
 import type { UserRole } from '@/api/types';
-import { ROLE_OPERATOR } from '@/api/types';
+import { ROLE_ADMIN, ROLE_OPERATOR } from '@/api/types';
 import { USER_ROLE_OPTIONS } from '@/auth/roles';
 import { SettingsLayout } from '@/components/SettingsLayout';
 import { EmptyState, TableSkeleton } from '@/components/Skeleton';
@@ -18,6 +19,11 @@ import { ReauthField, ReauthModal } from '@/components/ReauthModal';
 import { useToast } from '@/components/Toast';
 import { fmtDate } from '@/lib/format';
 import { MIN_PASSWORD_LEN, validatePasswordClient } from '@/lib/passwordPolicy';
+import './users.css';
+
+function isEnabled(u: UserRow): boolean {
+  return u.enabled !== false;
+}
 
 export default function UsersPage() {
   const { user: me, refresh } = useAuth();
@@ -38,6 +44,7 @@ export default function UsersPage() {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [deleteReauth, setDeleteReauth] = useState('');
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [enableBusy, setEnableBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -56,6 +63,11 @@ export default function UsersPage() {
     document.title = 'ГеоАтлас — Пользователи';
     void load();
   }, [load]);
+
+  const enabledAdminCount = useMemo(
+    () => users.filter((u) => u.role === ROLE_ADMIN && isEnabled(u)).length,
+    [users],
+  );
 
   function resetCreateForm() {
     setUsername('');
@@ -89,27 +101,52 @@ export default function UsersPage() {
     }
   }
 
-  return (
-    <SettingsLayout
-      title="Пользователи"
-      actions={
-        <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
-          Создать
-        </button>
-      }
-    >
-      <div className="page-content-inner narrow">
-        <p className="page-lead">Локальные учётные записи UI.</p>
+  async function onToggleEnabled(u: UserRow, next: boolean) {
+    const isSelf = !!me?.username && me.username.toLowerCase() === u.username.toLowerCase();
+    if (!next && isSelf) {
+      toast('Нельзя выключить собственную учётную запись', 'error');
+      return;
+    }
+    if (!next && u.role === ROLE_ADMIN && enabledAdminCount <= 1) {
+      toast('Должен остаться хотя бы один активный администратор', 'error');
+      return;
+    }
+    setEnableBusy(u.username);
+    try {
+      await updateUserEnabled(u.username, next);
+      toast(next ? 'Учётная запись включена' : 'Учётная запись выключена', 'success');
+      void load();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Ошибка', 'error');
+      void load();
+    } finally {
+      setEnableBusy(null);
+    }
+  }
 
-        <div className="card">
+  return (
+    <SettingsLayout title="Пользователи" plainTitle>
+      <div className="page-content-inner narrow">
+        <p className="page-lead">
+          Учётные записи входа в интерфейс. Выключенная запись не входит в систему; должен остаться
+          хотя бы один активный администратор.
+        </p>
+
+        <div className="page-actions">
+          <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
+            Создать
+          </button>
+        </div>
+
+        <div className="card users-card">
           <div className="table-wrap">
-            <table>
+            <table className="users-table">
               <thead>
                 <tr>
                   <th scope="col">ФИО</th>
                   <th scope="col">Логин</th>
                   <th scope="col">Роль</th>
-                  <th scope="col">Статус</th>
+                  <th scope="col">Включена</th>
                   <th scope="col">Создана</th>
                   <th scope="col">
                     <span className="visually-hidden">Действия</span>
@@ -133,7 +170,11 @@ export default function UsersPage() {
                         title="Нет пользователей"
                         description="Создайте учётную запись для оператора или dashboard-просмотра."
                         action={
-                          <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
+                          <button
+                            type="button"
+                            className="btn primary"
+                            onClick={() => setCreateOpen(true)}
+                          >
                             Создать пользователя
                           </button>
                         }
@@ -144,14 +185,21 @@ export default function UsersPage() {
                   users.map((u) => {
                     const isSelf =
                       !!me?.username && me.username.toLowerCase() === u.username.toLowerCase();
+                    const enabled = isEnabled(u);
+                    const lastActiveAdmin = u.role === ROLE_ADMIN && enabled && enabledAdminCount <= 1;
+                    const enableBlocked = isSelf || lastActiveAdmin;
                     return (
-                      <tr key={u.username}>
+                      <tr
+                        key={u.username}
+                        className={enabled ? undefined : 'users-row-disabled'}
+                      >
                         <td>
                           <input
-                            className="fio-input"
+                            className="users-fio-input"
                             defaultValue={u.full_name || ''}
                             maxLength={200}
                             placeholder="ФИО"
+                            aria-label={`ФИО ${u.username}`}
                             onBlur={async (e) => {
                               const v = e.target.value;
                               if (v === (u.full_name || '')) return;
@@ -168,17 +216,36 @@ export default function UsersPage() {
                           />
                         </td>
                         <td>
-                          <b>{u.username}</b>
-                          {isSelf ? ' ' : null}
-                          {isSelf ? <span className="badge">вы</span> : null}
+                          <span className="users-login-cell">
+                            <b title={u.username}>{u.username}</b>
+                            {isSelf ? <span className="badge">Вы</span> : null}
+                            {u.must_reset_password ? (
+                              <span className="badge reset">сброс при входе</span>
+                            ) : null}
+                          </span>
                         </td>
                         <td>
                           <select
                             disabled={isSelf}
                             defaultValue={u.role}
+                            aria-label={`Роль ${u.username}`}
                             onChange={async (e) => {
+                              const nextRole = e.target.value;
+                              if (
+                                u.role === ROLE_ADMIN &&
+                                nextRole !== ROLE_ADMIN &&
+                                enabled &&
+                                enabledAdminCount <= 1
+                              ) {
+                                toast(
+                                  'Должен остаться хотя бы один активный администратор',
+                                  'error',
+                                );
+                                e.target.value = u.role;
+                                return;
+                              }
                               try {
-                                await updateUserRole(u.username, e.target.value);
+                                await updateUserRole(u.username, nextRole);
                                 toast('Роль обновлена', 'success');
                                 void load();
                               } catch (err) {
@@ -195,28 +262,73 @@ export default function UsersPage() {
                           </select>
                         </td>
                         <td>
-                          {u.must_reset_password ? (
-                            <span className="badge reset">сброс при входе</span>
-                          ) : (
-                            <span className="badge">ок</span>
-                          )}
-                        </td>
-                        <td>{fmtDate(u.created_at)}</td>
-                        <td className="actions">
-                          <button type="button" className="btn" onClick={() => setResetTarget(u.username)}>
-                            Сбросить пароль
-                          </button>
-                          <button
-                            type="button"
-                            className="btn danger"
-                            disabled={isSelf}
-                            onClick={() => {
-                              setDeleteTarget(u.username);
-                              setDeleteReauth('');
-                            }}
+                          <label
+                            className={`users-enable${enabled ? '' : ' is-off'}`}
+                            title={
+                              isSelf
+                                ? 'Нельзя выключить собственную учётную запись'
+                                : lastActiveAdmin
+                                  ? 'Должен остаться хотя бы один активный администратор'
+                                  : enabled
+                                    ? 'Включена'
+                                    : 'Выключена'
+                            }
                           >
-                            Удалить
-                          </button>
+                            <input
+                              type="checkbox"
+                              role="switch"
+                              checked={enabled}
+                              disabled={enableBusy === u.username || (!enabled ? false : enableBlocked)}
+                              aria-label={
+                                enabled
+                                  ? `Выключить ${u.username}`
+                                  : `Включить ${u.username}`
+                              }
+                              onChange={(e) => void onToggleEnabled(u, e.target.checked)}
+                            />
+                          </label>
+                        </td>
+                        <td className="users-date">{fmtDate(u.created_at)}</td>
+                        <td className="actions">
+                          <div className="users-row-actions">
+                            <details className="users-more">
+                              <summary
+                                className="btn sm ghost users-more-trigger"
+                                aria-label={`Действия для ${u.username}`}
+                              >
+                                …
+                              </summary>
+                              <div className="users-more-menu" role="menu">
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  className="users-more-item"
+                                  onClick={(e) => {
+                                    const root = e.currentTarget.closest('details');
+                                    if (root instanceof HTMLDetailsElement) root.open = false;
+                                    setResetTarget(u.username);
+                                  }}
+                                >
+                                  Сбросить пароль…
+                                </button>
+                                <div className="users-more-sep" role="separator" />
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  className="users-more-item is-danger"
+                                  disabled={isSelf}
+                                  onClick={(e) => {
+                                    const root = e.currentTarget.closest('details');
+                                    if (root instanceof HTMLDetailsElement) root.open = false;
+                                    setDeleteTarget(u.username);
+                                    setDeleteReauth('');
+                                  }}
+                                >
+                                  Удалить
+                                </button>
+                              </div>
+                            </details>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -231,6 +343,7 @@ export default function UsersPage() {
       {createOpen ? (
         <div
           className="modal-backdrop show"
+          role="presentation"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setCreateOpen(false);
@@ -244,6 +357,7 @@ export default function UsersPage() {
             aria-modal="true"
             aria-labelledby="create-user-title"
             onSubmit={onCreate}
+            onClick={(e) => e.stopPropagation()}
           >
             <h3 id="create-user-title">Создать учётную запись</h3>
             <div className="field">
@@ -292,7 +406,11 @@ export default function UsersPage() {
               </select>
             </div>
             <label className="checkbox">
-              <input type="checkbox" checked={mustReset} onChange={(e) => setMustReset(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={mustReset}
+                onChange={(e) => setMustReset(e.target.checked)}
+              />
               <span>Сброс пароля при первом входе</span>
             </label>
             <div className="modal-actions">
@@ -317,6 +435,7 @@ export default function UsersPage() {
       {resetTarget ? (
         <div
           className="modal-backdrop show"
+          role="presentation"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setResetTarget(null);
@@ -328,6 +447,8 @@ export default function UsersPage() {
             className="modal"
             role="dialog"
             aria-modal="true"
+            aria-labelledby="reset-user-title"
+            onClick={(e) => e.stopPropagation()}
             onSubmit={async (e) => {
               e.preventDefault();
               const policyErr = validatePasswordClient(resetPass, resetTarget);
@@ -351,7 +472,7 @@ export default function UsersPage() {
               }
             }}
           >
-            <h3>
+            <h3 id="reset-user-title">
               Сброс пароля: <span>{resetTarget}</span>
             </h3>
             <div className="field">
@@ -368,7 +489,11 @@ export default function UsersPage() {
               />
             </div>
             <label className="checkbox">
-              <input type="checkbox" checked={resetMust} onChange={(e) => setResetMust(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={resetMust}
+                onChange={(e) => setResetMust(e.target.checked)}
+              />
               <span>Сброс пароля при первом входе</span>
             </label>
             <ReauthField value={reauthPassword} onChange={setReauthPassword} />
@@ -422,10 +547,6 @@ export default function UsersPage() {
           })();
         }}
       />
-      <style>{`
-        .fio-input { width: 100%; min-width: 180px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 6px 8px; }
-        .actions { display: flex; flex-wrap: wrap; gap: 6px; }
-      `}</style>
     </SettingsLayout>
   );
 }

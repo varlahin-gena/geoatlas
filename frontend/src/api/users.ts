@@ -40,6 +40,13 @@ export function updateUserRole(username: string, role: UserRole | string): Promi
   });
 }
 
+export function updateUserEnabled(username: string, enabled: boolean): Promise<UserRow> {
+  return apiFetch(apiPath('/api/users/{username}/enabled', { username }), {
+    method: 'POST',
+    body: JSON.stringify({ enabled }),
+  });
+}
+
 export function deleteUser(username: string, currentPassword: string): Promise<unknown> {
   return apiFetch(apiPath('/api/users/{username}', { username }), {
     method: 'DELETE',

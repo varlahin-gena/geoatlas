@@ -24,6 +24,7 @@
 }
 
 :root {
+  color-scheme: dark;
   --font-sans: Geist, ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'Geist Mono', ui-monospace, monospace;
   --ease-out: cubic-bezier(0.32, 0.72, 0, 1);
@@ -72,15 +73,16 @@
   --map-land-rgb: 39, 39, 39;
   --map-outline-rgb: 19, 18, 9;
 
-  /* UI density — compact. */
-  --density-row-pad-y: 4px;
+  /* UI density — comfortable desktop default (≥13px table text). */
+  --density-row-pad-y: 6px;
   --density-row-pad-x: 8px;
-  --density-font-table: 12px;
+  --density-font-table: 13px;
   --density-summary-gap: 8px;
   --density-summary-pad: 6px 10px;
 }
 
 html[data-theme="light"] {
+  color-scheme: light;
   --bg: #f4f4f4;
   --panel: #ffffff;
   --panel-2: #eeeeee;

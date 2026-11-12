@@ -1,7 +1,6 @@
 import { useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AdminSidebar, SystemHealthPill, UserMenu } from './Shell';
-import { PageSkeleton } from './Skeleton';
 
 export function AdminLayout({
   title,
@@ -57,8 +56,4 @@ export function AdminLayout({
       </div>
     </div>
   );
-}
-
-export function PageLoading({ label = 'Загрузка…' }: { label?: string }) {
-  return <PageSkeleton label={label} />;
 }

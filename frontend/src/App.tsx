@@ -1,32 +1,53 @@
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from '@/auth/AuthContext';
 import { RequireAuth } from '@/auth/RequireAuth';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ToastProvider } from '@/components/Toast';
 import { CommandPaletteHost } from '@/components/CommandPalette';
-import { PageLoading } from '@/components/AdminLayout';
+import { PageLoading } from '@/components/Skeleton';
+import { lazyRetry } from '@/lib/lazyRetry';
 import LoginPage from '@/pages/Login/LoginPage';
 import ChangePasswordPage from '@/pages/ChangePassword/ChangePasswordPage';
 
-const ProfilePage = lazy(() => import('@/pages/Profile/ProfilePage'));
-const MapPage = lazy(() => import('@/pages/Map/MapPage'));
+const ProfilePage = lazyRetry(() => import('@/pages/Profile/ProfilePage'), { label: 'профиль' });
+const MapPage = lazyRetry(() => import('@/pages/Map/MapPage'), { label: 'карта' });
 
-const SystemPage = lazy(() => import('@/pages/System/SystemPage'));
-const UsersPage = lazy(() => import('@/pages/Users/UsersPage'));
-const ApiTokensPage = lazy(() => import('@/pages/ApiTokens/ApiTokensPage'));
-const TlsPage = lazy(() => import('@/pages/Tls/TlsPage'));
-const ParseErrorsPage = lazy(() => import('@/pages/ParseErrors/ParseErrorsPage'));
-const ParserTestPage = lazy(() => import('@/pages/ParserTest/ParserTestPage'));
-const GeoMissingPage = lazy(() => import('@/pages/GeoMissing/GeoMissingPage'));
-const GeoRangesPage = lazy(() => import('@/pages/GeoRanges/GeoRangesPage'));
-const ReputationPage = lazy(() => import('@/pages/Reputation/ReputationPage'));
-const ConnectorsPage = lazy(() => import('@/pages/Connectors/ConnectorsPage'));
-const AnomaliesPage = lazy(() => import('@/pages/Anomalies/AnomaliesPage'));
-const AnomalyEnginePage = lazy(() => import('@/pages/Anomalies/AnomalyEnginePage'));
-const HuntsPage = lazy(() => import('@/pages/Hunts/HuntsPage'));
-const InvestigatePage = lazy(() => import('@/pages/Investigate/InvestigatePage'));
-const NotFoundPage = lazy(() => import('@/pages/NotFound/NotFoundPage'));
+const SystemPage = lazyRetry(() => import('@/pages/System/SystemPage'), { label: 'система' });
+const UsersPage = lazyRetry(() => import('@/pages/Users/UsersPage'), { label: 'пользователи' });
+const ApiTokensPage = lazyRetry(() => import('@/pages/ApiTokens/ApiTokensPage'), {
+  label: 'API-токены',
+});
+const TlsPage = lazyRetry(() => import('@/pages/Tls/TlsPage'), { label: 'HTTPS-сертификаты' });
+const ParseErrorsPage = lazyRetry(() => import('@/pages/ParseErrors/ParseErrorsPage'), {
+  label: 'ошибки парсинга',
+});
+const ParserTestPage = lazyRetry(() => import('@/pages/ParserTest/ParserTestPage'), {
+  label: 'тест парсеров',
+});
+const GeoMissingPage = lazyRetry(() => import('@/pages/GeoMissing/GeoMissingPage'), {
+  label: 'IP без координат',
+});
+const GeoRangesPage = lazyRetry(() => import('@/pages/GeoRanges/GeoRangesPage'), {
+  label: 'база GeoIP',
+});
+const ReputationPage = lazyRetry(() => import('@/pages/Reputation/ReputationPage'), {
+  label: 'репутация',
+});
+const ConnectorsPage = lazyRetry(() => import('@/pages/Connectors/ConnectorsPage'), {
+  label: 'коннекторы',
+});
+const AnomaliesPage = lazyRetry(() => import('@/pages/Anomalies/AnomaliesPage'), {
+  label: 'аномалии',
+});
+const AnomalyEnginePage = lazyRetry(() => import('@/pages/Anomalies/AnomalyEnginePage'), {
+  label: 'движок аномалий',
+});
+const HuntsPage = lazyRetry(() => import('@/pages/Hunts/HuntsPage'), { label: 'охоты' });
+const InvestigatePage = lazyRetry(() => import('@/pages/Investigate/InvestigatePage'), {
+  label: 'разбор',
+});
+const NotFoundPage = lazyRetry(() => import('@/pages/NotFound/NotFoundPage'), { label: '404' });
 
 function Lazy({ children, label }: { children: React.ReactNode; label?: string }) {
   return (

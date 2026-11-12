@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useId, useRef, useState } from 'react';
 import {
   applyConnectors,
   createConnector,
@@ -12,37 +12,193 @@ import { fetchSystemStats } from '@/api/system';
 import { SettingsLayout } from '@/components/SettingsLayout';
 import { EmptyState, TableSkeleton } from '@/components/Skeleton';
 import { useToast } from '@/components/Toast';
+import {
+  CONNECTOR_LIVE_WINDOW_MS,
+  connectorLiveClass,
+  connectorLiveKind,
+  connectorLiveLabel,
+  connectorLiveTitle,
+  connectorProtocolsLabel,
+} from './connectorDisplay';
+import './connectors.css';
 
-/** Fresh last_event_at window for green «жив» status. */
-const LIVE_WINDOW_MS = 5 * 60 * 1000;
 const LIVE_POLL_MS = 15_000;
 
-type LiveKind = 'on' | 'idle' | 'off';
-
-function connectorLiveKind(enabled: boolean, lastEventAt: string | undefined, now = Date.now()): LiveKind {
-  if (!enabled) return 'off';
-  if (!lastEventAt) return 'idle';
-  const t = Date.parse(lastEventAt);
-  if (!Number.isFinite(t)) return 'idle';
-  return now - t <= LIVE_WINDOW_MS ? 'on' : 'idle';
+function useDialogA11y<T extends HTMLElement>(open: boolean, onDismiss: () => void) {
+  const ref = useRef<T | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const node = ref.current;
+    node?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onDismiss();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onDismiss]);
+  return ref;
 }
 
-function liveButtonClass(kind: LiveKind): string {
-  if (kind === 'on') return 'status-on';
-  if (kind === 'idle') return 'status-idle';
-  return 'status-off';
+function DeleteConnectorModal({
+  connector,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  connector: Connector;
+  busy: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const titleId = useId();
+  const dialogRef = useDialogA11y<HTMLDivElement>(true, onClose);
+
+  return (
+    <div
+      className="modal-backdrop show"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !busy) onClose();
+      }}
+    >
+      <div
+        ref={dialogRef}
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 id={titleId}>Удалить коннектор?</h3>
+        <p className="hint" style={{ marginBottom: 16 }}>
+          «{connector.name}» ({connector.id}) будет удалён. Чтобы закрыть порт, нажмите «Применить».
+        </p>
+        <div className="modal-actions">
+          <button type="button" className="btn" disabled={busy} onClick={onClose}>
+            Отмена
+          </button>
+          <button type="button" className="btn danger" disabled={busy} onClick={onConfirm}>
+            {busy ? 'Удаление…' : 'Удалить'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
-function liveButtonTitle(kind: LiveKind, enabled: boolean): string {
-  if (kind === 'on') {
-    return 'Жив: enabled и событие за последние 5 мин. Клик — выключить.';
-  }
-  if (kind === 'idle') {
-    return enabled
-      ? 'Включён в конфиге, но нет свежего трафика (5 мин). Клик — выключить.'
-      : 'Клик — включить.';
-  }
-  return 'Выключен в конфиге. Клик — включить.';
+function EditConnectorModal({
+  connector,
+  busy,
+  portMin,
+  portMax,
+  onClose,
+  onSave,
+}: {
+  connector: Connector;
+  busy: boolean;
+  portMin: number;
+  portMax: number;
+  onClose: () => void;
+  onSave: (patch: {
+    name: string;
+    port: number;
+    protocols: ConnectorProtocols;
+  }) => void;
+}) {
+  const titleId = useId();
+  const dialogRef = useDialogA11y<HTMLFormElement>(true, onClose);
+  const [name, setName] = useState(connector.name);
+  const [port, setPort] = useState(String(connector.port));
+  const [protocols, setProtocols] = useState<ConnectorProtocols>(
+    connector.protocols === 'udp' || connector.protocols === 'tcp' ? connector.protocols : 'both',
+  );
+
+  return (
+    <div
+      className="modal-backdrop show"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !busy) onClose();
+      }}
+    >
+      <form
+        ref={dialogRef}
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (busy) return;
+          onSave({
+            name: name.trim(),
+            port: Number(port),
+            protocols,
+          });
+        }}
+      >
+        <h3 id={titleId}>Изменить коннектор</h3>
+        <p className="hint" style={{ marginBottom: 16 }}>
+          ID <code>{connector.id}</code> нельзя сменить. После сохранения нажмите «Применить».
+        </p>
+        <div className="field">
+          <label htmlFor="connector-edit-name">Имя</label>
+          <input
+            id="connector-edit-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            maxLength={128}
+            disabled={busy}
+            autoFocus
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="connector-edit-port">Порт</label>
+          <input
+            id="connector-edit-port"
+            value={port}
+            onChange={(e) => setPort(e.target.value)}
+            type="number"
+            min={connector.builtin ? 514 : portMin > 0 ? portMin : 1024}
+            max={connector.builtin ? 514 : portMax > 0 ? portMax : 65535}
+            required
+            disabled={busy || !!connector.builtin}
+            title={connector.builtin ? 'У встроенного коннектора порт всегда 514' : undefined}
+          />
+          {!connector.builtin && portMin > 0 ? (
+            <span className="field-hint">
+              {portMin}–{portMax}
+            </span>
+          ) : null}
+        </div>
+        <div className="field">
+          <label htmlFor="connector-edit-protocols">Протоколы</label>
+          <select
+            id="connector-edit-protocols"
+            value={protocols}
+            onChange={(e) => setProtocols(e.target.value as ConnectorProtocols)}
+            disabled={busy}
+          >
+            <option value="both">UDP+TCP</option>
+            <option value="udp">UDP</option>
+            <option value="tcp">TCP</option>
+          </select>
+        </div>
+        <div className="modal-actions">
+          <button type="button" className="btn" disabled={busy} onClick={onClose}>
+            Отмена
+          </button>
+          <button type="submit" className="btn primary" disabled={busy}>
+            {busy ? 'Сохранение…' : 'Сохранить'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
 }
 
 export default function ConnectorsPage() {
@@ -55,6 +211,10 @@ export default function ConnectorsPage() {
   const [dirty, setDirty] = useState(false);
   const [rowBusy, setRowBusy] = useState<string | null>(null);
   const [lastEventById, setLastEventById] = useState<Record<string, string>>({});
+  const [pendingDelete, setPendingDelete] = useState<Connector | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [pendingEdit, setPendingEdit] = useState<Connector | null>(null);
+  const [editBusy, setEditBusy] = useState(false);
   const [id, setId] = useState('');
   const [name, setName] = useState('');
   const [port, setPort] = useState('');
@@ -82,7 +242,7 @@ export default function ConnectorsPage() {
       setExtraPorts(data.extra_ports || { min: 0, max: 0 });
       await refreshLive();
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Ошибка', 'error');
+      toast(e instanceof Error ? e.message : 'Не удалось загрузить коннекторы', 'error');
     } finally {
       setLoading(false);
     }
@@ -94,10 +254,10 @@ export default function ConnectorsPage() {
   }, [load]);
 
   useEffect(() => {
-    const id = window.setInterval(() => {
+    const timer = window.setInterval(() => {
       void refreshLive();
     }, LIVE_POLL_MS);
-    return () => window.clearInterval(id);
+    return () => window.clearInterval(timer);
   }, [refreshLive]);
 
   async function onCreate(e: FormEvent) {
@@ -113,11 +273,11 @@ export default function ConnectorsPage() {
       setName('');
       setPort('');
       setProtocols('both');
-      toast('Коннектор добавлен. Нажмите «Применить», чтобы открыть порт в syslog-ng.', 'success');
+      toast('Коннектор добавлен — примените изменения', 'success');
       setDirty(true);
       await load();
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Ошибка', 'error');
+      toast(err instanceof Error ? err.message : 'Не удалось добавить коннектор', 'error');
     }
   }
 
@@ -132,15 +292,10 @@ export default function ConnectorsPage() {
     try {
       await updateConnector(c.id, { enabled: next });
       setDirty(true);
-      toast(
-        next
-          ? 'Включено. Нажмите «Применить», чтобы открыть порт.'
-          : 'Выключено. Нажмите «Применить», чтобы закрыть порт.',
-        'success',
-      );
+      toast(next ? 'Включено — примените изменения' : 'Выключено — примените изменения', 'success');
     } catch (err) {
       setEnabledLocal(c.id, c.enabled);
-      toast(err instanceof Error ? err.message : 'Ошибка', 'error');
+      toast(err instanceof Error ? err.message : 'Не удалось изменить статус', 'error');
     } finally {
       setRowBusy(null);
     }
@@ -154,28 +309,59 @@ export default function ConnectorsPage() {
       setEnabledLocal(c.id, true);
       await updateConnector(c.id, { enabled: true });
       setDirty(true);
-      toast('Перезапуск: выкл → вкл. Нажмите «Применить», чтобы обновить syslog-ng.', 'success');
+      toast('Перезапуск записан — примените изменения', 'success');
       await refreshLive();
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Ошибка перезапуска', 'error');
+      toast(err instanceof Error ? err.message : 'Не удалось перезапустить', 'error');
       await load();
     } finally {
       setRowBusy(null);
     }
   }
 
-  async function onDelete(c: Connector) {
-    if (c.builtin) return;
-    if (!window.confirm(`Удалить коннектор «${c.name}» (${c.id})?`)) return;
-    setRowBusy(c.id);
+  async function confirmDelete() {
+    if (!pendingDelete || deleteBusy) return;
+    setDeleteBusy(true);
+    setRowBusy(pendingDelete.id);
     try {
-      await deleteConnector(c.id);
+      await deleteConnector(pendingDelete.id);
       setDirty(true);
-      toast('Удалено. Примените конфиг.', 'success');
+      toast('Удалено — примените изменения', 'success');
+      setPendingDelete(null);
       await load();
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Ошибка', 'error');
+      toast(err instanceof Error ? err.message : 'Не удалось удалить коннектор', 'error');
     } finally {
+      setDeleteBusy(false);
+      setRowBusy(null);
+    }
+  }
+
+  async function confirmEdit(patch: {
+    name: string;
+    port: number;
+    protocols: ConnectorProtocols;
+  }) {
+    if (!pendingEdit || editBusy) return;
+    setEditBusy(true);
+    setRowBusy(pendingEdit.id);
+    try {
+      const body: Parameters<typeof updateConnector>[1] = {
+        name: patch.name,
+        protocols: patch.protocols,
+      };
+      if (!pendingEdit.builtin) {
+        body.port = patch.port;
+      }
+      await updateConnector(pendingEdit.id, body);
+      setDirty(true);
+      toast('Сохранено — примените изменения', 'success');
+      setPendingEdit(null);
+      await load();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Не удалось изменить коннектор', 'error');
+    } finally {
+      setEditBusy(false);
       setRowBusy(null);
     }
   }
@@ -186,10 +372,10 @@ export default function ConnectorsPage() {
     try {
       const res = await applyConnectors();
       if (res.ok && res.apply?.reloaded) {
-        toast('Конфиг syslog-ng применён и перезагружен', 'success');
+        toast('Конфиг применён, приём перезагружен', 'success');
         setDirty(false);
       } else if (res.apply?.reload_error) {
-        toast(`Конфиг записан, reload: ${res.apply.reload_error}`, 'error');
+        toast(`Конфиг записан, перезагрузка: ${res.apply.reload_error}`, 'error');
         setDirty(false);
       } else {
         toast('Конфиг записан', 'success');
@@ -197,44 +383,87 @@ export default function ConnectorsPage() {
       }
       await refreshLive();
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Ошибка apply', 'error');
+      toast(err instanceof Error ? err.message : 'Не удалось применить конфиг', 'error');
     } finally {
       setApplyBusy(false);
     }
   }
 
-  const portHint =
+  const portRangeHint =
     extraPorts.min > 0
-      ? `Доп. порты: ${extraPorts.min}–${extraPorts.max} (плюс 514 для default). Лимит: ${maxConnectors}.`
-      : `Только порт 514 (default). Задайте GA_CONNECTOR_EXTRA_PORTS и опубликуйте range в compose.`;
+      ? `Доп. порты ${extraPorts.min}–${extraPorts.max} (514 — у встроенного). Лимит: ${maxConnectors}.`
+      : `Сейчас доступен только порт 514 (встроенный).`;
+
   const applyTitle = dirty
-    ? 'Записывает syslog-ng и делает reload. После новых портов: scripts/sync-syslog-firewall.sh или GA_SYSLOG_ALLOW_FROM.'
+    ? 'Записать конфиг приёма и перезагрузить.'
     : 'Нет неприменённых изменений';
 
+  const applyButton = (
+    <button
+      type="button"
+      className="btn primary"
+      disabled={!dirty || applyBusy}
+      title={applyTitle}
+      onClick={() => void onApply()}
+    >
+      {applyBusy ? 'Применение…' : 'Применить'}
+    </button>
+  );
+
   return (
-    <SettingsLayout title="Коннекторы">
+    <SettingsLayout title="Коннекторы" plainTitle>
       <div className="page-content-inner narrow">
         <p className="page-lead">
-          Отдельные UDP/TCP порты приёма. После изменений нажмите «Применить»; метрики — Мониторинг →
-          Pipeline.
+          Порты приёма логов. После правок нажмите «Применить», чтобы открыть или закрыть порт.
         </p>
-        <p className="hint">{portHint}</p>
 
-        <div className="toolbar">
-          <button
-            type="button"
-            className="btn primary"
-            disabled={!dirty || applyBusy}
-            title={applyTitle}
-            onClick={() => void onApply()}
-          >
-            {applyBusy ? 'Применение…' : 'Применить'}
-          </button>
-        </div>
+        <p className="connectors-summary" role="status">
+          <span>
+            {rows.length}/{maxConnectors}{' '}
+            {maxConnectors === 1 ? 'коннектор' : 'коннекторов'}
+          </span>
+          <span aria-hidden="true">·</span>
+          <span className="hint">{portRangeHint}</span>
+        </p>
 
-        <div className="card">
+        <details className="connectors-details">
+          <summary>Как это устроено</summary>
+          <p>
+            Каждый коннектор — отдельный UDP/TCP порт. Метрики потока смотрите в Мониторинг →
+            Pipeline. Статус «Жив» означает события за последние{' '}
+            {Math.round(CONNECTOR_LIVE_WINDOW_MS / 60_000)} мин.
+          </p>
+          {extraPorts.min > 0 ? (
+            <p>
+              Лимит {maxConnectors} = встроенный 514 + порты{' '}
+              <code>
+                {extraPorts.min}–{extraPorts.max}
+              </code>{' '}
+              из <code>GA_CONNECTOR_EXTRA_PORTS</code> (compose публикует этот range заранее).
+              После смены range/портов при необходимости обновите firewall (
+              <code>scripts/sync-syslog-firewall.sh</code> или <code>GA_SYSLOG_ALLOW_FROM</code>).
+            </p>
+          ) : (
+            <p>
+              Чтобы добавить порты, задайте <code>GA_CONNECTOR_EXTRA_PORTS</code> и опубликуйте
+              диапазон в compose; для firewall —{' '}
+              <code>scripts/sync-syslog-firewall.sh</code> или <code>GA_SYSLOG_ALLOW_FROM</code>.
+            </p>
+          )}
+        </details>
+
+        {dirty ? (
+          <div className="connectors-dirty" role="status">
+            <span>Есть неприменённые изменения</span>
+            {applyButton}
+          </div>
+        ) : (
+          <div className="connectors-toolbar">{applyButton}</div>
+        )}
+
+        <div className="card connectors-card">
           <div className="table-wrap">
-            <table>
+            <table className="connectors-table">
               <thead>
                 <tr>
                   <th scope="col">Имя</th>
@@ -253,54 +482,102 @@ export default function ConnectorsPage() {
                 ) : rows.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="empty">
-                      <EmptyState compact title="Нет коннекторов" />
+                      <EmptyState
+                        compact
+                        title="Нет коннекторов"
+                        description="Добавьте порт приёма в форме ниже."
+                      />
                     </td>
                   </tr>
                 ) : (
                   rows.map((c) => {
                     const busy = rowBusy === c.id;
                     const kind = connectorLiveKind(c.enabled, lastEventById[c.id]);
+                    const liveLabel = connectorLiveLabel(kind);
                     return (
                       <tr key={c.id}>
-                        <td>{c.name}</td>
-                        <td className="mono">
+                        <td>
+                          <div className="conn-name">
+                            <span title={c.name}>{c.name}</span>
+                            {c.builtin ? <span className="connectors-builtin">Встроенный</span> : null}
+                          </div>
+                        </td>
+                        <td className="mono" title={c.id}>
                           {c.id}
-                          {c.builtin ? ' · builtin' : ''}
                         </td>
                         <td className="mono">{c.port}</td>
-                        <td>{c.protocols}</td>
+                        <td>{connectorProtocolsLabel(c.protocols)}</td>
                         <td>
                           <button
                             type="button"
-                            className={`btn ${liveButtonClass(kind)}`}
+                            className={`btn sm ${connectorLiveClass(kind)}`}
                             disabled={busy}
                             aria-pressed={c.enabled}
-                            title={liveButtonTitle(kind, c.enabled)}
+                            aria-label={`${c.name}: ${liveLabel}. ${connectorLiveTitle(kind)}`}
+                            title={connectorLiveTitle(kind)}
                             onClick={() => void onToggle(c)}
                           >
-                            {c.enabled ? 'ВКЛ' : 'ВЫКЛ'}
+                            {liveLabel}
                           </button>
                         </td>
                         <td className="actions">
-                          <button
-                            type="button"
-                            className="btn"
-                            disabled={busy}
-                            title="Выкл → вкл"
-                            onClick={() => void onRestart(c)}
-                          >
-                            Перезапуск
-                          </button>
-                          {!c.builtin ? (
-                            <button
-                              type="button"
-                              className="btn danger"
-                              disabled={busy}
-                              onClick={() => void onDelete(c)}
-                            >
-                              Удалить
-                            </button>
-                          ) : null}
+                          <div className="connectors-row-actions">
+                            <details className="connectors-more">
+                              <summary
+                                className="btn sm ghost connectors-more-trigger"
+                                aria-label={`Действия для ${c.name}`}
+                              >
+                                …
+                              </summary>
+                              <div className="connectors-more-menu" role="menu">
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  className="connectors-more-item"
+                                  disabled={busy}
+                                  onClick={(e) => {
+                                    const root = e.currentTarget.closest('details');
+                                    if (root instanceof HTMLDetailsElement) root.open = false;
+                                    setPendingEdit(c);
+                                  }}
+                                >
+                                  Изменить…
+                                </button>
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  className="connectors-more-item"
+                                  disabled={busy}
+                                  title="Выкл → вкл в конфиге"
+                                  onClick={(e) => {
+                                    const root = e.currentTarget.closest('details');
+                                    if (root instanceof HTMLDetailsElement) root.open = false;
+                                    void onRestart(c);
+                                  }}
+                                >
+                                  Перезапуск
+                                </button>
+                                {!c.builtin ? (
+                                  <>
+                                    <div className="connectors-more-sep" role="separator" />
+                                    <button
+                                      type="button"
+                                      role="menuitem"
+                                      className="connectors-more-item is-danger"
+                                      disabled={busy}
+                                      onClick={(e) => {
+                                        const root = e.currentTarget.closest('details');
+                                        if (root instanceof HTMLDetailsElement) root.open = false;
+                                        setPendingDelete(c);
+                                      }}
+                                    >
+                                      Удалить
+                                    </button>
+                                  </>
+                                ) : null}
+                              </div>
+                            </details>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -311,22 +588,10 @@ export default function ConnectorsPage() {
           </div>
         </div>
 
-        <section className="card">
+        <section className="card connectors-form">
           <h2>Добавить коннектор</h2>
           <form className="form-row" onSubmit={(e) => void onCreate(e)}>
-            <div className="field">
-              <label htmlFor="connector-id">ID</label>
-              <input
-                id="connector-id"
-                value={id}
-                onChange={(e) => setId(e.target.value)}
-                placeholder="fw-a"
-                required
-                pattern="[a-z][a-z0-9_-]{0,31}"
-                title="латиница, цифры, _ -; с буквы; до 32 символов"
-              />
-            </div>
-            <div className="field">
+            <div className="field field-name">
               <label htmlFor="connector-name">Имя</label>
               <input
                 id="connector-name"
@@ -336,19 +601,24 @@ export default function ConnectorsPage() {
                 required
               />
             </div>
-            <div className="field">
+            <div className="field field-port">
               <label htmlFor="connector-port">Порт</label>
               <input
                 id="connector-port"
                 value={port}
                 onChange={(e) => setPort(e.target.value)}
                 type="number"
-                min={1024}
-                max={65535}
+                min={extraPorts.min > 0 ? extraPorts.min : 1024}
+                max={extraPorts.max > 0 ? extraPorts.max : 65535}
                 required
               />
+              {extraPorts.min > 0 ? (
+                <span className="field-hint">
+                  {extraPorts.min}–{extraPorts.max}
+                </span>
+              ) : null}
             </div>
-            <div className="field">
+            <div className="field field-protocols">
               <label htmlFor="connector-protocols">Протоколы</label>
               <select
                 id="connector-protocols"
@@ -360,12 +630,54 @@ export default function ConnectorsPage() {
                 <option value="tcp">TCP</option>
               </select>
             </div>
-            <button type="submit" className="btn" disabled={rows.length >= maxConnectors}>
-              Добавить
-            </button>
+            <div className="field field-id">
+              <label htmlFor="connector-id">ID</label>
+              <input
+                id="connector-id"
+                value={id}
+                onChange={(e) => setId(e.target.value)}
+                placeholder="fw-a"
+                required
+                pattern="[a-z][a-z0-9_-]{0,31}"
+                title="латиница, цифры, _ -; с буквы; до 32 символов"
+                autoComplete="off"
+              />
+            </div>
+            <div className="field field-submit">
+              <span className="field-submit-label" aria-hidden="true">
+                &nbsp;
+              </span>
+              <button type="submit" className="btn" disabled={rows.length >= maxConnectors}>
+                Добавить
+              </button>
+            </div>
           </form>
         </section>
       </div>
+
+      {pendingEdit ? (
+        <EditConnectorModal
+          connector={pendingEdit}
+          busy={editBusy}
+          portMin={extraPorts.min}
+          portMax={extraPorts.max}
+          onClose={() => {
+            if (!editBusy) setPendingEdit(null);
+          }}
+          onSave={(patch) => void confirmEdit(patch)}
+        />
+      ) : null}
+
+      {pendingDelete ? (
+        <DeleteConnectorModal
+          connector={pendingDelete}
+          busy={deleteBusy}
+          onClose={() => {
+            if (!deleteBusy) setPendingDelete(null);
+          }}
+          onConfirm={() => void confirmDelete()}
+        />
+      ) : null}
     </SettingsLayout>
   );
 }

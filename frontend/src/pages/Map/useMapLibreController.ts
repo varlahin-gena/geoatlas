@@ -30,6 +30,7 @@ import {
 import './maplibreSetup';
 import type { ViewState } from './mapTypes';
 import { useGlobeAutoRotate } from './useGlobeAutoRotate';
+import { localizeMapLibreControls } from './mapControlI18n';
 
 type ToastFn = (msg: string, kind?: ToastKind) => void;
 
@@ -176,6 +177,10 @@ export function useMapLibreController(opts: {
     }
 
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
+    localizeMapLibreControls(map.getContainer());
+    map.once('load', () => {
+      localizeMapLibreControls(map.getContainer());
+    });
     mapRef.current = map;
 
     const fallbackToEmpty = (why: string) => {

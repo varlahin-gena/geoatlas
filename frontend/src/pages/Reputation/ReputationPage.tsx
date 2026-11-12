@@ -1,4 +1,13 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type RefObject,
+} from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetchRaw } from '@/api/client';
 import {
@@ -16,11 +25,258 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { EmptyState, TableSkeleton } from '@/components/Skeleton';
 import { useToast } from '@/components/Toast';
 import { fmtDate, fmtNumber } from '@/lib/format';
+import {
+  REPUTATION_CATEGORY_OPTIONS,
+  REPUTATION_FORMAT_OPTIONS,
+  reputationCategoryLabel,
+  reputationFormatLabel,
+  shortReputationUrl,
+} from './reputationDisplay';
+import './reputation.css';
+
+type ActiveRow = {
+  name: string;
+  category: string;
+  format: string;
+  url: string;
+  count: number;
+  source: string;
+  updated_at?: string;
+  last_error: string;
+};
+
+function useDialogA11y<T extends HTMLElement>(open: boolean, onDismiss: () => void) {
+  const ref = useRef<T | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const node = ref.current;
+    node?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onDismiss();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onDismiss]);
+  return ref;
+}
+
+function UrlCell({ url }: { url: string }) {
+  const short = shortReputationUrl(url);
+  if (!url) return <span>—</span>;
+  const safe = /^https?:\/\//i.test(url);
+  if (safe) {
+    return (
+      <a href={url} target="_blank" rel="noreferrer" title={url}>
+        {short}
+      </a>
+    );
+  }
+  return <span title={url}>{short}</span>;
+}
+
+function DeleteListModal({
+  name,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  name: string;
+  busy: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const titleId = useId();
+  const dialogRef = useDialogA11y<HTMLDivElement>(true, onClose);
+
+  return (
+    <div
+      className="modal-backdrop show"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !busy) onClose();
+      }}
+    >
+      <div
+        ref={dialogRef}
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 id={titleId}>Удалить список?</h3>
+        <p className="hint" style={{ marginBottom: 16 }}>
+          «{name}» будет снят. URL-фид с тем же именем тоже удалится. Это нельзя отменить.
+        </p>
+        <div className="modal-actions">
+          <button type="button" className="btn" disabled={busy} onClick={onClose}>
+            Отмена
+          </button>
+          <button type="button" className="btn danger" disabled={busy} onClick={onConfirm}>
+            {busy ? 'Удаление…' : 'Удалить'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AddFeedModal({
+  busy,
+  uploadName,
+  name,
+  url,
+  category,
+  format,
+  fileInputRef,
+  onClose,
+  onChangeName,
+  onChangeUrl,
+  onChangeCategory,
+  onChangeFormat,
+  onSubmit,
+  onPickFile,
+}: {
+  busy: boolean;
+  uploadName: string;
+  name: string;
+  url: string;
+  category: string;
+  format: string;
+  fileInputRef: RefObject<HTMLInputElement | null>;
+  onClose: () => void;
+  onChangeName: (v: string) => void;
+  onChangeUrl: (v: string) => void;
+  onChangeCategory: (v: string) => void;
+  onChangeFormat: (v: string) => void;
+  onSubmit: (e: FormEvent) => void;
+  onPickFile: (file: File) => void;
+}) {
+  const titleId = useId();
+  const dialogRef = useDialogA11y<HTMLDivElement>(true, () => {
+    if (!busy) onClose();
+  });
+
+  return (
+    <div
+      className="modal-backdrop show"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !busy) onClose();
+      }}
+    >
+      <div
+        ref={dialogRef}
+        className="modal reputation-add-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 id={titleId}>Добавить фид</h3>
+        <p className="hint reputation-add-lead">
+          URL подтянется по расписанию или кнопкой «Скачать фиды сейчас». CSV можно загрузить сразу.
+        </p>
+        <form className="reputation-add-form" onSubmit={onSubmit}>
+          <div className="field">
+            <label htmlFor="rep-feed-name">Имя</label>
+            <input
+              id="rep-feed-name"
+              required
+              value={name}
+              onChange={(e) => onChangeName(e.target.value)}
+              placeholder="my_blocklist"
+              autoComplete="off"
+              autoFocus
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="rep-feed-url">URL</label>
+            <input
+              id="rep-feed-url"
+              required
+              type="url"
+              value={url}
+              onChange={(e) => onChangeUrl(e.target.value)}
+              placeholder="https://…"
+              autoComplete="off"
+            />
+          </div>
+          <div className="reputation-add-row">
+            <div className="field">
+              <label htmlFor="rep-feed-cat">Категория</label>
+              <select
+                id="rep-feed-cat"
+                value={category}
+                onChange={(e) => onChangeCategory(e.target.value)}
+              >
+                {REPUTATION_CATEGORY_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="rep-feed-fmt">Формат</label>
+              <select
+                id="rep-feed-fmt"
+                value={format}
+                onChange={(e) => onChangeFormat(e.target.value)}
+              >
+                {REPUTATION_FORMAT_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="modal-actions">
+            <button type="button" className="btn" disabled={busy} onClick={onClose}>
+              Отмена
+            </button>
+            <button type="submit" className="btn primary" disabled={busy}>
+              Добавить
+            </button>
+          </div>
+        </form>
+
+        <div className="reputation-upload">
+          <span className="reputation-upload-label">Или загрузите CSV вручную</span>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,text/csv,text/plain"
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              if (file) onPickFile(file);
+            }}
+          />
+          <button
+            type="button"
+            className="btn"
+            disabled={busy}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            Выбрать CSV…
+          </button>
+          {uploadName ? <span className="reputation-upload-name">{uploadName}</span> : null}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function ReputationPage() {
   const { toast } = useToast();
   const { reputationEnabled } = useAuth();
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [lists, setLists] = useState<RepList[]>([]);
   const [catalog, setCatalog] = useState<Feed[]>([]);
@@ -30,6 +286,25 @@ export default function ReputationPage() {
   const [category, setCategory] = useState('attacks');
   const [format, setFormat] = useState('netset');
   const [refreshBusy, setRefreshBusy] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [uploadName, setUploadName] = useState('');
+  const [lastRefreshAt, setLastRefreshAt] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addBusy, setAddBusy] = useState(false);
+
+  function resetAddForm() {
+    setName('');
+    setUrl('');
+    setCategory('attacks');
+    setFormat('netset');
+  }
+
+  function closeAddModal() {
+    if (addBusy || uploadName) return;
+    setAddOpen(false);
+    resetAddForm();
+  }
 
   const activeNames = useMemo(
     () => new Set(feeds.map((f) => f.name).filter(Boolean)),
@@ -41,7 +316,7 @@ export default function ReputationPage() {
     [catalog, activeNames],
   );
 
-  const activeRows = useMemo(() => {
+  const activeRows = useMemo((): ActiveRow[] => {
     const byFeed: Record<string, Feed> = {};
     const byList: Record<string, RepList> = {};
     feeds.forEach((f) => {
@@ -73,6 +348,18 @@ export default function ReputationPage() {
     [lists],
   );
 
+  const errorCount = useMemo(
+    () => activeRows.filter((r) => r.last_error).length,
+    [activeRows],
+  );
+
+  const showFormatCol = useMemo(
+    () => activeRows.some((r) => r.format && r.format !== 'netset'),
+    [activeRows],
+  );
+
+  const showErrorCol = errorCount > 0;
+
   const load = useCallback(async () => {
     try {
       const [f, l, c] = await Promise.all([
@@ -84,7 +371,7 @@ export default function ReputationPage() {
       setLists(l.lists || []);
       setCatalog(c.feeds || []);
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Ошибка', 'error');
+      toast(e instanceof Error ? e.message : 'Не удалось загрузить списки репутации', 'error');
     } finally {
       setLoading(false);
     }
@@ -110,26 +397,31 @@ export default function ReputationPage() {
 
   async function onAddFeed(e: FormEvent) {
     e.preventDefault();
+    if (addBusy) return;
+    setAddBusy(true);
     try {
+      const feedName = name.trim();
       await addFeedBody({
-        name: name.trim(),
+        name: feedName,
         url: url.trim(),
         category: category.trim() || 'unknown',
         format: format || 'netset',
       });
-      toast(`Фид добавлен: ${name.trim()}. Нажмите «Обновить фиды».`, 'success');
-      setName('');
-      setUrl('');
+      toast(`Фид «${feedName}» добавлен. Нажмите «Скачать фиды сейчас».`, 'success');
+      setAddOpen(false);
+      resetAddForm();
       void load();
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Ошибка', 'error');
+      toast(err instanceof Error ? err.message : 'Не удалось добавить фид', 'error');
+    } finally {
+      setAddBusy(false);
     }
   }
 
   async function refreshFeeds() {
     if (refreshBusy) return;
     setRefreshBusy(true);
-    toast('Обновление фидов… это может занять несколько минут', 'info');
+    toast('Скачивание фидов… это может занять несколько минут', 'info');
     try {
       const data = await refreshReputation(true);
       const updated = Array.isArray(data.updated) ? data.updated : [];
@@ -165,22 +457,77 @@ export default function ReputationPage() {
             .join('\n'),
         );
       }
+      setLastRefreshAt(new Date().toISOString());
       await load();
       toast(lines.join('\n'), failNames.length ? 'error' : 'success');
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Ошибка', 'error');
+      toast(e instanceof Error ? e.message : 'Не удалось скачать фиды', 'error');
     } finally {
       setRefreshBusy(false);
     }
   }
 
+  async function confirmDelete() {
+    if (!pendingDelete || deleteBusy) return;
+    setDeleteBusy(true);
+    try {
+      await deleteReputationList(pendingDelete);
+      toast(`Удалено: ${pendingDelete}`, 'success');
+      setPendingDelete(null);
+      void load();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Не удалось удалить список', 'error');
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
+  async function onUploadFile(file: File) {
+    setUploadName(file.name);
+    try {
+      const res = await apiFetchRaw('/upload-reputation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/csv' },
+        body: await file.text(),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        ranges?: number;
+      };
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      toast(`Загружено диапазонов: ${fmtNumber(data.ranges || 0)}`, 'success');
+      setAddOpen(false);
+      resetAddForm();
+      void load();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Не удалось загрузить файл', 'error');
+    } finally {
+      setUploadName('');
+    }
+  }
+
+  const activeColSpan = 5 + (showFormatCol ? 1 : 0) + (showErrorCol ? 1 : 0);
+
   return (
-    <AdminLayout
-      title="Репутация IP"
-      actions={
-        <>
-          <button type="button" className="btn" onClick={() => void load()}>
-            Обновить список
+    <AdminLayout title="Репутация IP">
+      <div className="page-content-inner">
+        <p className="page-lead">
+          Подключите списки вредоносных IP — они обновляются по расписанию и участвуют в проверке
+          репутации на карте и в аномалиях.
+        </p>
+        <div className="page-actions">
+          <button type="button" className="btn" onClick={() => void load()} disabled={loading}>
+            Обновить таблицу
+          </button>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              resetAddForm();
+              setAddOpen(true);
+            }}
+          >
+            Добавить фид
           </button>
           <button
             type="button"
@@ -188,145 +535,111 @@ export default function ReputationPage() {
             disabled={refreshBusy}
             onClick={() => void refreshFeeds()}
           >
-            {refreshBusy ? 'Обновление…' : 'Обновить фиды'}
+            {refreshBusy ? 'Скачивание…' : 'Скачать фиды сейчас'}
           </button>
-        </>
-      }
-    >
-      <div className="page-content-inner">
-        <p className="page-lead">
-          URL-фиды хранятся в <code>reputation_feeds.json</code> и обновляются по расписанию. Форматы:{' '}
-          <code>netset/plain</code>, <code>spamhaus_json</code>, <code>csv_ip</code>.
-        </p>
-        <p className="hint">
-          {activeRows.length
-            ? `Списков: ${activeRows.length}, диапазонов: ${fmtNumber(totalRanges)}`
-            : 'Списки ещё не загружены — добавьте фид, нажмите «Обновить фиды» или загрузите CSV.'}
-        </p>
-        <div className="card">
-          <h2>Добавить фид</h2>
-          <form className="form-row" onSubmit={onAddFeed}>
-            <div className="field">
-              <label>Имя</label>
-              <input required value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
-            <div className="field" style={{ flex: 1, minWidth: 240 }}>
-              <label>URL</label>
-              <input required value={url} onChange={(e) => setUrl(e.target.value)} />
-            </div>
-            <div className="field">
-              <label>Category</label>
-              <input value={category} onChange={(e) => setCategory(e.target.value)} />
-            </div>
-            <div className="field">
-              <label>Format</label>
-              <select value={format} onChange={(e) => setFormat(e.target.value)}>
-                <option value="netset">netset</option>
-                <option value="spamhaus_json">spamhaus_json</option>
-                <option value="csv_ip">csv_ip</option>
-              </select>
-            </div>
-            <button type="submit" className="btn primary">
-              Добавить
-            </button>
-          </form>
-          <div style={{ marginTop: 12 }}>
-            <label>
-              Ручная загрузка файла{' '}
-              <input
-                type="file"
-                accept=".csv,text/csv,text/plain"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  e.target.value = '';
-                  if (!file) return;
-                  try {
-                    const res = await apiFetchRaw('/upload-reputation', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'text/csv' },
-                      body: await file.text(),
-                    });
-                    const data = (await res.json().catch(() => ({}))) as {
-                      error?: string;
-                      ranges?: number;
-                    };
-                    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-                    toast(`Загружено диапазонов: ${data.ranges || 0}`, 'success');
-                    void load();
-                  } catch (err) {
-                    toast(err instanceof Error ? err.message : 'Ошибка', 'error');
-                  }
-                }}
-              />
-            </label>
-          </div>
         </div>
 
-        <div className="card" style={{ marginTop: 16 }}>
+        <p className="reputation-summary" role="status">
+          {activeRows.length ? (
+            <>
+              <span>
+                {fmtNumber(activeRows.length)}{' '}
+                {activeRows.length === 1 ? 'список' : activeRows.length < 5 ? 'списка' : 'списков'}
+              </span>
+              <span>· {fmtNumber(totalRanges)} диапазонов</span>
+              {errorCount ? (
+                <span className="hint" style={{ color: 'var(--red)' }}>
+                  · с ошибкой: {errorCount}
+                </span>
+              ) : null}
+              {lastRefreshAt ? (
+                <span className="hint">· скачано {fmtDate(lastRefreshAt)}</span>
+              ) : null}
+            </>
+          ) : (
+            <span className="hint">
+              Списки ещё не загружены — добавьте фид, выберите пресет из каталога или загрузите CSV.
+            </span>
+          )}
+        </p>
+
+        <details className="reputation-details">
+          <summary>Как это устроено</summary>
+          <p>
+            URL-фиды хранятся на сервере и подтягиваются по расписанию или кнопкой «Скачать фиды
+            сейчас». После добавления фида списки нужно скачать, иначе диапазоны появятся не сразу.
+          </p>
+          <p>
+            Форматы: <code>netset</code> / plain, <code>spamhaus_json</code>, <code>csv_ip</code>.
+          </p>
+        </details>
+
+        <div className="card reputation-card">
           <h2>Активные списки</h2>
           <div className="table-wrap">
-            <table>
+            <table className="reputation-table">
               <thead>
                 <tr>
                   <th scope="col">Имя</th>
-                  <th scope="col">Category</th>
-                  <th scope="col">Format</th>
-                  <th scope="col">URL</th>
-                  <th scope="col">Ranges</th>
-                  <th scope="col">Source</th>
+                  <th scope="col">Категория</th>
+                  {showFormatCol ? <th scope="col">Формат</th> : null}
+                  <th scope="col">Источник</th>
+                  <th scope="col" className="num">
+                    Диапазонов
+                  </th>
                   <th scope="col">Обновлён</th>
-                  <th scope="col">Ошибка</th>
-                  <th scope="col"> </th>
+                  {showErrorCol ? <th scope="col">Ошибка</th> : null}
+                  <th scope="col">
+                    <span className="visually-hidden">Действия</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <TableSkeleton cols={9} rows={4} />
+                  <TableSkeleton cols={activeColSpan} rows={4} />
                 ) : !activeRows.length ? (
                   <tr>
-                    <td colSpan={9} className="empty">
+                    <td colSpan={activeColSpan} className="empty">
                       <EmptyState
                         compact
                         title="Нет активных списков"
-                        description="Добавьте URL-фид выше, выберите пресет из каталога или загрузите CSV."
+                        description="Добавьте URL-фид, выберите пресет из каталога или загрузите CSV."
+                        action={
+                          <button
+                            type="button"
+                            className="btn primary"
+                            onClick={() => {
+                              resetAddForm();
+                              setAddOpen(true);
+                            }}
+                          >
+                            Добавить фид
+                          </button>
+                        }
                       />
                     </td>
                   </tr>
                 ) : (
                   activeRows.map((r) => (
                     <tr key={r.name}>
-                      <td>{r.name}</td>
-                      <td>{r.category}</td>
-                      <td>{r.format}</td>
-                      <td className="raw" title={r.url}>
-                        {r.url}
+                      <td className="rep-name">{r.name}</td>
+                      <td>{reputationCategoryLabel(r.category)}</td>
+                      {showFormatCol ? <td>{reputationFormatLabel(r.format)}</td> : null}
+                      <td className="rep-url">
+                        <UrlCell url={r.url} />
                       </td>
-                      <td>{fmtNumber(r.count)}</td>
-                      <td>{r.source}</td>
+                      <td className="num">{fmtNumber(r.count)}</td>
                       <td>{fmtDate(r.updated_at)}</td>
-                      <td className="hint" style={{ color: r.last_error ? 'var(--red)' : undefined }}>
-                        {r.last_error}
-                      </td>
-                      <td>
+                      {showErrorCol ? (
+                        <td className="rep-error" title={r.last_error || undefined}>
+                          {r.last_error || '—'}
+                        </td>
+                      ) : null}
+                      <td className="actions">
                         <button
                           type="button"
-                          className="btn"
-                          onClick={async () => {
-                            if (
-                              !confirm(
-                                `Удалить список «${r.name}»? URL-фид с тем же именем тоже будет снят.`,
-                              )
-                            ) {
-                              return;
-                            }
-                            try {
-                              await deleteReputationList(r.name);
-                              toast(`Удалено: ${r.name}`, 'success');
-                              void load();
-                            } catch (e) {
-                              toast(e instanceof Error ? e.message : 'Ошибка', 'error');
-                            }
-                          }}
+                          className="btn sm danger ghost"
+                          onClick={() => setPendingDelete(r.name)}
                         >
                           Удалить
                         </button>
@@ -339,17 +652,20 @@ export default function ReputationPage() {
           </div>
         </div>
 
-        <div className="card" style={{ marginTop: 16 }}>
+        <div className="card reputation-card">
           <h2>Каталог</h2>
+          <p className="hint">Пресеты, которых ещё нет среди активных списков.</p>
           <div className="table-wrap">
-            <table>
+            <table className="reputation-table">
               <thead>
                 <tr>
                   <th scope="col">Имя</th>
-                  <th scope="col">Category</th>
-                  <th scope="col">Format</th>
-                  <th scope="col">URL</th>
-                  <th scope="col"> </th>
+                  <th scope="col">Категория</th>
+                  <th scope="col">Формат</th>
+                  <th scope="col">Источник</th>
+                  <th scope="col">
+                    <span className="visually-hidden">Действия</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -358,7 +674,11 @@ export default function ReputationPage() {
                 ) : !catalog.length ? (
                   <tr>
                     <td colSpan={5} className="empty">
-                      <EmptyState compact title="Каталог пуст" description="Пресеты фидов недоступны на этом сервере." />
+                      <EmptyState
+                        compact
+                        title="Каталог пуст"
+                        description="Пресеты фидов недоступны на этом сервере."
+                      />
                     </td>
                   </tr>
                 ) : !catalogAvailable.length ? (
@@ -367,23 +687,23 @@ export default function ReputationPage() {
                       <EmptyState
                         compact
                         title="Все пресеты уже подключены"
-                        description="Активные фиды покрывают весь каталог — остаётся обновить списки или добавить свой URL."
+                        description="Активные фиды покрывают весь каталог — остаётся скачать списки или добавить свой URL."
                       />
                     </td>
                   </tr>
                 ) : (
                   catalogAvailable.map((c) => (
                     <tr key={c.name}>
-                      <td>{c.name}</td>
-                      <td>{c.category}</td>
-                      <td>{c.format || 'netset'}</td>
-                      <td className="raw" title={c.url}>
-                        {c.url}
+                      <td className="rep-name">{c.name}</td>
+                      <td>{reputationCategoryLabel(c.category)}</td>
+                      <td>{reputationFormatLabel(c.format || 'netset')}</td>
+                      <td className="rep-url">
+                        <UrlCell url={c.url || ''} />
                       </td>
-                      <td>
+                      <td className="actions">
                         <button
                           type="button"
-                          className="btn primary"
+                          className="btn sm"
                           onClick={async () => {
                             try {
                               await addFeedBody({
@@ -393,12 +713,15 @@ export default function ReputationPage() {
                                 format: c.format || 'netset',
                               });
                               toast(
-                                `Добавлено из каталога: ${c.name}. Нажмите «Обновить фиды».`,
+                                `«${c.name}» из каталога. Нажмите «Скачать фиды сейчас».`,
                                 'success',
                               );
                               void load();
                             } catch (err) {
-                              toast(err instanceof Error ? err.message : 'Ошибка', 'error');
+                              toast(
+                                err instanceof Error ? err.message : 'Не удалось добавить пресет',
+                                'error',
+                              );
                             }
                           }}
                         >
@@ -413,6 +736,36 @@ export default function ReputationPage() {
           </div>
         </div>
       </div>
+
+      {addOpen ? (
+        <AddFeedModal
+          busy={addBusy || Boolean(uploadName)}
+          uploadName={uploadName}
+          name={name}
+          url={url}
+          category={category}
+          format={format}
+          fileInputRef={fileInputRef}
+          onClose={closeAddModal}
+          onChangeName={setName}
+          onChangeUrl={setUrl}
+          onChangeCategory={setCategory}
+          onChangeFormat={setFormat}
+          onSubmit={(e) => void onAddFeed(e)}
+          onPickFile={(file) => void onUploadFile(file)}
+        />
+      ) : null}
+
+      {pendingDelete ? (
+        <DeleteListModal
+          name={pendingDelete}
+          busy={deleteBusy}
+          onClose={() => {
+            if (!deleteBusy) setPendingDelete(null);
+          }}
+          onConfirm={() => void confirmDelete()}
+        />
+      ) : null}
     </AdminLayout>
   );
 }

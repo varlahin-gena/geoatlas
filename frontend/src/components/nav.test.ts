@@ -3,7 +3,9 @@ import {
   filterNav,
   formatNavBadge,
   groupNav,
+  navBadgeTone,
   sectionBadgeTitle,
+  sectionBadgeTone,
   splitNavItems,
   PAGE_NAV,
   type NavItem,
@@ -91,6 +93,24 @@ describe('formatNavBadge', () => {
     expect(formatNavBadge(-1)).toBeNull();
     expect(formatNavBadge(12)).toBe('12');
     expect(formatNavBadge(100, 99)).toBe('99+');
+  });
+});
+
+describe('navBadgeTone', () => {
+  it('reserves danger for anomalies only', () => {
+    expect(navBadgeTone('/anomalies')).toBe('danger');
+    expect(navBadgeTone('/parse-errors')).toBe('muted');
+    expect(navBadgeTone('/geo-missing')).toBe('muted');
+    const items = filterNav(PAGE_NAV, {
+      isAdmin: true,
+      reputationEnabled: true,
+      uiAuthEnabled: true,
+    });
+    const { sections } = splitNavItems(items);
+    const data = sections.find((s) => s.id === 'data')!;
+    const triage = sections.find((s) => s.id === 'triage')!;
+    expect(sectionBadgeTone(data, { '/parse-errors': '99+' })).toBe('muted');
+    expect(sectionBadgeTone(triage, { '/anomalies': '5' })).toBe('danger');
   });
 });
 

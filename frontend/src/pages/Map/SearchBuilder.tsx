@@ -203,15 +203,19 @@ export function SearchBuilder({
             ))}
           </div>
           <div className="search-builder-hint">
-            Подсказка: src_ip=10.0.0.1, action=allow, action!=deny, device:fw1
+            Примеры синтаксиса: src_ip=10.0.0.1, action=allow, action!=deny, device:fw1
           </div>
           <div className="search-builder-rows">
             {rows.map((row, idx) => (
-              <div key={idx} className="search-builder-row">
+              <div
+                key={idx}
+                className={`search-builder-row${row.kind === 'group' ? ' is-group' : ''}`}
+              >
                 {idx > 0 ? (
                   <select
                     className="search-builder-join"
                     value={row.joinWith}
+                    aria-label="Связь с предыдущим условием"
                     onChange={(e) =>
                       updateRow(idx, { joinWith: e.target.value === 'OR' ? 'OR' : 'AND' })
                     }
@@ -252,7 +256,7 @@ export function SearchBuilder({
                     <div className="search-builder-group-head">
                       <span>Группа</span>
                       <label className="search-builder-group-op">
-                        Связка
+                        Объединять через
                         <select
                           value={row.op}
                           onChange={(e) =>
@@ -305,6 +309,20 @@ export function SearchBuilder({
                               updateRow(idx, { children });
                             }}
                           />
+                          <button
+                            type="button"
+                            className="search-builder-remove"
+                            disabled={row.children.length <= 1}
+                            aria-label="Удалить условие в группе"
+                            onClick={() => {
+                              if (row.children.length <= 1) return;
+                              updateRow(idx, {
+                                children: row.children.filter((_, i) => i !== cidx),
+                              });
+                            }}
+                          >
+                            Удалить
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -329,6 +347,7 @@ export function SearchBuilder({
                   type="button"
                   className="search-builder-remove"
                   disabled={rows.length <= 1}
+                  aria-label={row.kind === 'group' ? 'Удалить группу' : 'Удалить условие'}
                   onClick={() => setRows((prev) => prev.filter((_, i) => i !== idx))}
                 >
                   Удалить

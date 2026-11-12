@@ -23,6 +23,10 @@ import {
 } from './theme';
 import { deriveIsAdmin, deriveReputationEnabled, deriveUiAuthEnabled } from './roles';
 import { normalizeMapGroupBy, type MapGroupBy } from '@/lib/mapGrouping';
+import { promiseTimeout } from '@/lib/promiseTimeout';
+
+/** Cap auth bootstrap so RequireAuth cannot show PageSkeleton forever. */
+const AUTH_BOOT_TIMEOUT_MS = 15_000;
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -136,7 +140,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (async () => {
       setLoading(true);
       try {
-        const me = await authApi.fetchMe();
+        const me = await promiseTimeout(
+          authApi.fetchMe(),
+          AUTH_BOOT_TIMEOUT_MS,
+          'Таймаут проверки сессии',
+        );
         if (!cancelled) {
           setUser(me);
           if (me) applyUserTheme(me);

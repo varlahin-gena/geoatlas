@@ -112,6 +112,7 @@ func expectedAuthMatrix() map[string]authTier {
 		"POST /api/users":                                 tierAdmin,
 		"POST /api/users/{username}/role":                 tierAdmin,
 		"POST /api/users/{username}/full-name":            tierAdmin,
+		"POST /api/users/{username}/enabled":              tierAdmin,
 		"POST /api/users/{username}/reset-password":       tierAdmin,
 		"DELETE /api/users/{username}":                    tierAdmin,
 		"GET /api/me/search-templates":                    tierLogin,
