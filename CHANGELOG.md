@@ -5,6 +5,25 @@
 
 ## [Unreleased]
 
+## [2.6.13] — 2026-11-12
+
+Тестовый / pre-release: Users more-меню + правка коннекторов (не Latest).
+
+### Added
+- **Коннекторы**: кнопка «Изменить» — имя, порт и протоколы без пересоздания (ID неизменен; дальше «Применить»).
+
+### Fixed
+- **Пользователи**: выпадающее меню «⋯» больше не обрезается рамкой таблицы/карточки.
+
+### Changed
+- **Коннекторы**: подсказка про `GA_CONNECTOR_EXTRA_PORTS` показывается, когда диапазон реально задан.
+
+### Notes
+- OpenAPI API doc version: **1.21.0**
+- Продуктовая версия: **2.6.13** (тестовый пререлиз)
+- Схема ClickHouse: без изменений Ensure*.
+- Достаточно `update.sh` 2.6.13 (recreate **frontend**).
+
 ## [2.6.12] — 2026-11-12
 
 Тестовый / pre-release: финальный Apple Design UI-проход + возврат 2.6.11 после revert (не Latest).
@@ -308,6 +327,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.6.13]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.13
 [2.6.12]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.12
 [2.6.11]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.11
 [2.6.10]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.10
