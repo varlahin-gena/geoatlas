@@ -58,7 +58,8 @@
 **Общий первый шаг на сервере** (Ubuntu и Oracle Linux одинаково):
 
 ```bash
-VER=2.7.0   # или нужный релиз
+VER=2.7.1   # или нужный релиз
+
 cd /tmp
 curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz"
 curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz.sha256"
