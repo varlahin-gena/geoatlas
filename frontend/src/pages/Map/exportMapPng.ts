@@ -20,7 +20,7 @@ function nextPaint(): Promise<void> {
 }
 
 /** Wait until MapLibre has presented at least one frame after triggerRepaint. */
-export function waitForMapRender(map: MapLibreMap, timeoutMs = 800): Promise<void> {
+function waitForMapRender(map: MapLibreMap, timeoutMs = 800): Promise<void> {
   return new Promise((resolve) => {
     let settled = false;
     let timer = 0;
