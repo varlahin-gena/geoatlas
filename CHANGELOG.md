@@ -8,7 +8,7 @@
 
 ## [2.7.1] — 2026-11-13
 
-Патч: демо аномалий на боевой, пиры в разборе по окну алерта, кнопка «Закрыть».
+Патч: демо аномалий на боевой, пиры в разборе по окну алерта, кнопка «Закрыть», фикс PNG-экспорта карты.
 
 ### Added
 - **Демо аномалий**: `scripts/emulate-map-load.ps1` — `-Recipes` (default `port_scan,lateral_fanout`), `-AnomalyOnly`; seed-скрипты карты (`seed-demo-map.*`).
@@ -23,6 +23,7 @@
 ### Fixed
 - **lateral_fanout** в демо: src/dst только в gray enterprise nets (`10.0` / `10.25` / `10.27` / `10.28` / `10.30`) — раньше src `10.68.*` часто вне `enterprise_nets`.
 - **Пиры пустые**: scan map period `15m` → `2h`; подсказка про отсутствие гео у src/dst.
+- **Экспорт PNG карты**: MapLibre v6 — `canvasContextAttributes.preserveDrawingBuffer` (top-level флаг игнорировался → чёрная подложка); ожидание кадра `render` и композит map+overlay по размеру canvas MapLibre.
 
 ### Notes
 - OpenAPI API doc version: **1.21.0**

@@ -168,8 +168,8 @@ export function useMapLibreController(opts: {
         pitch: vs.pitch,
         attributionControl: {},
         fadeDuration: 0,
-        // Needed for PNG export from canvas
-        ...({ preserveDrawingBuffer: true } as Record<string, unknown>),
+        // MapLibre v6+: top-level preserveDrawingBuffer is ignored — basemap export goes black.
+        canvasContextAttributes: { preserveDrawingBuffer: true },
       });
     } catch (e) {
       console.error('MapLibre init failed:', e);
