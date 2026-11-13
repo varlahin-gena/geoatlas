@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { collectMapCanvases } from './exportMapPng';
+import { collectMapCanvases, drawCanvasToMapSize } from './exportMapPng';
 
 function fakeCanvas(width: number, height: number): HTMLCanvasElement {
   const c = document.createElement('canvas');
@@ -28,19 +28,47 @@ describe('collectMapCanvases', () => {
     expect(list).toEqual([mapCanvas, deckCanvas]);
   });
 
-  it('skips empty canvases', () => {
-    const mapCanvas = fakeCanvas(0, 0);
-    const deckCanvas = fakeCanvas(50, 40);
+  it('does not scrape unrelated canvases from the container', () => {
+    const mapCanvas = fakeCanvas(100, 80);
+    const deckCanvas = fakeCanvas(100, 80);
+    const stray = fakeCanvas(10, 10);
     const root = document.createElement('div');
     root.appendChild(mapCanvas);
     root.appendChild(deckCanvas);
+    root.appendChild(stray);
 
     const map = {
       getCanvas: () => mapCanvas,
       getContainer: () => root,
     };
     const list = collectMapCanvases(map as never, { getCanvas: () => deckCanvas } as never);
+    expect(list).toEqual([mapCanvas, deckCanvas]);
+  });
+
+  it('skips empty canvases', () => {
+    const mapCanvas = fakeCanvas(0, 0);
+    const deckCanvas = fakeCanvas(50, 40);
+    const map = {
+      getCanvas: () => mapCanvas,
+    };
+    const list = collectMapCanvases(map as never, { getCanvas: () => deckCanvas } as never);
     expect(list).toEqual([deckCanvas]);
+  });
+});
+
+describe('drawCanvasToMapSize', () => {
+  it('draws 1:1 when sizes match', () => {
+    const ctx = { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D;
+    const src = fakeCanvas(64, 32);
+    drawCanvasToMapSize(ctx, src, 64, 32);
+    expect(ctx.drawImage).toHaveBeenCalledWith(src, 0, 0);
+  });
+
+  it('scales when buffer sizes differ', () => {
+    const ctx = { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D;
+    const src = fakeCanvas(32, 16);
+    drawCanvasToMapSize(ctx, src, 64, 32);
+    expect(ctx.drawImage).toHaveBeenCalledWith(src, 0, 0, 32, 16, 0, 0, 64, 32);
   });
 });
 
@@ -49,11 +77,9 @@ describe('exportMapPng', () => {
     const { exportMapPng } = await import('./exportMapPng');
     const mapCanvas = fakeCanvas(32, 24);
     const deckCanvas = fakeCanvas(32, 24);
-    const root = document.createElement('div');
-    root.appendChild(mapCanvas);
-    root.appendChild(deckCanvas);
 
     const drawImage = vi.fn();
+    const fillRect = vi.fn();
     const toBlob = vi.fn((cb: BlobCallback) => {
       cb(new Blob(['png'], { type: 'image/png' }));
     });
@@ -63,7 +89,7 @@ describe('exportMapPng', () => {
       const el = origCreate(tag);
       if (tag === 'canvas') {
         Object.defineProperty(el, 'getContext', {
-          value: () => ({ drawImage }),
+          value: () => ({ drawImage, fillRect }),
         });
         Object.defineProperty(el, 'toBlob', { value: toBlob });
       }
@@ -75,8 +101,12 @@ describe('exportMapPng', () => {
 
     const map = {
       getCanvas: () => mapCanvas,
-      getContainer: () => root,
+      getContainer: () => document.createElement('div'),
       triggerRepaint: vi.fn(),
+      once: (_ev: string, cb: () => void) => {
+        cb();
+        return map;
+      },
     };
     const overlay = {
       getCanvas: () => deckCanvas,
@@ -92,5 +122,6 @@ describe('exportMapPng', () => {
     expect(drawImage).toHaveBeenCalled();
     expect(click).toHaveBeenCalled();
     expect(overlay.setProps).toHaveBeenCalled();
+    expect(map.triggerRepaint).toHaveBeenCalled();
   });
 });
