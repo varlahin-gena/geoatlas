@@ -111,7 +111,7 @@ function AnomalyRowActions({
   canPeers,
   acking,
   onTogglePeers,
-  onHide,
+  onClose,
 }: {
   item: AnomalyEvent;
   acked: boolean;
@@ -119,9 +119,8 @@ function AnomalyRowActions({
   canPeers: boolean;
   acking: boolean;
   onTogglePeers: () => void;
-  onHide: () => void;
+  onClose: () => void;
 }) {
-  const hasMore = canPeers || !acked;
   return (
     <div className="anomaly-row-actions">
       {item.fingerprint ? (
@@ -138,41 +137,33 @@ function AnomalyRowActions({
       >
         На карте
       </Link>
-      {hasMore ? (
+      {!acked ? (
+        <button
+          type="button"
+          className="btn sm"
+          disabled={acking}
+          title="Закрыть алерт (acknowledge)"
+          onClick={onClose}
+        >
+          Закрыть
+        </button>
+      ) : null}
+      {canPeers ? (
         <details className="anomaly-more">
           <summary className="btn sm ghost">Ещё</summary>
           <div className="anomaly-more-menu" role="menu">
-            {canPeers ? (
-              <button
-                type="button"
-                role="menuitem"
-                className="anomaly-more-item"
-                aria-expanded={expanded}
-                onClick={(e) => {
-                  closeAnomalyMore(e.currentTarget);
-                  onTogglePeers();
-                }}
-              >
-                {expanded ? 'Скрыть связи' : 'Связи'}
-              </button>
-            ) : null}
-            {!acked ? (
-              <>
-                {canPeers ? <div className="anomaly-more-sep" role="separator" /> : null}
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="anomaly-more-item"
-                  disabled={acking}
-                  onClick={(e) => {
-                    closeAnomalyMore(e.currentTarget);
-                    onHide();
-                  }}
-                >
-                  Скрыть на 24 ч
-                </button>
-              </>
-            ) : null}
+            <button
+              type="button"
+              role="menuitem"
+              className="anomaly-more-item"
+              aria-expanded={expanded}
+              onClick={(e) => {
+                closeAnomalyMore(e.currentTarget);
+                onTogglePeers();
+              }}
+            >
+              {expanded ? 'Скрыть связи' : 'Связи'}
+            </button>
           </div>
         </details>
       ) : null}
@@ -342,7 +333,7 @@ export default function AnomaliesPage() {
     setSeverity((cur) => (cur === next ? '' : next));
   }
 
-  async function hideAlert(item: AnomalyEvent) {
+  async function closeAlert(item: AnomalyEvent) {
     const fp = item.fingerprint;
     if (!fp || acking) return;
     setAcking(fp);
@@ -375,12 +366,12 @@ export default function AnomaliesPage() {
       });
       toast(
         closer
-          ? `Алерт скрыт на 24 ч (${personLabel(closer) || closer})`
-          : 'Алерт скрыт на 24 ч',
+          ? `Алерт закрыт (${personLabel(closer) || closer})`
+          : 'Алерт закрыт',
         'success',
       );
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Не удалось скрыть алерт', 'error');
+      toast(e instanceof Error ? e.message : 'Не удалось закрыть алерт', 'error');
     } finally {
       setAcking(null);
     }
@@ -521,7 +512,7 @@ export default function AnomaliesPage() {
                 checked={includeAcked}
                 onChange={(e) => setIncludeAcked(e.target.checked)}
               />
-              <span>Со скрытыми</span>
+              <span>С закрытыми</span>
             </label>
           </div>
           <div className="anomaly-toolbar-actions">
@@ -689,7 +680,7 @@ export default function AnomaliesPage() {
                           <span
                             title={
                               item.ack_by
-                                ? `Скрыл: ${personLabel(item.ack_by) || item.ack_by}`
+                                ? `Закрыл: ${personLabel(item.ack_by) || item.ack_by}`
                                 : undefined
                             }
                           >
@@ -719,8 +710,8 @@ export default function AnomaliesPage() {
                       <td>
                         {acked
                           ? item.ack_by
-                            ? `Скрыт (${personLabel(item.ack_by) || item.ack_by})`
-                            : 'Скрыт'
+                            ? `Закрыт (${personLabel(item.ack_by) || item.ack_by})`
+                            : 'Закрыт'
                           : 'Открыт'}
                       </td>
                       <td className="actions">
@@ -735,7 +726,7 @@ export default function AnomaliesPage() {
                               cur === item.fingerprint ? null : item.fingerprint || null,
                             )
                           }
-                          onHide={() => void hideAlert(item)}
+                          onClose={() => void closeAlert(item)}
                         />
                       </td>
                     </tr>

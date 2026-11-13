@@ -232,7 +232,12 @@ export function formatAnomalyWindow(
 
 /** Human scope line for peers panel (API path stays in title attribute). */
 export function anomalyPeersScopeLabel(item: AnomalyEvent, hours: number): string {
-  const parts = [`Связи за ${hours} ч`];
+  const startMs = Date.parse(item.window_start || '');
+  const endMs = Date.parse(item.window_end || item.detected_at || '');
+  const parts =
+    Number.isFinite(startMs) && Number.isFinite(endMs) && endMs >= startMs
+      ? ['Связи за окно алерта']
+      : [`Связи за ${hours} ч`];
   const q = anomalyEventsQuery(item).trim();
   if (!q) return parts[0];
   for (const token of q.split(/\s+/).filter(Boolean)) {
@@ -306,6 +311,24 @@ export function anomalyEventsHours(item: AnomalyEvent): number {
     if (Number.isFinite(n) && n > 0) return Math.max(1, Math.ceil(n / 60));
   }
   return 1;
+}
+
+const PEERS_WINDOW_PAD_MS = 5 * 60_000;
+
+/**
+ * Prefer absolute anomaly window for peers so the panel still works when the
+ * alert is older than map.period (15m → relative 1h from "now" goes empty).
+ * Falls back to hours=N when window_* is missing.
+ */
+export function anomalyPeersPeriodQuery(item: AnomalyEvent): string {
+  const startMs = Date.parse(item.window_start || '');
+  const endMs = Date.parse(item.window_end || item.detected_at || '');
+  if (Number.isFinite(startMs) && Number.isFinite(endMs) && endMs >= startMs) {
+    const from = new Date(startMs - PEERS_WINDOW_PAD_MS).toISOString();
+    const to = new Date(endMs + PEERS_WINDOW_PAD_MS).toISOString();
+    return `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+  }
+  return `hours=${anomalyEventsHours(item)}`;
 }
 
 export function anomalyEventsQuery(item: AnomalyEvent): string {

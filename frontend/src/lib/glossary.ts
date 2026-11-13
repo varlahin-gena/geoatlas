@@ -20,7 +20,8 @@ export const COPY = {
   huntDeleteConfirm: 'Удалить охоту?',
   huntsLoading: 'Загрузка охот…',
   peersHead: 'Пиры источника',
-  peersEmpty: 'Нет связей за выбранное окно (часто для private IP без гео).',
+  peersEmpty:
+    'Нет связей за окно алерта: /api/events (карта) отбрасывает рёбра без гео у src или dst — часто у private/enterprise IP без координат в GeoIP.',
   peersLoading: 'Загрузка пиров…',
   loginLocal: 'Локальный вход',
 } as const;
