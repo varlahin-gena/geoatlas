@@ -31,6 +31,7 @@ import './maplibreSetup';
 import type { ViewState } from './mapTypes';
 import { useGlobeAutoRotate } from './useGlobeAutoRotate';
 import { localizeMapLibreControls } from './mapControlI18n';
+import { exportMapPng as exportMapPngComposite } from './exportMapPng';
 
 type ToastFn = (msg: string, kind?: ToastKind) => void;
 
@@ -243,6 +244,10 @@ export function useMapLibreController(opts: {
       const overlay = new MapboxOverlay({
         interleaved: false,
         layers: [],
+        // Keep overlay pixels readable for PNG export (MapLibre already uses preserveDrawingBuffer).
+        deviceProps: {
+          webgl: { preserveDrawingBuffer: true },
+        },
       });
       map.addControl(overlay as unknown as maplibregl.IControl);
       overlayRef.current = overlay;
@@ -416,16 +421,25 @@ export function useMapLibreController(opts: {
     setLayersTick((tick) => tick + 1);
   }
 
-  function exportPng() {
-    const canvas = mapContainer.current?.querySelector('canvas');
-    if (!canvas) {
+  async function exportPng() {
+    const result = await exportMapPngComposite({
+      map: mapRef.current,
+      overlay: overlayRef.current,
+      filename: `geoatlas-${Date.now()}.png`,
+    });
+    if (result === 'ok') {
+      toast('PNG сохранён', 'success');
+      return;
+    }
+    if (result === 'not-ready') {
       toast('Карта ещё не готова', 'warn');
       return;
     }
-    const a = document.createElement('a');
-    a.href = (canvas as HTMLCanvasElement).toDataURL('image/png');
-    a.download = `geoatlas-${Date.now()}.png`;
-    a.click();
+    if (result === 'tainted') {
+      toast('Не удалось экспортировать: canvas недоступен (CORS подложки)', 'error');
+      return;
+    }
+    toast('Не удалось экспортировать PNG', 'error');
   }
 
   return {

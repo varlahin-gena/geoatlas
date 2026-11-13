@@ -5,21 +5,22 @@
 
 .DESCRIPTION
   IPs only from your GeoIP ranges (10.x + 1.0/1.1).
-  By default injects three anomaly patterns (medium+ profile safe margins):
+  By default injects demo anomaly patterns (safe margins for small/medium):
     - port_scan:       public 1.x src -> many dst_ports (touches 10.x)
-    - horizontal_scan: public 1.x src -> many hosts in one 10.x/24
     - lateral_fanout:  10.x src -> many other 10.x hosts (needs enterprise nets)
-  Then optional background noise (-DurationSec / -Lines).
+  Optional: horizontal_scan via -Recipes. Then optional background noise
+  (-DurationSec / -Lines) unless -AnomalyOnly.
   Scanner runs every ~5 min. Mark 10.x as enterprise nets; open /anomalies.
 
 .EXAMPLE
-  .\emulate-map-load.ps1
+  # Presentation demo (anomaly burst only)
+  .\emulate-map-load.ps1 -AnomalyOnly
 
 .EXAMPLE
   .\emulate-map-load.ps1 -Eps 80 -DurationSec 60
 
 .EXAMPLE
-  .\emulate-map-load.ps1 -AnomalyOnly
+  .\emulate-map-load.ps1 -AnomalyOnly -Recipes port_scan,horizontal_scan,lateral_fanout
 #>
 param(
   [string]$HostAddress = '138.16.225.160',
@@ -28,6 +29,8 @@ param(
   [int]$DurationSec = 30,
   [int]$Lines = 0,
   [int]$Batch = 50,
+  # Comma-separated: port_scan, horizontal_scan, lateral_fanout
+  [string]$Recipes = 'port_scan,lateral_fanout',
   [switch]$AnomalyOnly,
   [switch]$NoAnomaly,
   [switch]$DryRun
@@ -135,10 +138,26 @@ function New-NoiseLine {
     (Get-Random -Maximum 3)
 }
 
-# --- Anomaly recipes (above medium thresholds; OK for large too) ---
-# port_scan:      >=50 ports, >=100 events / 5m; PUBLIC src (1.x); dst touches enterprise 10.x
-# horizontal:     >=40 hosts in one /24, >=80 events; PUBLIC src
-# lateral_fanout: >=25 enterprise hosts, >=50 events; src AND dst in enterprise (10.x)
+# --- Anomaly recipes (margins vs thresholds.go) ---
+# small:  port_scan 40p/80e; horizontal 30h/60e; lateral 20h/40e
+# medium: port_scan 50p/100e; horizontal 40h/80e; lateral 25h/50e
+# Demo volumes below clear small+medium; PUBLIC src for scans (include_private=false).
+
+function Resolve-RecipeSet([string]$raw) {
+  $allowed = @('port_scan', 'horizontal_scan', 'lateral_fanout')
+  $parts = @($raw -split ',' | ForEach-Object { $_.Trim().ToLowerInvariant() } | Where-Object { $_ })
+  if ($parts.Count -eq 0) { throw 'Recipes is empty; use port_scan,horizontal_scan,lateral_fanout' }
+  $set = New-Object 'System.Collections.Generic.HashSet[string]'
+  foreach ($p in $parts) {
+    if ($allowed -notcontains $p) {
+      throw ("Unknown recipe '{0}'. Allowed: {1}" -f $p, ($allowed -join ', '))
+    }
+    [void]$set.Add($p)
+  }
+  return $set
+}
+
+$RecipeSet = Resolve-RecipeSet $Recipes
 
 function Get-AnomalyLines {
   $lines = New-Object System.Collections.Generic.List[string]
@@ -148,56 +167,87 @@ function Get-AnomalyLines {
   $attackerHoriz = '1.1.8.20'
   $victimPort = '10.0.10.10'          # enterprise target for port scan
   $horizBase = 10,0,1                 # scan 10.0.1.0/24
-  $lateralSrc = '10.68.1.10'          # east-west source inside 10.68.0.0/16
+  # Must sit inside enterprise_nets (detector filters src AND dst). Prefer gray 10.0/16.
+  $lateralSrc = '10.0.68.10'
 
-  Write-Host 'anomaly recipe: port_scan (1.0.1.50 -> 10.0.10.10, 80 ports x 2 = 160 events)'
-  foreach ($port in 1..80) {
-    1..2 | ForEach-Object {
-      $lines.Add((New-CefLine $attackerPort $victimPort (10000 + $port) $port 'deny' 'TCP' 0))
+  if ($RecipeSet.Contains('port_scan')) {
+    Write-Host 'anomaly recipe: port_scan (1.0.1.50 -> 10.0.10.10, 100 ports x 2 = 200 events)'
+    foreach ($port in 1..100) {
+      1..2 | ForEach-Object {
+        $lines.Add((New-CefLine $attackerPort $victimPort (10000 + $port) $port 'deny' 'TCP' 0))
+      }
     }
   }
 
-  Write-Host 'anomaly recipe: horizontal_scan (1.1.8.20 -> 10.0.1.1..60, 120 events)'
-  foreach ($hostOctet in 1..60) {
-    $dst = '{0}.{1}.{2}.{3}' -f $horizBase[0], $horizBase[1], $horizBase[2], $hostOctet
-    1..2 | ForEach-Object {
-      $lines.Add((New-CefLine $attackerHoriz $dst (20000 + $hostOctet) 445 'deny' 'TCP' 2))
+  if ($RecipeSet.Contains('horizontal_scan')) {
+    Write-Host 'anomaly recipe: horizontal_scan (1.1.8.20 -> 10.0.1.1..60, 120 events)'
+    foreach ($hostOctet in 1..60) {
+      $dst = '{0}.{1}.{2}.{3}' -f $horizBase[0], $horizBase[1], $horizBase[2], $hostOctet
+      1..2 | ForEach-Object {
+        $lines.Add((New-CefLine $attackerHoriz $dst (20000 + $hostOctet) 445 'deny' 'TCP' 2))
+      }
     }
   }
 
-  Write-Host 'anomaly recipe: lateral_fanout (10.68.1.10 -> 60 x 10.x hosts, 120 events)'
-  $latTargets = @(
-    '10.0.2.11','10.0.3.12','10.1.4.13','10.1.5.14','10.2.6.15','10.2.7.16','10.3.8.17','10.3.9.18',
-    '10.25.10.19','10.25.11.20','10.27.12.21','10.27.13.22','10.28.14.23','10.28.15.24','10.30.16.25','10.30.17.26',
-    '10.32.18.27','10.32.19.28','10.69.20.29','10.69.21.30','10.70.22.31','10.70.23.32','10.71.24.33','10.71.25.34',
-    '10.72.26.35','10.72.27.36','10.73.28.37','10.73.29.38','10.74.30.39','10.74.31.40','10.75.32.41','10.75.33.42',
-    '10.76.34.43','10.76.35.44','10.78.36.45','10.78.37.46','10.79.38.47','10.79.39.48','10.81.40.49','10.81.41.50',
-    '10.82.42.51','10.82.43.52','10.84.44.53','10.84.45.54','10.86.46.55','10.86.47.56','10.87.48.57','10.87.49.58',
-    '10.88.50.59','10.88.51.60','10.91.52.61','10.91.53.62','10.92.54.63','10.92.55.64','10.93.56.65','10.93.57.66',
-    '10.95.58.67','10.95.59.68','10.97.60.69','10.97.61.70'
-  )
-  foreach ($dst in $latTargets) {
-    1..2 | ForEach-Object {
-      $lines.Add((New-CefLine $lateralSrc $dst (30000 + (Get-Random -Maximum 20000)) 445 'accept' 'TCP' 0))
+  if ($RecipeSet.Contains('lateral_fanout')) {
+    # Detector requires BOTH src and dst in enterprise_nets. Stick to the usual gray
+    # enterprise ranges (same as load-test): 10.0 / 10.25 / 10.27 / 10.28 / 10.30.
+    # 40 unique hosts x 3 = 120 events (clears small 20/40 and medium 25/50).
+    $latTargets = @(
+      '10.0.2.11','10.0.3.12','10.0.4.13','10.0.5.14','10.0.6.15','10.0.7.16','10.0.8.17','10.0.9.18',
+      '10.0.10.19','10.0.11.20','10.0.12.21','10.0.13.22','10.0.14.23','10.0.15.24','10.0.16.25','10.0.17.26',
+      '10.25.10.19','10.25.11.20','10.25.12.21','10.25.13.22','10.25.14.23','10.25.15.24','10.25.16.25','10.25.17.26',
+      '10.27.12.21','10.27.13.22','10.27.14.23','10.27.15.24','10.28.14.23','10.28.15.24','10.28.16.25','10.28.17.26',
+      '10.30.16.25','10.30.17.26','10.30.18.27','10.30.19.28','10.30.20.29','10.30.21.30','10.30.22.31','10.30.23.32'
+    )
+    Write-Host ("anomaly recipe: lateral_fanout ({0} -> {1} gray enterprise hosts x 3 = {2} events)" -f `
+      $lateralSrc, $latTargets.Count, ($latTargets.Count * 3))
+    foreach ($dst in $latTargets) {
+      1..3 | ForEach-Object {
+        $lines.Add((New-CefLine $lateralSrc $dst (30000 + (Get-Random -Maximum 20000)) 445 'accept' 'TCP' 0))
+      }
     }
   }
 
   return $lines
 }
 
+function Write-AnomalyChecklist {
+  $selected = @($RecipeSet | Sort-Object)
+  Write-Host 'Anomaly checklist:'
+  Write-Host '  1) Enterprise nets must cover gray ranges used by lateral: 10.0/16, 10.25/16, 10.27/16, 10.28/16, 10.30/16'
+  Write-Host '  2) Wait for scanner (~5 min, ANOMALY_SCAN_INTERVAL); lateral window is 15 min'
+  Write-Host ("  3) Open /anomalies — expect: {0}" -f ($selected -join ', '))
+  Write-Host '  4) Use «Разбор» / map deep-link on each alert'
+  Write-Host '  5) If port_scan missing: confirm 1.x src is public (include_private=false is OK)'
+  Write-Host '  6) If lateral missing: src+dst must both be inside enterprise_nets (not only dst)'
+  Write-Host '  7) If peers empty in «Разбор»: GeoIP must have coords for BOTH src and dst (10.x often missing)'
+  Write-Host '  8) Re-run same day: ANOMALY_SUPPRESS_HOURS=24 — use -Recipes lateral_fanout only, or change src IP'
+  $bits = @()
+  if ($RecipeSet.Contains('port_scan')) { $bits += 'port_scan src=1.0.1.50 dst=10.0.10.10' }
+  if ($RecipeSet.Contains('horizontal_scan')) { $bits += 'horizontal src=1.1.8.20 net=10.0.1.0/24' }
+  if ($RecipeSet.Contains('lateral_fanout')) { $bits += 'lateral src=10.0.68.10 (gray 10.0/16)' }
+  Write-Host ("  Actors: {0}" -f ($bits -join '; '))
+}
+
 if ($DryRun) {
-  Write-Host ("== dry-run: {0} ranges (public={1}, private10={2}) ==" -f $Ranges.Count, $PublicRanges.Count, $PrivateRanges.Count)
-  $anom = Get-AnomalyLines
-  Write-Host ("anomaly lines: {0}" -f $anom.Count)
-  $anom | Select-Object -First 3
+  Write-Host ("== dry-run: {0} ranges (public={1}, private10={2}) recipes={3} ==" -f `
+    $Ranges.Count, $PublicRanges.Count, $PrivateRanges.Count, (($RecipeSet | Sort-Object) -join ','))
+  if (-not $NoAnomaly) {
+    $anom = Get-AnomalyLines
+    Write-Host ("anomaly lines: {0}" -f $anom.Count)
+    $anom | Select-Object -First 3
+  }
   Write-Host '--- noise sample ---'
   1..3 | ForEach-Object { New-NoiseLine }
+  Write-Host ''
+  Write-AnomalyChecklist
   exit 0
 }
 
 $target = '{0}:{1}' -f $HostAddress, $Port
-Write-Host ("== emulate-map-load TCP syslog: {0} eps={1} duration={2}s lines={3} anomaly={4} ==" -f `
-  $target, $Eps, $DurationSec, $Lines, (-not $NoAnomaly))
+Write-Host ("== emulate-map-load TCP syslog: {0} eps={1} duration={2}s lines={3} anomaly={4} recipes={5} ==" -f `
+  $target, $Eps, $DurationSec, $Lines, (-not $NoAnomaly), (($RecipeSet | Sort-Object) -join ','))
 
 $client = New-Object System.Net.Sockets.TcpClient
 try { $client.Connect($HostAddress, $Port) }
@@ -258,9 +308,4 @@ try {
 
 Write-Host ("OK: sent ~{0} lines to {1} (unique noise pairs={2})." -f $script:sent, $target, $script:uniquePairs.Count)
 Write-Host ''
-Write-Host 'Anomaly checklist:'
-Write-Host '  1) Mark 10.x subnets as enterprise nets (UI / geo)'
-Write-Host '  2) Wait for scanner (~5 min, ANOMALY_SCAN_INTERVAL)'
-Write-Host '  3) Open /anomalies — expect port_scan, horizontal_scan, lateral_fanout'
-Write-Host '  4) If scans missing: enable include_private OR confirm 1.x src is not filtered'
-Write-Host '  Attackers: 1.0.1.50 (port), 1.1.8.20 (horizontal); lateral src: 10.68.1.10'
+Write-AnomalyChecklist

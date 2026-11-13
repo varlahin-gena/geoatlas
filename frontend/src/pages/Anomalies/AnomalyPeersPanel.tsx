@@ -7,6 +7,7 @@ import { COPY, TERM } from '@/lib/glossary';
 import {
   anomalyEventsHours,
   anomalyEventsQuery,
+  anomalyPeersPeriodQuery,
   anomalyPeersScopeLabel,
 } from './anomalyDisplay';
 
@@ -21,6 +22,7 @@ export function AnomalyPeersPanel({
 }) {
   const q = anomalyEventsQuery(item);
   const hours = anomalyEventsHours(item);
+  const periodQuery = anomalyPeersPeriodQuery(item);
   const [lines, setLines] = useState<MapLine[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -42,7 +44,7 @@ export function AnomalyPeersPanel({
       limit: 100,
       filter: item.map?.filter && item.map.filter !== 'all' ? item.map.filter : undefined,
       q,
-      periodQuery: `hours=${hours}`,
+      periodQuery,
       source: 'live',
       signal: ac.signal,
     })
@@ -64,7 +66,7 @@ export function AnomalyPeersPanel({
         if (!ac.signal.aborted) setLoading(false);
       });
     return () => ac.abort();
-  }, [q, hours, item.map?.filter, item.fingerprint]);
+  }, [q, periodQuery, item.map?.filter, item.fingerprint]);
 
   if (!q) return null;
 
@@ -72,7 +74,7 @@ export function AnomalyPeersPanel({
     <div className="anomaly-peers-panel">
       <div className="anomaly-peers-head">
         <strong title={TERM.peerHint}>{COPY.peersHead}</strong>
-        <span className="hint" title={`/api/events · ${hours}ч · q=${q}`}>
+        <span className="hint" title={`/api/events · ${periodQuery} · q=${q}`}>
           {anomalyPeersScopeLabel(item, hours)}
         </span>
         {toolbar ? <div className="anomaly-peers-toolbar">{toolbar}</div> : null}

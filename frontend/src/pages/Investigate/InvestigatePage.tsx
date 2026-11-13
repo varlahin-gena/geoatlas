@@ -167,7 +167,7 @@ export default function InvestigatePage() {
     }
   }
 
-  async function hideAlert() {
+  async function closeAlert() {
     if (!item?.fingerprint || acking) return;
     setAcking(true);
     try {
@@ -185,12 +185,12 @@ export default function InvestigatePage() {
       );
       toast(
         closer
-          ? `Алерт скрыт на 24 ч (${personLabel(closer) || closer})`
-          : 'Алерт скрыт на 24 ч',
+          ? `Алерт закрыт (${personLabel(closer) || closer})`
+          : 'Алерт закрыт',
         'success',
       );
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Не удалось скрыть алерт', 'error');
+      toast(e instanceof Error ? e.message : 'Не удалось закрыть алерт', 'error');
     } finally {
       setAcking(false);
     }
@@ -326,8 +326,8 @@ export default function InvestigatePage() {
                 <dd>
                   {acked
                     ? item.ack_by
-                      ? `Скрыт (${personLabel(item.ack_by) || item.ack_by})`
-                      : 'Скрыт'
+                      ? `Закрыт (${personLabel(item.ack_by) || item.ack_by})`
+                      : 'Закрыт'
                     : 'Открыт'}
                 </dd>
               </div>
@@ -370,11 +370,12 @@ export default function InvestigatePage() {
               {!acked ? (
                 <button
                   type="button"
-                  className="btn ghost"
+                  className="btn"
                   disabled={acking}
-                  onClick={() => void hideAlert()}
+                  title="Закрыть алерт (acknowledge)"
+                  onClick={() => void closeAlert()}
                 >
-                  Скрыть на 24 ч
+                  Закрыть
                 </button>
               ) : null}
               <details className="anomaly-more investigate-more">

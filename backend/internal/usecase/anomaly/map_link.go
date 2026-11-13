@@ -11,7 +11,8 @@ func MapLinkFor(e Event) MapLink {
 	switch e.Code {
 	case CodePortScan, CodeHorizontalScan, CodeLateralFanout:
 		if src := strings.TrimSpace(e.SrcIP); src != "" {
-			period := "15m"
+			// Wider than detect window so investigate peers / map deep-link still resolve later.
+			period := "2h"
 			if e.Code == CodeLateralFanout {
 				period = "1h"
 			}

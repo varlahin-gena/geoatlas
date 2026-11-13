@@ -6,6 +6,7 @@ import {
   anomalyEventsHours,
   anomalyEventsQuery,
   anomalyMapHref,
+  anomalyPeersPeriodQuery,
   anomalyPeersScopeLabel,
   compareAnomalies,
   formatAnomalyDescription,
@@ -155,5 +156,27 @@ describe('anomalyDisplay', () => {
     expect(anomalyPeersScopeLabel({ src_ip: '10.0.0.1' } as AnomalyEvent, 2)).toBe(
       'Связи за 2 ч · источник 10.0.0.1',
     );
+    expect(
+      anomalyPeersScopeLabel(
+        {
+          window_start: '2026-11-13T03:29:00.000Z',
+          window_end: '2026-11-13T03:34:00.000Z',
+          map: { q: 'src:1.0.1.50' },
+        } as AnomalyEvent,
+        1,
+      ),
+    ).toBe('Связи за окно алерта · источник 1.0.1.50');
+  });
+
+  it('prefers absolute anomaly window for peers period', () => {
+    const q = anomalyPeersPeriodQuery({
+      window_start: '2026-11-13T03:29:00.000Z',
+      window_end: '2026-11-13T03:34:00.000Z',
+      map: { period: '15m' },
+    } as AnomalyEvent);
+    expect(q).toContain('from=');
+    expect(q).toContain('to=');
+    expect(q).not.toContain('hours=');
+    expect(anomalyPeersPeriodQuery(item)).toBe('hours=1');
   });
 });

@@ -4,26 +4,60 @@
 Ядро всегда поднимается: **clickhouse + backend + frontend**.
 `syslog-ng`, `stats-collector` и `dozzle` включаются через compose-профили (`COMPOSE_PROFILES=syslog,stats,dozzle` — по умолчанию при установке / в `.env.example`).
 
+Все long-running сервисы в одной docker-сети **`geoatlas`** (bridge). Снаружи публикуются только:
+
+| Снаружи (хост) | Куда | Зачем |
+|----------------|------|--------|
+| `:80` / `:443` | `frontend` | UI + прокси API |
+| `:514` + `5514–5529` (tcp/udp) | `syslog-ng` | приём логов МСЭ / SIEM |
+
+`backend:8080`, `backend:1514`, `clickhouse:8123/9000`, `dozzle:8080`, `syslog-ng:9577/9578` — **только внутри** сети (`expose`), с хоста напрямую не торчат.
+
 ```
-МСЭ (UserGate, FortiGate, …) или SIEM
-      │ syslog (514 + connector ports)     [профиль syslog]
-      ▼
- ┌───────────┐   TCP :1514 (@@ga/{udp|tcp}/token/id/@@)                    ┌───────────┐
- │ syslog-ng │ ──────────────────────────────────────────────────────────► │ backend   │
- └───────────┘                                                             │ (Go)      │
-                                                                           │ parser +  │
- пользователь ── login / upload-geo ───►                                   │ geoip +   │
-                                                                           │ ingest +  │
-                                                                           │ aggregator│
- ┌────────────────┐                                                        └────┬──────┘
- │ stats-collector│ ──────────────────────────────────────────────────────────► │ ClickHouse
- └────────────────┘   system_metrics   [профиль stats]                          │ (25.8)
-                                                                          ┌─────▼───────┐
- браузер ────────── :80 / :443 ───────► frontend (nginx) ── /api/* ─────► │ traffic_*   │
-                                      auth_request                        │ geo_ranges  │
-                                                                          │ parse_errors│
-                                                                          └─────────────┘
+                    ┌──────────────────────────────────────────────────────────┐
+                    │               docker network: geoatlas                   │
+                    │                                                          │
+ МСЭ / SIEM         │  ┌───────────┐  TCP :1514 + маркер @@ga/…   ┌─────────┐ │
+ :514 / connectors ─┼─►│ syslog-ng │ ────────────────────────────►│ backend │ │
+                    │  └─────┬─────┘  (disk-buffer, best-effort)  │  (Go)   │ │
+                    │        │                                    └────┬────┘ │
+                    │        │ :9577 /stats   :9578 /reload            │      │
+                    │        │◄── scrape ── backend / stats-collector ─┤      │
+                    │        │◄── reload ── backend (коннекторы) ──────┘      │
+                    │                                              native     │
+                    │                                              :9000      │
+                    │  ┌────────────────┐                            ▼        │
+                    │  │stats-collector │ ── INSERT system_metrics ► clickhouse│
+                    │  └───────┬────────┘  + HTTP backend /live               │
+                    │          │             + /api/ingest/stats              │
+                    │          └─────────── + HTTP syslog-ng :9577            │
+                    │                                                          │
+ браузер :80/:443 ──┼─► frontend (nginx) ── /api/* ──► backend:8080           │
+                    │        │ auth_request                                    │
+                    │        └── /dozzle/ ──► dozzle:8080   [профиль dozzle]  │
+                    └──────────────────────────────────────────────────────────┘
 ```
+
+**Важно:** UI **не** ходит в ClickHouse. Чтение: браузер → nginx → backend HTTP API → ClickHouse. Anomaly engine, GeoIP, бэкапы и репутация — фоновые jobs внутри `backend`, не отдельные контейнеры.
+
+### Кто с кем говорит
+
+| От | К | Протокол / порт | Назначение |
+|----|---|-----------------|------------|
+| МСЭ / SIEM | `syslog-ng` | UDP/TCP `:514` (+ connector ports) | сырой syslog |
+| `syslog-ng` | `backend` | TCP `:1514` | форвард с маркером `@@ga/{udp\|tcp}/<token>/<connector_id>/@@` + disk-buffer |
+| `backend` | `clickhouse` | native `:9000` | INSERT событий / SELECT для API и anomaly |
+| `stats-collector` | `clickhouse` | native `:9000` | INSERT `system_metrics` |
+| `stats-collector` | `backend` | HTTP `:8080` | `/live`, `/api/ingest/stats` (Bearer ops/admin) |
+| `stats-collector` | `syslog-ng` | HTTP `:9577` | scrape drops/queue |
+| `backend` | `syslog-ng` | HTTP `:9577` / `:9578` | scrape stats; reload после Apply коннекторов |
+| браузер | `frontend` | HTTP(S) `:80`/`:443` | SPA + API edge |
+| `frontend` | `backend` | HTTP `:8080` | `/api/*`, `auth_request` → `/api/auth/check*` |
+| `frontend` | `dozzle` | HTTP `:8080` | `/dozzle/` (только administrator) |
+| `dozzle` | Docker Engine | `docker.sock` | realtime-логи / actions контейнеров стека |
+| `backend` ↔ `syslog-ng` | том `./syslog-ng.d` | файлы | backend пишет `zz_connectors.conf`, syslog-ng читает |
+
+Одноразовый init-контейнер `volume-perms` (не в таблице сервисов ниже) выравнивает uid **101** на shared-томах и сразу завершается.
 
 ## Сервисы
 
@@ -38,11 +72,11 @@
 
 ## Поток данных
 
-1. **Syslog**: МСЭ отправляет события на `<IP_сервера>:514` (TCP или UDP).
-2. **syslog-ng** принимает сообщения и пересылает их по TCP на `backend:1514` с маркерами транспорта (`@@ga/udp/@@` / `@@ga/tcp/@@`).
-3. **backend** снимает маркеры транспорта, парсит строки, обогащает GeoIP, пишет в ClickHouse; при старте `EnsureBaseSchema` / `Ensure*` создаёт базовые таблицы и агрегаты (`traffic_edges_*`, geo), применяет TTL из `retention.json` и при необходимости делает backfill. **Delivery contract — at-most-once / best-effort:** полная очередь ingest **не блокирует** TCP — лишние строки дропаются (`dropped_total`); при outage ClickHouse insert circuit ставит dequeue на паузу (очередь растёт → admission drops), а потери из processor-буфера учитываются отдельно (`buffer_drops_total`). Перед backend **syslog-ng уже буферизует** (см. ниже). Алерты и live-метрики drops — на `/system`.
-4. **frontend** отдаёт статику и проксирует API-запросы на backend.
-5. **stats-collector** каждые 30 секунд собирает метрики CPU/RAM контейнеров и состояние пайплайна (включая разбивку UDP/TCP).
+1. **Syslog**: МСЭ отправляет события на `<IP_сервера>:514` (TCP или UDP), либо на порт коннектора (`5514–5529` по умолчанию).
+2. **syslog-ng** принимает сообщения, буферизует (disk-buffer) и пересылает по TCP на `backend:1514` с маркером `@@ga/{udp|tcp}/<token>/<connector_id>/@@…` (`INGEST_SHARED_SECRET`).
+3. **backend** снимает маркер (проверка токена + `connector_id`), парсит строки, обогащает GeoIP, пишет в ClickHouse; при старте `EnsureBaseSchema` / `Ensure*` создаёт базовые таблицы и агрегаты (`traffic_edges_*`, geo), применяет TTL из `retention.json` и при необходимости делает backfill. **Delivery contract — at-most-once / best-effort:** полная очередь ingest **не блокирует** TCP — лишние строки дропаются (`dropped_total`); при outage ClickHouse insert circuit ставит dequeue на паузу (очередь растёт → admission drops), а потери из processor-буфера учитываются отдельно (`buffer_drops_total`). Перед backend **syslog-ng уже буферизует**. Алерты и live-метрики drops — на `/system`.
+4. **frontend** отдаёт статику SPA и проксирует `/api/*` на `backend:8080` (с `auth_request`); `/dozzle/` — на контейнер `dozzle`.
+5. **stats-collector** каждые 30 с: cgroup CPU/RAM, HTTP scrape backend (`/live`, `/api/ingest/stats`) и syslog-ng (`:9577`), пишет `system_metrics` в ClickHouse.
 6. **Anomaly engine** (фоновый job в backend): каждые `ANOMALY_SCAN_INTERVAL` сканирует `traffic_logs` в ClickHouse, пишет срабатывания в JSON-store (`/app/data`), отдаёт через `GET /api/anomalies`. Требуются сети предприятия. Типы, пороги UI и learning — [anomalies.md](anomalies.md).
 7. **Edge**: браузер ходит только в nginx (`:80`/`:443`); backend `:8080` за proxy gate (`GA_REQUIRE_PROXY`) не принимает прямые запросы с хоста (кроме loopback / Bearer). Rate limit и JSON-hardening — [configuration.md](configuration.md#api-threat-protection-edge).
 

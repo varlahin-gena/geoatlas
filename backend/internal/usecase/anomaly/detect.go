@@ -39,7 +39,8 @@ func (s *Service) detectPortScan(ctx context.Context, now time.Time, th Threshol
 			},
 			SrcIP: src, SrcCountry: h.SrcCountry, EventCount: h.Events,
 			Fingerprint: fingerprint(CodePortScan, src, "", "", now),
-			Map:         MapLink{Period: "15m", Group: "ip", Filter: "all", Query: "src:" + src},
+			// 2h so investigate/map peers still resolve after the 5m detect window ages.
+			Map: MapLink{Period: "2h", Group: "ip", Filter: "all", Query: "src:" + src},
 		}
 		out = append(out, e)
 	}
@@ -75,7 +76,7 @@ func (s *Service) detectHorizontalScan(ctx context.Context, now time.Time, th Th
 			},
 			SrcIP: src, EventCount: h.Events,
 			Fingerprint: fingerprint(CodeHorizontalScan, src, "", h.Net24, now),
-			Map:         MapLink{Period: "15m", Group: "ip", Filter: "all", Query: "src:" + src},
+			Map:         MapLink{Period: "2h", Group: "ip", Filter: "all", Query: "src:" + src},
 		}
 		out = append(out, e)
 	}
