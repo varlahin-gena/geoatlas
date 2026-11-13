@@ -6,6 +6,30 @@
 ## [Unreleased]
 
 
+## [2.7.1] — 2026-11-13
+
+Патч: демо аномалий на боевой, пиры в разборе по окну алерта, кнопка «Закрыть».
+
+### Added
+- **Демо аномалий**: `scripts/emulate-map-load.ps1` — `-Recipes` (default `port_scan,lateral_fanout`), `-AnomalyOnly`; seed-скрипты карты (`seed-demo-map.*`).
+- **Карта**: экспорт PNG (MapLibre + deck.gl).
+- **docs/presentations**: материалы meetup + скрипт сборки pptx.
+
+### Changed
+- **Аномалии**: видимая кнопка **«Закрыть»** (ack) на `/anomalies` и `/investigate`; статус «Закрыт» / фильтр «С закрытыми».
+- **Разбор**: пиры запрашиваются по абсолютному окну алерта (`from`/`to`), а не «последний 1 ч от сейчас».
+- **Архитектура**: обновлена схема docker-сети и таблица «кто с кем говорит».
+
+### Fixed
+- **lateral_fanout** в демо: src/dst только в gray enterprise nets (`10.0` / `10.25` / `10.27` / `10.28` / `10.30`) — раньше src `10.68.*` часто вне `enterprise_nets`.
+- **Пиры пустые**: scan map period `15m` → `2h`; подсказка про отсутствие гео у src/dst.
+
+### Notes
+- OpenAPI API doc version: **1.21.0**
+- Продуктовая версия: **2.7.1**
+- Схема ClickHouse: без изменений Ensure*.
+- Достаточно `update.sh` 2.7.1 (recreate **backend** + **frontend**).
+
 ## [2.7.0] — 2026-11-12
 
 Минор: стабильный пакет после train 2.6.1–2.6.15 — multi-port syslog connectors, dismiss system alerts, HIG admin UI, Pipeline/syslog metrics.
@@ -157,8 +181,10 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.7.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.1
 [2.7.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.0
 [2.6.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.0
+
 [2.5.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.5.0
 [2.0.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.0.0
 [1.0.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v1.0.0
