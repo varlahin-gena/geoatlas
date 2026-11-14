@@ -153,7 +153,7 @@ def build():
     set_run(p.add_run(), "Meetup для будущих пользователей  ·  до 20 минут + вопросы", size=16, color=MUTED)
     p2 = tf.add_paragraph()
     p2.space_before = Pt(8)
-    set_run(p2.add_run(), "v2.7.0  ·  Apache 2.0  ·  open source", size=15, color=TEAL)
+    set_run(p2.add_run(), "v2.7.2  ·  Apache 2.0  ·  open source", size=15, color=TEAL)
 
     # 2 Agenda
     s = new_slide()
