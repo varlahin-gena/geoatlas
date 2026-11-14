@@ -15,14 +15,14 @@ export type AnomalyDescriptionParts = {
 export const ANOMALY_CODE_OPTIONS = [
   { value: '', label: 'Все типы' },
   { value: 'port_scan', label: 'Сканирование портов' },
-  { value: 'horizontal_scan', label: 'Сканирование подсети' },
-  { value: 'blocked_surge', label: 'Всплеск блокировок' },
-  { value: 'byte_surge', label: 'Всплеск объёма' },
-  { value: 'beaconing', label: 'Периодическая связь' },
-  { value: 'lateral_fanout', label: 'Веер по сети предприятия' },
-  { value: 'new_country_dst', label: 'Новая страна назначения' },
-  { value: 'rep_new_peer', label: 'Репутационная связь' },
-  { value: 'hunt_threshold', label: 'Порог saved hunt' },
+  { value: 'horizontal_scan', label: 'Обход подсети' },
+  { value: 'blocked_surge', label: 'Резкий рост блокировок' },
+  { value: 'byte_surge', label: 'Резкий рост трафика' },
+  { value: 'beaconing', label: 'Регулярные короткие сессии' },
+  { value: 'lateral_fanout', label: 'Обход внутренней сети' },
+  { value: 'new_country_dst', label: 'Новая страна' },
+  { value: 'rep_new_peer', label: 'Контакт с отмеченным адресом' },
+  { value: 'hunt_threshold', label: 'Сработал сохранённый поиск' },
 ] as const;
 
 export const ANOMALY_SINCE_OPTIONS = [
@@ -52,21 +52,21 @@ export function anomalyCodeLabel(code?: string): string {
     case 'port_scan':
       return 'Сканирование портов';
     case 'horizontal_scan':
-      return 'Сканирование подсети';
+      return 'Обход подсети';
     case 'blocked_surge':
-      return 'Всплеск блокировок';
+      return 'Резкий рост блокировок';
     case 'byte_surge':
-      return 'Всплеск объёма';
+      return 'Резкий рост трафика';
     case 'beaconing':
-      return 'Периодическая связь';
+      return 'Регулярные короткие сессии';
     case 'lateral_fanout':
-      return 'Веер по сети предприятия';
+      return 'Обход внутренней сети';
     case 'new_country_dst':
-      return 'Новая страна назначения';
+      return 'Новая страна';
     case 'rep_new_peer':
-      return 'Репутационная связь';
+      return 'Контакт с отмеченным адресом';
     case 'hunt_threshold':
-      return 'Порог saved hunt';
+      return 'Сработал сохранённый поиск';
     default:
       return code || '';
   }
@@ -79,11 +79,11 @@ export function eventCodeLabel(item: AnomalyEvent): string {
 export function severityLabel(severity?: string): string {
   switch (severity) {
     case 'high':
-      return 'Критично';
+      return 'Важно';
     case 'warn':
-      return 'Предупреждение';
+      return 'Внимание';
     case 'info':
-      return 'Информация';
+      return 'Справка';
     default:
       return severity || '—';
   }

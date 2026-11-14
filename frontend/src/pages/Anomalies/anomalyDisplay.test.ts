@@ -41,8 +41,12 @@ describe('anomalyDisplay', () => {
   });
 
   it('maps detector codes to Russian labels', () => {
-    expect(anomalyCodeLabel('horizontal_scan')).toBe('Сканирование подсети');
+    expect(anomalyCodeLabel('horizontal_scan')).toBe('Обход подсети');
     expect(anomalyCodeLabel('port_scan')).toBe('Сканирование портов');
+    expect(anomalyCodeLabel('lateral_fanout')).toBe('Обход внутренней сети');
+    expect(anomalyCodeLabel('beaconing')).toBe('Регулярные короткие сессии');
+    expect(anomalyCodeLabel('rep_new_peer')).toBe('Контакт с отмеченным адресом');
+    expect(anomalyCodeLabel('hunt_threshold')).toBe('Сработал сохранённый поиск');
     expect(anomalyCodeLabel('unknown_code')).toBe('unknown_code');
   });
 
@@ -87,8 +91,8 @@ describe('anomalyDisplay', () => {
   it('formats blocked surge description from detail', () => {
     const surge = {
       code: 'blocked_surge',
-      code_label: 'Всплеск блокировок',
-      title: 'Всплеск блокировок: 10.0.0.0/8 (Новосибирск) (680861 за 15 мин, было 103447)',
+      code_label: 'Резкий рост блокировок',
+      title: 'Резкий рост блокировок · 10.0.0.0/8 (Новосибирск) · 680861 за 15 мин, было 103447',
       detail: {
         network: '10.0.0.0/8',
         label: 'Новосибирск',

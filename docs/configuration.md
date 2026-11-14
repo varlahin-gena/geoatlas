@@ -106,13 +106,13 @@ Onboarding МСЭ: [syslog.md](syslog.md). Лимиты ёмкости: [арх�
 | `REPUTATION_FETCH_ENABLED` | `true` | Полный выключатель модуля |
 | `REPUTATION_FETCH_INTERVAL` | `6h` | Период опроса URL-фидов (не короче ~1m) |
 | `REPUTATION_FEEDS` / `REPUTATION_FEEDS_FILE` | seed / `/app/data/…` | Список фидов |
-| `ANOMALY_ENABLED` | `true` | Движок аномалий |
+| `ANOMALY_ENABLED` | `true` | Поиск аномалий |
 | `ANOMALY_SCAN_INTERVAL` | `5m` | Фоновый скан |
 | `ANOMALY_INCLUDE_PRIVATE` | `false` | Учитывать RFC1918 и т.п. |
 | `ANOMALY_LEARNING_DAYS` | `3` | Окно обучения |
 | `ANOMALY_SUPPRESS_HOURS` | `24` | Подавление после срабатывания |
 
-Пороги детекторов по умолчанию привязаны к [профилю производительности](operations.md#профили-производительности) (`install-profile.json`). Администратор может переопределить их на странице **Движок аномалий** (`/anomalies/engine`); значения сохраняются в `/app/data/anomaly_settings.json` и применяются без рестарта. См. таблицу в [anomalies.md](anomalies.md#пороги-новых-детекторов-по-профилю).
+Пороги проверок по умолчанию привязаны к [профилю производительности](operations.md#профили-производительности) (`install-profile.json`). Администратор может переопределить их на странице **Настройки аномалий** (`/anomalies/engine`); значения сохраняются в `/app/data/anomaly_settings.json` и применяются без рестарта. См. таблицу в [anomalies.md](anomalies.md#пороги-новых-детекторов-по-профилю).
 
 Подробнее: [reputation.md](reputation.md), [anomalies.md](anomalies.md).
 
