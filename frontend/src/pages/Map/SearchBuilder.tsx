@@ -224,7 +224,7 @@ export function SearchBuilder({
                     <option value="OR">ИЛИ</option>
                   </select>
                 ) : (
-                  <span className="search-builder-join" style={{ visibility: 'hidden', width: 56 }}>
+                  <span className="search-builder-join" aria-hidden="true" style={{ visibility: 'hidden' }}>
                     И
                   </span>
                 )}
@@ -301,6 +301,7 @@ export function SearchBuilder({
                           />
                           <input
                             type="text"
+                            className="search-builder-value"
                             placeholder="Значение"
                             value={child.value}
                             onChange={(e) => {

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ГеоАтлас — нагрузочный ramp</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #000;
+      color: #e8eee9;
+      font-family: "Segoe UI", Calibri, system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 36px 40px 28px;
+    }
+    .frame { width: min(1280px, 100%); }
+    h1 {
+      margin: 0 0 4px;
+      font-size: 22px;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+      color: #f2f5f4;
+    }
+    .sub {
+      margin: 0 0 20px;
+      font-size: 13px;
+      color: #8a9690;
+    }
+    .chart-wrap {
+      position: relative;
+      height: min(560px, 70vh);
+      background: #050505;
+      border: 1px solid #1c1c1c;
+      border-radius: 10px;
+      padding: 16px 12px 8px;
+    }
+    .legend-note {
+      margin-top: 14px;
+      font-size: 12px;
+      color: #7a8580;
+      display: flex;
+      gap: 22px;
+      flex-wrap: wrap;
+    }
+    .legend-note span b { color: #c5cec9; font-weight: 600; }
+    .teal { color: #2dd4a8; }
+    .ink { color: #d1d5db; }
+    .amber { color: #e8b84a; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <h1>Нагрузочный ramp — поток событий</h1>
+    <p class="sub">FindThreshold · 4 коннектора · цель 8k→30k EPS · стабильно до ~26k</p>
+    <div class="chart-wrap">
+      <canvas id="c"></canvas>
+    </div>
+    <div class="legend-note">
+      <span><b class="amber">Целевой EPS</b></span>
+      <span><b class="teal">Клиент</b> / <b class="ink">Сервер (recv)</b> — событий/с</span>
+    </div>
+  </div>
+  <script>
+    const rows = [
+      { t: 8000,  client: 7976.3,  recv: 7650.8 },
+      { t: 10000, client: 9958.2,  recv: 10284.1 },
+      { t: 12000, client: 11899.4, recv: 11923.3 },
+      { t: 14000, client: 13919.1, recv: 13822.3 },
+      { t: 16000, client: 15944.7, recv: 15868.0 },
+      { t: 18000, client: 17946.0, recv: 18031.6 },
+      { t: 20000, client: 19925.6, recv: 19969.5 },
+      { t: 22000, client: 21929.2, recv: 21814.5 },
+      { t: 24000, client: 23888.8, recv: 23830.2 },
+      { t: 26000, client: 25892.6, recv: 25885.0 },
+      { t: 28000, client: 27890.6, recv: 23974.9 },
+      { t: 30000, client: 29893.0, recv: 30560.6 },
+    ];
+    const labels = rows.map((r) => (r.t / 1000) + 'k');
+    const grid = 'rgba(255,255,255,0.06)';
+    const tick = '#8a9690';
+
+    new Chart(document.getElementById('c'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Целевой EPS',
+            data: rows.map((r) => r.t),
+            borderColor: '#e8b84a',
+            backgroundColor: 'transparent',
+            fill: false,
+            tension: 0,
+            pointRadius: 0,
+            borderWidth: 1.8,
+            borderDash: [2, 4],
+          },
+          {
+            label: 'Клиент, EPS',
+            data: rows.map((r) => r.client),
+            borderColor: '#2dd4a8',
+            backgroundColor: 'rgba(45, 212, 168, 0.08)',
+            fill: true,
+            tension: 0.2,
+            pointRadius: 3,
+            pointHoverRadius: 5,
+            borderWidth: 2.4,
+          },
+          {
+            label: 'Сервер (recv), EPS',
+            data: rows.map((r) => r.recv),
+            borderColor: '#e5e7eb',
+            backgroundColor: 'transparent',
+            fill: false,
+            tension: 0.2,
+            pointRadius: 3,
+            borderWidth: 2,
+            borderDash: [5, 4],
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            position: 'top',
+            align: 'end',
+            labels: {
+              color: '#b8c0bb',
+              boxWidth: 12,
+              boxHeight: 12,
+              font: { size: 12 },
+              padding: 16,
+            },
+          },
+          tooltip: {
+            backgroundColor: '#111',
+            titleColor: '#fff',
+            bodyColor: '#d1d5db',
+            borderColor: '#333',
+            borderWidth: 1,
+            callbacks: {
+              label: (ctx) => {
+                const v = ctx.parsed.y;
+                const n = Number.isInteger(v) ? v : Math.round(v * 10) / 10;
+                return `${ctx.dataset.label}: ${n.toLocaleString('ru-RU')}`;
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            title: { display: true, text: 'Целевой EPS', color: tick },
+            grid: { color: grid },
+            ticks: { color: tick },
+            border: { color: '#222' },
+          },
+          y: {
+            title: { display: true, text: 'Событий / с', color: tick },
+            grid: { color: grid },
+            ticks: {
+              color: tick,
+              callback: (v) => v.toLocaleString('ru-RU'),
+            },
+            border: { color: '#222' },
+            min: 0,
+            suggestedMax: 32000,
+          },
+        },
+      },
+    });
+  </script>
+</body>
+</html>

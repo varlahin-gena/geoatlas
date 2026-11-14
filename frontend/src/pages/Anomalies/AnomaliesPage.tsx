@@ -77,12 +77,14 @@ function EpisodesPanel({
   return (
     <section className="card card-compact anomaly-episodes-panel">
       <div className="anomaly-episodes-head">
-        <h3 className="card-title">Эпизоды (корреляция по IP / час)</h3>
+        <h3 className="card-title">Связанные алерты</h3>
         <button type="button" className="btn sm" onClick={() => setOpen(false)}>
           Скрыть
         </button>
       </div>
-      {!episodes.length ? <p className="hint">Нет эпизодов за период.</p> : null}
+      {!episodes.length ? (
+        <p className="hint">За этот период связанных алертов нет.</p>
+      ) : null}
       {episodes.map((ep) => (
         <div key={ep.episode_id || ep.anchor_ip} className="anomaly-episode-row">
           <strong>{ep.anchor_ip || ep.episode_id?.slice(0, 8) || '—'}</strong>
@@ -142,7 +144,7 @@ function AnomalyRowActions({
           type="button"
           className="btn sm"
           disabled={acking}
-          title="Закрыть алерт (acknowledge)"
+          title="Закрыть алерт"
           onClick={onClose}
         >
           Закрыть
@@ -406,14 +408,15 @@ export default function AnomaliesPage() {
         ) : null}
         {scanPaused ? (
           <p className="hint warn-banner">
-            Сканирование приостановлено в{' '}
-            <Link to="/anomalies/engine">настройках движка</Link> — журнал показывает ранее найденные алерты.
+            Поиск аномалий приостановлен в{' '}
+            <Link to="/anomalies/engine">настройках аномалий</Link> — журнал показывает ранее найденные
+            алерты.
           </p>
         ) : null}
         {!moduleOff && !scanPaused && summary?.learning ? (
           <p className="anomaly-learning-note" role="status">
-            Режим обучения — «новая страна» и «периодическая связь» пока не ищутся. Параметры — в{' '}
-            <Link to="/anomalies/engine">движке</Link>.
+            Пока идёт привыкание: проверки «Новая страна» и «Регулярные короткие сессии» отключены.
+            Параметры — в <Link to="/anomalies/engine">настройках аномалий</Link>.
           </p>
         ) : null}
 
@@ -429,7 +432,7 @@ export default function AnomaliesPage() {
               aria-pressed={severity === 'high'}
               onClick={() => toggleSeverityFilter('high')}
             >
-              <span className="anomaly-summary-label">Критично</span>
+              <span className="anomaly-summary-label">Важно</span>
               <strong className="sev-high">{fmtNumber(summary?.high || 0)}</strong>
             </button>
             <button
@@ -438,7 +441,7 @@ export default function AnomaliesPage() {
               aria-pressed={severity === 'warn'}
               onClick={() => toggleSeverityFilter('warn')}
             >
-              <span className="anomaly-summary-label">Предупреждения</span>
+              <span className="anomaly-summary-label">Внимание</span>
               <strong className="sev-warn">{fmtNumber(summary?.warn || 0)}</strong>
             </button>
             <button
@@ -447,7 +450,7 @@ export default function AnomaliesPage() {
               aria-pressed={!severity}
               onClick={() => setSeverity('')}
             >
-              <span className="anomaly-summary-label">Всего открытых</span>
+              <span className="anomaly-summary-label">Открытые</span>
               <strong>{fmtNumber(summary?.total || 0)}</strong>
             </button>
           </div>
@@ -512,7 +515,7 @@ export default function AnomaliesPage() {
                 checked={includeAcked}
                 onChange={(e) => setIncludeAcked(e.target.checked)}
               />
-              <span>С закрытыми</span>
+              <span>Показывать закрытые</span>
             </label>
           </div>
           <div className="anomaly-toolbar-actions">
@@ -552,7 +555,7 @@ export default function AnomaliesPage() {
                 <th scope="col">Описание</th>
                 <th scope="col">Источник</th>
                 <th scope="col">Цель</th>
-                <th scope="col">Исполнитель</th>
+                <th scope="col">Ответственный</th>
                 <th
                   scope="col"
                   aria-sort={
@@ -689,7 +692,7 @@ export default function AnomaliesPage() {
                         ) : (
                           <select
                             className="anomaly-assignee-select"
-                            aria-label="Исполнитель"
+                            aria-label="Ответственный"
                             value={item.assigned_to || ''}
                             disabled={assigning === item.fingerprint}
                             onChange={(e) => {

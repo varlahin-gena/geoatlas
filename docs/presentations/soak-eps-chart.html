@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ГеоАтлас — soak ~10k EPS</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --ink: #14212b;
+      --ink-soft: #3a4a55;
+      --muted: #5c6b75;
+      --teal: #0e7c66;
+      --teal-dark: #0a5c4c;
+      --surface: #f4f8f7;
+      --line: #d5e0dc;
+      --warm: #c45c26;
+      --white: #fff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Calibri, system-ui, sans-serif;
+      color: var(--ink);
+      background: linear-gradient(165deg, #eef5f3 0%, #f7faf9 45%, #ffffff 100%);
+      min-height: 100vh;
+    }
+    .top {
+      height: 6px;
+      background: var(--teal);
+    }
+    .wrap {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px 32px 40px;
+    }
+    h1 {
+      margin: 0 0 6px;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .sub {
+      margin: 0 0 22px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+    .kpi {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px 16px;
+      border-left: 4px solid var(--teal);
+    }
+    .kpi .label {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 4px;
+    }
+    .kpi .value {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--teal-dark);
+      font-variant-numeric: tabular-nums;
+    }
+    .kpi .hint {
+      font-size: 12px;
+      color: var(--ink-soft);
+      margin-top: 2px;
+    }
+    .card {
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 18px 18px 8px;
+      box-shadow: 0 8px 28px rgba(20, 33, 43, 0.05);
+    }
+    .card h2 {
+      margin: 0 0 4px;
+      font-size: 16px;
+      color: var(--teal-dark);
+    }
+    .card .note {
+      margin: 0 0 12px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .chart-box { position: relative; height: 420px; }
+    footer {
+      margin-top: 18px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    @media (max-width: 900px) {
+      .kpis { grid-template-columns: 1fr 1fr; }
+      .chart-box { height: 320px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="top"></div>
+  <div class="wrap">
+    <h1>Steady soak ≈ 10 000 EPS</h1>
+    <p class="sub">
+      ГеоАтлас · 4 коннектора · цель 2500 EPS × 4 · лог
+      <code>soak-20261112-002917.csv</code> · ~10 мин
+    </p>
+
+    <div class="kpis">
+      <div class="kpi">
+        <div class="label">Client EPS</div>
+        <div class="value" id="kpi-client">—</div>
+        <div class="hint">avg / min–max</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Server recv EPS</div>
+        <div class="value" id="kpi-recv">—</div>
+        <div class="hint">avg / min–max</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Drops</div>
+        <div class="value" id="kpi-drop">0</div>
+        <div class="hint">drop/s avg · все сэмплы ok</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Lag</div>
+        <div class="value" id="kpi-lag">—</div>
+        <div class="hint">секунд backlog / recv</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>EPS во времени</h2>
+      <p class="note">Клиентский поток и серверный received держат целевые ~10k; очередь и drops ≈ 0.</p>
+      <div class="chart-box">
+        <canvas id="eps"></canvas>
+      </div>
+    </div>
+
+    <footer>
+      Источник: Windows load-test-connectors.ps1 -Soak · host 138.16.225.160 ·
+      для слайда: браузер → печать / PNG, либо скриншот этой страницы.
+    </footer>
+  </div>
+
+  <script>
+    // Reconstructed from RU-locale CSV (decimal comma split columns).
+    // elapsed_s, client_eps, recv_eps, drop_eps, queue_pct, lag_s
+    const rows = [
+      { t: 60.1,  client: 10003.3, recv: 10023.5, drop: 0, queue: 0, lag: 2.7 },
+      { t: 120.4, client: 9993.7,  recv: 9998.0,  drop: 0, queue: 0, lag: 3.0 },
+      { t: 180.7, client: 9999.2,  recv: 9988.0,  drop: 0, queue: 0, lag: 3.2 },
+      { t: 240.8, client: 10003.8, recv: 10011.9, drop: 0, queue: 0, lag: 3.4 },
+      { t: 301.0, client: 9997.0,  recv: 9994.5,  drop: 0, queue: 0, lag: 3.5 },
+      { t: 361.1, client: 10003.1, recv: 10001.5, drop: 0, queue: 0, lag: 3.6 },
+      { t: 421.2, client: 10000.1, recv: 10002.5, drop: 0, queue: 0, lag: 3.7 },
+      { t: 481.3, client: 9999.2,  recv: 10000.6, drop: 0, queue: 0, lag: 3.8 },
+      { t: 541.4, client: 10001.4, recv: 9998.3,  drop: 0, queue: 0, lag: 3.9 },
+      { t: 601.5, client: 9999.3,  recv: 9992.8,  drop: 0, queue: 0, lag: 4.0 },
+    ];
+
+    const avg = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    const fmt = (n) => Math.round(n).toLocaleString('ru-RU');
+    const clients = rows.map((r) => r.client);
+    const recvs = rows.map((r) => r.recv);
+    const lags = rows.map((r) => r.lag);
+
+    document.getElementById('kpi-client').textContent =
+      `${fmt(avg(clients))}  ·  ${fmt(Math.min(...clients))}–${fmt(Math.max(...clients))}`;
+    document.getElementById('kpi-recv').textContent =
+      `${fmt(avg(recvs))}  ·  ${fmt(Math.min(...recvs))}–${fmt(Math.max(...recvs))}`;
+    document.getElementById('kpi-drop').textContent = '0 / s';
+    document.getElementById('kpi-lag').textContent =
+      `${avg(lags).toFixed(1)} s`;
+
+    const labels = rows.map((r) => `${Math.round(r.t / 60)} мин`);
+
+    new Chart(document.getElementById('eps'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Client EPS',
+            data: clients,
+            borderColor: '#0e7c66',
+            backgroundColor: 'rgba(14, 124, 102, 0.12)',
+            fill: true,
+            tension: 0.25,
+            pointRadius: 3,
+            pointHoverRadius: 5,
+            borderWidth: 2.5,
+          },
+          {
+            label: 'Server recv EPS',
+            data: recvs,
+            borderColor: '#14212b',
+            backgroundColor: 'transparent',
+            fill: false,
+            tension: 0.25,
+            pointRadius: 3,
+            pointHoverRadius: 5,
+            borderWidth: 2,
+            borderDash: [5, 4],
+          },
+          {
+            label: 'Target 10 000',
+            data: rows.map(() => 10000),
+            borderColor: '#c45c26',
+            backgroundColor: 'transparent',
+            fill: false,
+            tension: 0,
+            pointRadius: 0,
+            borderWidth: 1.5,
+            borderDash: [2, 4],
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            position: 'top',
+            align: 'end',
+            labels: { boxWidth: 14, color: '#3a4a55', font: { size: 12 } },
+          },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => `${ctx.dataset.label}: ${Math.round(ctx.parsed.y).toLocaleString('ru-RU')}`,
+            },
+          },
+        },
+        scales: {
+          x: {
+            grid: { color: 'rgba(213, 224, 220, 0.7)' },
+            ticks: { color: '#5c6b75' },
+            title: { display: true, text: 'Время', color: '#5c6b75' },
+          },
+          y: {
+            min: 9000,
+            max: 11000,
+            grid: { color: 'rgba(213, 224, 220, 0.7)' },
+            ticks: {
+              color: '#5c6b75',
+              callback: (v) => v.toLocaleString('ru-RU'),
+            },
+            title: { display: true, text: 'Событий / с', color: '#5c6b75' },
+          },
+        },
+      },
+    });
+  </script>
+</body>
+</html>

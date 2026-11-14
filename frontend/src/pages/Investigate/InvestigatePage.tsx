@@ -372,7 +372,7 @@ export default function InvestigatePage() {
                   type="button"
                   className="btn"
                   disabled={acking}
-                  title="Закрыть алерт (acknowledge)"
+                  title="Закрыть алерт"
                   onClick={() => void closeAlert()}
                 >
                   Закрыть

@@ -69,11 +69,11 @@ function StatusPanel({ status }: { status: AnomalyScanStatus | null }) {
   if (!status) return null;
   return (
     <section className="card card-compact anomaly-engine-status">
-      <h3 className="card-title">Состояние сканера</h3>
+      <h3 className="card-title">Состояние</h3>
       <dl className="anomaly-engine-dl">
         <div>
-          <dt>Обучение</dt>
-          <dd>{status.learning ? 'да' : 'нет'}</dd>
+          <dt>Привыкание к трафику</dt>
+          <dd>{status.learning ? 'идёт' : 'готово'}</dd>
         </div>
         <div>
           <dt>Сети предприятия</dt>
@@ -84,12 +84,12 @@ function StatusPanel({ status }: { status: AnomalyScanStatus | null }) {
             <dt>Подсказка</dt>
             <dd className="hint">
               Отметьте сети в <Link to="/geo-ranges">базе GeoIP</Link> → «Сети предприятия», иначе
-              сканер пропускает запуски.
+              поиск аномалий не запускается.
             </dd>
           </div>
         ) : null}
         <div>
-          <dt>Последний успешный запуск</dt>
+          <dt>Последняя успешная проверка</dt>
           <dd>{status.last_ok ? fmtDate(status.last_ok) : '—'}</dd>
         </div>
         <div>
@@ -97,7 +97,7 @@ function StatusPanel({ status }: { status: AnomalyScanStatus | null }) {
           <dd>{formatScanDuration(status.last_duration)}</dd>
         </div>
         <div>
-          <dt>Алертов за запуск</dt>
+          <dt>Найдено за последний проход</dt>
           <dd>{fmtNumber(status.last_inserted ?? 0)}</dd>
         </div>
         {status.last_skip ? (
@@ -115,8 +115,8 @@ function StatusPanel({ status }: { status: AnomalyScanStatus | null }) {
       </dl>
       {status.learning ? (
         <p className="anomaly-learning-note" role="status">
-          Обучение · «новая страна» и «периодическая связь» пока не ищутся. Длительность задаётся в
-          параметрах ниже.
+          Пока идёт привыкание: проверки «Новая страна» и «Регулярные короткие сессии» отключены.
+          Остальное уже работает. Длительность задаётся в параметрах ниже.
         </p>
       ) : null}
     </section>
@@ -192,7 +192,7 @@ function DetectorCard({
             aria-controls={adviceId}
             onClick={() => setAdviceOpen((v) => !v)}
           >
-            {adviceOpen ? 'Скрыть справку' : 'Как настроить'}
+            {adviceOpen ? 'Скрыть справку' : 'Справка'}
           </button>
           <button
             type="button"
@@ -253,7 +253,7 @@ function ThresholdsPanel({
     <section className="card card-compact anomaly-thresholds-panel">
       <div className="anomaly-thresholds-head">
         <div>
-          <h3 className="card-title">Пороги детекторов</h3>
+          <h3 className="card-title">Чувствительность</h3>
           <p className="hint">
             Профиль установки: <strong>{profile || 'medium'}</strong>.
             {customized
@@ -263,7 +263,7 @@ function ThresholdsPanel({
           </p>
         </div>
         <button type="button" className="btn sm" onClick={onReset} disabled={!defaults}>
-          Сбросить к профилю
+          Вернуть значения профиля
         </button>
       </div>
 
@@ -287,7 +287,7 @@ function ThresholdsPanel({
                   <span className="thresholds-category-title">{group.title}</span>
                   <span className="thresholds-category-count">
                     {group.detectors.length}{' '}
-                    {group.detectors.length === 1 ? 'детектор' : 'детектора'}
+                    {group.detectors.length === 1 ? 'проверка' : 'проверки'}
                   </span>
                   <span className="thresholds-category-chevron" aria-hidden="true">
                     {expanded ? '▾' : '▸'}
@@ -341,14 +341,14 @@ export default function AnomalyEnginePage() {
       const data = await fetchAnomalyEngineSettings();
       applyView(data);
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Не удалось загрузить настройки движка', 'error');
+      toast(e instanceof Error ? e.message : 'Не удалось загрузить настройки аномалий', 'error');
     } finally {
       setLoading(false);
     }
   }, [applyView, toast]);
 
   useEffect(() => {
-    document.title = 'ГеоАтлас — Движок аномалий';
+    document.title = 'ГеоАтлас — Настройки аномалий';
   }, []);
 
   useEffect(() => {
@@ -383,7 +383,7 @@ export default function AnomalyEnginePage() {
       };
       const data = await putAnomalyEngineSettings(payload);
       applyView(data);
-      toast('Настройки движка сохранены', 'success');
+      toast('Настройки аномалий сохранены', 'success');
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Не удалось сохранить настройки', 'error');
     } finally {
@@ -392,10 +392,10 @@ export default function AnomalyEnginePage() {
   };
 
   return (
-    <AdminLayout title="Движок аномалий">
+    <AdminLayout title="Настройки аномалий">
       <div className="page-intro">
         <p>
-          Параметры сканера и пороги детекторов. Журнал алертов — на странице{' '}
+          Как часто искать аномалии и насколько чувствительны проверки. Журнал алертов — на странице{' '}
           <Link to="/anomalies">Аномалии</Link>. Сети предприятия задаются в{' '}
           <Link to="/geo-ranges">базе GeoIP</Link>.
         </p>
@@ -425,7 +425,7 @@ export default function AnomalyEnginePage() {
                 disabled={loading || saving}
                 title="Отменить несохранённые правки и загрузить настройки с сервера"
               >
-                Перезагрузить с сервера
+                Отменить правки
               </button>
             </div>
 
@@ -437,12 +437,12 @@ export default function AnomalyEnginePage() {
                 checked={settings.enabled}
                 onChange={(e) => setSettings({ ...settings, enabled: e.target.checked })}
               />
-              Сканирование включено
+              Искать аномалии
             </label>
 
             <div className="form-row">
               <label className="anomaly-engine-field">
-                Интервал сканирования (мин)
+                Как часто проверять (мин)
                 <input
                   type="number"
                   min={1}
@@ -454,7 +454,7 @@ export default function AnomalyEnginePage() {
                 />
               </label>
               <label className="anomaly-engine-field">
-                Дней обучения
+                Дней на привыкание к трафику
                 <input
                   type="number"
                   min={1}
@@ -464,7 +464,7 @@ export default function AnomalyEnginePage() {
                 />
               </label>
               <label className="anomaly-engine-field">
-                Скрытие алерта (часов)
+                Не повторять тот же алерт (часов)
                 <input
                   type="number"
                   min={1}
@@ -481,7 +481,7 @@ export default function AnomalyEnginePage() {
                 checked={settings.include_private}
                 onChange={(e) => setSettings({ ...settings, include_private: e.target.checked })}
               />
-              Учитывать частные адреса (10/8, 172.16/12, 192.168/16) в детекторах
+              Учитывать частные адреса (10.x, 172.16.x, 192.168.x)
             </label>
 
             {settings.updated_at ? (

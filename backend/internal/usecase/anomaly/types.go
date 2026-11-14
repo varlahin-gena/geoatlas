@@ -68,21 +68,21 @@ func CodeHumanLabel(code string) string {
 	case CodePortScan:
 		return "Сканирование портов"
 	case CodeHorizontalScan:
-		return "Сканирование подсети"
+		return "Обход подсети"
 	case CodeBlockedSurge:
-		return "Всплеск блокировок"
+		return "Резкий рост блокировок"
 	case CodeNewCountryDst:
-		return "Новая страна назначения"
+		return "Новая страна"
 	case CodeRepNewDst:
-		return "Репутационная связь"
+		return "Контакт с отмеченным адресом"
 	case CodeByteSurge:
-		return "Всплеск объёма"
+		return "Резкий рост трафика"
 	case CodeBeaconing:
-		return "Периодическая связь"
+		return "Регулярные короткие сессии"
 	case CodeLateralFanout:
-		return "Веер по сети предприятия"
+		return "Обход внутренней сети"
 	case CodeHuntThreshold:
-		return "Порог saved hunt"
+		return "Сработал сохранённый поиск"
 	default:
 		return code
 	}

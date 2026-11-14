@@ -414,7 +414,7 @@ func TestRepNewSrc(t *testing.T) {
 	for _, e := range store.inserted {
 		if e.Code == CodeRepNewDst {
 			found = true
-			if !strings.Contains(e.Title, "Репутационный источник") {
+			if !strings.Contains(e.Title, "Контакт с отмеченным адресом") || !strings.Contains(e.Title, "→") {
 				t.Fatalf("unexpected title %q", e.Title)
 			}
 		}

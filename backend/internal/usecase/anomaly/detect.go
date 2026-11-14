@@ -32,7 +32,7 @@ func (s *Service) detectPortScan(ctx context.Context, now time.Time, th Threshol
 			Code:        CodePortScan,
 			Severity:    sev,
 			Score:       scoreAgainst(float64(h.Ports), float64(th.PortScanPorts), sev),
-			Title:       fmt.Sprintf("Сканирование портов: %s (%d портов за 5 мин)", src, h.Ports),
+			Title:       fmt.Sprintf("Сканирование портов · %s · %d портов за 5 мин", src, h.Ports),
 			Detail: map[string]any{
 				"src_ip": src, "unique_ports": h.Ports, "events": h.Events,
 				"window_minutes": 5, "threshold_ports": th.PortScanPorts,
@@ -69,7 +69,7 @@ func (s *Service) detectHorizontalScan(ctx context.Context, now time.Time, th Th
 			Code:        CodeHorizontalScan,
 			Severity:    sev,
 			Score:       scoreAgainst(float64(h.Hosts), float64(th.HorizontalHosts), sev),
-			Title:       fmt.Sprintf("Сканирование подсети: %s -> %s (%d хостов)", src, h.Net24, h.Hosts),
+			Title:       fmt.Sprintf("Обход подсети · %s · %d хостов в %s", src, h.Hosts, h.Net24),
 			Detail: map[string]any{
 				"src_ip": src, "net24": h.Net24, "hosts": h.Hosts, "events": h.Events,
 				"window_minutes": 5, "threshold_hosts": th.HorizontalHosts,
@@ -137,7 +137,7 @@ func (s *Service) detectBlockedSurge(ctx context.Context, now time.Time, th Thre
 			Code:        CodeBlockedSurge,
 			Severity:    sev,
 			Score:       scoreAgainst(float64(curr), float64(need), sev),
-			Title:       fmt.Sprintf("Всплеск блокировок: %s (%d за 15 мин, было %d)", where, curr, prev),
+			Title:       fmt.Sprintf("Резкий рост блокировок · %s · %d за 15 мин, было %d", where, curr, prev),
 			Detail: map[string]any{
 				"blocked_current": curr, "blocked_previous": prev,
 				"ratio": th.SurgeRatio, "abs_min": th.SurgeAbsMin, "window_minutes": 15,
@@ -210,7 +210,7 @@ func (s *Service) detectNewCountry(ctx context.Context, now time.Time, th Thresh
 			Code:        CodeNewCountryDst,
 			Severity:    sev,
 			Score:       scoreAgainst(float64(c.N), float64(th.NewCountryMin), sev),
-			Title:       fmt.Sprintf("Новая страна назначения: %s (%d событий за 1 ч)", cc, c.N),
+			Title:       fmt.Sprintf("Новая страна · %s · %d событий за час", cc, c.N),
 			Detail:      map[string]any{"dst_country": cc, "events": c.N, "baseline_days": countryBaselineDays, "share": share},
 			DstCountry:  cc, EventCount: c.N,
 			Fingerprint:    fingerprint(CodeNewCountryDst, "", "", cc, now),
@@ -277,26 +277,14 @@ func (s *Service) detectRepNewDst(ctx context.Context, now time.Time, th Thresho
 		if _, ok := known[pairKey(c.SrcIP, c.DstIP)]; ok {
 			continue
 		}
-		label := func(hits []model.ReputationHit) string {
-			if len(hits) == 0 {
-				return ""
-			}
-			list := hits[0].List
-			if list == "" {
-				list = hits[0].Category
-			}
-			return list
-		}
-		srcList := label(c.SrcHits)
-		dstList := label(c.DstHits)
 		title := ""
 		switch {
 		case len(c.SrcHits) > 0 && len(c.DstHits) > 0:
-			title = fmt.Sprintf("Репутационная связь: %s ↔ %s (src: %s, dst: %s)", c.SrcIP, c.DstIP, srcList, dstList)
+			title = fmt.Sprintf("Контакт с отмеченным адресом · %s ↔ %s", c.SrcIP, c.DstIP)
 		case len(c.SrcHits) > 0:
-			title = fmt.Sprintf("Репутационный источник: %s -> %s (%s)", c.SrcIP, c.DstIP, srcList)
+			title = fmt.Sprintf("Контакт с отмеченным адресом · %s → %s", c.SrcIP, c.DstIP)
 		default:
-			title = fmt.Sprintf("Репутационное назначение: %s <- %s (%s)", c.DstIP, c.SrcIP, dstList)
+			title = fmt.Sprintf("Контакт с отмеченным адресом · %s ← %s", c.DstIP, c.SrcIP)
 		}
 		sev := SeverityHigh
 		out = append(out, Event{
@@ -356,7 +344,7 @@ func (s *Service) detectByteSurge(ctx context.Context, now time.Time, th Thresho
 			Code:        CodeByteSurge,
 			Severity:    sev,
 			Score:       scoreAgainst(float64(h.BytesNow), float64(need), sev),
-			Title:       fmt.Sprintf("Всплеск объёма: %s (%s за 1 ч, было %s)", src, formatBytes(h.BytesNow), formatBytes(h.BytesPrev)),
+			Title:       fmt.Sprintf("Резкий рост трафика · %s · %s за час, было %s", src, formatBytes(h.BytesNow), formatBytes(h.BytesPrev)),
 			Detail: map[string]any{
 				"src_ip": src, "bytes_now": h.BytesNow, "bytes_prev": h.BytesPrev,
 				"ratio": ratio, "threshold_ratio": th.ByteSurgeRatio, "abs_min": th.ByteSurgeAbsMin,
@@ -393,7 +381,7 @@ func (s *Service) detectLateralFanout(ctx context.Context, now time.Time, th Thr
 			Code:        CodeLateralFanout,
 			Severity:    sev,
 			Score:       scoreAgainst(float64(h.Hosts), float64(th.LateralHosts), sev),
-			Title:       fmt.Sprintf("Веер по сети предприятия: %s → %d внутренних хостов за 15 мин", src, h.Hosts),
+			Title:       fmt.Sprintf("Обход внутренней сети · %s · %d хостов за 15 мин", src, h.Hosts),
 			Detail: map[string]any{
 				"src_ip": src, "hosts": h.Hosts, "events": h.Events,
 				"window_minutes": 15, "threshold_hosts": th.LateralHosts,
@@ -443,7 +431,7 @@ func (s *Service) detectBeaconing(ctx context.Context, now time.Time, th Thresho
 			Code:        CodeBeaconing,
 			Severity:    sev,
 			Score:       scoreAgainst(reg, th.BeaconMinRegularity, sev),
-			Title:       fmt.Sprintf("Периодическая связь: %s ↔ %s (%d ч за сутки, ~%s/ч)", src, dst, h.ActiveHours, formatBytes(avg)),
+			Title:       fmt.Sprintf("Регулярные короткие сессии · %s ↔ %s · %d ч, ~%s/ч", src, dst, h.ActiveHours, formatBytes(avg)),
 			Detail: map[string]any{
 				"src_ip": src, "dst_ip": dst, "active_hours": h.ActiveHours,
 				"total_bytes": h.TotalBytes, "avg_bytes_per_hour": avg,

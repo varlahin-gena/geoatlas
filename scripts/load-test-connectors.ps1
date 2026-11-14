@@ -69,6 +69,7 @@ param(
   [int]$StepSec = 45,
   # 0 = no pause between steps (recommended for capacity tests — avoids cache/queue drain).
   [int]$SettleSec = 0,
+  [string]$ThresholdLog = '',
   [string]$ApiBase = '',
   [string]$ApiToken = '',
   [double]$FailDropPerSec = 1,
@@ -642,18 +643,25 @@ if ($Soak) {
       }
       $samples.Add($row)
 
-      $line = "{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11}" -f `
-        ([DateTime]::UtcNow.ToString('o')),
-        $row.ElapsedSec, $clientEps,
-        $(if ($null -ne $recvEps) { $recvEps } else { '' }),
-        $(if ($null -ne $dropEps) { $dropEps } else { '' }),
-        $(if ($null -ne $queuePct) { $queuePct } else { '' }),
-        $(if ($null -ne $lag) { $lag } else { '' }),
-        $(if ($null -ne $authDelta) { $authDelta } else { '' }),
-        $(if ($null -ne $recvTotal) { $recvTotal } else { '' }),
-        $(if ($null -ne $dropTotal) { $dropTotal } else { '' }),
-        $(if ($null -ne $qDepth) { $qDepth } else { '' }),
+      # InvariantCulture: RU locale uses ',' as decimal → breaks CSV columns
+      $inv = [System.Globalization.CultureInfo]::InvariantCulture
+      $n1 = { param($v) if ($null -eq $v) { '' } else { ([double]$v).ToString('0.0', $inv) } }
+      $n2 = { param($v) if ($null -eq $v) { '' } else { ([double]$v).ToString('0.00', $inv) } }
+      $n0 = { param($v) if ($null -eq $v) { '' } else { ([double]$v).ToString('0', $inv) } }
+      $line = '{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11}' -f @(
+        [DateTime]::UtcNow.ToString('o', $inv),
+        (& $n1 $row.ElapsedSec),
+        (& $n1 $clientEps),
+        (& $n1 $recvEps),
+        (& $n2 $dropEps),
+        (& $n1 $queuePct),
+        (& $n1 $lag),
+        (& $n0 $authDelta),
+        $(if ($null -ne $recvTotal) { ([long]$recvTotal).ToString($inv) } else { '' }),
+        $(if ($null -ne $dropTotal) { ([long]$dropTotal).ToString($inv) } else { '' }),
+        $(if ($null -ne $qDepth) { ([long]$qDepth).ToString($inv) } else { '' }),
         $verdict
+      )
       Add-Content -LiteralPath $SoakLog -Value $line -Encoding UTF8
 
       Write-Host ("  t={0,6:N0}s client={1,8} recv={2,8} drop={3,7} queue={4,6}% lag={5,5} => {6} {7}" -f `
@@ -709,6 +717,10 @@ if ($FindThreshold) {
   if ($MaxEpsPerSender -lt $StartEpsPerSender) { throw 'MaxEpsPerSender must be >= StartEpsPerSender' }
   if ($StepEpsPerSender -lt 1) { throw 'StepEpsPerSender must be >= 1' }
   if ($StepSec -lt 5) { throw 'StepSec must be >= 5' }
+  if (-not $ThresholdLog) {
+    $ThresholdLog = Join-Path $PSScriptRoot ("threshold-{0:yyyyMMdd-HHmmss}.csv" -f (Get-Date))
+  }
+  $inv = [System.Globalization.CultureInfo]::InvariantCulture
 
   $nLogical = $LogicalConnectors.Count
   Write-Host ''
@@ -719,11 +731,14 @@ if ($FindThreshold) {
     $StartEpsPerSender, $MaxEpsPerSender, $StepEpsPerSender,
     ($StartEpsPerSender * $nLogical), ($MaxEpsPerSender * $nLogical))
   Write-Host ("fail if: drop/s>{0} OR queue>={1}% OR lag>{2}s" -f $FailDropPerSec, $FailQueuePct, $FailLagSec)
+  Write-Host ("log={0}" -f $ThresholdLog)
   Write-Host 'MODE: continuous ramp (connections stay open; rate changes in-place, no settle/reconnect gap).'
   Write-Host 'NOTE: if client EPS plateaus with drop/s=0, that is CLIENT limit (not server).'
   foreach ($c in $LogicalConnectors) {
     Write-Host ("  -> {0} ({1}) :{2}/{3}" -f $c.Name, $c.Id, $c.Port, $c.Proto)
   }
+  'utc,step,eps_per_logical,target_eps,client_eps,recv_eps,drop_eps,queue_pct,lag_s,auth_delta,received_total,dropped_total,queue_depth,verdict,reason' |
+    Set-Content -LiteralPath $ThresholdLog -Encoding UTF8
   if (-not $ApiToken) {
     Write-Warning 'No -ApiToken: cannot auto-detect drops. Watch UI /system Pipeline; script ramps blindly.'
     Write-Host '  Token: docker exec backend printenv API_AUTH_TOKEN'
@@ -877,6 +892,12 @@ Continuing ramp WITHOUT auto drop detection. Watch UI /system Pipeline.
         Write-Host ("  server: (no stats) => {0} {1}" -f $verdict, $reason)
       }
 
+      $recvTotal = $null; $dropTotal = $null; $qDepthOut = $null
+      if ($null -ne $after) {
+        $recvTotal = $after.received_total
+        $dropTotal = $after.dropped_total
+        $qDepthOut = $after.queue_depth
+      }
       $row = [pscustomobject]@{
         EpsPerLogical = $eps
         TotalTargetEps = $totalTarget
@@ -889,6 +910,28 @@ Continuing ramp WITHOUT auto drop detection. Watch UI /system Pipeline.
         Reason = $reason
       }
       $steps.Add($row)
+
+      $n1 = { param($v) if ($null -eq $v) { '' } else { ([double]$v).ToString('0.0', $inv) } }
+      $n2 = { param($v) if ($null -eq $v) { '' } else { ([double]$v).ToString('0.00', $inv) } }
+      $csvReason = ($reason -replace ',', ';')
+      $csvLine = '{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14}' -f @(
+        [DateTime]::UtcNow.ToString('o', $inv),
+        $steps.Count,
+        $eps,
+        $totalTarget,
+        (& $n1 $client.EpsActual),
+        (& $n1 $recvPerSec),
+        (& $n2 $dropPerSec),
+        (& $n1 $queuePct),
+        (& $n1 $lag),
+        (& $n1 $authDelta),
+        $(if ($null -ne $recvTotal) { ([long]$recvTotal).ToString($inv) } else { '' }),
+        $(if ($null -ne $dropTotal) { ([long]$dropTotal).ToString($inv) } else { '' }),
+        $(if ($null -ne $qDepthOut) { ([long]$qDepthOut).ToString($inv) } else { '' }),
+        $verdict,
+        $csvReason
+      )
+      Add-Content -LiteralPath $ThresholdLog -Value $csvLine -Encoding UTF8
 
       if ($verdict -eq 'ok') {
         $lastGood = $row
@@ -911,6 +954,7 @@ Continuing ramp WITHOUT auto drop detection. Watch UI /system Pipeline.
   Write-Host ''
   Write-Host '== threshold report =='
   $steps | Format-Table EpsPerLogical, TotalTargetEps, ClientEps, RecvPerSec, DropPerSec, QueuePct, LagSec, Verdict, Reason -AutoSize
+  Write-Host ("CSV for charts: {0}" -f $ThresholdLog)
 
   $maxRecv = ($steps | Where-Object { $null -ne $_.RecvPerSec } | Measure-Object -Property RecvPerSec -Maximum).Maximum
   $maxClient = ($steps | Measure-Object -Property ClientEps -Maximum).Maximum

@@ -6,6 +6,24 @@
 ## [Unreleased]
 
 
+## [2.7.2] — 2026-11-14
+
+Патч: понятные названия аномалий в UI, фикс полей в группе конструктора запросов, CSV load-test без локали RU.
+
+### Changed
+- **Аномалии**: человекочитаемые типы и заголовки (без жаргона «движок» / «веер» / «beaconing» в UI); пункт меню **«Настройки»** вместо «Движок».
+- **scripts/load-test-connectors.ps1**: CSV soak/threshold через `InvariantCulture`; параметр `-ThresholdLog`.
+- **docs/presentations**: HTML/PNG графики EPS (soak / threshold).
+
+### Fixed
+- **Конструктор запросов**: поле «Значение» внутри группы условий больше не схлопывается (гибкая CSS Grid + класс `search-builder-value`).
+
+### Notes
+- OpenAPI API doc version: **1.21.0**
+- Продуктовая версия: **2.7.2**
+- Схема ClickHouse: без изменений Ensure*.
+- Достаточно `update.sh` 2.7.2 (recreate **backend** + **frontend**).
+
 ## [2.7.1] — 2026-11-13
 
 Патч: демо аномалий на боевой, пиры в разборе по окну алерта, кнопка «Закрыть», фикс PNG-экспорта карты.
@@ -182,6 +200,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.7.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.2
 [2.7.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.1
 [2.7.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.0
 [2.6.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.0

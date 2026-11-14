@@ -8,16 +8,17 @@
 
 ## Типы
 
-| Код | Смысл | Severity |
+| Код | Смысл (UI) | Severity |
 |-----|--------|----------|
 | `port_scan` | Сканирование портов | high |
-| `horizontal_scan` | Сканирование подсети | high |
-| `blocked_surge` | Всплеск блокировок | warn / high |
-| `byte_surge` | Всплеск объёма байт (src, 1ч vs 1ч) | warn / high |
-| `beaconing` | Периодическая low-volume связь за 24ч | warn / high |
-| `lateral_fanout` | Веер на внутренние хосты enterprise-net | high |
-| `new_country_dst` | Новая страна назначения | warn |
-| `rep_new_peer` | Новая связь с репутационным адресом | high |
+| `horizontal_scan` | Обход подсети | high |
+| `blocked_surge` | Резкий рост блокировок | warn / high |
+| `byte_surge` | Резкий рост трафика (src, 1ч vs 1ч) | warn / high |
+| `beaconing` | Регулярные короткие сессии (24ч) | warn / high |
+| `lateral_fanout` | Обход внутренней сети | high |
+| `new_country_dst` | Новая страна | warn |
+| `rep_new_peer` | Контакт с отмеченным адресом | high |
+| `hunt_threshold` | Сработал сохранённый поиск | — |
 
 На карте — полоска/баннер со ссылкой на `/anomalies`. На странице аномалий:
 
@@ -52,7 +53,7 @@ Fingerprint + URL = «кейс»; отдельного case store нет.
 
 ### Редактирование порогов (UI)
 
-Администратор на **`/anomalies/engine`** может переопределить пороги детекторов (`GET`/`PUT /api/anomalies/settings`). Значения пишутся в `/app/data/anomaly_settings.json` и подхватываются без рестарта; сброс возвращает defaults профиля. Подписи и группировка полей — в UI (help по каждому порогу).
+Администратор на **`/anomalies/engine`** (страница **Настройки аномалий**) может переопределить чувствительность проверок (`GET`/`PUT /api/anomalies/settings`). Значения пишутся в `/app/data/anomaly_settings.json` и подхватываются без рестарта; сброс возвращает defaults профиля. Подписи и группировка полей — в UI (справка по каждому порогу).
 
 ### Окно обучения
 
@@ -92,6 +93,6 @@ Fingerprint + URL = «кейс»; отдельного case store нет.
 
 - **Ack** — `POST /api/anomalies/{fingerprint}/ack` (сессия login): событие отмечено обработанным; могут заполниться `ack_by` / `assigned_to`.
 - **Assign** — `POST /api/anomalies/{fingerprint}/assign`: исполнитель из `GET /api/users/directory`.
-- В UI на `/anomalies` — список, переключатель «включая ack», назначение исполнителя.
+- В UI на `/anomalies` — список, переключатель «Показывать закрытые», назначение ответственного.
 
 Контракт: [`openapi.yaml`](../openapi.yaml). Роли: [ui.md — доступ](ui.md#роли-и-доступ).
