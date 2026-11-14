@@ -348,7 +348,7 @@ export default function AnomalyEnginePage() {
   }, [applyView, toast]);
 
   useEffect(() => {
-    document.title = 'ГеоАтлас — Настройки аномалий';
+    document.title = 'ГеоАтлас — Движок аномалий';
   }, []);
 
   useEffect(() => {
@@ -392,7 +392,7 @@ export default function AnomalyEnginePage() {
   };
 
   return (
-    <AdminLayout title="Настройки аномалий">
+    <AdminLayout title="Движок аномалий">
       <div className="page-intro">
         <p>
           Как часто искать аномалии и насколько чувствительны проверки. Журнал алертов — на странице{' '}

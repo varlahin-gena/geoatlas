@@ -83,8 +83,8 @@ export const PAGE_NAV: NavItem[] = [
   },
   {
     href: '/anomalies/engine',
-    label: 'Настройки',
-    title: 'Настройки аномалий',
+    label: 'Движок аномалий',
+    title: 'Движок аномалий',
     group: 'system',
     match: ['/anomalies/engine'],
     adminOnly: true,
