@@ -48,6 +48,12 @@
   white-space: nowrap;
 }
 
+.anomaly-engine-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .anomaly-engine-form .form-row {
   display: flex;
   flex-wrap: wrap;
@@ -69,7 +75,7 @@
 .anomaly-engine-form .form-row input[type='number'] {
   background: var(--panel-2);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--text);
   padding: 8px 10px;
   font: inherit;
@@ -90,6 +96,15 @@
   width: min(420px, 100%);
 }
 
+.thresholds-fanout-exclude {
+  width: 100%;
+  max-width: 32rem;
+}
+
+.thresholds-fanout-exclude textarea {
+  width: 100%;
+}
+
 .anomaly-engine-form .form-actions {
   display: flex;
   gap: 8px;
@@ -102,13 +117,27 @@
   z-index: 2;
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
-  margin: -4px -4px 14px;
-  padding: 10px 4px;
-  background: color-mix(in srgb, var(--panel) 92%, transparent);
-  border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(8px);
+  margin: 0 0 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.anomaly-engine-sticky-actions .btn.primary {
+  min-height: 32px;
+  padding-inline: 14px;
+  font-weight: 600;
+}
+
+.anomaly-engine-dirty-hint {
+  margin-left: 4px;
+  font-size: 12px;
+  color: var(--text-dim);
 }
 
 .anomaly-engine-status .anomaly-learning-note {
@@ -150,45 +179,55 @@
   font-size: 14px;
 }
 
+.anomaly-engine-status,
+.anomaly-engine-schedule,
+.anomaly-thresholds-panel {
+  border-radius: 12px;
+}
+
 .anomaly-engine-status {
-  margin-bottom: 16px;
+  margin-bottom: 0;
 }
 
 .anomaly-thresholds-panel {
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border);
+  margin-top: 0;
 }
 
 .anomaly-thresholds-head {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 12px 16px;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
+}
+
+.anomaly-thresholds-head .card-title {
+  margin-bottom: 4px;
 }
 
 .anomaly-thresholds-head .hint {
   margin-bottom: 0;
   max-width: 52rem;
+  line-height: 1.45;
+}
+
+.anomaly-thresholds-head > .btn {
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 .thresholds-categories {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 12px;
 }
 
 .thresholds-category {
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
-  background: color-mix(in srgb, var(--panel-2) 40%, transparent);
-}
-
-.thresholds-category + .thresholds-category {
-  margin-top: 10px;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: var(--panel-2);
 }
 
 .thresholds-category-head {
@@ -256,10 +295,19 @@
   flex-direction: column;
   gap: 10px;
   margin: 0;
-  padding: 12px 14px;
+  padding: 14px 16px;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--panel-2) 70%, transparent);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.thresholds-detector.is-fanout {
+  grid-column: 1 / -1;
+}
+
+.thresholds-detector.is-editing {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 .thresholds-detector-head {
@@ -281,20 +329,54 @@
 .thresholds-detector-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
 }
 
-.thresholds-detector-actions .btn.sm.ghost {
-  background: transparent;
-  border-color: transparent;
-  color: var(--text-dim);
+.thresholds-detector-actions .btn.sm {
+  min-height: 28px;
+  font-size: 12px;
+  padding: 5px 12px;
 }
 
-.thresholds-detector-actions .btn.sm.ghost:hover {
-  background: var(--panel-3);
-  border-color: var(--border);
+.anomaly-engine-schedule .anomaly-include-acked,
+.anomaly-engine-form .anomaly-include-acked {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 8px;
+  font-size: 13px;
+}
+
+.thresholds-action-link {
+  margin: 0;
+  padding: 4px 2px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.3;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 2px;
+}
+
+.thresholds-action-link:hover {
   color: var(--text);
+  text-decoration-color: currentColor;
+}
+
+.thresholds-action-link.has-exclusion {
+  color: var(--accent);
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.thresholds-detector-code-line {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--text-dim);
 }
 
 .thresholds-detector-title {
@@ -825,26 +907,69 @@ a.anomaly-more-item {
 .anomaly-exclude-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: var(--z-modal);
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: 48px 16px;
+  padding: clamp(24px, 8vh, 64px) 16px;
   overflow: auto;
-  background: rgba(0, 0, 0, 0.45);
+  background: color-mix(in srgb, var(--bg) 35%, rgba(0, 0, 0, 0.55));
+  backdrop-filter: blur(6px);
 }
 
-.anomaly-exclude-host.topbar {
-  height: auto;
-  max-height: none;
+.anomaly-exclude-sheet {
   width: min(820px, 100%);
-  display: block;
-  padding: 0;
+  margin: 0 auto;
+  padding: 16px 18px 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  color: var(--text);
 }
 
-.anomaly-exclude-host.topbar .search-builder-panel,
-.anomaly-exclude-host.topbar .search-builder-panel.open {
+.anomaly-exclude-sheet-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.anomaly-exclude-sheet-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+.anomaly-exclude-sheet-sub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-dim);
+  max-width: 36rem;
+}
+
+.anomaly-exclude-sheet .search-builder-panel,
+.anomaly-exclude-sheet .search-builder-panel.open {
   display: block;
   position: static;
   width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.anomaly-exclude-sheet .search-builder-title {
+  /* Sheet header already names the task; keep constructor chrome quiet. */
+  font-size: 13px;
 }

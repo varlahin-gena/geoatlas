@@ -21,6 +21,7 @@ import {
   serializeSearchBuilderRows,
   type BuilderRow,
 } from '@/lib/searchBuilder';
+import './searchBuilder.css';
 
 function FieldSelect({
   value,
