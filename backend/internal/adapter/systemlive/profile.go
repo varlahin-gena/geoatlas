@@ -33,9 +33,10 @@ func (ProfileAdapter) Load(path string) (*system.CapacityProfile, error) {
 				ProfileServiceLimits: system.ProfileServiceLimits{
 					MemoryGB: profile.Limits.Backend.MemoryGB, CPUs: profile.Limits.Backend.CPUs,
 				},
-				IngestWorkers:   profile.Limits.Backend.IngestWorkers,
-				IngestQueueSize: profile.Limits.Backend.IngestQueueSize,
-				IngestBatchSize: profile.Limits.Backend.IngestBatchSize,
+				IngestWorkers:       profile.Limits.Backend.IngestWorkers,
+				IngestQueueSize:     profile.Limits.Backend.IngestQueueSize,
+				IngestQueueMaxBytes: profile.Limits.Backend.IngestQueueMaxBytes,
+				IngestBatchSize:     profile.Limits.Backend.IngestBatchSize,
 			},
 			SyslogNG: system.ProfileSyslogLimits{
 				MemoryMB: profile.Limits.SyslogNG.MemoryMB, CPUs: profile.Limits.SyslogNG.CPUs,

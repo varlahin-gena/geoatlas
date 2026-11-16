@@ -34,7 +34,7 @@ func TestConfigureQuerySettingsKeepsDefaultThreads(t *testing.T) {
 }
 
 func TestAggSettingsSpillBelowMemoryHeadroom(t *testing.T) {
-	// 1.2 GiB query cap (typical 3 GiB CH container @ 40%) with high spill request.
+	// 1.2 GiB query cap with a spill request above max/4.
 	ConfigureQuerySettings(1288490188, 512<<20, 512<<20, 2)
 	t.Cleanup(func() {
 		ConfigureQuerySettings(2<<30, 256<<20, 256<<20, 2)

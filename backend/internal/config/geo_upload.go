@@ -10,16 +10,19 @@ import (
 )
 
 // BackendSoftMemLimitBytes — 75% cgroup backend для проверки peak HeapAlloc при GeoIP replace.
-func BackendSoftMemLimitBytes(memoryGB int) uint64 {
+func BackendSoftMemLimitBytes(memoryGB float64) uint64 {
 	if memoryGB <= 0 {
 		return 0
 	}
-	return uint64(memoryGB) * 3 * (1 << 30) / 4
+	// 75% cgroup. Деление до умножения на GiB сохраняет целый 0.75 GiB,
+	// дальше масштаб дробного профиля (tiny backend 0.75 → 576 MiB).
+	perGiB := uint64(3 * (1 << 30) / 4)
+	return uint64(memoryGB * float64(perGiB))
 }
 
 // GeoUploadDefaultsForBackendMemoryGB — безопасные лимиты upload/replace GeoIP
 // относительно cgroup backend (пиковый RAM ≈ старый индекс + новый CSV в памяти).
-func GeoUploadDefaultsForBackendMemoryGB(gb int) (maxBytes int64, maxRanges int) {
+func GeoUploadDefaultsForBackendMemoryGB(gb float64) (maxBytes int64, maxRanges int) {
 	if gb <= 0 {
 		gb = 2
 	}
@@ -48,7 +51,7 @@ func (c *Config) ResolveGeoUploadLimits() {
 	bytesFromEnv := envInt64Set("GEOIP_UPLOAD_MAX_BYTES") || envInt64Set("MAX_GEO_UPLOAD_SIZE")
 	rangesFromEnv := envIntSet("GEOIP_UPLOAD_MAX_RANGES")
 
-	gb := 2
+	gb := 2.0
 	src := "default"
 	if p, err := installprofile.Load(c.InstallProfilePath); err == nil && p != nil {
 		if p.Limits.Backend.MemoryGB > 0 {

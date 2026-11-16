@@ -28,3 +28,22 @@ func TestLoadOKAndErrors(t *testing.T) {
 		t.Fatal("bad json")
 	}
 }
+
+func TestLoadFractionalMemory(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "profile.json")
+	body := `{"profile":"tiny","limits":{"clickhouse":{"memory_gb":1.5},"backend":{"memory_gb":0.75,"ingest_queue_max_bytes":67108864}}}`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Limits.ClickHouse.MemoryGB != 1.5 || p.Limits.Backend.MemoryGB != 0.75 {
+		t.Fatalf("memory: ch=%v be=%v", p.Limits.ClickHouse.MemoryGB, p.Limits.Backend.MemoryGB)
+	}
+	if p.Limits.Backend.IngestQueueMaxBytes != 67_108_864 {
+		t.Fatalf("queue bytes: %d", p.Limits.Backend.IngestQueueMaxBytes)
+	}
+}
