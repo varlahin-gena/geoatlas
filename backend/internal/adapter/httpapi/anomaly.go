@@ -174,6 +174,7 @@ func (h *AnomalyHandler) PutSettings(w http.ResponseWriter, r *http.Request) {
 	if timeout <= 0 {
 		timeout = 30 * time.Second
 	}
+	extendConnDeadline(w, timeout)
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
 

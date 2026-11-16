@@ -44,6 +44,9 @@ func (stubScan) HorizontalScan(context.Context, time.Duration, int, int, bool, [
 func (stubScan) BlockedCount(context.Context, time.Time, time.Time, *usecaseanomaly.IPRange) (uint64, error) {
 	return 0, nil
 }
+func (stubScan) BlockedCounts(context.Context, time.Time, time.Time, time.Time, time.Time, []usecaseanomaly.IPRange) ([]usecaseanomaly.BlockedWindowCount, error) {
+	return nil, nil
+}
 func (stubScan) CurrentCountries(context.Context, time.Duration, uint64, []usecaseanomaly.IPRange) ([]usecaseanomaly.CountryCount, error) {
 	return nil, nil
 }

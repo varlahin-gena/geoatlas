@@ -31,6 +31,9 @@ type TrafficScanner interface {
 	PortScan(ctx context.Context, window time.Duration, portsTh, eventsTh int, includePrivate bool, nets []IPRange) ([]PortScanHit, error)
 	HorizontalScan(ctx context.Context, window time.Duration, hostsTh, eventsTh int, includePrivate bool, nets []IPRange) ([]HorizontalScanHit, error)
 	BlockedCount(ctx context.Context, start, end time.Time, net *IPRange) (uint64, error)
+	// BlockedCounts — current/previous для каждой сети одним проходом.
+	// len(результата) == len(nets), порядок совпадает. Пустой nets → nil, nil.
+	BlockedCounts(ctx context.Context, currStart, currEnd, prevStart, prevEnd time.Time, nets []IPRange) ([]BlockedWindowCount, error)
 	CurrentCountries(ctx context.Context, window time.Duration, minN uint64, nets []IPRange) ([]CountryCount, error)
 	CurrentCountryTotal(ctx context.Context, window time.Duration, nets []IPRange) (uint64, error)
 	BaselineCountries(ctx context.Context, days int, minN uint64, nets []IPRange) (map[string]struct{}, error)

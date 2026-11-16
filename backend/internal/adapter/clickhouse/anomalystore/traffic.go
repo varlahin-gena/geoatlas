@@ -11,6 +11,7 @@ import (
 
 	"geoatlas/internal/adapter/clickhouse/query"
 	"geoatlas/internal/adapter/clickhouse/sqlclause"
+	"geoatlas/internal/model"
 	usecaseanomaly "geoatlas/internal/usecase/anomaly"
 )
 
@@ -106,6 +107,59 @@ func (r *Repository) BlockedCount(ctx context.Context, start, end time.Time, net
 	var n uint64
 	err := r.ch.QueryRow(ctx, q, args...).Scan(&n)
 	return n, err
+}
+
+// BlockedCounts считает current и previous окна для каждой сети одним SELECT
+// (чанки по 32, чтобы не раздувать список countIf). Порядок совпадает с nets.
+func (r *Repository) BlockedCounts(ctx context.Context, currStart, currEnd, prevStart, prevEnd time.Time, nets []usecaseanomaly.IPRange) ([]usecaseanomaly.BlockedWindowCount, error) {
+	if len(nets) == 0 {
+		return nil, nil
+	}
+	out := make([]usecaseanomaly.BlockedWindowCount, len(nets))
+	const chunk = 32
+	for i := 0; i < len(nets); i += chunk {
+		j := i + chunk
+		if j > len(nets) {
+			j = len(nets)
+		}
+		if err := r.scanBlockedChunk(ctx, currStart, currEnd, prevStart, prevEnd, nets[i:j], out[i:j]); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+func (r *Repository) scanBlockedChunk(ctx context.Context, currStart, currEnd, prevStart, prevEnd time.Time, nets []usecaseanomaly.IPRange, dest []usecaseanomaly.BlockedWindowCount) error {
+	action := fmt.Sprintf("lower(action) IN (%s)", model.BlockedInClause())
+	src := ipv4AsUInt32SQL("src_ip")
+	dst := ipv4AsUInt32SQL("dst_ip")
+	pred := fmt.Sprintf(
+		"countIf(timestamp >= ? AND timestamp < ? AND %s AND (%s BETWEEN ? AND ? OR %s BETWEEN ? AND ?))",
+		action, src, dst,
+	)
+	cols := make([]string, 0, len(nets)*2)
+	args := make([]any, 0, len(nets)*12+2)
+	for _, n := range nets {
+		cols = append(cols, pred, pred)
+		args = append(args,
+			currStart, currEnd, n.Start, n.End, n.Start, n.End,
+			prevStart, prevEnd, n.Start, n.End, n.Start, n.End,
+		)
+	}
+	args = append(args, prevStart, currEnd)
+	q := fmt.Sprintf(`SELECT %s FROM traffic_logs WHERE timestamp >= ? AND timestamp < ?`, strings.Join(cols, ", "))
+	vals := make([]uint64, len(nets)*2)
+	ptrs := make([]any, len(vals))
+	for i := range vals {
+		ptrs[i] = &vals[i]
+	}
+	if err := r.ch.QueryRow(ctx, q, args...).Scan(ptrs...); err != nil {
+		return err
+	}
+	for i := range nets {
+		dest[i] = usecaseanomaly.BlockedWindowCount{Current: vals[i*2], Previous: vals[i*2+1]}
+	}
+	return nil
 }
 
 func (r *Repository) CurrentCountries(ctx context.Context, window time.Duration, minN uint64, nets []usecaseanomaly.IPRange) ([]usecaseanomaly.CountryCount, error) {

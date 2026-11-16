@@ -134,6 +134,14 @@ type ScanResult struct {
 	Skipped  string
 	Learning bool
 	Error    string
+	// Missed — детекторы, которые не стартовали: общий бюджет тика уже истёк.
+	Missed []string
+}
+
+// BlockedWindowCount — blocked-события сети в текущем и предыдущем окне.
+type BlockedWindowCount struct {
+	Current  uint64
+	Previous uint64
 }
 
 // PortScanHit — кандидат port_scan.

@@ -1562,8 +1562,10 @@ export interface paths {
         };
         /**
          * Readiness
-         * @description ClickHouse ping + краткий снимок ingest. HTTP 503 только если ClickHouse
-         *     недоступен. Перегрузка ingest — status при HTTP 200 (`degraded` / `overloaded`).
+         * @description ClickHouse ping, схема таблиц для `/api/events` и краткий снимок ingest.
+         *     HTTP 503, если ClickHouse недоступен или схема ещё не обеспечена
+         *     (`error`: `http schema not ready`). Перегрузка ingest — status при HTTP 200
+         *     (`degraded` / `overloaded`).
          */
         get: {
             parameters: {
@@ -1583,7 +1585,7 @@ export interface paths {
                         "application/json": components["schemas"]["HealthResponse"];
                     };
                 };
-                /** @description ClickHouse недоступен */
+                /** @description ClickHouse недоступен или схема для /api/events ещё не обеспечена */
                 503: {
                     headers: {
                         [name: string]: unknown;
@@ -1626,7 +1628,7 @@ export interface paths {
                         "application/json": components["schemas"]["HealthResponse"];
                     };
                 };
-                /** @description ClickHouse недоступен */
+                /** @description ClickHouse недоступен или схема для /api/events ещё не обеспечена */
                 503: {
                     headers: {
                         [name: string]: unknown;
@@ -5221,11 +5223,11 @@ export interface components {
             /** @enum {string} */
             status: "live";
         };
-        /** @description Readiness (`GET /ready`). HTTP 503 только если ClickHouse недоступен. Перегрузка ingest отражается в status при HTTP 200. Детали — /api/ingest/stats и /api/system/stats. */
+        /** @description Readiness (`GET /ready`). HTTP 503, если ClickHouse недоступен или схема для /api/events ещё не обеспечена (`error`: `http schema not ready`). Перегрузка ingest отражается в status при HTTP 200. Детали — /api/ingest/stats и /api/system/stats. */
         HealthResponse: {
             ok?: boolean;
             /**
-             * @description healthy — норма; degraded — очередь ≥75% или есть drops; overloaded — очередь ≥90%, drops/s ≥100 или ingest error; unavailable — ClickHouse недоступен (HTTP 503).
+             * @description healthy — норма; degraded — очередь ≥75% или есть drops; overloaded — очередь ≥90%, drops/s ≥100 или ingest error; unavailable — ClickHouse недоступен или схема для /api/events ещё не обеспечена (HTTP 503).
              * @enum {string}
              */
             status?: "healthy" | "degraded" | "overloaded" | "unavailable";

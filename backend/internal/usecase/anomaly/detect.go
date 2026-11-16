@@ -97,21 +97,26 @@ func (s *Service) detectBlockedSurge(ctx context.Context, now time.Time, th Thre
 	if err != nil {
 		return nil, err
 	}
-	out := make([]Event, 0)
+	active := make([]IPRange, 0, len(nets))
 	for _, n := range nets {
-		net := n
-		key := SuppressionKey(CodeBlockedSurge + "|net|" + net.Network)
+		key := SuppressionKey(CodeBlockedSurge + "|net|" + n.Network)
 		if _, ok := recent[key]; ok {
 			continue
 		}
-		curr, err := s.scan.BlockedCount(ctx, currStart, now, &net)
-		if err != nil {
-			return nil, err
-		}
-		prev, err := s.scan.BlockedCount(ctx, prevStart, currStart, &net)
-		if err != nil {
-			return nil, err
-		}
+		active = append(active, n)
+	}
+	counts, err := s.scan.BlockedCounts(ctx, currStart, now, prevStart, currStart, active)
+	if err != nil {
+		return nil, err
+	}
+	if len(counts) != len(active) {
+		return nil, fmt.Errorf("blocked counts: got %d, want %d", len(counts), len(active))
+	}
+	out := make([]Event, 0)
+	for i, net := range active {
+		key := SuppressionKey(CodeBlockedSurge + "|net|" + net.Network)
+		curr := counts[i].Current
+		prev := counts[i].Previous
 		if prev < th.SurgeFloor {
 			continue
 		}

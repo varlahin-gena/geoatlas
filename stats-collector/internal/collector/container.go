@@ -1,7 +1,7 @@
 package collector
 
 import (
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -11,7 +11,7 @@ import (
 )
 
 var commToTarget = map[string]string{
-	"geoatlas": "backend",
+	"geoatlas":        "backend",
 	"clickhouse-serv": "clickhouse",
 	"clickhouse":      "clickhouse",
 	"syslog-ng":       "syslog-ng",
@@ -98,7 +98,7 @@ func (c *Collector) FindCgroupPaths() map[string]string {
 
 	entries, err := os.ReadDir(c.cfg.HostProcRoot)
 	if err != nil {
-		log.Printf("cannot read %s: %v", c.cfg.HostProcRoot, err)
+		slog.Warn("cannot read proc", "path", c.cfg.HostProcRoot, "err", err)
 		return result
 	}
 
@@ -257,7 +257,7 @@ func (c *Collector) collectContainerMetrics(ts time.Time) []Metric {
 	out := []Metric{}
 	paths := c.FindCgroupPaths()
 	if len(paths) == 0 {
-		log.Printf("warning: no container cgroups found in %s", c.cfg.HostProcRoot)
+		slog.Warn("no container cgroups found", "path", c.cfg.HostProcRoot)
 		return out
 	}
 

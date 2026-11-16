@@ -18,6 +18,7 @@ import (
 	appmetrics "geoatlas/internal/adapter/metrics"
 	"geoatlas/internal/adapter/reputationjob"
 	"geoatlas/internal/config"
+	usecasesystem "geoatlas/internal/usecase/system"
 )
 
 type app struct {
@@ -33,6 +34,7 @@ type app struct {
 	heavy       *heavytask.Limiter
 	skipGate    *heavytask.DeferredGate
 	dataLock    *datalock.Lock
+	httpSchema  *usecasesystem.HTTPSchemaGate
 	bgCancel    context.CancelFunc
 	bgWg        sync.WaitGroup
 	ingestDone  chan error
@@ -87,6 +89,7 @@ func buildApp(ctx context.Context, cfg config.Config) (*app, error) {
 		dataLock:   dataLock,
 		heavy:      heavytask.New(1),
 		skipGate:   heavytask.NewDeferredGate(),
+		httpSchema: &usecasesystem.HTTPSchemaGate{},
 	}
 
 	bg := wireBackground(ctx, bgCtx, a, cfg)

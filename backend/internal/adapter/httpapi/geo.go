@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"geoatlas/internal/apperr"
 )
@@ -18,7 +17,8 @@ func (h *GeoHandler) UploadGeo(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "geo service unavailable"})
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Minute)
+	extendConnDeadline(w, longIOTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), longIOTimeout)
 	defer cancel()
 
 	dryRun := isDryRun(r)

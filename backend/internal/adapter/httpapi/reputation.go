@@ -17,7 +17,8 @@ func (h *ReputationHandler) UploadReputation(w http.ResponseWriter, r *http.Requ
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "reputation service unavailable"})
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Minute)
+	extendConnDeadline(w, longIOTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), longIOTimeout)
 	defer cancel()
 
 	dryRun := isDryRun(r)
@@ -68,6 +69,7 @@ func (h *ReputationHandler) DeleteList(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "reputation service unavailable"})
 		return
 	}
+	extendConnDeadline(w, 10*time.Minute)
 	name := r.PathValue("name")
 	if err := h.reputationUC.DeleteList(r.Context(), name); err != nil {
 		writeDomainError(w, "reputation delete failed", err)
@@ -81,6 +83,7 @@ func (h *ReputationHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "reputation service unavailable"})
 		return
 	}
+	extendConnDeadline(w, 10*time.Minute)
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Minute)
 	defer cancel()
 	force := strings.EqualFold(r.URL.Query().Get("force"), "1") ||

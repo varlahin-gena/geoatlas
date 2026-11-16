@@ -23,6 +23,7 @@ import (
 	"geoatlas/internal/usecase/connectors"
 	usecasereputation "geoatlas/internal/usecase/reputation"
 	usecaseretention "geoatlas/internal/usecase/retention"
+	usecasesystem "geoatlas/internal/usecase/system"
 )
 
 // backgroundParts — индексы/UC, нужные ingest и HTTP после wireBackground.
@@ -58,6 +59,9 @@ func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backg
 	// IP-тип логов — до geo MV/enrich JOIN (IPv4 = IPv4).
 	if err := migrate.EnsureHTTPSchema(ctx, a.pools.Background); err != nil {
 		slog.Warn("http schema ensure (early) failed", "err", err)
+		a.httpSchema.Mark(err)
+	} else {
+		a.httpSchema.Mark(nil)
 	}
 
 	var repIdx *repstore.ReloadableReputationIndex
@@ -138,7 +142,8 @@ func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backg
 	go func() {
 		defer a.bgWg.Done()
 		bootstrap.RunStartup(bgCtx, bootstrap.Dependencies{
-			Schema: bgStore, Backfill: bgStore, Ready: bgStore,
+			Schema:   httpSchemaMark{SchemaEnsurer: bgStore, gate: a.httpSchema},
+			Backfill: bgStore, Ready: bgStore,
 			Enrich: a.geoJobs, Geo: geo, Retention: retentionUC,
 			Gate: a.skipGate,
 		}, bootstrap.Options{
@@ -160,6 +165,18 @@ func wireBackground(ctx, bgCtx context.Context, a *app, cfg config.Config) backg
 		retentionUC:  retentionUC,
 		connectorsUC: connectorsUC,
 	}
+}
+
+// httpSchemaMark повторяет результат EnsureHTTPSchema в гейт /ready.
+type httpSchemaMark struct {
+	bootstrap.SchemaEnsurer
+	gate *usecasesystem.HTTPSchemaGate
+}
+
+func (m httpSchemaMark) EnsureHTTPSchema(ctx context.Context) error {
+	err := m.SchemaEnsurer.EnsureHTTPSchema(ctx)
+	m.gate.Mark(err)
+	return err
 }
 
 func reputationFeedsFromConfig(feeds []config.ReputationFeed) []usecasereputation.Feed {

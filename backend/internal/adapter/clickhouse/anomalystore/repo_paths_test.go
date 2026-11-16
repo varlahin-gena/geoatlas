@@ -190,6 +190,11 @@ func TestTrafficScansHappyPaths(t *testing.T) {
 	if _, err := r.BlockedCount(ctx, now.Add(-time.Hour), now, nil); err != nil {
 		t.Fatal(err)
 	}
+	ch.pushRow(uint64(4), uint64(2))
+	got, err := r.BlockedCounts(ctx, now.Add(-15*time.Minute), now, now.Add(-30*time.Minute), now.Add(-15*time.Minute), nets)
+	if err != nil || len(got) != 1 || got[0].Current != 4 || got[0].Previous != 2 {
+		t.Fatalf("%+v %v", got, err)
+	}
 
 	ch.pushQuery([]any{"CN", uint64(5)})
 	if cc, err := r.CurrentCountries(ctx, time.Hour, 1, nets); err != nil || len(cc) != 1 {
