@@ -275,6 +275,30 @@ func (r *Repository) RecentSuppressionKeys(ctx context.Context, code string, key
 	return out, rows.Err()
 }
 
+func (r *Repository) OpenBySuppression(ctx context.Context, key usecaseanomaly.SuppressionKey) (bool, error) {
+	if r == nil || r.ch == nil || strings.TrimSpace(string(key)) == "" {
+		return false, nil
+	}
+	rows, err := r.ch.Query(ctx, `
+		SELECT e.fingerprint
+		FROM anomaly_events AS e
+		LEFT JOIN (
+			SELECT fingerprint
+			FROM anomaly_acks
+			GROUP BY fingerprint
+		) AS a ON e.fingerprint = a.fingerprint
+		WHERE e.suppression_key = ?
+		  AND a.fingerprint = ''
+		LIMIT 1
+	`, string(key))
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	open := rows.Next()
+	return open, rows.Err()
+}
+
 func (r *Repository) Ack(ctx context.Context, fingerprint, by string, suppressFor time.Duration) error {
 	if r == nil || r.ch == nil {
 		return fmt.Errorf("clickhouse not configured")

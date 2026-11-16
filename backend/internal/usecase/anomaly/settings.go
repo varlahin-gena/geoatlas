@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
+	"strings"
 	"time"
 
 	"geoatlas/internal/apperr"
@@ -30,6 +32,7 @@ const (
 	maxBeaconRegularity = 1.0
 	minBeaconHours      = 1
 	maxBeaconHours      = 168
+	maxFanoutExclude    = 200
 )
 
 var (
@@ -38,14 +41,16 @@ var (
 
 // Settings — редактируемые параметры движка (JSON на диске).
 type Settings struct {
-	Enabled            bool        `json:"enabled"`
-	ScanIntervalMin    int         `json:"scan_interval_min"`
-	LearningDays       int         `json:"learning_days"`
-	SuppressHours      int         `json:"suppress_hours"`
-	IncludePrivate     bool        `json:"include_private"`
-	NewCountryMinShare float64     `json:"new_country_min_share"`
-	Thresholds         *Thresholds `json:"thresholds,omitempty"`
-	UpdatedAt          string      `json:"updated_at,omitempty"`
+	Enabled            bool    `json:"enabled"`
+	ScanIntervalMin    int     `json:"scan_interval_min"`
+	LearningDays       int     `json:"learning_days"`
+	SuppressHours      int     `json:"suppress_hours"`
+	IncludePrivate     bool    `json:"include_private"`
+	NewCountryMinShare float64 `json:"new_country_min_share"`
+	// FanoutExclude — источники, которые не поднимают обход хостов предприятия.
+	FanoutExclude []string    `json:"fanout_exclude,omitempty"`
+	Thresholds    *Thresholds `json:"thresholds,omitempty"`
+	UpdatedAt     string      `json:"updated_at,omitempty"`
 }
 
 // SettingsStore — персистентность настроек.
@@ -211,6 +216,7 @@ func normalizeSettings(st Settings) Settings {
 	if st.NewCountryMinShare > maxNewCountryShare {
 		st.NewCountryMinShare = maxNewCountryShare
 	}
+	st.FanoutExclude = cleanFanoutExclude(st.FanoutExclude)
 	return st
 }
 
@@ -227,6 +233,10 @@ func validateSettings(in Settings) (Settings, error) {
 	if in.NewCountryMinShare < minNewCountryShare || in.NewCountryMinShare > maxNewCountryShare {
 		return Settings{}, fmt.Errorf("%w: new_country_min_share out of range", ErrInvalidAnomalySettings)
 	}
+	exclude, err := validateFanoutExclude(in.FanoutExclude)
+	if err != nil {
+		return Settings{}, err
+	}
 	if in.Thresholds != nil {
 		if err := validateThresholds(*in.Thresholds); err != nil {
 			return Settings{}, err
@@ -235,8 +245,64 @@ func validateSettings(in Settings) (Settings, error) {
 	out := normalizeSettings(in)
 	out.Enabled = in.Enabled
 	out.IncludePrivate = in.IncludePrivate
+	out.FanoutExclude = exclude
 	out.Thresholds = in.Thresholds
 	return out, nil
+}
+
+func validateFanoutExclude(in []string) ([]string, error) {
+	if len(in) > maxFanoutExclude {
+		return nil, fmt.Errorf("%w: fanout_exclude too long", ErrInvalidAnomalySettings)
+	}
+	seen := make(map[string]struct{}, len(in))
+	out := make([]string, 0, len(in))
+	for _, raw := range in {
+		trimmed := strings.TrimSpace(raw)
+		if trimmed == "" {
+			continue
+		}
+		ip := net.ParseIP(trimmed)
+		if ip == nil || ip.To4() == nil {
+			return nil, fmt.Errorf("%w: fanout_exclude %q", ErrInvalidAnomalySettings, trimmed)
+		}
+		s := ip.To4().String()
+		if _, ok := seen[s]; ok {
+			continue
+		}
+		seen[s] = struct{}{}
+		out = append(out, s)
+	}
+	if len(out) == 0 {
+		return nil, nil
+	}
+	return out, nil
+}
+
+func cleanFanoutExclude(in []string) []string {
+	if len(in) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(in))
+	out := make([]string, 0, len(in))
+	for _, raw := range in {
+		ip := net.ParseIP(strings.TrimSpace(raw))
+		if ip == nil || ip.To4() == nil {
+			continue
+		}
+		s := ip.To4().String()
+		if _, ok := seen[s]; ok {
+			continue
+		}
+		seen[s] = struct{}{}
+		out = append(out, s)
+		if len(out) >= maxFanoutExclude {
+			break
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func validateThresholds(th Thresholds) error {

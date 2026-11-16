@@ -21,9 +21,9 @@ func (r HuntAnomalyReporter) ReportHuntBreach(ctx context.Context, hunt hunts.Hu
 	if now.IsZero() {
 		now = time.Now().UTC()
 	}
-	title := fmt.Sprintf("Hunt «%s»: %d рёбер", hunt.Name, run.EdgeCount)
+	title := fmt.Sprintf("Охота «%s»: %d рёбер", hunt.Name, run.EdgeCount)
 	if run.PrevEdges > 0 && run.Ratio > 0 {
-		title = fmt.Sprintf("Hunt «%s»: %d рёбер (×%.1f)", hunt.Name, run.EdgeCount, run.Ratio)
+		title = fmt.Sprintf("Охота «%s»: %d рёбер (×%.1f)", hunt.Name, run.EdgeCount, run.Ratio)
 	}
 	fp := usecaseanomaly.FingerprintForHunt(hunt.ID, now)
 	ev := usecaseanomaly.Event{
@@ -42,9 +42,10 @@ func (r HuntAnomalyReporter) ReportHuntBreach(ctx context.Context, hunt hunts.Hu
 			"ratio":      run.Ratio,
 			"query_cost": run.QueryCost,
 		},
-		EventCount:  uint64(run.EdgeCount),
-		Fingerprint: fp,
-		ExpiresAt:   now.Add(30 * 24 * time.Hour),
+		EventCount:     uint64(run.EdgeCount),
+		Fingerprint:    fp,
+		SuppressionKey: usecaseanomaly.HuntSuppressionKey(hunt.ID),
+		ExpiresAt:      now.Add(30 * 24 * time.Hour),
 		Map: usecaseanomaly.MapLink{
 			Period:  hunt.Map.Period,
 			Group:   hunt.Map.GroupBy,

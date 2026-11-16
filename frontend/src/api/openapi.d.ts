@@ -5378,6 +5378,8 @@ export interface components {
             suppress_hours: number;
             include_private: boolean;
             new_country_min_share: number;
+            /** @description Адреса, которые не считаются обходом хостов в сети. */
+            fanout_exclude?: string[];
             thresholds?: components["schemas"]["AnomalyThresholds"];
             /** Format: date-time */
             updated_at?: string;

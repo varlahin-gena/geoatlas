@@ -173,11 +173,7 @@ func TestTrafficScansHappyPaths(t *testing.T) {
 	}
 
 	ch.pushQuery([]any{"1.1.1.1", uint64(20), uint64(50), "RU"})
-	if hits, err := r.PortScan(ctx, time.Hour, 10, 10, false, nets); err != nil || len(hits) != 1 {
-		t.Fatalf("%v %v", hits, err)
-	}
-	ch.pushQuery([]any{"1.1.1.1", "1.1.1.0/24", uint64(30), uint64(40)})
-	if hits, err := r.HorizontalScan(ctx, time.Hour, 10, 10, true, nil); err != nil || len(hits) != 1 {
+	if hits, err := r.PortScan(ctx, time.Hour, 10, 10, nets); err != nil || len(hits) != 1 {
 		t.Fatalf("%v %v", hits, err)
 	}
 
@@ -222,12 +218,12 @@ func TestTrafficScansHappyPaths(t *testing.T) {
 	}
 
 	ch.pushQuery([]any{"1.1.1.1", "2.2.2.2", uint64(3), "RU", "US"})
-	if edges, err := r.RecentEdges(ctx, time.Hour, 0, nil); err != nil || len(edges) != 1 {
+	if edges, err := r.ReputationEdges(ctx, time.Hour, 1, 0, nil); err != nil || len(edges) != 1 {
 		t.Fatalf("%v %v", edges, err)
 	}
-	ch.pushQueryErr(errors.New("missing"))
+	ch.pushQueryErr(errors.New("unknown table"))
 	ch.pushQuery([]any{"1.1.1.1", "2.2.2.2", uint64(1), "RU", "US"})
-	if _, err := r.RecentEdges(ctx, time.Hour, 5, nets); err != nil {
+	if _, err := r.ReputationEdges(ctx, time.Hour, 1, 5, nets); err != nil {
 		t.Fatal(err)
 	}
 
@@ -244,18 +240,18 @@ func TestTrafficScansHappyPaths(t *testing.T) {
 		t.Fatalf("%v %v", m, err)
 	}
 
-	ch.pushQuery([]any{"1.1.1.1", uint64(1000), uint64(10)})
-	if hits, err := r.ByteSurge(ctx, time.Second, 1, 100, nil); err != nil || len(hits) != 1 {
+	ch.pushQuery([]any{"1.1.1.1", "2.2.2.2", uint64(1000), uint64(10), uint64(4), "out"})
+	if hits, err := r.ByteSurge(ctx, time.Second, 1, 100, nil); err != nil || len(hits) != 1 || hits[0].Direction != "out" {
 		t.Fatalf("%v %v", hits, err)
 	}
-	ch.pushQueryErr(errors.New("missing"))
-	ch.pushQuery([]any{"1.1.1.1", uint64(1000), uint64(10)})
+	ch.pushQueryErr(errors.New("unknown table"))
+	ch.pushQuery([]any{"1.1.1.1", "2.2.2.2", uint64(1000), uint64(10), uint64(4), "in"})
 	if _, err := r.ByteSurge(ctx, time.Hour, 1, 100, nets); err != nil {
 		t.Fatal(err)
 	}
 
 	ch.pushQuery([]any{"1.1.1.1", uint64(8), uint64(20)})
-	if hits, err := r.LateralFanout(ctx, time.Hour, 5, 5, nets); err != nil || len(hits) != 1 {
+	if hits, err := r.LateralFanout(ctx, time.Hour, 5, 5, nets, nil); err != nil || len(hits) != 1 {
 		t.Fatalf("%v %v", hits, err)
 	}
 }

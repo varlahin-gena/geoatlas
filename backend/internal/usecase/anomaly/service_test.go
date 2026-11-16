@@ -20,6 +20,7 @@ type fakeStore struct {
 	ackedFingerprint string
 	ackedBy          string
 	ackedSuppressFor time.Duration
+	open             map[SuppressionKey]struct{}
 	assignedTo       string
 	assignedBy       string
 	assignErr        error
@@ -77,31 +78,36 @@ func (f *fakeStore) AssignIfEmpty(ctx context.Context, fingerprint, assignedTo, 
 func (f *fakeStore) CountSummary(context.Context, time.Time) (Summary, error) {
 	return f.summary, nil
 }
+func (f *fakeStore) OpenBySuppression(_ context.Context, key SuppressionKey) (bool, error) {
+	if f.open == nil {
+		return false, nil
+	}
+	_, ok := f.open[key]
+	return ok, nil
+}
 
 type fakeScan struct {
-	oldest       time.Time
-	now          time.Time
-	ports        []PortScanHit
-	horiz        []HorizontalScanHit
-	blockedCurr  uint64
-	blockedPrev  uint64
-	hasBlocked   bool
-	countries    []CountryCount
-	countryTotal uint64
-	baseline     map[string]struct{}
-	edges        []EdgeRow
-	knownPairs   map[string]struct{}
-	byteSurge    []ByteSurgeHit
-	beaconing    []BeaconingHit
-	lateral      []LateralFanoutHit
+	oldest        time.Time
+	now           time.Time
+	ports         []PortScanHit
+	blockedCurr   uint64
+	blockedPrev   uint64
+	hasBlocked    bool
+	blockedSrc    []BlockedPeer
+	blockedDst    []BlockedPeer
+	hostCountries []HostCountryHit
+	hostBaseline  map[string]struct{}
+	edges         []EdgeRow
+	knownPairs    map[string]struct{}
+	byteSurge     []ByteSurgeHit
+	beaconing     []BeaconingHit
+	seen          map[string]struct{}
+	lateral       []LateralFanoutHit
 }
 
 func (f *fakeScan) OldestLogTime(context.Context) (time.Time, error) { return f.oldest, nil }
-func (f *fakeScan) PortScan(context.Context, time.Duration, int, int, bool, []IPRange) ([]PortScanHit, error) {
+func (f *fakeScan) PortScan(context.Context, time.Duration, int, int, []IPRange) ([]PortScanHit, error) {
 	return f.ports, nil
-}
-func (f *fakeScan) HorizontalScan(context.Context, time.Duration, int, int, bool, []IPRange) ([]HorizontalScanHit, error) {
-	return f.horiz, nil
 }
 func (f *fakeScan) BlockedCounts(ctx context.Context, currStart, currEnd, prevStart, prevEnd time.Time, nets []IPRange) ([]BlockedWindowCount, error) {
 	out := make([]BlockedWindowCount, len(nets))
@@ -132,20 +138,29 @@ func (f *fakeScan) BlockedCount(_ context.Context, start, end time.Time, _ *IPRa
 	}
 	return f.blockedPrev, nil
 }
-func (f *fakeScan) CurrentCountries(context.Context, time.Duration, uint64, []IPRange) ([]CountryCount, error) {
-	return f.countries, nil
+func (f *fakeScan) BlockedPeers(context.Context, time.Time, time.Time, IPRange, int) ([]BlockedPeer, []BlockedPeer, error) {
+	return f.blockedSrc, f.blockedDst, nil
 }
-func (f *fakeScan) CurrentCountryTotal(context.Context, time.Duration, []IPRange) (uint64, error) {
-	return f.countryTotal, nil
+func (f *fakeScan) HostCountries(context.Context, time.Duration, uint64, []IPRange) ([]HostCountryHit, error) {
+	return f.hostCountries, nil
 }
-func (f *fakeScan) BaselineCountries(context.Context, int, uint64, []IPRange) (map[string]struct{}, error) {
-	if f.baseline == nil {
+func (f *fakeScan) HostCountryBaseline(context.Context, int, uint64, []IPRange) (map[string]struct{}, error) {
+	if f.hostBaseline == nil {
 		return map[string]struct{}{}, nil
 	}
-	return f.baseline, nil
+	return f.hostBaseline, nil
 }
-func (f *fakeScan) RecentEdges(context.Context, time.Duration, int, []IPRange) ([]EdgeRow, error) {
+func (f *fakeScan) ReputationEdges(context.Context, time.Duration, uint64, int, []IPRange) ([]EdgeRow, error) {
 	return f.edges, nil
+}
+func (f *fakeScan) SeenIPs(_ context.Context, ips []string, _, _ time.Time) (map[string]struct{}, error) {
+	out := map[string]struct{}{}
+	for _, ip := range ips {
+		if _, ok := f.seen[ip]; ok {
+			out[ip] = struct{}{}
+		}
+	}
+	return out, nil
 }
 func (f *fakeScan) KnownPairs(context.Context, [][2]string, time.Duration) (map[string]struct{}, error) {
 	if f.knownPairs == nil {
@@ -159,7 +174,7 @@ func (f *fakeScan) ByteSurge(context.Context, time.Duration, uint64, uint64, []I
 func (f *fakeScan) Beaconing(context.Context, time.Duration, int, uint64, []IPRange) ([]BeaconingHit, error) {
 	return f.beaconing, nil
 }
-func (f *fakeScan) LateralFanout(context.Context, time.Duration, int, int, []IPRange) ([]LateralFanoutHit, error) {
+func (f *fakeScan) LateralFanout(context.Context, time.Duration, int, int, []IPRange, []string) ([]LateralFanoutHit, error) {
 	return f.lateral, nil
 }
 
@@ -242,19 +257,6 @@ func TestPortScanBelowThreshold(t *testing.T) {
 	}
 }
 
-func TestHorizontalScanEmits(t *testing.T) {
-	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
-	store := &fakeStore{exist: map[string]struct{}{}}
-	scan := &fakeScan{
-		oldest: now.Add(-30 * 24 * time.Hour),
-		horiz:  []HorizontalScanHit{{SrcIP: "198.51.100.7", Net24: "203.0.113.0/24", Hosts: 50, Events: 90}},
-	}
-	res := withEnterprise(newSvc(store, scan, nil)).Scan(context.Background(), now)
-	if res.Inserted != 1 || store.inserted[0].Code != CodeHorizontalScan {
-		t.Fatalf("got %+v inserted=%v", store.inserted, res)
-	}
-}
-
 func TestBlockedSurgeFloor(t *testing.T) {
 	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
 	store := &fakeStore{exist: map[string]struct{}{}}
@@ -280,12 +282,16 @@ func TestBlockedSurgeEmits(t *testing.T) {
 		hasBlocked:  true,
 		blockedCurr: 2000,
 		blockedPrev: 80,
+		blockedSrc:  []BlockedPeer{{IP: "203.0.113.8", Events: 1800}},
 	}
 	res := withEnterprise(newSvc(store, scan, nil)).Scan(context.Background(), now)
 	found := false
 	for _, e := range store.inserted {
 		if e.Code == CodeBlockedSurge {
 			found = true
+			if e.Severity != SeverityHigh {
+				t.Fatalf("dominant source must be high, got %s", e.Severity)
+			}
 			if e.Device != "10.0.0.0/8" {
 				t.Fatalf("expected per-net device, got %q", e.Device)
 			}
@@ -352,8 +358,8 @@ func TestNewCountryLearningSkip(t *testing.T) {
 	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
 	store := &fakeStore{exist: map[string]struct{}{}}
 	scan := &fakeScan{
-		oldest:    now.Add(-2 * 24 * time.Hour),
-		countries: []CountryCount{{Country: "CN", N: 20}},
+		oldest:        now.Add(-2 * 24 * time.Hour),
+		hostCountries: []HostCountryHit{{SrcIP: "10.1.1.8", Country: "CN", Events: 20}},
 	}
 	res := newSvc(store, scan, nil).Scan(context.Background(), now)
 	if !res.Learning {
@@ -370,15 +376,13 @@ func TestNewCountryEmits(t *testing.T) {
 	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
 	store := &fakeStore{exist: map[string]struct{}{}}
 	scan := &fakeScan{
-		oldest:       now.Add(-30 * 24 * time.Hour),
-		countries:    []CountryCount{{Country: "CN", N: 20}},
-		countryTotal: 100,
-		baseline:     map[string]struct{}{"RU": {}},
+		oldest:        now.Add(-30 * 24 * time.Hour),
+		hostCountries: []HostCountryHit{{SrcIP: "10.1.1.8", Country: "CN", Events: 20}},
 	}
 	res := withEnterprise(newSvc(store, scan, nil)).Scan(context.Background(), now)
 	found := false
 	for _, e := range store.inserted {
-		if e.Code == CodeNewCountryDst {
+		if e.Code == CodeNewCountryDst && e.SrcIP == "10.1.1.8" {
 			found = true
 		}
 	}
@@ -479,38 +483,35 @@ func TestScanRecordsDetectorsSkippedWhenTickCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	res := withEnterprise(newSvc(store, scan, nil)).Scan(ctx, now)
-	if len(res.Missed) != 8 || res.Inserted != 0 || res.Error == "" {
+	if len(res.Missed) != 7 || res.Inserted != 0 || res.Error == "" {
 		t.Fatalf("missed=%v err=%q inserted=%d", res.Missed, res.Error, res.Inserted)
 	}
 }
 
-func TestNewCountryMinShareSkipsNoise(t *testing.T) {
+func TestNewCountryKnownHostSkips(t *testing.T) {
 	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
 	store := &fakeStore{exist: map[string]struct{}{}}
 	scan := &fakeScan{
-		oldest:       now.Add(-30 * 24 * time.Hour),
-		countries:    []CountryCount{{Country: "CN", N: 20}},
-		countryTotal: 1000,
-		baseline:     map[string]struct{}{"RU": {}},
+		oldest:        now.Add(-30 * 24 * time.Hour),
+		hostCountries: []HostCountryHit{{SrcIP: "10.1.1.8", Country: "CN", Events: 20}},
+		hostBaseline:  map[string]struct{}{"10.1.1.8|CN": {}},
 	}
 	res := withEnterprise(newSvc(store, scan, nil)).Scan(context.Background(), now)
 	if res.Inserted != 0 {
-		t.Fatalf("expected low-share country to skip, got %d", res.Inserted)
+		t.Fatalf("expected known host-country to skip, got %d", res.Inserted)
 	}
 }
 
 func TestNewCountryRepeatCooldownSkipsRecentRepeat(t *testing.T) {
 	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
-	key := suppressionKeyForCodeCountry(CodeNewCountryDst, "CN")
+	key := hostCountryKey("10.1.1.8", "CN")
 	store := &fakeStore{
 		exist:            map[string]struct{}{},
 		recentSuppressed: map[SuppressionKey]struct{}{key: {}},
 	}
 	scan := &fakeScan{
-		oldest:       now.Add(-30 * 24 * time.Hour),
-		countries:    []CountryCount{{Country: "CN", N: 20}},
-		countryTotal: 100,
-		baseline:     map[string]struct{}{"RU": {}},
+		oldest:        now.Add(-30 * 24 * time.Hour),
+		hostCountries: []HostCountryHit{{SrcIP: "10.1.1.8", Country: "CN", Events: 20}},
 	}
 	res := withEnterprise(newSvc(store, scan, nil)).Scan(context.Background(), now)
 	if res.Inserted != 0 {
@@ -617,7 +618,8 @@ func TestByteSurgeEmits(t *testing.T) {
 	scan := &fakeScan{
 		oldest: now.Add(-30 * 24 * time.Hour),
 		byteSurge: []ByteSurgeHit{{
-			SrcIP: "10.1.2.3", BytesNow: 600_000_000, BytesPrev: 10_000_000,
+			HostIP: "10.1.2.3", Peer: "198.51.100.9", BytesNow: 600_000_000, BytesPrev: 10_000_000,
+			Events: 12, Direction: "out",
 		}},
 	}
 	res := withEnterprise(newSvc(store, scan, nil)).Scan(context.Background(), now)
@@ -711,6 +713,117 @@ func TestBeaconingEmits(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("beaconing missing inserted=%d err=%s", res.Inserted, res.Error)
+	}
+}
+
+func TestBeaconingKnownExternalSkips(t *testing.T) {
+	now := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	hours := make([]int64, 0, 12)
+	base := now.Add(-24 * time.Hour).Unix()
+	for i := 0; i < 12; i++ {
+		hours = append(hours, base+int64(i)*3600)
+	}
+	store := &fakeStore{exist: map[string]struct{}{}}
+	scan := &fakeScan{
+		oldest: now.Add(-30 * 24 * time.Hour),
+		seen:   map[string]struct{}{"203.0.113.9": {}},
+		beaconing: []BeaconingHit{{
+			SrcIP: "10.0.0.8", DstIP: "203.0.113.9",
+			ActiveHours: 12, TotalBytes: 1_200_000, Events: 40, HourUnix: hours,
+		}},
+	}
+	res := withEnterprise(newSvc(store, scan, nil)).Scan(context.Background(), now)
+	for _, e := range store.inserted {
+		if e.Code == CodeBeaconing {
+			t.Fatalf("known external must not emit, inserted=%d", res.Inserted)
+		}
+	}
+}
+
+func TestBeaconingReputationDuringLearning(t *testing.T) {
+	now := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	hours := make([]int64, 0, 12)
+	base := now.Add(-24 * time.Hour).Unix()
+	for i := 0; i < 12; i++ {
+		hours = append(hours, base+int64(i)*3600)
+	}
+	store := &fakeStore{exist: map[string]struct{}{}}
+	scan := &fakeScan{
+		oldest: now.Add(-2 * 24 * time.Hour),
+		beaconing: []BeaconingHit{{
+			SrcIP: "10.0.0.8", DstIP: "203.0.113.9",
+			ActiveHours: 12, TotalBytes: 1_200_000, Events: 40, HourUnix: hours,
+		}},
+	}
+	rep := fakeRep{hits: map[string][]model.ReputationHit{
+		"203.0.113.9": {{List: "spamhaus_drop", Category: "drop"}},
+	}}
+	res := withEnterprise(newSvc(store, scan, rep)).Scan(context.Background(), now)
+	if !res.Learning {
+		t.Fatal("expected learning")
+	}
+	found := false
+	for _, e := range store.inserted {
+		if e.Code == CodeBeaconing {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("reputation beacon must emit during learning")
+	}
+}
+
+func TestByteSurgeDedupsInternalPair(t *testing.T) {
+	now := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	store := &fakeStore{exist: map[string]struct{}{}}
+	hit := ByteSurgeHit{BytesNow: 600_000_000, BytesPrev: 10_000_000, Events: 12}
+	outHit := hit
+	outHit.HostIP, outHit.Peer, outHit.Direction = "10.1.2.3", "10.1.2.9", "out"
+	inHit := hit
+	inHit.HostIP, inHit.Peer, inHit.Direction = "10.1.2.9", "10.1.2.3", "in"
+	scan := &fakeScan{
+		oldest:    now.Add(-30 * 24 * time.Hour),
+		byteSurge: []ByteSurgeHit{inHit, outHit},
+	}
+	res := withEnterprise(newSvc(store, scan, nil)).Scan(context.Background(), now)
+	n := 0
+	for _, e := range store.inserted {
+		if e.Code == CodeByteSurge {
+			n++
+			if !strings.Contains(e.Title, "исходящего") {
+				t.Fatalf("kept the wrong direction: %s", e.Title)
+			}
+		}
+	}
+	if n != 1 {
+		t.Fatalf("internal pair must be one case, got %d inserted=%d", n, res.Inserted)
+	}
+}
+
+func TestHuntOpenSkipsRepeat(t *testing.T) {
+	now := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	key := HuntSuppressionKey("hunt-1")
+	store := &fakeStore{open: map[SuppressionKey]struct{}{key: {}}}
+	svc := newSvc(store, &fakeScan{}, nil)
+	ev := Event{
+		Code:           CodeHuntThreshold,
+		SuppressionKey: key,
+		Fingerprint:    FingerprintForHunt("hunt-1", now),
+		DetectedAt:     now,
+	}
+	if err := svc.InsertSynthetic(context.Background(), []Event{ev}, now); err != nil {
+		t.Fatal(err)
+	}
+	if len(store.inserted) != 0 {
+		t.Fatalf("open hunt must not insert again: %+v", store.inserted)
+	}
+	store.open = nil
+	ev.Fingerprint = FingerprintForHunt("hunt-1", now.Add(time.Minute))
+	if err := svc.InsertSynthetic(context.Background(), []Event{ev}, now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if len(store.inserted) != 1 {
+		t.Fatalf("closed hunt must insert the next breach, got %d", len(store.inserted))
 	}
 }
 

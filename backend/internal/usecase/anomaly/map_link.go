@@ -20,7 +20,13 @@ func MapLinkFor(e Event) MapLink {
 		}
 	case CodeByteSurge:
 		if src := strings.TrimSpace(e.SrcIP); src != "" {
-			return MapLink{Period: "2h", Group: "ip", Filter: "all", Query: "src:" + src}
+			query := "src:" + src
+			if e.Detail != nil {
+				if dir, _ := e.Detail["direction"].(string); dir == "in" {
+					query = "dst:" + src
+				}
+			}
+			return MapLink{Period: "2h", Group: "ip", Filter: "all", Query: query}
 		}
 	case CodeBeaconing, CodeRepNewDst:
 		src := strings.TrimSpace(e.SrcIP)
@@ -35,6 +41,13 @@ func MapLinkFor(e Event) MapLink {
 		}
 		return MapLink{Period: period, Group: "ip", Filter: "all", Query: q}
 	case CodeNewCountryDst:
+		if src := strings.TrimSpace(e.SrcIP); src != "" {
+			q := "src:" + src
+			if country := strings.TrimSpace(e.DstCountry); country != "" {
+				q += " dst:" + country
+			}
+			return MapLink{Period: "1h", Group: "ip", Filter: "all", Query: q, Country: strings.TrimSpace(e.DstCountry)}
+		}
 		if country := strings.TrimSpace(e.DstCountry); country != "" {
 			return MapLink{Period: "1h", Group: "country", Filter: "all", Query: "dst:" + country, Country: country}
 		}

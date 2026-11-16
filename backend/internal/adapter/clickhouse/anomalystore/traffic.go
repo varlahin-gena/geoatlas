@@ -24,8 +24,9 @@ func (r *Repository) OldestLogTime(ctx context.Context) (time.Time, error) {
 	return t, err
 }
 
-func (r *Repository) PortScan(ctx context.Context, window time.Duration, portsTh, eventsTh int, includePrivate bool, nets []usecaseanomaly.IPRange) ([]usecaseanomaly.PortScanHit, error) {
+func (r *Repository) PortScan(ctx context.Context, window time.Duration, portsTh, eventsTh int, nets []usecaseanomaly.IPRange) ([]usecaseanomaly.PortScanHit, error) {
 	touch, touchArgs := touchNetsSQL(nets)
+	blocked := fmt.Sprintf("AND lower(action) IN (%s)", model.BlockedInClause())
 	q := fmt.Sprintf(`
 		SELECT toString(src_ip) AS src_ip, uniqExact(dst_port) AS ports, count() AS events, any(src_country) AS src_country
 		FROM traffic_logs
@@ -38,7 +39,7 @@ func (r *Repository) PortScan(ctx context.Context, window time.Duration, portsTh
 		ORDER BY ports DESC
 		LIMIT 10
 		%s
-	`, int(window.Seconds()), privateSrcSQL(includePrivate), touch, query.AggSettings())
+	`, int(window.Seconds()), blocked, touch, query.AggSettings())
 	args := append(touchArgs, portsTh, eventsTh)
 	rows, err := r.ch.Query(ctx, q, args...)
 	if err != nil {
@@ -49,42 +50,6 @@ func (r *Repository) PortScan(ctx context.Context, window time.Duration, portsTh
 	for rows.Next() {
 		var h usecaseanomaly.PortScanHit
 		if err := rows.Scan(&h.SrcIP, &h.Ports, &h.Events, &h.SrcCountry); err != nil {
-			return nil, err
-		}
-		out = append(out, h)
-	}
-	return out, rows.Err()
-}
-
-func (r *Repository) HorizontalScan(ctx context.Context, window time.Duration, hostsTh, eventsTh int, includePrivate bool, nets []usecaseanomaly.IPRange) ([]usecaseanomaly.HorizontalScanHit, error) {
-	touch, touchArgs := touchNetsSQL(nets)
-	q := fmt.Sprintf(`
-		SELECT
-			toString(src_ip) AS src_ip,
-			concat(IPv4NumToString(bitAnd(%s, toUInt32(4294967040))), '/24') AS net24,
-			uniqExact(dst_ip) AS hosts,
-			count() AS events
-		FROM traffic_logs
-		WHERE timestamp >= now() - INTERVAL %d SECOND
-		  AND timestamp < now()
-		  %s
-		  %s
-		GROUP BY src_ip, net24
-		HAVING hosts >= ? AND events >= ?
-		ORDER BY hosts DESC
-		LIMIT 10
-		%s
-	`, ipv4AsUInt32SQL("dst_ip"), int(window.Seconds()), privateSrcSQL(includePrivate), touch, query.AggSettings())
-	args := append(touchArgs, hostsTh, eventsTh)
-	rows, err := r.ch.Query(ctx, q, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []usecaseanomaly.HorizontalScanHit
-	for rows.Next() {
-		var h usecaseanomaly.HorizontalScanHit
-		if err := rows.Scan(&h.SrcIP, &h.Net24, &h.Hosts, &h.Events); err != nil {
 			return nil, err
 		}
 		out = append(out, h)
@@ -258,36 +223,64 @@ func (r *Repository) BaselineCountries(ctx context.Context, days int, minN uint6
 	return scanCountrySet(rows, out)
 }
 
-func (r *Repository) RecentEdges(ctx context.Context, window time.Duration, limit int, nets []usecaseanomaly.IPRange) ([]usecaseanomaly.EdgeRow, error) {
+func (r *Repository) ReputationEdges(ctx context.Context, window time.Duration, minEvents uint64, limit int, nets []usecaseanomaly.IPRange) ([]usecaseanomaly.EdgeRow, error) {
 	if limit < 1 {
-		limit = 2000
+		limit = 100
 	}
+	if limit > 200 {
+		limit = 200
+	}
+	sec := int(window.Seconds())
 	src, srcArgs := colInNetsSQL("src_ip", nets)
+	srcU := ipv4AsUInt32SQL("e.src_ip")
+	dstU := ipv4AsUInt32SQL("e.dst_ip")
 	q := fmt.Sprintf(`
-		SELECT toString(src_ip), toString(dst_ip), sum(cnt) AS cnt,
-		       anyMerge(src_country), anyMerge(dst_country)
-		FROM traffic_edges_hourly
-		WHERE hour >= now() - INTERVAL %d SECOND
-		  %s
-		GROUP BY src_ip, dst_ip
+		SELECT toString(e.src_ip), toString(e.dst_ip), any(e.cnt) AS cnt,
+		       any(e.src_country), any(e.dst_country)
+		FROM (
+			SELECT src_ip, dst_ip, sum(cnt) AS cnt,
+			       anyMerge(src_country) AS src_country,
+			       anyMerge(dst_country) AS dst_country
+			FROM traffic_edges_hourly
+			WHERE hour >= now() - INTERVAL %d SECOND
+			  %s
+			GROUP BY src_ip, dst_ip
+			HAVING cnt >= ?
+		) AS e
+		INNER JOIN reputation_ranges AS r
+		  ON (%s BETWEEN r.start_ip AND r.end_ip OR %s BETWEEN r.start_ip AND r.end_ip)
+		GROUP BY e.src_ip, e.dst_ip
 		ORDER BY cnt DESC
 		LIMIT %d
 		%s
-	`, int(window.Seconds()), src, limit, query.AggSettings())
-	rows, err := r.ch.Query(ctx, q, srcArgs...)
+	`, sec, src, srcU, dstU, limit, query.AggSettings())
+	args := append(append([]any{}, srcArgs...), minEvents)
+	rows, err := r.ch.Query(ctx, q, args...)
 	if err != nil {
+		if !shouldFallbackToLogs(ctx, err) {
+			return nil, err
+		}
 		q2 := fmt.Sprintf(`
-			SELECT toString(src_ip), toString(dst_ip), count() AS cnt,
-			       any(src_country), any(dst_country)
-			FROM traffic_logs
-			WHERE timestamp >= now() - INTERVAL %d SECOND
-			  %s
-			GROUP BY src_ip, dst_ip
+			SELECT toString(e.src_ip), toString(e.dst_ip), any(e.cnt) AS cnt,
+			       any(e.src_country), any(e.dst_country)
+			FROM (
+				SELECT src_ip, dst_ip, count() AS cnt,
+				       any(src_country) AS src_country,
+				       any(dst_country) AS dst_country
+				FROM traffic_logs
+				WHERE timestamp >= now() - INTERVAL %d SECOND
+				  %s
+				GROUP BY src_ip, dst_ip
+				HAVING cnt >= ?
+			) AS e
+			INNER JOIN reputation_ranges AS r
+			  ON (%s BETWEEN r.start_ip AND r.end_ip OR %s BETWEEN r.start_ip AND r.end_ip)
+			GROUP BY e.src_ip, e.dst_ip
 			ORDER BY cnt DESC
 			LIMIT %d
 			%s
-		`, int(window.Seconds()), src, limit, query.AggSettings())
-		rows, err = r.ch.Query(ctx, q2, srcArgs...)
+		`, sec, src, srcU, dstU, limit, query.AggSettings())
+		rows, err = r.ch.Query(ctx, q2, args...)
 		if err != nil {
 			return nil, err
 		}
@@ -360,41 +353,12 @@ func (r *Repository) ByteSurge(ctx context.Context, window time.Duration, floor,
 		window = time.Hour
 	}
 	sec := int(window.Seconds())
-	src, srcArgs := colInNetsSQL("src_ip", nets)
-	q := fmt.Sprintf(`
-		SELECT
-			toString(src_ip) AS src_ip,
-			sumIf(bytes_sent, hour >= now() - INTERVAL %d SECOND AND hour < now())
-			  + sumIf(bytes_recv, hour >= now() - INTERVAL %d SECOND AND hour < now()) AS bytes_now,
-			sumIf(bytes_sent, hour >= now() - INTERVAL %d SECOND AND hour < now() - INTERVAL %d SECOND)
-			  + sumIf(bytes_recv, hour >= now() - INTERVAL %d SECOND AND hour < now() - INTERVAL %d SECOND) AS bytes_prev
-		FROM traffic_edges_hourly
-		WHERE hour >= now() - INTERVAL %d SECOND
-		  %s
-		GROUP BY src_ip
-		HAVING bytes_now >= ? AND bytes_prev >= ?
-		ORDER BY bytes_now DESC
-		LIMIT 10
-		%s
-	`, sec, sec, 2*sec, sec, 2*sec, sec, 2*sec, src, query.AggSettings())
-	args := append(srcArgs, absMin, floor)
-	rows, err := r.ch.Query(ctx, q, args...)
+	rows, err := r.ch.Query(ctx, byteSurgeSQL(true, sec, nets), byteSurgeArgs(absMin, floor, nets)...)
 	if err != nil {
-		q2 := fmt.Sprintf(`
-			SELECT
-				toString(src_ip) AS src_ip,
-				sumIf(bytes_sent + bytes_recv, timestamp >= now() - INTERVAL %d SECOND AND timestamp < now()) AS bytes_now,
-				sumIf(bytes_sent + bytes_recv, timestamp >= now() - INTERVAL %d SECOND AND timestamp < now() - INTERVAL %d SECOND) AS bytes_prev
-			FROM traffic_logs
-			WHERE timestamp >= now() - INTERVAL %d SECOND
-			  %s
-			GROUP BY src_ip
-			HAVING bytes_now >= ? AND bytes_prev >= ?
-			ORDER BY bytes_now DESC
-			LIMIT 10
-			%s
-		`, sec, 2*sec, sec, 2*sec, src, query.AggSettings())
-		rows, err = r.ch.Query(ctx, q2, args...)
+		if !shouldFallbackToLogs(ctx, err) {
+			return nil, err
+		}
+		rows, err = r.ch.Query(ctx, byteSurgeSQL(false, sec, nets), byteSurgeArgs(absMin, floor, nets)...)
 		if err != nil {
 			return nil, err
 		}
@@ -403,7 +367,7 @@ func (r *Repository) ByteSurge(ctx context.Context, window time.Duration, floor,
 	var out []usecaseanomaly.ByteSurgeHit
 	for rows.Next() {
 		var h usecaseanomaly.ByteSurgeHit
-		if err := rows.Scan(&h.SrcIP, &h.BytesNow, &h.BytesPrev); err != nil {
+		if err := rows.Scan(&h.HostIP, &h.Peer, &h.BytesNow, &h.BytesPrev, &h.Events, &h.Direction); err != nil {
 			return nil, err
 		}
 		out = append(out, h)
@@ -572,9 +536,9 @@ func shouldFallbackToLogs(ctx context.Context, err error) bool {
 	return strings.Contains(msg, "unknown table") || strings.Contains(msg, "doesn't exist")
 }
 
-func (r *Repository) LateralFanout(ctx context.Context, window time.Duration, hostsTh, eventsTh int, nets []usecaseanomaly.IPRange) ([]usecaseanomaly.LateralFanoutHit, error) {
-	src, srcArgs := colInNetsSQL("src_ip", nets)
+func (r *Repository) LateralFanout(ctx context.Context, window time.Duration, hostsTh, eventsTh int, nets []usecaseanomaly.IPRange, exclude []string) ([]usecaseanomaly.LateralFanoutHit, error) {
 	dst, dstArgs := colInNetsSQL("dst_ip", nets)
+	ex, exArgs := excludeSrcSQL(exclude)
 	q := fmt.Sprintf(`
 		SELECT toString(src_ip) AS src_ip, uniqExact(dst_ip) AS hosts, count() AS events
 		FROM traffic_logs
@@ -587,8 +551,8 @@ func (r *Repository) LateralFanout(ctx context.Context, window time.Duration, ho
 		ORDER BY hosts DESC
 		LIMIT 10
 		%s
-	`, int(window.Seconds()), src, dst, query.AggSettings())
-	args := append(append(srcArgs, dstArgs...), hostsTh, eventsTh)
+	`, int(window.Seconds()), dst, ex, query.AggSettings())
+	args := append(append(dstArgs, exArgs...), hostsTh, eventsTh)
 	rows, err := r.ch.Query(ctx, q, args...)
 	if err != nil {
 		return nil, err
@@ -658,6 +622,27 @@ func ipNetsSQL(cols []string, nets []usecaseanomaly.IPRange) (string, []any) {
 		return "", nil
 	}
 	return "AND (" + strings.Join(parts, " OR ") + ")", args
+}
+
+func excludeSrcSQL(ips []string) (string, []any) {
+	clean := make([]string, 0, len(ips))
+	for _, ip := range ips {
+		ip = strings.TrimSpace(ip)
+		if ip == "" {
+			continue
+		}
+		clean = append(clean, ip)
+	}
+	if len(clean) == 0 {
+		return "", nil
+	}
+	parts := make([]string, len(clean))
+	args := make([]any, len(clean))
+	for i, ip := range clean {
+		parts[i] = "?"
+		args[i] = ip
+	}
+	return "AND toString(src_ip) NOT IN (" + strings.Join(parts, ",") + ")", args
 }
 
 func privateSrcSQL(includePrivate bool) string {

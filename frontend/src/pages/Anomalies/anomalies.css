@@ -65,6 +65,7 @@
 }
 
 .anomaly-engine-field input,
+.anomaly-engine-field textarea,
 .anomaly-engine-form .form-row input[type='number'] {
   background: var(--panel-2);
   border: 1px solid var(--border);
@@ -77,9 +78,16 @@
 }
 
 .anomaly-engine-field input:focus,
+.anomaly-engine-field textarea:focus,
 .anomaly-engine-form .form-row input[type='number']:focus {
   border-color: var(--accent);
   outline: none;
+}
+
+.anomaly-engine-field textarea {
+  min-height: 88px;
+  resize: vertical;
+  width: min(420px, 100%);
 }
 
 .anomaly-engine-form .form-actions {

@@ -14,7 +14,7 @@ func (s *Service) detectPortScan(ctx context.Context, now time.Time, th Threshol
 	if len(nets) == 0 {
 		return nil, nil
 	}
-	hits, err := s.scan.PortScan(ctx, portScanWindow, th.PortScanPorts, th.PortScanEvents, s.cfgSnapshot().IncludePrivate, nets)
+	hits, err := s.scan.PortScan(ctx, portScanWindow, th.PortScanPorts, th.PortScanEvents, nets)
 	if err != nil {
 		return nil, err
 	}
@@ -32,51 +32,16 @@ func (s *Service) detectPortScan(ctx context.Context, now time.Time, th Threshol
 			Code:        CodePortScan,
 			Severity:    sev,
 			Score:       scoreAgainst(float64(h.Ports), float64(th.PortScanPorts), sev),
-			Title:       fmt.Sprintf("Сканирование портов · %s · %d портов за 5 мин", src, h.Ports),
+			Title:       fmt.Sprintf("Заблокированное сканирование портов · %s · %d портов за 5 мин", src, h.Ports),
 			Detail: map[string]any{
 				"src_ip": src, "unique_ports": h.Ports, "events": h.Events,
 				"window_minutes": 5, "threshold_ports": th.PortScanPorts,
+				"blocked_only": true,
 			},
 			SrcIP: src, SrcCountry: h.SrcCountry, EventCount: h.Events,
 			Fingerprint: fingerprint(CodePortScan, src, "", "", now),
 			// 2h so investigate/map peers still resolve after the 5m detect window ages.
 			Map: MapLink{Period: "2h", Group: "ip", Filter: "all", Query: "src:" + src},
-		}
-		out = append(out, e)
-	}
-	return out, nil
-}
-
-func (s *Service) detectHorizontalScan(ctx context.Context, now time.Time, th Thresholds, nets []IPRange) ([]Event, error) {
-	if len(nets) == 0 {
-		return nil, nil
-	}
-	hits, err := s.scan.HorizontalScan(ctx, horizontalScanWindow, th.HorizontalHosts, th.HorizontalEvents, s.cfgSnapshot().IncludePrivate, nets)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]Event, 0, len(hits))
-	for _, h := range hits {
-		src := displayIP(h.SrcIP)
-		if src == "" || h.Net24 == "" {
-			continue
-		}
-		sev := SeverityHigh
-		e := Event{
-			DetectedAt:  now,
-			WindowStart: now.Add(-horizontalScanWindow),
-			WindowEnd:   now,
-			Code:        CodeHorizontalScan,
-			Severity:    sev,
-			Score:       scoreAgainst(float64(h.Hosts), float64(th.HorizontalHosts), sev),
-			Title:       fmt.Sprintf("Обход подсети · %s · %d хостов в %s", src, h.Hosts, h.Net24),
-			Detail: map[string]any{
-				"src_ip": src, "net24": h.Net24, "hosts": h.Hosts, "events": h.Events,
-				"window_minutes": 5, "threshold_hosts": th.HorizontalHosts,
-			},
-			SrcIP: src, EventCount: h.Events,
-			Fingerprint: fingerprint(CodeHorizontalScan, src, "", h.Net24, now),
-			Map:         MapLink{Period: "2h", Group: "ip", Filter: "all", Query: "src:" + src},
 		}
 		out = append(out, e)
 	}
@@ -127,8 +92,12 @@ func (s *Service) detectBlockedSurge(ctx context.Context, now time.Time, th Thre
 		if curr < need {
 			continue
 		}
+		srcTop, dstTop, err := s.scan.BlockedPeers(ctx, currStart, now, net, 5)
+		if err != nil {
+			return nil, err
+		}
 		sev := SeverityWarn
-		if curr >= th.SurgeAbsMin*5 {
+		if blockedPeerDominates(curr, srcTop) || blockedPeerDominates(curr, dstTop) {
 			sev = SeverityHigh
 		}
 		where := net.Network
@@ -147,6 +116,7 @@ func (s *Service) detectBlockedSurge(ctx context.Context, now time.Time, th Thre
 				"blocked_current": curr, "blocked_previous": prev,
 				"ratio": th.SurgeRatio, "abs_min": th.SurgeAbsMin, "window_minutes": 15,
 				"network": net.Network, "label": net.Label,
+				"top_src": peerDetail(srcTop), "top_dst": peerDetail(dstTop),
 			},
 			Device:         net.Network,
 			EventCount:     curr,
@@ -163,25 +133,22 @@ func (s *Service) detectNewCountry(ctx context.Context, now time.Time, th Thresh
 	if len(nets) == 0 {
 		return nil, nil
 	}
-	cur, err := s.scan.CurrentCountries(ctx, countryWindow, th.NewCountryMin, nets)
+	cur, err := s.scan.HostCountries(ctx, countryWindow, th.NewCountryMin, nets)
 	if err != nil {
 		return nil, err
 	}
-	total, err := s.scan.CurrentCountryTotal(ctx, countryWindow, nets)
-	if err != nil {
-		return nil, err
-	}
-	base, err := s.scan.BaselineCountries(ctx, countryBaselineDays, th.NewCountryBaseline, nets)
+	base, err := s.scan.HostCountryBaseline(ctx, countryBaselineDays, th.NewCountryBaseline, nets)
 	if err != nil {
 		return nil, err
 	}
 	candidateKeys := make([]SuppressionKey, 0, len(cur))
 	for _, c := range cur {
+		src := displayIP(c.SrcIP)
 		cc := strings.TrimSpace(c.Country)
-		if cc == "" {
+		if src == "" || cc == "" {
 			continue
 		}
-		candidateKeys = append(candidateKeys, suppressionKeyForCodeCountry(CodeNewCountryDst, cc))
+		candidateKeys = append(candidateKeys, hostCountryKey(src, cc))
 	}
 	recent, err := s.store.RecentSuppressionKeys(ctx, CodeNewCountryDst, candidateKeys, now.Add(-s.cfgSnapshot().newCountryRepeatCooldown()))
 	if err != nil {
@@ -189,22 +156,16 @@ func (s *Service) detectNewCountry(ctx context.Context, now time.Time, th Thresh
 	}
 	out := make([]Event, 0)
 	for _, c := range cur {
+		src := displayIP(c.SrcIP)
 		cc := strings.TrimSpace(c.Country)
-		if cc == "" {
+		if src == "" || cc == "" {
 			continue
 		}
-		if _, ok := base[cc]; ok {
+		if _, ok := base[hostCountryBaselineID(src, cc)]; ok {
 			continue
 		}
-		key := suppressionKeyForCodeCountry(CodeNewCountryDst, cc)
+		key := hostCountryKey(src, cc)
 		if _, ok := recent[key]; ok {
-			continue
-		}
-		share := 0.0
-		if total > 0 {
-			share = float64(c.N) / float64(total)
-		}
-		if th.NewCountryMinShare > 0 && share < th.NewCountryMinShare {
 			continue
 		}
 		sev := SeverityWarn
@@ -214,16 +175,26 @@ func (s *Service) detectNewCountry(ctx context.Context, now time.Time, th Thresh
 			WindowEnd:   now,
 			Code:        CodeNewCountryDst,
 			Severity:    sev,
-			Score:       scoreAgainst(float64(c.N), float64(th.NewCountryMin), sev),
-			Title:       fmt.Sprintf("Новая страна · %s · %d событий за час", cc, c.N),
-			Detail:      map[string]any{"dst_country": cc, "events": c.N, "baseline_days": countryBaselineDays, "share": share},
-			DstCountry:  cc, EventCount: c.N,
-			Fingerprint:    fingerprint(CodeNewCountryDst, "", "", cc, now),
+			Score:       scoreAgainst(float64(c.Events), float64(th.NewCountryMin), sev),
+			Title:       fmt.Sprintf("Новая страна · %s · %s · %d событий за час", src, cc, c.Events),
+			Detail: map[string]any{
+				"src_ip": src, "dst_country": cc, "events": c.Events, "baseline_days": countryBaselineDays,
+			},
+			SrcIP: src, DstCountry: cc, EventCount: c.Events,
+			Fingerprint:    fingerprint(CodeNewCountryDst, src, "", cc, now),
 			SuppressionKey: key,
-			Map:            MapLink{Period: "1h", Group: "country", Filter: "all", Query: "dst:" + cc, Country: cc},
+			Map:            MapLink{Period: "1h", Group: "ip", Filter: "all", Query: "src:" + src + " dst:" + cc, Country: cc},
 		})
 	}
 	return out, nil
+}
+
+func hostCountryBaselineID(src, country string) string {
+	return src + "|" + country
+}
+
+func hostCountryKey(src, country string) SuppressionKey {
+	return SuppressionKey(CodeNewCountryDst + "|host|" + src + "|" + country)
 }
 
 func (s *Service) detectRepNewDst(ctx context.Context, now time.Time, th Thresholds, nets []IPRange) ([]Event, error) {
@@ -233,7 +204,7 @@ func (s *Service) detectRepNewDst(ctx context.Context, now time.Time, th Thresho
 	if s.rep == nil {
 		return nil, nil
 	}
-	edges, err := s.scan.RecentEdges(ctx, repWindow, 2000, nets)
+	edges, err := s.scan.ReputationEdges(ctx, repWindow, th.RepMinEvents, 100, nets)
 	if err != nil {
 		return nil, err
 	}
@@ -321,11 +292,32 @@ func (s *Service) detectByteSurge(ctx context.Context, now time.Time, th Thresho
 	if err != nil {
 		return nil, err
 	}
-	out := make([]Event, 0, len(hits))
+	ordered := make([]ByteSurgeHit, 0, len(hits))
+	inbound := make([]ByteSurgeHit, 0)
 	for _, h := range hits {
-		src := displayIP(h.SrcIP)
-		if src == "" || h.BytesPrev < th.ByteSurgeFloor {
+		if h.Direction == "in" {
+			inbound = append(inbound, h)
 			continue
+		}
+		ordered = append(ordered, h)
+	}
+	ordered = append(ordered, inbound...)
+	out := make([]Event, 0, len(ordered))
+	emittedPair := map[string]struct{}{}
+	for _, h := range ordered {
+		host := displayIP(h.HostIP)
+		peer := displayIP(h.Peer)
+		if host == "" || h.BytesPrev < th.ByteSurgeFloor {
+			continue
+		}
+		direction := h.Direction
+		if direction != "in" {
+			direction = "out"
+		}
+		if direction == "in" && peer != "" && ipInNets(host, nets) && ipInNets(peer, nets) {
+			if _, ok := emittedPair[hostPairKey(peer, host)]; ok {
+				continue
+			}
 		}
 		need := uint64(float64(h.BytesPrev) * th.ByteSurgeRatio)
 		if need < th.ByteSurgeAbsMin {
@@ -342,6 +334,19 @@ func (s *Service) detectByteSurge(ctx context.Context, now time.Time, th Thresho
 		if h.BytesNow >= th.ByteSurgeAbsMin*5 {
 			sev = SeverityHigh
 		}
+		title := fmt.Sprintf("Резкий рост исходящего трафика · %s · %s за час, было %s", host, formatBytes(h.BytesNow), formatBytes(h.BytesPrev))
+		query := "src:" + host
+		if direction == "in" {
+			title = fmt.Sprintf("Резкий рост входящего трафика · %s · %s за час, было %s", host, formatBytes(h.BytesNow), formatBytes(h.BytesPrev))
+			query = "dst:" + host
+		}
+		if peer != "" {
+			if direction == "in" {
+				title = fmt.Sprintf("Резкий рост входящего трафика · %s ← %s · %s за час, было %s", host, peer, formatBytes(h.BytesNow), formatBytes(h.BytesPrev))
+			} else {
+				title = fmt.Sprintf("Резкий рост исходящего трафика · %s → %s · %s за час, было %s", host, peer, formatBytes(h.BytesNow), formatBytes(h.BytesPrev))
+			}
+		}
 		e := Event{
 			DetectedAt:  now,
 			WindowStart: now.Add(-byteSurgeWindow),
@@ -349,26 +354,34 @@ func (s *Service) detectByteSurge(ctx context.Context, now time.Time, th Thresho
 			Code:        CodeByteSurge,
 			Severity:    sev,
 			Score:       scoreAgainst(float64(h.BytesNow), float64(need), sev),
-			Title:       fmt.Sprintf("Резкий рост трафика · %s · %s за час, было %s", src, formatBytes(h.BytesNow), formatBytes(h.BytesPrev)),
+			Title:       title,
 			Detail: map[string]any{
-				"src_ip": src, "bytes_now": h.BytesNow, "bytes_prev": h.BytesPrev,
+				"src_ip": host, "peer_ip": peer, "direction": direction,
+				"bytes_now": h.BytesNow, "bytes_prev": h.BytesPrev,
 				"ratio": ratio, "threshold_ratio": th.ByteSurgeRatio, "abs_min": th.ByteSurgeAbsMin,
 				"window_minutes": 60,
 			},
-			SrcIP: src, EventCount: h.BytesNow,
-			Fingerprint: fingerprint(CodeByteSurge, src, "", "", now),
-			Map:         MapLink{Period: "2h", Group: "ip", Filter: "all", Query: "src:" + src},
+			SrcIP: host, DstIP: peer, EventCount: h.Events,
+			Fingerprint: fingerprint(CodeByteSurge, host, direction, "", now),
+			Map:         MapLink{Period: "2h", Group: "ip", Filter: "all", Query: query},
+		}
+		if direction == "out" && peer != "" {
+			emittedPair[hostPairKey(host, peer)] = struct{}{}
 		}
 		out = append(out, e)
 	}
 	return out, nil
 }
 
+func hostPairKey(a, b string) string {
+	return a + "|" + b
+}
+
 func (s *Service) detectLateralFanout(ctx context.Context, now time.Time, th Thresholds, nets []IPRange) ([]Event, error) {
 	if len(nets) == 0 {
 		return nil, nil
 	}
-	hits, err := s.scan.LateralFanout(ctx, lateralFanoutWindow, th.LateralHosts, th.LateralEvents, nets)
+	hits, err := s.scan.LateralFanout(ctx, lateralFanoutWindow, th.LateralHosts, th.LateralEvents, nets, s.cfgSnapshot().FanoutExclude)
 	if err != nil {
 		return nil, err
 	}
@@ -386,7 +399,7 @@ func (s *Service) detectLateralFanout(ctx context.Context, now time.Time, th Thr
 			Code:        CodeLateralFanout,
 			Severity:    sev,
 			Score:       scoreAgainst(float64(h.Hosts), float64(th.LateralHosts), sev),
-			Title:       fmt.Sprintf("Обход внутренней сети · %s · %d хостов за 15 мин", src, h.Hosts),
+			Title:       fmt.Sprintf("Обход хостов предприятия · %s · %d хостов за 15 мин", src, h.Hosts),
 			Detail: map[string]any{
 				"src_ip": src, "hosts": h.Hosts, "events": h.Events,
 				"window_minutes": 15, "threshold_hosts": th.LateralHosts,
@@ -400,7 +413,7 @@ func (s *Service) detectLateralFanout(ctx context.Context, now time.Time, th Thr
 	return out, nil
 }
 
-func (s *Service) detectBeaconing(ctx context.Context, now time.Time, th Thresholds, nets []IPRange) ([]Event, error) {
+func (s *Service) detectBeaconing(ctx context.Context, now time.Time, th Thresholds, nets []IPRange, learning bool) ([]Event, error) {
 	if len(nets) == 0 {
 		return nil, nil
 	}
@@ -408,7 +421,16 @@ func (s *Service) detectBeaconing(ctx context.Context, now time.Time, th Thresho
 	if err != nil {
 		return nil, err
 	}
-	out := make([]Event, 0, len(hits))
+	type ready struct {
+		hit      BeaconingHit
+		src      string
+		dst      string
+		external string
+		reg      float64
+		listed   bool
+	}
+	readyHits := make([]ready, 0, len(hits))
+	seenAsk := make([]string, 0)
 	for _, h := range hits {
 		src, dst := displayIP(h.SrcIP), displayIP(h.DstIP)
 		if src == "" || dst == "" || h.ActiveHours == 0 {
@@ -418,37 +440,108 @@ func (s *Service) detectBeaconing(ctx context.Context, now time.Time, th Thresho
 		if reg < th.BeaconMinRegularity {
 			continue
 		}
-		avg := h.TotalBytes / h.ActiveHours
-		sev := SeverityWarn
-		if s.rep != nil {
-			peer := dst
-			if isPrivateOrLocal(dst) && !isPrivateOrLocal(src) {
-				peer = src
+		external, ok := beaconExternal(src, dst, nets)
+		if !ok {
+			continue
+		}
+		listed := false
+		if s.rep != nil && !isPrivateOrLocal(external) && len(s.rep.Lookup(external)) > 0 {
+			listed = true
+		}
+		if !listed {
+			if learning {
+				continue
 			}
-			if !isPrivateOrLocal(peer) && len(s.rep.Lookup(peer)) > 0 && reg >= 0.75 {
-				sev = SeverityHigh
+			seenAsk = append(seenAsk, external)
+		}
+		readyHits = append(readyHits, ready{hit: h, src: src, dst: dst, external: external, reg: reg, listed: listed})
+	}
+	seen := map[string]struct{}{}
+	if len(seenAsk) > 0 {
+		from := now.Add(-(countryBaselineDays*24*time.Hour + beaconLookback))
+		to := now.Add(-beaconLookback)
+		seen, err = s.scan.SeenIPs(ctx, seenAsk, from, to)
+		if err != nil {
+			return nil, err
+		}
+		if seen == nil {
+			seen = map[string]struct{}{}
+		}
+	}
+	out := make([]Event, 0, len(readyHits))
+	for _, h := range readyHits {
+		if !h.listed {
+			if _, known := seen[h.external]; known {
+				continue
 			}
 		}
-		e := Event{
+		avg := h.hit.TotalBytes / h.hit.ActiveHours
+		sev := SeverityWarn
+		if h.listed && h.reg >= 0.75 {
+			sev = SeverityHigh
+		}
+		reason := "new_external"
+		if h.listed {
+			reason = "reputation"
+		}
+		out = append(out, Event{
 			DetectedAt:  now,
 			WindowStart: now.Add(-beaconLookback),
 			WindowEnd:   now,
 			Code:        CodeBeaconing,
 			Severity:    sev,
-			Score:       scoreAgainst(reg, th.BeaconMinRegularity, sev),
-			Title:       fmt.Sprintf("Регулярные короткие сессии · %s ↔ %s · %d ч, ~%s/ч", src, dst, h.ActiveHours, formatBytes(avg)),
+			Score:       scoreAgainst(h.reg, th.BeaconMinRegularity, sev),
+			Title:       fmt.Sprintf("Регулярные короткие сессии · %s ↔ %s · %d ч, ~%s/ч", h.src, h.dst, h.hit.ActiveHours, formatBytes(avg)),
 			Detail: map[string]any{
-				"src_ip": src, "dst_ip": dst, "active_hours": h.ActiveHours,
-				"total_bytes": h.TotalBytes, "avg_bytes_per_hour": avg,
-				"regularity": reg, "events": h.Events, "lookback_hours": 24,
+				"src_ip": h.src, "dst_ip": h.dst, "external_ip": h.external,
+				"active_hours": h.hit.ActiveHours, "total_bytes": h.hit.TotalBytes,
+				"avg_bytes_per_hour": avg, "regularity": h.reg, "events": h.hit.Events,
+				"lookback_hours": 24, "reason": reason,
 			},
-			SrcIP: src, DstIP: dst, EventCount: h.Events,
-			Fingerprint: fingerprintDay(CodeBeaconing, src, dst, "", now),
-			Map:         MapLink{Period: "1d", Group: "ip", Filter: "all", Query: "src:" + src + " dst:" + dst},
-		}
-		out = append(out, e)
+			SrcIP: h.src, DstIP: h.dst, EventCount: h.hit.Events,
+			Fingerprint: fingerprintDay(CodeBeaconing, h.src, h.dst, "", now),
+			Map:         MapLink{Period: "1d", Group: "ip", Filter: "all", Query: "src:" + h.src + " dst:" + h.dst},
+		})
 	}
 	return out, nil
+}
+
+func beaconExternal(src, dst string, nets []IPRange) (string, bool) {
+	srcIn := ipInNets(src, nets)
+	dstIn := ipInNets(dst, nets)
+	switch {
+	case srcIn && !dstIn:
+		return dst, true
+	case dstIn && !srcIn:
+		return src, true
+	default:
+		return "", false
+	}
+}
+
+func blockedPeerDominates(total uint64, peers []BlockedPeer) bool {
+	if total == 0 || len(peers) == 0 {
+		return false
+	}
+	return peers[0].Events*2 >= total
+}
+
+func peerDetail(peers []BlockedPeer) []map[string]any {
+	if len(peers) == 0 {
+		return nil
+	}
+	out := make([]map[string]any, 0, len(peers))
+	for _, p := range peers {
+		ip := displayIP(p.IP)
+		if ip == "" {
+			continue
+		}
+		out = append(out, map[string]any{"ip": ip, "events": p.Events})
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func hourRegularity(hourUnix []int64) float64 {
