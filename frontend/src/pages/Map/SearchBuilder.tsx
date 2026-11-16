@@ -31,7 +31,12 @@ function FieldSelect({
   onChange: (field: SearchField) => void;
 }) {
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value as SearchField)}>
+    <select
+      className="search-builder-field"
+      value={value}
+      aria-label="Поле"
+      onChange={(e) => onChange(e.target.value as SearchField)}
+    >
       {SEARCH_BUILDER_FIELD_GROUPS.map((group) => (
         <optgroup key={group.label} label={group.label}>
           {group.fields.map((f) => (
@@ -50,6 +55,7 @@ function OpSelect({ value, onChange }: { value: SearchOp; onChange: (op: SearchO
     <select
       className="search-builder-op"
       value={value}
+      aria-label="Оператор"
       onChange={(e) => onChange(e.target.value as SearchOp)}
     >
       {(Object.keys(SEARCH_OP_DEFS) as SearchOp[]).map((op) => (
