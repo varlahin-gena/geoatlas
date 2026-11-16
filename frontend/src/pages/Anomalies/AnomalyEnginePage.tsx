@@ -10,6 +10,7 @@ import {
 } from '@/api/anomalies';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useToast } from '@/components/Toast';
+import { SearchBuilder } from '@/pages/Map/SearchBuilder';
 import { fmtBytes, fmtDate, fmtNumber } from '@/lib/format';
 import {
   DETECTOR_THRESHOLD_GROUPS,
@@ -154,11 +155,15 @@ function ThresholdField({
 function DetectorCard({
   detector,
   thresholds,
+  exclusion,
   onChange,
+  onEditExclusion,
 }: {
   detector: DetectorThresholdMeta;
   thresholds: Required<AnomalyThresholds>;
+  exclusion: string;
   onChange: (patch: Partial<AnomalyThresholds>) => void;
+  onEditExclusion: () => void;
 }) {
   const adviceId = useId();
   const fieldsId = useId();
@@ -185,6 +190,9 @@ function DetectorCard({
           ) : null}
         </div>
         <div className="thresholds-detector-actions">
+          <button type="button" className="btn sm ghost" onClick={onEditExclusion}>
+            {exclusion ? 'Исключение задано' : 'Исключение'}
+          </button>
           <button
             type="button"
             className="btn sm ghost"
@@ -215,6 +223,8 @@ function DetectorCard({
         </div>
       ) : null}
 
+      {exclusion ? <p className="thresholds-detector-summary">Не учитывать: {exclusion}</p> : null}
+
       {fieldsOpen ? (
         <div id={fieldsId} className="form-row thresholds-detector-fields">
           {detector.fields.map((field) => (
@@ -236,15 +246,19 @@ function ThresholdsPanel({
   thresholds,
   defaults,
   customized,
+  exclusions,
   onChange,
   onReset,
+  onEditExclusion,
 }: {
   profile: string;
   thresholds: Required<AnomalyThresholds>;
   defaults: AnomalyThresholds | null;
   customized: boolean;
+  exclusions: Record<string, string>;
   onChange: (next: Required<AnomalyThresholds>) => void;
   onReset: () => void;
+  onEditExclusion: (code: string) => void;
 }) {
   const [openGroup, setOpenGroup] = useState(DETECTOR_THRESHOLD_GROUPS[0]?.id || 'scanning');
   const set = (patch: Partial<AnomalyThresholds>) => onChange({ ...thresholds, ...patch });
@@ -259,7 +273,7 @@ function ThresholdsPanel({
             {customized
               ? ' Сейчас используются переопределённые значения.'
               : ' Показаны значения по умолчанию профиля.'}{' '}
-            Откройте категорию и нажмите «Изменить», чтобы править числа.
+            Откройте категорию и нажмите «Изменить», чтобы править числа. «Исключение» — тот же конструктор, что на карте: такой трафик проверка не учитывает.
           </p>
         </div>
         <button type="button" className="btn sm" onClick={onReset} disabled={!defaults}>
@@ -304,7 +318,9 @@ function ThresholdsPanel({
                       key={detector.id}
                       detector={detector}
                       thresholds={thresholds}
+                      exclusion={exclusions[detector.code] ?? ''}
                       onChange={set}
+                      onEditExclusion={() => onEditExclusion(detector.code)}
                     />
                   ))}
                 </div>
@@ -325,6 +341,7 @@ export default function AnomalyEnginePage() {
   const [thresholdCustomized, setThresholdCustomized] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [exclusionCode, setExclusionCode] = useState<string | null>(null);
 
   const applyView = useCallback((data: AnomalyEngineSettingsView) => {
     setView(data);
@@ -505,11 +522,42 @@ export default function AnomalyEnginePage() {
               thresholds={thresholds}
               defaults={view.threshold_defaults ?? null}
               customized={thresholdCustomized}
+              exclusions={settings.exclusions ?? {}}
               onChange={onThresholdChange}
               onReset={onResetThresholds}
+              onEditExclusion={setExclusionCode}
             />
           </form>
         </>
+      ) : null}
+      {exclusionCode ? (
+        <div
+          className="anomaly-exclude-backdrop"
+          onMouseDown={() => setExclusionCode(null)}
+        >
+          <div
+            className="topbar anomaly-exclude-host search-box"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <SearchBuilder
+              open
+              search={settings.exclusions?.[exclusionCode] ?? ''}
+              onOpenChange={(open) => {
+                if (!open) setExclusionCode(null);
+              }}
+              onApply={(query) => {
+                const code = exclusionCode;
+                setSettings((prev) => {
+                  const next = { ...(prev.exclusions ?? {}) };
+                  const q = query.trim();
+                  if (q) next[code] = q;
+                  else delete next[code];
+                  return { ...prev, exclusions: next };
+                });
+              }}
+            />
+          </div>
+        </div>
       ) : null}
     </AdminLayout>
   );

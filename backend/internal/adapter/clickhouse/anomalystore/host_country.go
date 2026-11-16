@@ -14,10 +14,12 @@ const countryExcludeSQL = `AND dst_country != ''
 
 func (r *Repository) HostCountries(ctx context.Context, window time.Duration, minN uint64, nets []usecaseanomaly.IPRange) ([]usecaseanomaly.HostCountryHit, error) {
 	src, srcArgs := colInNetsSQL("src_ip", nets)
+	skip, skipArgs := notMatch(ctx, usecaseanomaly.CodeNewCountryDst)
 	q := fmt.Sprintf(`
 		SELECT toString(src_ip), dst_country, count() AS n
 		FROM traffic_logs
 		WHERE timestamp >= now() - INTERVAL %d SECOND
+		  %s
 		  %s
 		  %s
 		GROUP BY src_ip, dst_country
@@ -25,8 +27,8 @@ func (r *Repository) HostCountries(ctx context.Context, window time.Duration, mi
 		ORDER BY n DESC
 		LIMIT 50
 		%s
-	`, int(window.Seconds()), countryExcludeSQL, src, query.AggSettings())
-	args := append(srcArgs, minN)
+	`, int(window.Seconds()), countryExcludeSQL, src, skip, query.AggSettings())
+	args := append(append(srcArgs, skipArgs...), minN)
 	rows, err := r.ch.Query(ctx, q, args...)
 	if err != nil {
 		return nil, err

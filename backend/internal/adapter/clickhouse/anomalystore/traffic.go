@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
+	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 
 	"geoatlas/internal/adapter/clickhouse/query"
 	"geoatlas/internal/adapter/clickhouse/sqlclause"
@@ -27,6 +28,7 @@ func (r *Repository) OldestLogTime(ctx context.Context) (time.Time, error) {
 func (r *Repository) PortScan(ctx context.Context, window time.Duration, portsTh, eventsTh int, nets []usecaseanomaly.IPRange) ([]usecaseanomaly.PortScanHit, error) {
 	touch, touchArgs := touchNetsSQL(nets)
 	blocked := fmt.Sprintf("AND lower(action) IN (%s)", model.BlockedInClause())
+	skip, skipArgs := notMatch(ctx, usecaseanomaly.CodePortScan)
 	q := fmt.Sprintf(`
 		SELECT toString(src_ip) AS src_ip, uniqExact(dst_port) AS ports, count() AS events, any(src_country) AS src_country
 		FROM traffic_logs
@@ -34,13 +36,14 @@ func (r *Repository) PortScan(ctx context.Context, window time.Duration, portsTh
 		  AND timestamp < now()
 		  %s
 		  %s
+		  %s
 		GROUP BY src_ip
 		HAVING ports >= ? AND events >= ?
 		ORDER BY ports DESC
 		LIMIT 10
 		%s
-	`, int(window.Seconds()), blocked, touch, query.AggSettings())
-	args := append(touchArgs, portsTh, eventsTh)
+	`, int(window.Seconds()), blocked, touch, skip, query.AggSettings())
+	args := append(append(touchArgs, skipArgs...), portsTh, eventsTh)
 	rows, err := r.ch.Query(ctx, q, args...)
 	if err != nil {
 		return nil, err
@@ -62,13 +65,15 @@ func (r *Repository) BlockedCount(ctx context.Context, start, end time.Time, net
 	if net != nil {
 		touch, touchArgs = touchNetsSQL([]usecaseanomaly.IPRange{*net})
 	}
+	skip, skipArgs := notMatch(ctx, usecaseanomaly.CodeBlockedSurge)
 	q := fmt.Sprintf(`
 		SELECT %s AS blocked
 		FROM traffic_logs
 		WHERE timestamp >= ? AND timestamp < ?
 		  %s
-	`, sqlclause.CountIfBlockedSQL(), touch)
-	args := append([]any{start, end}, touchArgs...)
+		  %s
+	`, sqlclause.CountIfBlockedSQL(), touch, skip)
+	args := append(append([]any{start, end}, touchArgs...), skipArgs...)
 	var n uint64
 	err := r.ch.QueryRow(ctx, q, args...).Scan(&n)
 	return n, err
@@ -112,7 +117,9 @@ func (r *Repository) scanBlockedChunk(ctx context.Context, currStart, currEnd, p
 		)
 	}
 	args = append(args, prevStart, currEnd)
-	q := fmt.Sprintf(`SELECT %s FROM traffic_logs WHERE timestamp >= ? AND timestamp < ?`, strings.Join(cols, ", "))
+	skip, skipArgs := notMatch(ctx, usecaseanomaly.CodeBlockedSurge)
+	args = append(args, skipArgs...)
+	q := fmt.Sprintf(`SELECT %s FROM traffic_logs WHERE timestamp >= ? AND timestamp < ? %s`, strings.Join(cols, ", "), skip)
 	vals := make([]uint64, len(nets)*2)
 	ptrs := make([]any, len(vals))
 	for i := range vals {
@@ -234,6 +241,8 @@ func (r *Repository) ReputationEdges(ctx context.Context, window time.Duration, 
 	src, srcArgs := colInNetsSQL("src_ip", nets)
 	srcU := ipv4AsUInt32SQL("e.src_ip")
 	dstU := ipv4AsUInt32SQL("e.dst_ip")
+	skip, skipArgs := notMatch(ctx, usecaseanomaly.CodeRepNewDst)
+	hourlyArgs := append(append([]any{}, srcArgs...), minEvents)
 	q := fmt.Sprintf(`
 		SELECT toString(e.src_ip), toString(e.dst_ip), any(e.cnt) AS cnt,
 		       any(e.src_country), any(e.dst_country)
@@ -254,10 +263,13 @@ func (r *Repository) ReputationEdges(ctx context.Context, window time.Duration, 
 		LIMIT %d
 		%s
 	`, sec, src, srcU, dstU, limit, query.AggSettings())
-	args := append(append([]any{}, srcArgs...), minEvents)
-	rows, err := r.ch.Query(ctx, q, args...)
-	if err != nil {
-		if !shouldFallbackToLogs(ctx, err) {
+	var rows driver.Rows
+	var err error
+	if skip == "" {
+		rows, err = r.ch.Query(ctx, q, hourlyArgs...)
+	}
+	if skip != "" || err != nil {
+		if skip == "" && !shouldFallbackToLogs(ctx, err) {
 			return nil, err
 		}
 		q2 := fmt.Sprintf(`
@@ -270,6 +282,7 @@ func (r *Repository) ReputationEdges(ctx context.Context, window time.Duration, 
 				FROM traffic_logs
 				WHERE timestamp >= now() - INTERVAL %d SECOND
 				  %s
+				  %s
 				GROUP BY src_ip, dst_ip
 				HAVING cnt >= ?
 			) AS e
@@ -279,8 +292,9 @@ func (r *Repository) ReputationEdges(ctx context.Context, window time.Duration, 
 			ORDER BY cnt DESC
 			LIMIT %d
 			%s
-		`, sec, src, srcU, dstU, limit, query.AggSettings())
-		rows, err = r.ch.Query(ctx, q2, args...)
+		`, sec, src, skip, srcU, dstU, limit, query.AggSettings())
+		logArgs := append(append(append([]any{}, srcArgs...), skipArgs...), minEvents)
+		rows, err = r.ch.Query(ctx, q2, logArgs...)
 		if err != nil {
 			return nil, err
 		}
@@ -353,12 +367,17 @@ func (r *Repository) ByteSurge(ctx context.Context, window time.Duration, floor,
 		window = time.Hour
 	}
 	sec := int(window.Seconds())
-	rows, err := r.ch.Query(ctx, byteSurgeSQL(true, sec, nets), byteSurgeArgs(absMin, floor, nets)...)
-	if err != nil {
-		if !shouldFallbackToLogs(ctx, err) {
+	skip, skipArgs := notMatch(ctx, usecaseanomaly.CodeByteSurge)
+	var rows driver.Rows
+	var err error
+	if skip == "" {
+		rows, err = r.ch.Query(ctx, byteSurgeSQL(true, sec, nets, ""), byteSurgeArgs(absMin, floor, nets, nil)...)
+	}
+	if skip != "" || err != nil {
+		if skip == "" && !shouldFallbackToLogs(ctx, err) {
 			return nil, err
 		}
-		rows, err = r.ch.Query(ctx, byteSurgeSQL(false, sec, nets), byteSurgeArgs(absMin, floor, nets)...)
+		rows, err = r.ch.Query(ctx, byteSurgeSQL(false, sec, nets, skip), byteSurgeArgs(absMin, floor, nets, skipArgs)...)
 		if err != nil {
 			return nil, err
 		}
@@ -384,9 +403,37 @@ func (r *Repository) Beaconing(ctx context.Context, lookback time.Duration, minH
 	}
 	sec := int(lookback.Seconds())
 	touch, touchArgs := touchNetsSQL(nets)
+	skip, skipArgs := notMatch(ctx, usecaseanomaly.CodeBeaconing)
 	args := append(append([]any{}, touchArgs...), minHours, maxAvgBytes)
 
 	// Phase 1: candidate pairs without hour arrays (groupUniqArray over all pairs is too heavy).
+	// Исключение считается по журналу: в часовом агрегате страна и действие не обычные колонки.
+	if skip != "" {
+		logArgs := append(append(append([]any{}, touchArgs...), skipArgs...), minHours, maxAvgBytes)
+		qLogs := fmt.Sprintf(`
+			SELECT
+				toString(src_ip) AS src_ip,
+				toString(dst_ip) AS dst_ip,
+				uniqExact(toStartOfHour(timestamp)) AS active_hours,
+				sum(bytes_sent) + sum(bytes_recv) AS total_bytes,
+				count() AS events
+			FROM traffic_logs
+			WHERE timestamp >= now() - INTERVAL %d SECOND
+			  %s
+			  %s
+			GROUP BY src_ip, dst_ip
+			HAVING active_hours >= ?
+			  AND (total_bytes / active_hours) <= ?
+			ORDER BY active_hours DESC, total_bytes ASC
+			LIMIT 30
+			%s
+		`, sec, touch, skip, query.AggSettings())
+		cands, err := r.scanBeaconingCandidates(ctx, qLogs, logArgs)
+		if err != nil {
+			return nil, err
+		}
+		return r.attachBeaconingHours(ctx, cands, sec, true)
+	}
 	qHourly := fmt.Sprintf(`
 		SELECT
 			toString(src_ip) AS src_ip,
@@ -539,6 +586,7 @@ func shouldFallbackToLogs(ctx context.Context, err error) bool {
 func (r *Repository) LateralFanout(ctx context.Context, window time.Duration, hostsTh, eventsTh int, nets []usecaseanomaly.IPRange, exclude []string) ([]usecaseanomaly.LateralFanoutHit, error) {
 	dst, dstArgs := colInNetsSQL("dst_ip", nets)
 	ex, exArgs := excludeSrcSQL(exclude)
+	skip, skipArgs := notMatch(ctx, usecaseanomaly.CodeLateralFanout)
 	q := fmt.Sprintf(`
 		SELECT toString(src_ip) AS src_ip, uniqExact(dst_ip) AS hosts, count() AS events
 		FROM traffic_logs
@@ -546,13 +594,14 @@ func (r *Repository) LateralFanout(ctx context.Context, window time.Duration, ho
 		  AND timestamp < now()
 		  %s
 		  %s
+		  %s
 		GROUP BY src_ip
 		HAVING hosts >= ? AND events >= ?
 		ORDER BY hosts DESC
 		LIMIT 10
 		%s
-	`, int(window.Seconds()), dst, ex, query.AggSettings())
-	args := append(append(dstArgs, exArgs...), hostsTh, eventsTh)
+	`, int(window.Seconds()), dst, ex, skip, query.AggSettings())
+	args := append(append(append(dstArgs, exArgs...), skipArgs...), hostsTh, eventsTh)
 	rows, err := r.ch.Query(ctx, q, args...)
 	if err != nil {
 		return nil, err

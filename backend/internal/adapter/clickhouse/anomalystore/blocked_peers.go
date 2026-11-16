@@ -30,18 +30,20 @@ func (r *Repository) BlockedPeers(ctx context.Context, start, end time.Time, net
 
 func (r *Repository) blockedPeerSide(ctx context.Context, start, end time.Time, net usecaseanomaly.IPRange, col string, limit int) ([]usecaseanomaly.BlockedPeer, error) {
 	touch, touchArgs := touchNetsSQL([]usecaseanomaly.IPRange{net})
+	skip, skipArgs := notMatch(ctx, usecaseanomaly.CodeBlockedSurge)
 	q := fmt.Sprintf(`
 		SELECT toString(%s) AS ip, count() AS n
 		FROM traffic_logs
 		WHERE timestamp >= ? AND timestamp < ?
 		  AND lower(action) IN (%s)
 		  %s
+		  %s
 		GROUP BY %s
 		ORDER BY n DESC
 		LIMIT %d
 		%s
-	`, col, model.BlockedInClause(), touch, col, limit, query.AggSettings())
-	args := append([]any{start, end}, touchArgs...)
+	`, col, model.BlockedInClause(), touch, skip, col, limit, query.AggSettings())
+	args := append(append([]any{start, end}, touchArgs...), skipArgs...)
 	rows, err := r.ch.Query(ctx, q, args...)
 	if err != nil {
 		return nil, err

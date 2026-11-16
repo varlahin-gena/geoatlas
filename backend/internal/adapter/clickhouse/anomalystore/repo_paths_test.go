@@ -3,6 +3,7 @@ package anomalystore
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -291,6 +292,27 @@ func TestScanCountrySetNilOut(t *testing.T) {
 	out, err := scanCountrySet(rows, nil)
 	if err != nil || len(out) != 1 {
 		t.Fatalf("%v %v", out, err)
+	}
+}
+
+func TestNotMatchExclusion(t *testing.T) {
+	ctx := usecaseanomaly.WithExclusions(context.Background(), map[string]string{
+		usecaseanomaly.CodePortScan: "src_ip=10.1.1.1",
+	})
+	clause, args := notMatch(ctx, usecaseanomaly.CodePortScan)
+	if !strings.Contains(clause, "NOT") || len(args) == 0 {
+		t.Fatalf("%q %v", clause, args)
+	}
+	if clause, args := notMatch(ctx, usecaseanomaly.CodeByteSurge); clause != "" || len(args) != 0 {
+		t.Fatalf("other code %q %v", clause, args)
+	}
+
+	ch := &stubConn{}
+	r := New(ch)
+	ch.pushQuery([]any{"10.0.0.1", uint64(20), uint64(50), "RU"})
+	hits, err := r.PortScan(ctx, time.Hour, 10, 10, []usecaseanomaly.IPRange{{Start: 10, End: 20}})
+	if err != nil || len(hits) != 1 {
+		t.Fatalf("%v %v", hits, err)
 	}
 }
 

@@ -5380,6 +5380,10 @@ export interface components {
             new_country_min_share: number;
             /** @description Адреса, которые не считаются обходом хостов в сети. */
             fanout_exclude?: string[];
+            /** @description Запрос как на карте для каждого типа. Совпавший трафик эта проверка не учитывает. Ключ — код типа. */
+            exclusions?: {
+                [key: string]: string;
+            };
             thresholds?: components["schemas"]["AnomalyThresholds"];
             /** Format: date-time */
             updated_at?: string;

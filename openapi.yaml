@@ -2947,6 +2947,10 @@ components:
           maxItems: 200
           items: { type: string }
           description: Адреса, которые не считаются обходом хостов в сети.
+        exclusions:
+          type: object
+          additionalProperties: { type: string, maxLength: 400 }
+          description: Запрос как на карте для каждого типа. Совпавший трафик эта проверка не учитывает. Ключ — код типа.
         thresholds:
           $ref: "#/components/schemas/AnomalyThresholds"
         updated_at: { type: string, format: date-time }
