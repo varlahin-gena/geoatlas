@@ -2,6 +2,7 @@ package anomaly
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -21,6 +22,7 @@ type fakeStore struct {
 	ackedSuppressFor time.Duration
 	assignedTo       string
 	assignedBy       string
+	assignErr        error
 }
 
 func (f *fakeStore) Insert(_ context.Context, events []Event) error {
@@ -64,6 +66,9 @@ func (f *fakeStore) Assign(_ context.Context, fingerprint, assignedTo, by string
 	return nil
 }
 func (f *fakeStore) AssignIfEmpty(ctx context.Context, fingerprint, assignedTo, by string) error {
+	if f.assignErr != nil {
+		return f.assignErr
+	}
 	if strings.TrimSpace(f.assignedTo) != "" {
 		return nil
 	}
@@ -97,6 +102,21 @@ func (f *fakeScan) PortScan(context.Context, time.Duration, int, int, bool, []IP
 }
 func (f *fakeScan) HorizontalScan(context.Context, time.Duration, int, int, bool, []IPRange) ([]HorizontalScanHit, error) {
 	return f.horiz, nil
+}
+func (f *fakeScan) BlockedCounts(ctx context.Context, currStart, currEnd, prevStart, prevEnd time.Time, nets []IPRange) ([]BlockedWindowCount, error) {
+	out := make([]BlockedWindowCount, len(nets))
+	for i := range nets {
+		cur, err := f.BlockedCount(ctx, currStart, currEnd, &nets[i])
+		if err != nil {
+			return nil, err
+		}
+		prev, err := f.BlockedCount(ctx, prevStart, prevEnd, &nets[i])
+		if err != nil {
+			return nil, err
+		}
+		out[i] = BlockedWindowCount{Current: cur, Previous: prev}
+	}
+	return out, nil
 }
 func (f *fakeScan) BlockedCount(_ context.Context, start, end time.Time, _ *IPRange) (uint64, error) {
 	if !f.hasBlocked {
@@ -436,6 +456,31 @@ func TestAckCreatesSuppressionWindow(t *testing.T) {
 	}
 	if store.ackedSuppressFor != 24*time.Hour {
 		t.Fatalf("suppressFor=%v", store.ackedSuppressFor)
+	}
+	if store.assignedTo != "alice" {
+		t.Fatalf("assign owner=%q", store.assignedTo)
+	}
+}
+
+func TestAckReturnsAssignError(t *testing.T) {
+	store := &fakeStore{assignErr: errors.New("assign down")}
+	scan := &fakeScan{oldest: time.Now().Add(-30 * 24 * time.Hour)}
+	svc := newSvc(store, scan, nil)
+	err := svc.Ack(context.Background(), "deadbeef", "alice")
+	if err == nil || !errors.Is(err, store.assignErr) {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestScanRecordsDetectorsSkippedWhenTickCancelled(t *testing.T) {
+	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
+	store := &fakeStore{exist: map[string]struct{}{}}
+	scan := &fakeScan{oldest: now.Add(-30 * 24 * time.Hour)}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	res := withEnterprise(newSvc(store, scan, nil)).Scan(ctx, now)
+	if len(res.Missed) != 8 || res.Inserted != 0 || res.Error == "" {
+		t.Fatalf("missed=%v err=%q inserted=%d", res.Missed, res.Error, res.Inserted)
 	}
 }
 

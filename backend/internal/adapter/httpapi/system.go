@@ -205,6 +205,7 @@ func (h *SystemHandler) PutRetention(w http.ResponseWriter, r *http.Request) {
 	if timeout <= 0 {
 		timeout = 2 * time.Minute
 	}
+	extendConnDeadline(w, timeout)
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
 
@@ -304,6 +305,7 @@ func (h *SystemHandler) DeleteBackup(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "backup service unavailable"})
 		return
 	}
+	extendConnDeadline(w, longIOTimeout)
 	name := strings.TrimSpace(r.PathValue("name"))
 	if err := h.backupUC.DeleteBackup(r.Context(), name, actorFromRequest(r)); err != nil {
 		writeDomainError(w, "backup delete failed", err)

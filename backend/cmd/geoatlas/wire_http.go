@@ -74,6 +74,7 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 		InstallProfilePath: cfg.InstallProfilePath,
 		InstallMetaPath:    cfg.InstallMetaPath,
 		Maintenance:        a.geoJobs,
+		HTTPSchema:         a.httpSchema,
 	})
 	authUC := usecaseauth.New(auth.users, auth.sessions)
 	dataDir := filepath.Dir(cfg.Auth.UsersFile)

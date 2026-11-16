@@ -26,13 +26,13 @@ geoatlas/
 │       │   ├── parseradapter/        # parser port
 │       │   ├── geoipcodec/           # GeoIP CSV/CIDR helpers
 │       │   ├── bootstrapadapter/     # Ensure*/Backfill* для usecase/bootstrap
+│       │   ├── ingestnet/            # TCP-приём syslog, очередь, admission
 │       │   ├── retentionfile/        # JSON-store TTL (`retention.json`)
 │       │   └── systemlive/           # live ingest / syslog-ng stats / profile adapters
-│       ├── usecase/                  # application use cases + ports (bootstrap, retention, anomaly, …)
+│       ├── usecase/                  # application use cases + ports (ingest, anomaly, bootstrap, …)
 │       ├── auth/                     # users / sessions / roles
 │       ├── config/                   # конфигурация из env
 │       ├── geoip/                    # импорт CSV и in-memory индекс
-│       ├── ingest/                   # syslog TCP, очередь, batch INSERT
 │       ├── installprofile/           # чтение install-profile.json
 │       ├── logging/                  # slog setup
 │       ├── model/                    # доменные структуры; action vocab SoT (go generate → backfill sh + schema SQL)
@@ -91,7 +91,7 @@ geoatlas/
 │   └── internal/
 │       ├── config/
 │       └── collector/
-├── openapi.yaml                      # контракт HTTP API (OpenAPI 1.17.0)
+├── openapi.yaml                      # контракт HTTP API (OpenAPI 1.21.0)
 ├── LICENSE / NOTICE                  # Apache License 2.0
 ├── SECURITY.md                       # как сообщать об уязвимостях
 ├── CODE_OF_CONDUCT.md                # кодекс поведения

@@ -13,7 +13,8 @@ func (h *HealthHandler) Live(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "status": "live"})
 }
 
-// Ready — ClickHouse ping + снимок ingest. HTTP 503 только если CH недоступен.
+// Ready — ClickHouse ping, схема /api/events и снимок ingest.
+// HTTP 503, если ClickHouse недоступен или EnsureHTTPSchema ещё не прошёл.
 func (h *HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
 	if h.systemUC == nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{

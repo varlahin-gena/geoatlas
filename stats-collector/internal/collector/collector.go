@@ -2,7 +2,7 @@ package collector
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"math"
 	"net/http"
 	"strings"
@@ -47,7 +47,7 @@ type Collector struct {
 
 func NewCollector(cfg config.Config, conn clickhouse.Conn) *Collector {
 	nCPU := detectHostCPUCount(cfg.HostProcRoot)
-	log.Printf("host CPU count for container metrics: %d", nCPU)
+	slog.Info("host CPU count for container metrics", "ncpu", nCPU)
 	return &Collector{
 		cfg:          cfg,
 		conn:         conn,
@@ -82,7 +82,7 @@ func firstLine(q string) string {
 func (c *Collector) queryUint64(ctx context.Context, query string) (uint64, bool) {
 	var v uint64
 	if err := c.conn.QueryRow(ctx, query).Scan(&v); err != nil {
-		log.Printf("query error [%s]: %v", firstLine(query), err)
+		slog.Warn("query error", "query", firstLine(query), "err", err)
 		return 0, false
 	}
 	return v, true
@@ -91,7 +91,7 @@ func (c *Collector) queryUint64(ctx context.Context, query string) (uint64, bool
 func (c *Collector) queryFloat64(ctx context.Context, query string) (float64, bool) {
 	var v float64
 	if err := c.conn.QueryRow(ctx, query).Scan(&v); err != nil {
-		log.Printf("query error [%s]: %v", firstLine(query), err)
+		slog.Warn("query error", "query", firstLine(query), "err", err)
 		return 0, false
 	}
 	return v, true
@@ -106,7 +106,7 @@ func (c *Collector) writeMetrics(ctx context.Context, metrics []Metric) (int, er
 	clean := make([]Metric, 0, len(metrics))
 	for _, m := range metrics {
 		if math.IsNaN(m.Value) || math.IsInf(m.Value, 0) {
-			log.Printf("skip non-finite metric: %s.%s.%s = %v", m.Type, m.Target, m.Name, m.Value)
+			slog.Warn("skip non-finite metric", "type", m.Type, "target", m.Target, "name", m.Name, "value", m.Value)
 			continue
 		}
 		clean = append(clean, m)
@@ -151,8 +151,8 @@ func (c *Collector) Collect(ctx context.Context) {
 
 	written, err := c.writeMetrics(qctx, metrics)
 	if err != nil {
-		log.Printf("write metrics error: %v", err)
+		slog.Warn("write metrics error", "err", err)
 		return
 	}
-	log.Printf("collected %d metrics", written)
+	slog.Info("collected metrics", "count", written)
 }

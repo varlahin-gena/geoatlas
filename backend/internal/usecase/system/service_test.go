@@ -249,4 +249,22 @@ func TestHealth(t *testing.T) {
 	if err != nil || !res.OK || res.Body["clickhouse"] != "ok" {
 		t.Fatalf("healthy: %+v %v", res, err)
 	}
+
+	gate := &HTTPSchemaGate{}
+	waiting := New(Dependencies{HTTPSchema: gate})
+	res, err = waiting.Health(context.Background(), &fakePinger{})
+	if err != nil || res.OK || res.Body["error"] != "http schema not ready" {
+		t.Fatalf("schema not ready: %+v %v", res, err)
+	}
+	gate.Mark(errors.New("ddl"))
+	res, err = waiting.Health(context.Background(), &fakePinger{})
+	if err != nil || res.OK {
+		t.Fatalf("schema still down: %+v %v", res, err)
+	}
+	gate.Mark(nil)
+	gate.Mark(errors.New("later"))
+	res, err = waiting.Health(context.Background(), &fakePinger{})
+	if err != nil || !res.OK {
+		t.Fatalf("schema ready sticks: %+v %v", res, err)
+	}
 }

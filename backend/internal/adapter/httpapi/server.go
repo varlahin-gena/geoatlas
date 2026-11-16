@@ -14,7 +14,8 @@ const (
 	maxJSONBodySize  = 1 << 20 // 1 MiB — мелкие JSON-эндпоинты
 
 	healthTimeout = 5 * time.Second
-	readTimeout   = 60 * time.Second // read-only эндпоинты
+	readTimeout   = 60 * time.Second // потолок обычного API и read-only эндпоинтов
+	longIOTimeout = 30 * time.Minute // upload / ingest body
 )
 
 type Server struct {
@@ -127,10 +128,10 @@ func NewServer(p Params, opts ...ServerOption) *Server {
 			// Заголовки должны прийти быстро — защита от slowloris по заголовкам.
 			ReadHeaderTimeout: 15 * time.Second,
 
-			// Верхняя граница hung-connections. Должна перекрывать geo-импорт
-			// (handler ctx 30m) и крупные upload; объём — MaxBytesReader + nginx.
-			ReadTimeout:  35 * time.Minute,
-			WriteTimeout: 35 * time.Minute,
+			// Короткий потолок на всё соединение. Маршруты длиннее readTimeout
+			// сами вызывают extendConnDeadline (upload, geo, refresh, export).
+			ReadTimeout:  readTimeout,
+			WriteTimeout: readTimeout,
 			IdleTimeout:  120 * time.Second,
 		},
 	}

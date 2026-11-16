@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -13,12 +13,12 @@ import (
 )
 
 type IngestStats struct {
-	State         string  `json:"state"`
-	ReceivedTotal float64 `json:"received_total"`
-	ParsedTotal   float64 `json:"parsed_total"`
-	InsertedTotal float64 `json:"inserted_total"`
-	SkippedTotal  float64 `json:"skipped_total"`
-	BufferedLines float64 `json:"buffered_lines"`
+	State              string  `json:"state"`
+	ReceivedTotal      float64 `json:"received_total"`
+	ParsedTotal        float64 `json:"parsed_total"`
+	InsertedTotal      float64 `json:"inserted_total"`
+	SkippedTotal       float64 `json:"skipped_total"`
+	BufferedLines      float64 `json:"buffered_lines"`
 	QueueDepth         float64 `json:"queue_depth"`
 	QueueCapacity      float64 `json:"queue_capacity"`
 	QueueBytes         float64 `json:"queue_bytes"`
@@ -26,8 +26,8 @@ type IngestStats struct {
 	DroppedTotal       float64 `json:"dropped_total"`
 	BufferDropsTotal   float64 `json:"buffer_drops_total"`
 	CircuitOpen        bool    `json:"circuit_open"`
-	Connections   float64 `json:"connections"`
-	UDP           struct {
+	Connections        float64 `json:"connections"`
+	UDP                struct {
 		ReceivedTotal float64 `json:"received_total"`
 		Connections   float64 `json:"connections"`
 	} `json:"udp"`
@@ -65,7 +65,7 @@ func (c *Collector) collectIngestMetrics(ctx context.Context, ts time.Time) []Me
 
 	status, err := fetchIngestStats(ctx, c.http, c.cfg.IngestStatsURL, c.cfg.BearerToken())
 	if err != nil {
-		log.Printf("ingest stats scrape error: %v", err)
+		slog.Warn("ingest stats scrape error", "err", err)
 		out = append(out, Metric{Timestamp: ts, Type: "health", Target: "ingest", Name: "up", Value: 0})
 		return out
 	}

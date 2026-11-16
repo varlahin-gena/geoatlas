@@ -20,6 +20,7 @@ type Dependencies struct {
 	GeoIndex           GeoIndexLive
 	Profiles           ProfileLoader
 	Maintenance        MaintenanceScheduler
+	HTTPSchema         *HTTPSchemaGate
 	InstallProfilePath string
 	InstallMetaPath    string
 	StartupTime        time.Time
@@ -34,6 +35,7 @@ type Service struct {
 	geoIndex           GeoIndexLive
 	profiles           ProfileLoader
 	maintenance        MaintenanceScheduler
+	httpSchema         *HTTPSchemaGate
 	installProfilePath string
 	installMetaPath    string
 	startupTime        time.Time
@@ -61,6 +63,7 @@ func New(deps Dependencies) *Service {
 		geoIndex:           deps.GeoIndex,
 		profiles:           deps.Profiles,
 		maintenance:        deps.Maintenance,
+		httpSchema:         deps.HTTPSchema,
 		installProfilePath: deps.InstallProfilePath,
 		installMetaPath:    deps.InstallMetaPath,
 		startupTime:        startupTime,
@@ -319,6 +322,12 @@ func (s *Service) Health(ctx context.Context, pinger ClickHousePinger) (HealthRe
 		return HealthResult{
 			OK:   false,
 			Body: map[string]any{"ok": false, "status": "unavailable", "error": "clickhouse unavailable"},
+		}, nil
+	}
+	if s.httpSchema != nil && !s.httpSchema.Ready() {
+		return HealthResult{
+			OK:   false,
+			Body: map[string]any{"ok": false, "status": "unavailable", "error": "http schema not ready"},
 		}, nil
 	}
 	body := map[string]any{"ok": true, "status": "healthy", "clickhouse": "ok"}

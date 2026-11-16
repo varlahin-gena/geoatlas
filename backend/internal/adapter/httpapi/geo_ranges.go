@@ -121,6 +121,7 @@ func (h *GeoHandler) AppendGeoRange(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "geo service unavailable"})
 		return
 	}
+	extendConnDeadline(w, 5*time.Minute)
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
 	defer cancel()
 
@@ -146,6 +147,7 @@ func (h *GeoHandler) UpdateGeoRange(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "geo service unavailable"})
 		return
 	}
+	extendConnDeadline(w, 5*time.Minute)
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
 	defer cancel()
 
@@ -171,13 +173,9 @@ func (h *GeoHandler) ExportGeoRangesCSV(w http.ResponseWriter, r *http.Request) 
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "geo service unavailable"})
 		return
 	}
+	extendConnDeadline(w, exportWriteTimeout)
 	ctx, cancel := context.WithTimeout(r.Context(), exportWriteTimeout)
 	defer cancel()
-
-	// Маршрут идёт мимо TimeoutHandler, поэтому дедлайн ставим на само соединение.
-	if err := http.NewResponseController(w).SetWriteDeadline(time.Now().Add(exportWriteTimeout)); err != nil {
-		slog.Warn("geo export: write deadline not supported", "err", err)
-	}
 
 	filename := "geoip-" + time.Now().UTC().Format("20060102-150405") + ".csv"
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
@@ -193,6 +191,7 @@ func (h *GeoHandler) ClearGeoRanges(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "geo service unavailable"})
 		return
 	}
+	extendConnDeadline(w, 2*time.Minute)
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
 	defer cancel()
 

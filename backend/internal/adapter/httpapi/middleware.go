@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"log/slog"
 	"net/http"
 	"runtime/debug"
@@ -276,4 +277,21 @@ func proxyGateExempt(path string) bool {
 // withTimeout навешивает жёсткий дедлайн на быстрые read-эндпоинты.
 func withTimeout(next http.Handler, d time.Duration) http.Handler {
 	return http.TimeoutHandler(next, d, `{"error":"request timeout"}`)
+}
+
+// extendConnDeadline удлиняет read/write дедлайн соединения сверх серверного
+// readTimeout. Более короткий бюджет не трогаем — иначе урежем потолок API.
+// httptest.ResponseRecorder возвращает ErrNotSupported: это не ошибка хендлера.
+func extendConnDeadline(w http.ResponseWriter, d time.Duration) {
+	if d <= readTimeout {
+		return
+	}
+	rc := http.NewResponseController(w)
+	deadline := time.Now().Add(d)
+	if err := rc.SetReadDeadline(deadline); err != nil && !errors.Is(err, http.ErrNotSupported) {
+		slog.Warn("set read deadline", "err", err)
+	}
+	if err := rc.SetWriteDeadline(deadline); err != nil && !errors.Is(err, http.ErrNotSupported) {
+		slog.Warn("set write deadline", "err", err)
+	}
 }

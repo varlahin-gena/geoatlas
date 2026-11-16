@@ -260,7 +260,9 @@ func (s *Service) Ack(ctx context.Context, fingerprint, by string) error {
 		return err
 	}
 	// Закрытие без явного назначения — УЗ закрывшего становится исполнителем.
-	_ = s.store.AssignIfEmpty(ctx, fp, by, by)
+	if err := s.store.AssignIfEmpty(ctx, fp, by, by); err != nil {
+		return fmt.Errorf("assign ack owner: %w", err)
+	}
 	return nil
 }
 
@@ -330,7 +332,9 @@ func (s *Service) Scan(ctx context.Context, now time.Time) ScanResult {
 
 	var candidates []Event
 	run := func(code string, timeout time.Duration, fn func(context.Context) ([]Event, error)) {
-		if tctx.Err() != nil {
+		if err := tctx.Err(); err != nil {
+			res.Missed = append(res.Missed, code)
+			slog.Warn("anomaly detector skipped", "code", code, "err", err)
 			return
 		}
 		if timeout <= 0 {
@@ -380,6 +384,15 @@ func (s *Service) Scan(ctx context.Context, now time.Time) ScanResult {
 		}
 		return s.detectBeaconing(c, now, th, ent)
 	})
+
+	if len(res.Missed) > 0 {
+		msg := "tick budget: skipped " + strings.Join(res.Missed, ",")
+		if res.Error != "" {
+			res.Error += "; " + msg
+		} else {
+			res.Error = msg
+		}
+	}
 
 	kept := s.dedupAndCap(tctx, candidates, now)
 	if len(kept) > 0 {

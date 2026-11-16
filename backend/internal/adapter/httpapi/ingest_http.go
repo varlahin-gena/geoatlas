@@ -29,6 +29,7 @@ func (h *IngestHandler) GetIngestStats(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *IngestHandler) IngestLogs(w http.ResponseWriter, r *http.Request) {
+	extendConnDeadline(w, longIOTimeout)
 	defer r.Body.Close()
 
 	stats, err := h.ingestReader(r.Context(), r.Body)
