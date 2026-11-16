@@ -64,8 +64,9 @@ type ProfileHost struct {
 }
 
 type ProfileServiceLimits struct {
-	MemoryGB int `json:"memory_gb"`
-	CPUs     int `json:"cpus"`
+	// MemoryGB может быть дробным (tiny backend = 0.75).
+	MemoryGB float64 `json:"memory_gb"`
+	CPUs     int     `json:"cpus"`
 }
 
 type ProfileClickHouseLimits struct {
@@ -76,9 +77,10 @@ type ProfileClickHouseLimits struct {
 
 type ProfileBackendLimits struct {
 	ProfileServiceLimits
-	IngestWorkers   int `json:"ingest_workers"`
-	IngestQueueSize int `json:"ingest_queue_size"`
-	IngestBatchSize int `json:"ingest_batch_size"`
+	IngestWorkers       int   `json:"ingest_workers"`
+	IngestQueueSize     int   `json:"ingest_queue_size"`
+	IngestQueueMaxBytes int64 `json:"ingest_queue_max_bytes,omitempty"`
+	IngestBatchSize     int   `json:"ingest_batch_size"`
 }
 
 type ProfileSyslogLimits struct {

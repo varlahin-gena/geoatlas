@@ -13,8 +13,9 @@ type HostInfo struct {
 }
 
 type ServiceLimits struct {
-	MemoryGB int `json:"memory_gb"`
-	CPUs     int `json:"cpus"`
+	// MemoryGB может быть дробным (tiny backend = 0.75).
+	MemoryGB float64 `json:"memory_gb"`
+	CPUs     int     `json:"cpus"`
 }
 
 type ClickHouseLimits struct {
@@ -25,9 +26,10 @@ type ClickHouseLimits struct {
 
 type BackendLimits struct {
 	ServiceLimits
-	IngestWorkers   int `json:"ingest_workers"`
-	IngestQueueSize int `json:"ingest_queue_size"`
-	IngestBatchSize int `json:"ingest_batch_size"`
+	IngestWorkers       int   `json:"ingest_workers"`
+	IngestQueueSize     int   `json:"ingest_queue_size"`
+	IngestQueueMaxBytes int64 `json:"ingest_queue_max_bytes,omitempty"`
+	IngestBatchSize     int   `json:"ingest_batch_size"`
 }
 
 type SyslogLimits struct {

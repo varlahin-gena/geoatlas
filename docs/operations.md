@@ -55,15 +55,15 @@ docker compose restart clickhouse
 | `syslog-ng.d/zz_profile.conf`              | `@define` буферов syslog-ng (fifo / window / disk)             |
 | `install-profile.json`                     | Сводка профиля (отображается в UI «Система»)                   |
 
-**Буферы syslog-ng по профилю** (на каждое из двух назначений UDP/TCP; `reliable(no)`; TCP `max-connections(64)`, `log-iw-size` ≥ 6400):
+**Буферы syslog-ng по профилю** (на каждое из двух назначений UDP/TCP; `reliable(no)`; `log-iw-size` = fifo и не меньше `max-connections` × 100):
 
-| Профиль  | RAM контейнера | fifo / window (сообщений) | disk-buf | UDP rcvbuf |
-|----------|----------------|---------------------------|----------|------------|
-| `tiny`   | 512 MiB        | 10 000                    | 256 MiB  | 16 MiB     |
-| `small`  | 768 MiB        | 25 000                    | 512 MiB  | 32 MiB     |
-| `medium` | 1 GiB          | 50 000                    | 1 GiB    | 64 MiB     |
-| `large`  | 2 GiB          | 100 000                   | 2 GiB    | 128 MiB    |
-| `xlarge` | 4 GiB          | 200 000                   | 4 GiB    | 128 MiB    |
+| Профиль  | RAM контейнера | fifo / window (сообщений) | disk-buf | UDP rcvbuf | TCP conn |
+|----------|----------------|---------------------------|----------|------------|----------|
+| `tiny`   | 384 MiB        | 10 000                    | 256 MiB  | 16 MiB     | 64       |
+| `small`  | 768 MiB        | 25 000                    | 512 MiB  | 32 MiB     | 64       |
+| `medium` | 1 GiB          | 50 000                    | 1 GiB    | 64 MiB     | 64       |
+| `large`  | 2 GiB          | 100 000                   | 2 GiB    | 128 MiB    | 128      |
+| `xlarge` | 4 GiB          | 200 000                   | 4 GiB    | 128 MiB    | 256      |
 
 Запрошенные `so-rcvbuf` / `so-sndbuf` применятся только если хост позволяет (`net.core.rmem_max` / `wmem_max`). Иначе в логе syslog-ng будет `The kernel refused to set the receive/send buffer` и останется ~416 KiB — на приём это не влияет, на пиках UDP возможны потери в сокете. Пример (не в compose по умолчанию):
 
@@ -74,15 +74,19 @@ sysctl -w net.core.wmem_max=16777216
 
 **Доступные профили:**
 
-| Профиль  | Сервер (ориентир)       | ClickHouse    | Backend       | Workers | EPS (событий/с) |
-|----------|-------------------------|---------------|---------------|---------|-----------------|
-| `tiny`   | ≤2 CPU / ≤4 GiB RAM     | 2 GiB         | 1 GiB         | 1       | 500 – 2 000     |
-| `small`  | ≤4 CPU / ≤8 GiB RAM     | 3 GiB / 3 CPU | 2 GiB / 2 CPU | 2       | 5 000 – 12 000  |
-| `medium` | ≤8 CPU / ≤16 GiB RAM    | 6 GiB         | 4 GiB         | 4       | 10 000 – 25 000 |
-| `large`  | ≤16 CPU / ≤32 GiB RAM   | 12 GiB        | 8 GiB         | 8       | 25 000 – 80 000 |
-| `xlarge` | >16 CPU / >32 GiB RAM   | 24 GiB        | 16 GiB        | 12      | 80 000 – 200 000|
+Рекомендация — **меньший** из класса по CPU и класса по RAM, чтобы сумма cgroup-лимитов помещалась в хост. Машина с многими ядрами и малой памятью остаётся на классе памяти.
 
-Профиль также задаёт **`CH_MAX_THREADS`** (~половина ядер ClickHouse, потолок 4; по умолчанию 2): лимит потоков на тяжёлые `GROUP BY` карты, чтобы refresh не утилизировал все ядра. Варианты в установщике — только `tiny`…`xlarge`.
+| Профиль  | Сервер (ориентир)              | ClickHouse      | Backend            | Workers | Очередь, байт | EPS (событий/с) |
+|----------|--------------------------------|-----------------|--------------------|---------|---------------|-----------------|
+| `tiny`   | до 2 CPU или до 8 GiB RAM      | 1.5 GiB / 1 CPU | 768 MiB / 1 CPU    | 1       | 64 MiB        | 500 – 2 000     |
+| `small`  | до 4 CPU или до 16 GiB RAM     | 3 GiB / 3 CPU   | 2 GiB / 2 CPU      | 2       | 128 MiB       | 5 000 – 12 000  |
+| `medium` | до 8 CPU или до 32 GiB RAM     | 6 GiB / 4 CPU   | 4 GiB / 3 CPU      | 2       | 256 MiB       | 10 000 – 25 000 |
+| `large`  | до 16 CPU или до 64 GiB RAM    | 12 GiB / 8 CPU  | 8 GiB / 6 CPU      | 3       | 512 MiB       | 25 000 – 80 000 |
+| `xlarge` | больше 16 CPU и от 64 GiB RAM  | 24 GiB / 16 CPU | 16 GiB / 12 CPU    | 4       | 1 GiB         | 80 000 – 200 000|
+
+К лимитам профиля всегда добавляются frontend 256 MiB и stats-collector 256 MiB. Пороги RAM чуть ниже номинала стикера (`MemTotal` у «8 GiB» часто около 7.6 GiB): до ~7 GiB — `tiny`, до ~14 GiB — `small`, до ~28 GiB — `medium`, до ~56 GiB — `large`, дальше `xlarge`.
+
+`INGEST_QUEUE_MAX_BYTES` режет очередь раньше, чем число сообщений, если строки длинные. `CH_MAX_THREADS` — около половины ядер ClickHouse (потолок 4, на 16 ядрах ClickHouse — 8). Доля RAM запроса: 30% контейнера на `tiny`/`small`, 40% на остальных. Spill `GROUP BY` на диск — до 512 MiB, у `large` до 1 GiB, у `xlarge` до 2 GiB. Варианты в установщике — только `tiny`…`xlarge`.
 
 **Пересчёт профиля после изменения ресурсов сервера:**
 

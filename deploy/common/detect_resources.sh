@@ -66,75 +66,138 @@ detect_cgroup_version() {
     esac
 }
 
+# Меньший из класса по CPU и класса по RAM. Иначе машина с многими ядрами
+# и малой памятью получает cgroup-лимиты больше, чем есть RAM.
+_profile_rank() {
+    case "$1" in
+        tiny) echo 1 ;;
+        small) echo 2 ;;
+        medium) echo 3 ;;
+        large) echo 4 ;;
+        xlarge) echo 5 ;;
+        *) echo 1 ;;
+    esac
+}
+
 recommend_profile() {
     local cpu="$1"
     local ram_mb="$2"
+    local cpu_tier ram_tier cpu_rank ram_rank
 
-    if (( ram_mb <= 4096 )) || (( cpu <= 2 && ram_mb <= 6144 )); then
-        echo "tiny"
-    elif (( cpu <= 4 && ram_mb <= 8192 )); then
-        echo "small"
-    elif (( cpu <= 8 && ram_mb <= 16384 )); then
-        echo "medium"
-    elif (( cpu <= 16 && ram_mb <= 32768 )); then
-        echo "large"
+    if (( cpu <= 2 )); then
+        cpu_tier="tiny"
+    elif (( cpu <= 4 )); then
+        cpu_tier="small"
+    elif (( cpu <= 8 )); then
+        cpu_tier="medium"
+    elif (( cpu <= 16 )); then
+        cpu_tier="large"
     else
-        echo "xlarge"
+        cpu_tier="xlarge"
     fi
+
+    # Пороги ниже номинала стикера: MemTotal у «8 GiB» часто ~7.6–8.0 GiB.
+    # Граница — хост, на котором лимиты профиля вместе с frontend и stats
+    # остаются примерно в 80% RAM.
+    if (( ram_mb < 7168 )); then
+        ram_tier="tiny" # < ~7 GiB (4 и 6 GiB)
+    elif (( ram_mb < 14336 )); then
+        ram_tier="small" # < ~14 GiB (8 и 12 GiB)
+    elif (( ram_mb < 28672 )); then
+        ram_tier="medium" # < ~28 GiB (16 и 24 GiB)
+    elif (( ram_mb < 57344 )); then
+        ram_tier="large" # < ~56 GiB (32 и 48 GiB)
+    else
+        ram_tier="xlarge"
+    fi
+
+    cpu_rank="$(_profile_rank "$cpu_tier")"
+    ram_rank="$(_profile_rank "$ram_tier")"
+    if (( cpu_rank < ram_rank )); then
+        echo "$cpu_tier"
+    else
+        echo "$ram_tier"
+    fi
+}
+
+# GiB для JSON и текста. 1536 MiB → 1.5, 2048 MiB → 2.
+_ga_gib() {
+    # LC_ALL=C: при ru_RU awk печатает 1,5 и ломает JSON.
+    LC_ALL=C awk -v mb="$1" 'BEGIN { printf "%g", mb / 1024 }'
 }
 
 profile_params() {
     local profile="$1"
     case "$profile" in
         tiny)
-            CH_MEM_GB=2; CH_CPUS=1
-            BE_MEM_GB=1; BE_CPUS=1
-            # Tiny: минимизируем churn частей; пусть ingest буферизует короткие bursts.
+            # ≤4 GiB хост: CH 1.5 + backend 0.75 + syslog 0.375 + frontend/stats 0.5 ≈ 3.1 GiB.
+            CH_MEM_MB=1536; CH_CPUS=1
+            BE_MEM_MB=768; BE_CPUS=1
+            # Мало воркеров — меньше мелких parts; короткие bursts держит очередь.
             BE_WORKERS=1; BE_QUEUE=50000; BE_BATCH=5000; BE_FLUSH=5
             BE_CH_CONNS=1
-            # 2×fifo сообщений в RAM (flow-control-window) + ~80 MiB процесс.
-            SYSLOG_MEM_MB=512; SYSLOG_CPUS=1
-            SYSLOG_FIFO=10000; SYSLOG_MEM_BUF=33554432; SYSLOG_DISK_BUF=268435456
-            SYSLOG_UDP_RCVBUF=16777216; SYSLOG_IW_SIZE=1000
+            BE_QUEUE_BYTES=$((64 * 1024 * 1024))
+            CH_QUERY_RATIO=0.30
+            SPILL_CAP_BYTES=$((512 * 1024 * 1024))
+            # Окно = fifo: UDP-всплеск уходит в disk-buffer, а не в сокет.
+            SYSLOG_MEM_MB=384; SYSLOG_CPUS=1
+            SYSLOG_FIFO=10000; SYSLOG_DISK_BUF=268435456
+            SYSLOG_UDP_RCVBUF=16777216; SYSLOG_IW_SIZE=10000
+            SYSLOG_TCP_MAX_CONN=64
             ;;
         small)
             # 4 CPU / 8 GiB: CH чаще упирается в inserts/merges, чем ingest.
-            # Держим умеренный параллелизм и более редкие flush, чтобы не плодить мелкие parts.
-            CH_MEM_GB=3; CH_CPUS=3
-            BE_MEM_GB=2; BE_CPUS=2
+            # Умеренный параллелизм и редкий flush, чтобы не плодить мелкие parts.
+            CH_MEM_MB=3072; CH_CPUS=3
+            BE_MEM_MB=2048; BE_CPUS=2
             BE_WORKERS=2; BE_QUEUE=200000; BE_BATCH=20000; BE_FLUSH=5
             BE_CH_CONNS=2
-            # 2×fifo сообщений в RAM (flow-control-window) + ~80 MiB процесс.
+            BE_QUEUE_BYTES=$((128 * 1024 * 1024))
+            CH_QUERY_RATIO=0.30
+            SPILL_CAP_BYTES=$((512 * 1024 * 1024))
             SYSLOG_MEM_MB=768; SYSLOG_CPUS=1
-            SYSLOG_FIFO=25000; SYSLOG_MEM_BUF=67108864; SYSLOG_DISK_BUF=536870912
-            SYSLOG_UDP_RCVBUF=33554432; SYSLOG_IW_SIZE=2000
+            SYSLOG_FIFO=25000; SYSLOG_DISK_BUF=536870912
+            SYSLOG_UDP_RCVBUF=33554432; SYSLOG_IW_SIZE=25000
+            SYSLOG_TCP_MAX_CONN=64
             ;;
         medium)
-            CH_MEM_GB=6; CH_CPUS=4
-            BE_MEM_GB=4; BE_CPUS=3
+            CH_MEM_MB=6144; CH_CPUS=4
+            BE_MEM_MB=4096; BE_CPUS=3
             BE_WORKERS=2; BE_QUEUE=300000; BE_BATCH=25000; BE_FLUSH=4
             BE_CH_CONNS=2
+            BE_QUEUE_BYTES=$((256 * 1024 * 1024))
+            CH_QUERY_RATIO=0.40
+            SPILL_CAP_BYTES=$((512 * 1024 * 1024))
             SYSLOG_MEM_MB=1024; SYSLOG_CPUS=2
-            SYSLOG_FIFO=50000; SYSLOG_MEM_BUF=100663296; SYSLOG_DISK_BUF=1073741824
-            SYSLOG_UDP_RCVBUF=67108864; SYSLOG_IW_SIZE=4000
+            SYSLOG_FIFO=50000; SYSLOG_DISK_BUF=1073741824
+            SYSLOG_UDP_RCVBUF=67108864; SYSLOG_IW_SIZE=50000
+            SYSLOG_TCP_MAX_CONN=64
             ;;
         large)
-            CH_MEM_GB=12; CH_CPUS=8
-            BE_MEM_GB=8; BE_CPUS=6
+            CH_MEM_MB=12288; CH_CPUS=8
+            BE_MEM_MB=8192; BE_CPUS=6
             BE_WORKERS=3; BE_QUEUE=500000; BE_BATCH=30000; BE_FLUSH=3
             BE_CH_CONNS=3
+            BE_QUEUE_BYTES=$((512 * 1024 * 1024))
+            CH_QUERY_RATIO=0.40
+            SPILL_CAP_BYTES=$((1024 * 1024 * 1024))
             SYSLOG_MEM_MB=2048; SYSLOG_CPUS=3
-            SYSLOG_FIFO=100000; SYSLOG_MEM_BUF=201326592; SYSLOG_DISK_BUF=2147483648
-            SYSLOG_UDP_RCVBUF=134217728; SYSLOG_IW_SIZE=8000
+            SYSLOG_FIFO=100000; SYSLOG_DISK_BUF=2147483648
+            SYSLOG_UDP_RCVBUF=134217728; SYSLOG_IW_SIZE=100000
+            SYSLOG_TCP_MAX_CONN=128
             ;;
         xlarge)
-            CH_MEM_GB=24; CH_CPUS=16
-            BE_MEM_GB=16; BE_CPUS=12
+            CH_MEM_MB=24576; CH_CPUS=16
+            BE_MEM_MB=16384; BE_CPUS=12
             BE_WORKERS=4; BE_QUEUE=750000; BE_BATCH=40000; BE_FLUSH=2
             BE_CH_CONNS=4
+            BE_QUEUE_BYTES=$((1024 * 1024 * 1024))
+            CH_QUERY_RATIO=0.40
+            SPILL_CAP_BYTES=$((2 * 1024 * 1024 * 1024))
             SYSLOG_MEM_MB=4096; SYSLOG_CPUS=4
-            SYSLOG_FIFO=200000; SYSLOG_MEM_BUF=402653184; SYSLOG_DISK_BUF=4294967296
-            SYSLOG_UDP_RCVBUF=134217728; SYSLOG_IW_SIZE=16000
+            SYSLOG_FIFO=200000; SYSLOG_DISK_BUF=4294967296
+            SYSLOG_UDP_RCVBUF=134217728; SYSLOG_IW_SIZE=200000
+            SYSLOG_TCP_MAX_CONN=256
             ;;
         *)
             _ga_log "Неизвестный профиль: $profile"
@@ -157,36 +220,41 @@ profile_capacity() {
 
 profile_label_ru() {
     case "$1" in
-        tiny)   echo "минимальный (≤2 CPU / ≤4 GiB RAM)" ;;
-        small)  echo "малый (≤4 CPU / ≤8 GiB RAM)" ;;
-        medium) echo "средний (≤8 CPU / ≤16 GiB RAM)" ;;
-        large)  echo "большой (≤16 CPU / ≤32 GiB RAM)" ;;
-        xlarge) echo "максимальный (>16 CPU / >32 GiB RAM)" ;;
+        tiny)   echo "минимальный (до 2 CPU или до 8 GiB RAM)" ;;
+        small)  echo "малый (до 4 CPU или до 16 GiB RAM)" ;;
+        medium) echo "средний (до 8 CPU или до 32 GiB RAM)" ;;
+        large)  echo "большой (до 16 CPU или до 64 GiB RAM)" ;;
+        xlarge) echo "максимальный (больше 16 CPU и от 64 GiB RAM)" ;;
         *)      echo "$1" ;;
     esac
 }
 
 calc_ch_max_query_bytes() {
-    local ch_mem_gb="$1"
-    awk -v gb="$ch_mem_gb" 'BEGIN { printf "%d", gb * 1024 * 1024 * 1024 * 0.40 }'
+    local mem_mb="$1"
+    local ratio="${2:-0.40}"
+    awk -v mb="$mem_mb" -v ratio="$ratio" 'BEGIN { printf "%d", mb * 1024 * 1024 * ratio }'
 }
 
 calc_external_spill_bytes() {
-    local ch_mem_gb="$1"
-    awk -v gb="$ch_mem_gb" 'BEGIN {
-        spill = gb * 1024 * 1024 * 64
+    local mem_mb="$1"
+    local cap="${2:-536870912}"
+    awk -v mb="$mem_mb" -v cap="$cap" 'BEGIN {
+        spill = mb * 1024 * 64
         if (spill < 134217728) spill = 134217728
-        if (spill > 536870912) spill = 536870912
+        if (spill > cap) spill = cap
         printf "%d", spill
     }'
 }
 
-# Потоки на один тяжёлый GROUP BY: ~половина ядер CH, потолок 4 (не утилизировать все ядра картой).
+# Потоки на один тяжёлый GROUP BY: ~половина ядер CH.
+# Потолок 4, на 16+ ядрах ClickHouse — 8, чтобы merges не остались без CPU.
 calc_ch_max_threads() {
     local ch_cpus="$1"
     local t=$(( (ch_cpus + 1) / 2 ))
+    local cap=4
     (( t < 1 )) && t=1
-    (( t > 4 )) && t=4
+    (( ch_cpus >= 16 )) && cap=8
+    (( t > cap )) && t=$cap
     echo "$t"
 }
 
@@ -239,8 +307,8 @@ print_profile_options() {
         mark=""
         [[ "$p" == "$recommended" ]] && mark="  ← рекомендуется"
         printf "  %-8s %s%s\n" "$p" "$(profile_label_ru "$p")" "$mark" >&2
-        printf "           ClickHouse %d GiB · Backend %d GiB · workers %d · EPS до %d/с\n" \
-            "$CH_MEM_GB" "$BE_MEM_GB" "$BE_WORKERS" "$EPS_MAX" >&2
+        printf "           ClickHouse %s GiB · Backend %s GiB · workers %s · EPS до %s/с\n" \
+            "$(_ga_gib "$CH_MEM_MB")" "$(_ga_gib "$BE_MEM_MB")" "$BE_WORKERS" "$EPS_MAX" >&2
         echo "" >&2
     done
 }
@@ -280,7 +348,7 @@ confirm_profile() {
             on_flag=OFF
             mark=""
             [[ "$p" == "$recommended" ]] && on_flag=ON && mark=" ← рекомендуется"
-            desc="$(profile_label_ru "$p")${mark} · ${CH_MEM_GB}/${BE_MEM_GB}G"
+            desc="$(profile_label_ru "$p")${mark} · $(_ga_gib "$CH_MEM_MB")/$(_ga_gib "$BE_MEM_MB")G"
             items+=("$p" "$desc" "$on_flag")
         done
 
@@ -343,8 +411,8 @@ write_env_file() {
     local env_file="${project_dir}/.env"
     local ch_max_mem spill existing_token="" existing_session="" existing_ch="" existing_ingest="" existing_ops="" token session ch_password ingest_secret ops_token
 
-    ch_max_mem="$(calc_ch_max_query_bytes "$CH_MEM_GB")"
-    spill="$(calc_external_spill_bytes "$CH_MEM_GB")"
+    ch_max_mem="$(calc_ch_max_query_bytes "$CH_MEM_MB" "$CH_QUERY_RATIO")"
+    spill="$(calc_external_spill_bytes "$CH_MEM_MB" "$SPILL_CAP_BYTES")"
 
     if [[ -f "$env_file" ]]; then
         existing_token="$(_ga_env_get "$env_file" API_AUTH_TOKEN)"
@@ -525,10 +593,11 @@ AUTH_OPERATOR_PASSWORD=${operator_pass}"
     cat >"$env_file" <<EOF
 # Сгенерировано detect_resources.sh — не редактируйте вручную, перезапустите tune-resources.sh
 GA_INSTALL_PROFILE=${profile}
-GA_CH_MEM_GB=${CH_MEM_GB}
-GA_BE_MEM_GB=${BE_MEM_GB}
+GA_CH_MEM_MB=${CH_MEM_MB}
+GA_BE_MEM_MB=${BE_MEM_MB}
 GA_BE_WORKERS=${BE_WORKERS}
 GA_BE_QUEUE=${BE_QUEUE}
+GA_BE_QUEUE_BYTES=${BE_QUEUE_BYTES}
 GA_BE_BATCH=${BE_BATCH}
 GA_BE_FLUSH=${BE_FLUSH}
 GA_BE_CH_CONNS=${BE_CH_CONNS}
@@ -574,8 +643,8 @@ write_compose_override() {
     local override="${project_dir}/docker-compose.override.yml"
     local ch_max_mem spill ch_threads
 
-    ch_max_mem="$(calc_ch_max_query_bytes "$CH_MEM_GB")"
-    spill="$(calc_external_spill_bytes "$CH_MEM_GB")"
+    ch_max_mem="$(calc_ch_max_query_bytes "$CH_MEM_MB" "$CH_QUERY_RATIO")"
+    spill="$(calc_external_spill_bytes "$CH_MEM_MB" "$SPILL_CAP_BYTES")"
     ch_threads="$(calc_ch_max_threads "$CH_CPUS")"
 
     cat >"$override" <<EOF
@@ -588,7 +657,7 @@ services:
       resources:
         limits:
           cpus: "${CH_CPUS}.0"
-          memory: ${CH_MEM_GB}g
+          memory: ${CH_MEM_MB}m
     volumes:
       - ./clickhouse/users.d/zz_install_limits.xml:/etc/clickhouse-server/users.d/zz_install_limits.xml:ro
 
@@ -597,6 +666,7 @@ services:
       INGEST_WORKERS: "${BE_WORKERS}"
       INGEST_BATCH_SIZE: "${BE_BATCH}"
       INGEST_QUEUE_SIZE: "${BE_QUEUE}"
+      INGEST_QUEUE_MAX_BYTES: "${BE_QUEUE_BYTES}"
       INGEST_FLUSH_SEC: "${BE_FLUSH}"
       CH_INGEST_MAX_OPEN_CONNS: "${BE_CH_CONNS}"
       CH_INGEST_ASYNC_INSERT: "true"
@@ -609,7 +679,7 @@ services:
       resources:
         limits:
           cpus: "${BE_CPUS}.0"
-          memory: ${BE_MEM_GB}g
+          memory: ${BE_MEM_MB}m
 
   syslog-ng:
     deploy:
@@ -621,7 +691,13 @@ EOF
 }
 
 # 4.11 делит TCP log-iw-size на max-connections; минимум 100 на соединение.
-syslog_tcp_max_conn() { echo 64; }
+syslog_tcp_max_conn() {
+    if [[ -n "${SYSLOG_TCP_MAX_CONN:-}" ]]; then
+        echo "$SYSLOG_TCP_MAX_CONN"
+    else
+        echo 64
+    fi
+}
 
 syslog_tcp_iw_size() {
     local tcp_max min_tcp_iw tcp_iw
@@ -672,18 +748,20 @@ EOF
 write_clickhouse_limits() {
     local project_dir="$1" profile="$2"
     local limits_file="${project_dir}/clickhouse/users.d/zz_install_limits.xml"
-    local max_mem spill ch_threads
+    local max_mem spill ch_threads ch_gib query_pct
 
-    max_mem="$(calc_ch_max_query_bytes "$CH_MEM_GB")"
-    spill="$(calc_external_spill_bytes "$CH_MEM_GB")"
+    max_mem="$(calc_ch_max_query_bytes "$CH_MEM_MB" "$CH_QUERY_RATIO")"
+    spill="$(calc_external_spill_bytes "$CH_MEM_MB" "$SPILL_CAP_BYTES")"
     ch_threads="$(calc_ch_max_threads "$CH_CPUS")"
+    ch_gib="$(_ga_gib "$CH_MEM_MB")"
+    query_pct="$(awk -v r="${CH_QUERY_RATIO:-0.40}" 'BEGIN { printf "%d", r * 100 }')"
 
     mkdir -p "${project_dir}/clickhouse/users.d"
     cat >"$limits_file" <<EOF
 <?xml version="1.0"?>
 <clickhouse>
     <!-- Сгенерировано detect_resources.sh, профиль: ${profile} -->
-    <!-- ClickHouse container: ${CH_MEM_GB} GiB / ${CH_CPUS} CPU; per-query ~40% RAM, max_threads=${ch_threads} -->
+    <!-- ClickHouse container: ${ch_gib} GiB / ${CH_CPUS} CPU; per-query ${query_pct}% RAM, max_threads=${ch_threads} -->
     <profiles>
         <default>
             <max_memory_usage>${max_mem}</max_memory_usage>
@@ -700,10 +778,12 @@ write_install_profile_json() {
     local project_dir="$1" profile="$2"
     local cpu="$3" ram_mb="$4" disk_gb="$5" cgroup="$6"
     local json_file="${project_dir}/install-profile.json"
-    local ch_max_mem spill
+    local ch_max_mem spill ch_gib be_gib
 
-    ch_max_mem="$(calc_ch_max_query_bytes "$CH_MEM_GB")"
-    spill="$(calc_external_spill_bytes "$CH_MEM_GB")"
+    ch_max_mem="$(calc_ch_max_query_bytes "$CH_MEM_MB" "$CH_QUERY_RATIO")"
+    spill="$(calc_external_spill_bytes "$CH_MEM_MB" "$SPILL_CAP_BYTES")"
+    ch_gib="$(_ga_gib "$CH_MEM_MB")"
+    be_gib="$(_ga_gib "$BE_MEM_MB")"
 
     cat >"$json_file" <<EOF
 {
@@ -718,17 +798,18 @@ write_install_profile_json() {
   "profile_label": "$(profile_label_ru "$profile")",
   "limits": {
     "clickhouse": {
-      "memory_gb": ${CH_MEM_GB},
+      "memory_gb": ${ch_gib},
       "cpus": ${CH_CPUS},
       "max_query_memory_bytes": ${ch_max_mem},
       "external_spill_bytes": ${spill},
       "max_threads": $(calc_ch_max_threads "$CH_CPUS")
     },
     "backend": {
-      "memory_gb": ${BE_MEM_GB},
+      "memory_gb": ${be_gib},
       "cpus": ${BE_CPUS},
       "ingest_workers": ${BE_WORKERS},
       "ingest_queue_size": ${BE_QUEUE},
+      "ingest_queue_max_bytes": ${BE_QUEUE_BYTES},
       "ingest_batch_size": ${BE_BATCH},
       "ingest_flush_sec": ${BE_FLUSH},
       "ch_ingest_max_open_conns": ${BE_CH_CONNS}
@@ -737,7 +818,6 @@ write_install_profile_json() {
       "memory_mb": ${SYSLOG_MEM_MB},
       "cpus": ${SYSLOG_CPUS},
       "fifo_size": ${SYSLOG_FIFO},
-      "mem_buf_bytes": ${SYSLOG_MEM_BUF},
       "disk_buf_bytes": ${SYSLOG_DISK_BUF},
       "udp_rcvbuf_bytes": ${SYSLOG_UDP_RCVBUF},
       "iw_size": ${SYSLOG_IW_SIZE},
@@ -756,9 +836,9 @@ EOF
 print_applied_config() {
     local profile="$1"
     echo "Применён профиль: $(profile_label_ru "$profile") [$profile]"
-    echo "  ClickHouse : ${CH_MEM_GB} GiB RAM, ${CH_CPUS} CPU"
-    echo "  Backend    : ${BE_MEM_GB} GiB RAM, ${BE_CPUS} CPU, workers=${BE_WORKERS}, queue=${BE_QUEUE}, batch=${BE_BATCH}, flush=${BE_FLUSH}s, ch_conns=${BE_CH_CONNS}"
-    echo "  syslog-ng  : ${SYSLOG_MEM_MB} MiB RAM, ${SYSLOG_CPUS} CPU, fifo=${SYSLOG_FIFO}, window=${SYSLOG_FIFO} msgs, disk=$((SYSLOG_DISK_BUF / 1048576)) MiB"
+    echo "  ClickHouse : $(_ga_gib "$CH_MEM_MB") GiB RAM, ${CH_CPUS} CPU"
+    echo "  Backend    : $(_ga_gib "$BE_MEM_MB") GiB RAM, ${BE_CPUS} CPU, workers=${BE_WORKERS}, queue=${BE_QUEUE}, queue_bytes=${BE_QUEUE_BYTES}, batch=${BE_BATCH}, flush=${BE_FLUSH}s, ch_conns=${BE_CH_CONNS}"
+    echo "  syslog-ng  : ${SYSLOG_MEM_MB} MiB RAM, ${SYSLOG_CPUS} CPU, fifo=${SYSLOG_FIFO}, window=${SYSLOG_IW_SIZE} msgs, tcp_conn=$(syslog_tcp_max_conn), disk=$((SYSLOG_DISK_BUF / 1048576)) MiB"
     echo "  Ёмкость    : ${EPS_MIN}–${EPS_MAX} eps"
     echo ""
     echo "Созданы файлы:"
@@ -783,6 +863,18 @@ warn_if_constraints() {
 
     if [[ "$cgroup" == "unknown" ]]; then
         _ga_log "ВНИМАНИЕ: не удалось определить версию cgroup — stats-collector может не видеть метрики контейнеров."
+    fi
+}
+
+# frontend 256 MiB + stats-collector 256 MiB не входят в лимиты профиля.
+warn_if_profile_exceeds_host() {
+    local ram_mb="$1"
+    local sum_mb budget
+    (( ram_mb > 0 )) || return 0
+    sum_mb=$(( CH_MEM_MB + BE_MEM_MB + SYSLOG_MEM_MB + 512 ))
+    budget=$(( ram_mb * 80 / 100 ))
+    if (( sum_mb > budget )); then
+        _ga_log "ВНИМАНИЕ: лимиты профиля (~${sum_mb} MiB с frontend и stats) больше 80% RAM хоста (${ram_mb} MiB). Возможен OOM."
     fi
 }
 
@@ -823,6 +915,7 @@ apply_resource_profile() {
         profile_params "$profile"
     fi
     profile_capacity "$profile"
+    warn_if_profile_exceeds_host "$ram_mb"
 
     write_env_file "$project_dir" "$profile"
     write_compose_override "$project_dir" "$profile"

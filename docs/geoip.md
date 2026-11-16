@@ -113,7 +113,7 @@ docker exec backend wget -qO- \
 
 | Ограничение                     | Env                                                  | Откуда дефолт                                                                        |
 |---------------------------------|------------------------------------------------------|--------------------------------------------------------------------------------------|
-| Размер тела `/upload-geo`       | `GEOIP_UPLOAD_MAX_BYTES` (или `MAX_GEO_UPLOAD_SIZE`) | `install-profile.json` → `limits.backend.memory_gb` (small≈512 MiB, medium≈1 GiB, …) |
+| Размер тела `/upload-geo`       | `GEOIP_UPLOAD_MAX_BYTES` (или `MAX_GEO_UPLOAD_SIZE`) | `install-profile.json` → `limits.backend.memory_gb` (tiny≤1 GiB≈256 MiB, small≈512 MiB, medium≈1 GiB, …) |
 | Число диапазонов в CSV          | `GEOIP_UPLOAD_MAX_RANGES`                            | тот же профиль (small≈4 M)                                                           |
 | Replace поверх крупного индекса | —                                                    | **409 до чтения body**, если индекс уже ≥ половины лимита ranges                     |
 | Soft mem headroom               | из `install-profile` `limits.backend.memory_gb` × ¾  | **409 после parse**, если `HeapAlloc + upload ≈` выше soft limit (запас 512 MiB)     |

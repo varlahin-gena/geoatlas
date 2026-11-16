@@ -85,7 +85,7 @@ Exempt от rate limit: `/live`, `/ready`, `/metrics`, `/api/live`, `/api/ready`
 | `INGEST_LISTEN_ADDR` | `:1514` | Слушатель backend (внутри docker) |
 | `INGEST_ALLOW_FROM` | `syslog-ng` | Allowlist peer для ingest TCP |
 | `GA_SYSLOG_ALLOW_FROM` | пусто (= любой) | CIDR/IP источника для хостового FW на `:514` |
-| `INGEST_WORKERS` / batch / queue / flush | из профиля | Параметры пайплайна (`docker-compose.override.yml`) |
+| `INGEST_WORKERS` / batch / queue / `INGEST_QUEUE_MAX_BYTES` / flush | из профиля | Параметры пайплайна (`docker-compose.override.yml`) |
 
 Onboarding МСЭ: [syslog.md](syslog.md). Лимиты ёмкости: [архитектура — Ingest SLO](architecture.md#ingest-slo).
 

@@ -4,10 +4,11 @@ import "testing"
 
 func TestGeoUploadDefaultsForBackendMemoryGB(t *testing.T) {
 	cases := []struct {
-		gb        int
+		gb        float64
 		minBytes  int64
 		maxRanges int
 	}{
+		{0.75, 256 << 20, 2_000_000},
 		{1, 256 << 20, 2_000_000},
 		{2, 512 << 20, 4_000_000},
 		{4, 1 << 30, 5_000_000},
@@ -17,7 +18,7 @@ func TestGeoUploadDefaultsForBackendMemoryGB(t *testing.T) {
 	for _, tc := range cases {
 		b, r := GeoUploadDefaultsForBackendMemoryGB(tc.gb)
 		if b != tc.minBytes || r != tc.maxRanges {
-			t.Fatalf("gb=%d got bytes=%d ranges=%d want %d/%d", tc.gb, b, r, tc.minBytes, tc.maxRanges)
+			t.Fatalf("gb=%g got bytes=%d ranges=%d want %d/%d", tc.gb, b, r, tc.minBytes, tc.maxRanges)
 		}
 	}
 }
@@ -30,5 +31,10 @@ func TestBackendSoftMemLimitBytes(t *testing.T) {
 	want := uint64(2) * 3 * (1 << 30) / 4
 	if got := BackendSoftMemLimitBytes(2); got != want {
 		t.Fatalf("gb=2 got=%d want=%d", got, want)
+	}
+	// 0.75 GiB cgroup → 75% = 576 MiB.
+	wantTiny := uint64(576 << 20)
+	if got := BackendSoftMemLimitBytes(0.75); got != wantTiny {
+		t.Fatalf("gb=0.75 got=%d want=%d", got, wantTiny)
 	}
 }
