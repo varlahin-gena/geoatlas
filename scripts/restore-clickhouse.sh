@@ -11,8 +11,9 @@
 #
 # Env:
 #   RESTORE_ALLOW_NONEMPTY — 1 = SETTINGS allow_non_empty_tables=true (дефолт 0)
-#   RESTORE_AUTH           — 1 = распаковать <name>.auth.tgz в backend:/app/data
-#                            (дефолт: 1 если файл есть, иначе 0)
+#   RESTORE_AUTH           — 1 = распаковать <name>.auth.tgz в backend:/app/data.
+#                            Дефолт: 1, если файл есть (control plane — часть комплекта), иначе 0.
+#                            0 — вернуть только таблицы ClickHouse, /app/data не трогать.
 #   RESTORE_STOP_INGEST    — 1 = stop backend + syslog-ng перед restore (дефолт 1)
 #   COMPOSE / CLICKHOUSE_SERVICE / BACKEND_SERVICE — как в backup-clickhouse.sh
 
@@ -68,10 +69,16 @@ fi
 CANDIDATES=(
   traffic_logs
   geo_ranges
+  enterprise_nets
   reputation_ranges
   parse_errors
   system_metrics
+  anomaly_events
+  anomaly_acks
+  anomaly_suppressions
+  anomaly_assignments
   traffic_edges_daily
+  traffic_edges_hourly
   traffic_edges_city_daily
   traffic_edges_country_daily
   traffic_edges_continent_daily

@@ -67,7 +67,7 @@ geoatlas/
 │   ├── test-compose-stop-env.sh      # CI: заглушки для compose down без секретов
 │   ├── shellcheck.sh                 # CI: start/stop/update, scripts/, deploy/
 │   ├── backup-clickhouse.sh          # native BACKUP → том clickhouse-backups
-│   └── restore-clickhouse.sh         # RESTORE + optional auth tarball
+│   └── restore-clickhouse.sh         # RESTORE таблиц + *.auth.tgz (control plane) по умолчанию
 ├── docs/                             # установка, ops, архитектура, GeoIP, UI/API
 ├── certs/                            # PEM (fullchain/privkey); README + .gitkeep; ключи в .gitignore
 ├── deploy/

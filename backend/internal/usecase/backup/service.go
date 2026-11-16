@@ -752,6 +752,8 @@ func (s *Service) logBackupFailure(ctx context.Context, actor, action, target st
 	s.logBackupMutation(ctx, actor, action, "backup", target, "failed", map[string]any{"error": err.Error()})
 }
 
+// resolveTables — состав комплекта ClickHouse. Тот же список в scripts/backup-clickhouse.sh
+// и scripts/restore-clickhouse.sh: журнал аномалий едет вместе с трафиком, не с JSON.
 func (s *Service) resolveTables(ctx context.Context, includeEdges bool) ([]string, error) {
 	base := []string{
 		"traffic_logs",
@@ -762,6 +764,8 @@ func (s *Service) resolveTables(ctx context.Context, includeEdges bool) ([]strin
 		"system_metrics",
 		"anomaly_events",
 		"anomaly_acks",
+		"anomaly_suppressions",
+		"anomaly_assignments",
 	}
 	if includeEdges {
 		base = append(base,

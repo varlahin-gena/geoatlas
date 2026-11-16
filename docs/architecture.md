@@ -77,7 +77,7 @@
 3. **backend** снимает маркер (проверка токена + `connector_id`), парсит строки, обогащает GeoIP, пишет в ClickHouse; при старте `EnsureBaseSchema` / `Ensure*` создаёт базовые таблицы и агрегаты (`traffic_edges_*`, geo), применяет TTL из `retention.json` и при необходимости делает backfill. **Delivery contract — at-most-once / best-effort:** полная очередь ingest **не блокирует** TCP — лишние строки дропаются (`dropped_total`); при outage ClickHouse insert circuit ставит dequeue на паузу (очередь растёт → admission drops), а потери из processor-буфера учитываются отдельно (`buffer_drops_total`). Перед backend **syslog-ng уже буферизует**. Алерты и live-метрики drops — на `/system`.
 4. **frontend** отдаёт статику SPA и проксирует `/api/*` на `backend:8080` (с `auth_request`); `/dozzle/` — на контейнер `dozzle`.
 5. **stats-collector** каждые 30 с: cgroup CPU/RAM, HTTP scrape backend (`/live`, `/api/ingest/stats`) и syslog-ng (`:9577`), пишет `system_metrics` в ClickHouse.
-6. **Anomaly engine** (фоновый job в backend): каждые `ANOMALY_SCAN_INTERVAL` сканирует `traffic_logs` в ClickHouse, пишет срабатывания в JSON-store (`/app/data`), отдаёт через `GET /api/anomalies`. Требуются сети предприятия. Типы, пороги UI и learning — [anomalies.md](anomalies.md).
+6. **Anomaly engine** (фоновый job в backend): каждые `ANOMALY_SCAN_INTERVAL` сканирует `traffic_logs` в ClickHouse и пишет срабатывания в `anomaly_events`, подтверждения в `anomaly_acks`, подавления в `anomaly_suppressions`, назначения в `anomaly_assignments`. Пороги движка — отдельно, JSON `/app/data/anomaly_settings.json` (это не журнал). Отдача — `GET /api/anomalies`. Требуются сети предприятия. Типы, пороги UI и learning — [anomalies.md](anomalies.md).
 7. **Edge**: браузер ходит только в nginx (`:80`/`:443`); backend `:8080` за proxy gate (`GA_REQUIRE_PROXY`) не принимает прямые запросы с хоста (кроме loopback / Bearer). Rate limit и JSON-hardening — [configuration.md](configuration.md#api-threat-protection-edge).
 
 ## Product limits (appliance)
@@ -85,7 +85,7 @@
 | Ограничение                   | Суть                                                                                                                                           |
 |-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
 | **IPv4-only**                 | Success path GeoIP / карта / lookup — IPv4. IPv6 не обогащается и не строится на карте.                                                        |
-| **Single-host control plane** | Учётки, API-токены, retention, reputation feeds, schedules — JSON на `/app/data`. Backend берёт exclusive lock (`/app/data/.ga_backend.lock`). |
+| **Single-host control plane** | Учётки, API-токены, retention, коннекторы, hunts, шаблоны поиска, фиды репутации, расписание бэкапа и пороги аномалий — JSON на `/app/data`. Журнал аномалий в этих файлах не лежит (он в ClickHouse). Backend берёт exclusive lock (`/app/data/.ga_backend.lock`). |
 | **Один процесс backend**      | Ingest TCP, HTTP API, GeoIP RAM и background jobs (geo/backup/anomaly/reputation) — один контейнер. OOM/рестарт = пауза и приёма, и UI.        |
 
 ## Ingest SLO
@@ -119,6 +119,9 @@ Runbook кратко: warn drops → проверить стадию Syslog-NG (
 | `system_metrics`                    | 7 дней            | EnsureBaseSchema / retention `system_metrics_days` |
 | `geo_ranges`                        | без TTL           | EnsureBaseSchema (не настраивается)                |
 | `ga_schema_version`                 | без TTL           | `Ensure*` (метаданные схемы)                       |
+| `anomaly_events`                    | 30 дней           | DDL (`anomalyEventsDDL`), не `retention.json`      |
+| `anomaly_suppressions`              | до `suppressed_until` + 1 день | DDL                                      |
+| `anomaly_acks`, `anomaly_assignments` | без TTL         | `ReplacingMergeTree`                               |
 
 Допустимый диапазон настраиваемых дней: **1…730**. На `traffic_logs` / `parse_errors` / `system_metrics` / `traffic_edges_*` включён `ttl_only_drop_parts` при **дневных** партициях: истечение удаляет дневную партицию целиком. Уменьшение TTL удалит старые партиции при следующем TTL merge/drop в ClickHouse.
 

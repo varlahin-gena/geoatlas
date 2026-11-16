@@ -6,6 +6,8 @@
 
 Сканер работает только при наличии **сетей предприятия** (иначе `no_enterprise_nets`).
 
+Срабатывания, ack, назначения и подавления живут в ClickHouse (`anomaly_events`, `anomaly_acks`, `anomaly_assignments`, `anomaly_suppressions`). Пороги со страницы движка — в `/app/data/anomaly_settings.json`. Журнал уезжает в бэкап ClickHouse, JSON — в соседний `*.auth.tgz`. См. [резервное копирование](operations.md#резервное-копирование-clickhouse).
+
 ## Типы
 
 | Код | Смысл (UI) | Severity |
