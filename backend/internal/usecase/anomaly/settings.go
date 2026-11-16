@@ -48,9 +48,11 @@ type Settings struct {
 	IncludePrivate     bool    `json:"include_private"`
 	NewCountryMinShare float64 `json:"new_country_min_share"`
 	// FanoutExclude — источники, которые не поднимают обход хостов предприятия.
-	FanoutExclude []string    `json:"fanout_exclude,omitempty"`
-	Thresholds    *Thresholds `json:"thresholds,omitempty"`
-	UpdatedAt     string      `json:"updated_at,omitempty"`
+	FanoutExclude []string `json:"fanout_exclude,omitempty"`
+	// Exclusions — запрос карты на каждый тип: такой трафик проверка не учитывает.
+	Exclusions map[string]string `json:"exclusions,omitempty"`
+	Thresholds *Thresholds       `json:"thresholds,omitempty"`
+	UpdatedAt  string            `json:"updated_at,omitempty"`
 }
 
 // SettingsStore — персистентность настроек.
@@ -217,6 +219,7 @@ func normalizeSettings(st Settings) Settings {
 		st.NewCountryMinShare = maxNewCountryShare
 	}
 	st.FanoutExclude = cleanFanoutExclude(st.FanoutExclude)
+	st.Exclusions = cleanExclusions(st.Exclusions)
 	return st
 }
 
@@ -237,6 +240,10 @@ func validateSettings(in Settings) (Settings, error) {
 	if err != nil {
 		return Settings{}, err
 	}
+	exclusions, err := validateExclusions(in.Exclusions)
+	if err != nil {
+		return Settings{}, err
+	}
 	if in.Thresholds != nil {
 		if err := validateThresholds(*in.Thresholds); err != nil {
 			return Settings{}, err
@@ -246,7 +253,32 @@ func validateSettings(in Settings) (Settings, error) {
 	out.Enabled = in.Enabled
 	out.IncludePrivate = in.IncludePrivate
 	out.FanoutExclude = exclude
+	out.Exclusions = exclusions
 	out.Thresholds = in.Thresholds
+	return out, nil
+}
+
+func validateExclusions(in map[string]string) (map[string]string, error) {
+	if len(in) == 0 {
+		return nil, nil
+	}
+	out := make(map[string]string, len(in))
+	for code, raw := range in {
+		if strings.TrimSpace(raw) == "" {
+			continue
+		}
+		if !knownExclusionCode(code) {
+			return nil, fmt.Errorf("%w: exclusions %q", ErrInvalidAnomalySettings, code)
+		}
+		q, ok := acceptableExclusion(code, raw)
+		if !ok {
+			return nil, fmt.Errorf("%w: exclusions %s", ErrInvalidAnomalySettings, code)
+		}
+		out[code] = q
+	}
+	if len(out) == 0 {
+		return nil, nil
+	}
 	return out, nil
 }
 

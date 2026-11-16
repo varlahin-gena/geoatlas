@@ -37,6 +37,21 @@ func TestValidateSettings(t *testing.T) {
 	if got.ScanIntervalMin != 10 || !got.IncludePrivate {
 		t.Fatalf("got %+v", got)
 	}
+	ok.Exclusions = map[string]string{CodePortScan: "src_ip=10.1.1.1"}
+	got, err = validateSettings(ok)
+	if err != nil || got.Exclusions[CodePortScan] != "src_ip=10.1.1.1" {
+		t.Fatalf("exclusions %+v %v", got.Exclusions, err)
+	}
+	badQ := ok
+	badQ.Exclusions = map[string]string{CodePortScan: "((("}
+	if _, err := validateSettings(badQ); err == nil {
+		t.Fatal("expected invalid exclusion query")
+	}
+	badCode := ok
+	badCode.Exclusions = map[string]string{"nope": "src_ip=10.1.1.1"}
+	if _, err := validateSettings(badCode); err == nil {
+		t.Fatal("expected unknown exclusion code")
+	}
 
 	if _, err := validateSettings(Settings{ScanIntervalMin: 0}); err == nil {
 		t.Fatal("expected error for scan interval")

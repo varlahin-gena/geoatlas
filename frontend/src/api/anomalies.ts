@@ -38,6 +38,8 @@ export type AnomalyEngineSettings = {
   include_private: boolean;
   new_country_min_share: number;
   fanout_exclude?: string[];
+  /** Запрос карты на код проверки. Совпавший трафик эта проверка не учитывает. */
+  exclusions?: Record<string, string>;
   thresholds?: AnomalyThresholds | null;
   updated_at?: string;
 };

@@ -38,6 +38,8 @@ type Config struct {
 	NewCountryRepeatCooldownHours int
 	// FanoutExclude — источники, которые не поднимают обход хостов предприятия.
 	FanoutExclude []string
+	// Exclusions — запрос карты на код проверки.
+	Exclusions map[string]string
 	// ThresholdOverrides — optional admin overrides; nil = только install profile.
 	ThresholdOverrides *Thresholds
 }
@@ -130,6 +132,14 @@ func (s *Service) ApplySettings(st Settings) {
 		s.cfg.FanoutExclude = nil
 	} else {
 		s.cfg.FanoutExclude = append([]string(nil), st.FanoutExclude...)
+	}
+	if len(st.Exclusions) == 0 {
+		s.cfg.Exclusions = nil
+	} else {
+		s.cfg.Exclusions = make(map[string]string, len(st.Exclusions))
+		for k, v := range st.Exclusions {
+			s.cfg.Exclusions[k] = v
+		}
 	}
 	if st.Thresholds != nil {
 		th := *st.Thresholds
@@ -337,6 +347,7 @@ func (s *Service) Scan(ctx context.Context, now time.Time) ScanResult {
 	learning := s.isLearning(tctx, now)
 	res.Learning = learning
 	cfg := s.cfgSnapshot()
+	tctx = WithExclusions(tctx, cfg.Exclusions)
 	th := EffectiveThresholds(cfg.InstallProfile, cfg.ThresholdOverrides, cfg.NewCountryMinShare)
 	ent := s.loadEnterpriseNets(tctx)
 	if len(ent) == 0 {
