@@ -24,6 +24,10 @@ certs/*
 geo_index.snap
 .ga-package
 
+# Артефакты локальных soak/threshold прогонов
+scripts/soak-*.csv
+scripts/threshold-*.csv
+
 # Локальные инструменты разработки
 dist/
 .tmp/
