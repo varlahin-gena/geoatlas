@@ -1,0 +1,95 @@
+# Live README badge + sole golangci-lint gate (not duplicated in ci.yml).
+name: golangci-lint
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "backend/**"
+      - "stats-collector/**"
+      - "pkg/**"
+      - "go.work"
+      - "go.work.sum"
+      - ".github/workflows/golangci-lint.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - "stats-collector/**"
+      - "pkg/**"
+      - "go.work"
+      - "go.work.sum"
+      - ".github/workflows/golangci-lint.yml"
+
+env:
+  GOWORK: "off"
+  GOTOOLCHAIN: local
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: "1.26.x"
+          check-latest: true
+          cache-dependency-path: |
+            backend/go.sum
+            backend/go.mod
+            pkg/chconn/go.sum
+            pkg/chconn/go.mod
+            pkg/syslogngstats/go.mod
+
+      - name: go mod download
+        run: go mod download
+
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
+        with:
+          version: v2.12.2
+          working-directory: backend
+          args: --timeout=5m
+
+  stats-collector:
+    name: stats-collector
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: stats-collector
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: "1.26.x"
+          check-latest: true
+          cache-dependency-path: |
+            stats-collector/go.sum
+            stats-collector/go.mod
+            pkg/chconn/go.sum
+            pkg/chconn/go.mod
+            pkg/syslogngstats/go.mod
+
+      - name: go mod download
+        run: go mod download
+
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
+        with:
+          version: v2.12.2
+          working-directory: stats-collector
+          args: --timeout=3m
