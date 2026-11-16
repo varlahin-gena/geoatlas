@@ -5,6 +5,19 @@
 
 ## [Unreleased]
 
+## [2.7.6] — 2026-11-16
+
+Патч: sheet исключения больше не сжимается до 360px из‑за стилей admin search-box.
+
+### Fixed
+- **Движок аномалий**: `body.page-admin .search-box { max-width: 360px }` больше не режет sheet исключения — окно снова до ~1120px.
+
+### Notes
+- OpenAPI API doc version: **1.21.0**
+- Продуктовая версия: **2.7.6**
+- Схема ClickHouse: без изменений Ensure*.
+- Достаточно `update.sh` 2.7.6 (recreate **frontend**).
+
 ## [2.7.5] — 2026-11-16
 
 Патч: sheet исключения на движке аномалий без горизонтальной прокрутки.
@@ -249,6 +262,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.7.6]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.6
 [2.7.5]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.5
 [2.7.4]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.4
 [2.7.3]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.3
