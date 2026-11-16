@@ -2,8 +2,8 @@
 # Обновление ГеоАтлас из локального пакета (tar.gz или распакованный каталог).
 # Тома Docker / .env / сертификаты / профиль сохраняются.
 #
-#   sudo ./update.sh /path/to/geoatlas-2.7.3.tar.gz
-#   tar -xzf geoatlas-2.7.3.tar.gz && sudo ./geoatlas-2.7.3/update.sh
+#   sudo ./update.sh /path/to/geoatlas-2.7.4.tar.gz
+#   tar -xzf geoatlas-2.7.4.tar.gz && sudo ./geoatlas-2.7.4/update.sh
 #
 # Опции:
 #   --package PATH     пакет (.tar.gz или каталог)

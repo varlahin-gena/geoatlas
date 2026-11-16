@@ -5,6 +5,19 @@
 
 ## [Unreleased]
 
+## [2.7.4] — 2026-11-16
+
+Патч: сетка конструктора исключений на движке аномалий больше не теряет поле и «НЕ».
+
+### Fixed
+- **Конструктор запросов**: в sheet исключения колонки поля и «НЕ» не схлопываются; кнопка «Закрыть» остаётся справа в шапке.
+
+### Notes
+- OpenAPI API doc version: **1.21.0**
+- Продуктовая версия: **2.7.4**
+- Схема ClickHouse: без изменений Ensure*.
+- Достаточно `update.sh` 2.7.4 (recreate **backend** + **frontend**).
+
 ## [2.7.3] — 2026-11-16
 
 Патч: проверки аномалий ближе к разбору аналитика, исключение по запросу карты, профили не превышают RAM хоста, журнал аномалий возвращается вместе с трафиком.
@@ -223,6 +236,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.7.4]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.4
 [2.7.3]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.3
 [2.7.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.2
 [2.7.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.1
