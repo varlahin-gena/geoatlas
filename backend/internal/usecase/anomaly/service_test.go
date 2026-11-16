@@ -103,14 +103,14 @@ func (f *fakeScan) PortScan(context.Context, time.Duration, int, int, bool, []IP
 func (f *fakeScan) HorizontalScan(context.Context, time.Duration, int, int, bool, []IPRange) ([]HorizontalScanHit, error) {
 	return f.horiz, nil
 }
-func (f *fakeScan) BlockedCounts(_ context.Context, currStart, currEnd, prevStart, prevEnd time.Time, nets []IPRange) ([]BlockedWindowCount, error) {
+func (f *fakeScan) BlockedCounts(ctx context.Context, currStart, currEnd, prevStart, prevEnd time.Time, nets []IPRange) ([]BlockedWindowCount, error) {
 	out := make([]BlockedWindowCount, len(nets))
 	for i := range nets {
-		cur, err := f.BlockedCount(context.Background(), currStart, currEnd, &nets[i])
+		cur, err := f.BlockedCount(ctx, currStart, currEnd, &nets[i])
 		if err != nil {
 			return nil, err
 		}
-		prev, err := f.BlockedCount(context.Background(), prevStart, prevEnd, &nets[i])
+		prev, err := f.BlockedCount(ctx, prevStart, prevEnd, &nets[i])
 		if err != nil {
 			return nil, err
 		}
