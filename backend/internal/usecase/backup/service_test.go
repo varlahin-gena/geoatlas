@@ -144,6 +144,46 @@ func (r *memRunner) DropMapShadow(context.Context) error {
 	r.dropN++
 	return r.failDrop
 }
+func TestResolveTablesRecoverySet(t *testing.T) {
+	s := New(Options{}, &memRunner{}, newMemStore(), &memSchedule{})
+	got, err := s.resolveTables(context.Background(), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"traffic_logs",
+		"geo_ranges",
+		"enterprise_nets",
+		"reputation_ranges",
+		"parse_errors",
+		"system_metrics",
+		"anomaly_events",
+		"anomaly_acks",
+		"anomaly_suppressions",
+		"anomaly_assignments",
+		"traffic_edges_daily",
+		"traffic_edges_hourly",
+		"traffic_edges_city_daily",
+		"traffic_edges_country_daily",
+		"traffic_edges_continent_daily",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("len %d: %v", len(got), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf(" [%d] got %q want %q\nfull %v", i, got[i], want[i], got)
+		}
+	}
+	facts, err := s.resolveTables(context.Background(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(facts) != 10 {
+		t.Fatalf("facts without edges: %v", facts)
+	}
+}
+
 func (r *memRunner) TableExists(_ context.Context, name string) (bool, error) {
 	if r.failExists != nil {
 		return false, r.failExists

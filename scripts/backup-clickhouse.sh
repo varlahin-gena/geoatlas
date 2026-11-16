@@ -8,8 +8,10 @@
 # Env:
 #   BACKUP_ENABLED     — если 0, выход 0 без работы (для cron-обёрток). Дефолт: 1
 #   BACKUP_KEEP        — сколько полных бэкапов оставить (дефолт 7)
-#   BACKUP_INCLUDE_EDGES — 1 = включить traffic_edges_* (дефолт 1); 0 = только факты + ranges
-#   BACKUP_INCLUDE_AUTH  — 1 = tar /app/data → *.auth.tgz рядом (дефолт 1)
+#   BACKUP_INCLUDE_EDGES — 1 = включить traffic_edges_* (дефолт 1); 0 = только факты + ranges + журнал аномалий
+#   BACKUP_INCLUDE_AUTH  — 1 = tar /app/data → *.auth.tgz рядом (дефолт 1).
+#                          Пара ga-<name>/ + ga-<name>.auth.tgz — один комплект восстановления.
+#                          Список таблиц держать вместе с backup.resolveTables (service.go).
 #   COMPOSE            — команда compose (дефолт: docker compose)
 #   CLICKHOUSE_SERVICE — имя сервиса (дефолт: clickhouse)
 #   BACKEND_SERVICE    — имя сервиса backend (дефолт: backend)
@@ -53,13 +55,19 @@ echo "backup: starting name=$NAME keep=$BACKUP_KEEP edges=$BACKUP_INCLUDE_EDGES 
 TABLES=(
   traffic_logs
   geo_ranges
+  enterprise_nets
   reputation_ranges
   parse_errors
   system_metrics
+  anomaly_events
+  anomaly_acks
+  anomaly_suppressions
+  anomaly_assignments
 )
 if [[ "$BACKUP_INCLUDE_EDGES" == "1" || "$BACKUP_INCLUDE_EDGES" == "true" ]]; then
   TABLES+=(
     traffic_edges_daily
+    traffic_edges_hourly
     traffic_edges_city_daily
     traffic_edges_country_daily
     traffic_edges_continent_daily
@@ -99,7 +107,9 @@ echo "backup: clickhouse ok → Disk('backups', '$NAME')"
 
 if [[ "$BACKUP_INCLUDE_AUTH" == "1" || "$BACKUP_INCLUDE_AUTH" == "true" ]]; then
   if $COMPOSE ps --status running --services 2>/dev/null | grep -qx "$BACKEND_SERVICE"; then
-    $COMPOSE exec -T "$BACKEND_SERVICE" tar czf - -C /app/data . \
+    # Те же исключения, что backupfs.skipAuthTarballName: снимок GeoIP, lock и недописанные *.tmp.
+    $COMPOSE exec -T "$BACKEND_SERVICE" tar czf - -C /app/data \
+      --exclude='*.snap' --exclude='*.tmp' --exclude='.ga_backend.lock' . \
       | $COMPOSE exec -T "$CLICKHOUSE_SERVICE" sh -c "cat > '${BACKUP_ROOT}/${NAME}.auth.tgz'"
     echo "backup: auth ok → ${NAME}.auth.tgz"
   else

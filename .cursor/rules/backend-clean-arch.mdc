@@ -30,6 +30,8 @@ internal/mapagg         → map edge/node aggregation
 - Prefer domain types from `model` directly.
 - SQL/DDL SoT: `adapter/clickhouse` (+ `migrate` / `query` / `sqlclause` / `aggstate`).
 - Startup Ensure*/Backfill belongs in `usecase/bootstrap` (+ `adapter/bootstrapadapter`); geo jobs under `adapter/geojob`.
+- Не дописывать сценарии в `adapter/httpapi/auth.go`. Login, session, tokens и проверки прав остаются в `usecase/auth` и `internal/auth`; handler только разбирает запрос и пишет JSON.
+- Не дописывать детекторы в `adapter/clickhouse/anomalystore/traffic.go`. Новый скан — отдельный файл в `anomalystore` за портом `usecase/anomaly`.
 
 ## Examples
 

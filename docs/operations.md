@@ -132,15 +132,20 @@ TTL таблиц ClickHouse настраивается без правки сг�
 
 ## Резервное копирование ClickHouse
 
-Native `BACKUP` / `RESTORE` на отдельный Docker-том `clickhouse-backups` (disk `backups` → `/var/lib/clickhouse-backups`). Это **не** замена HA: single-node appliance, бэкап защищает от потери `clickhouse-data` / ошибок оператора.
+Один комплект восстановления — каталог `ga-…` на томе `clickhouse-backups` и соседний `ga-….auth.tgz`. Native `BACKUP` / `RESTORE` (disk `backups` → `/var/lib/clickhouse-backups`) закрывает таблицы ClickHouse. Tarball закрывает control plane на `/app/data`. Это **не** замена HA: бэкап защищает от потери `clickhouse-data` и от потери учёток, коннекторов и порогов.
 
-| Что                  | Детали                                                                                                                   |
-|----------------------|--------------------------------------------------------------------------------------------------------------------------|
-| Конфиг disk          | `clickhouse/config.d/backups.xml`                                                                                        |
-| Том                  | `clickhouse-backups` (отдельно от `clickhouse-data`)                                                                     |
-| Скрипты              | `scripts/backup-clickhouse.sh`, `scripts/restore-clickhouse.sh`                                                          |
-| По умолчанию в бэкап | `traffic_logs`, `geo_ranges`, `reputation_ranges`, `parse_errors`, `system_metrics`, `traffic_edges_*`                   |
-| Рядом                | `*.auth.tgz` — снимок `/app/data` (users, retention, feeds, schedule); без `geo_index.snap`, `.ga_backend.lock`, `*.tmp` |
+`./scripts/restore-clickhouse.sh <name>` по умолчанию поднимает обе стороны (`RESTORE_AUTH=1`, если `*.auth.tgz` есть). `RESTORE_AUTH=0` возвращает только таблицы и не трогает `/app/data`. Кнопка **Подключить** в UI — тень для карты (`ga_bak_*`), она не подменяет control plane и не заменяет этот скрипт.
+
+| Что | Детали |
+|-----|--------|
+| Конфиг disk | `clickhouse/config.d/backups.xml` |
+| Том | `clickhouse-backups` (отдельно от `clickhouse-data`) |
+| Скрипты | `scripts/backup-clickhouse.sh`, `scripts/restore-clickhouse.sh` |
+| Таблицы ClickHouse | `traffic_logs`, `geo_ranges`, `enterprise_nets`, `reputation_ranges`, `parse_errors`, `system_metrics`, `anomaly_events`, `anomaly_acks`, `anomaly_suppressions`, `anomaly_assignments` |
+| Агрегаты | те же скрипты при `BACKUP_INCLUDE_EDGES=1` (дефолт): `traffic_edges_daily`, `traffic_edges_hourly`, `traffic_edges_city_daily`, `traffic_edges_country_daily`, `traffic_edges_continent_daily` |
+| `*.auth.tgz` | файлы `/app/data`: учётки, API-токены, retention, коннекторы, hunts, шаблоны поиска, фиды, расписание бэкапа, `anomaly_settings.json`. Без `*.snap`, `*.tmp`, `.ga_backend.lock` |
+
+Список таблиц в скриптах совпадает с `backup.resolveTables`. Таблицы, которых нет в этой установке (выключенная репутация, старая схема), пропускаются. Журнал аномалий старше бэкапа, снятого до появления этих таблиц в комплекте, из того архива не вернётся.
 
 Backend и ClickHouse пишут в `clickhouse-backups` под **одним uid 101**. Сервис `volume-perms` при старте делает `chown 101:101` на томах `clickhouse-backups`, `auth-users`, `./certs` и `./syslog-ng.d` (миграция со старого backend uid 10001; запись `zz_connectors.conf` при Apply).
 
