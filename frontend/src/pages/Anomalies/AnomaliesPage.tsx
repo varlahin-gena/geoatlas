@@ -415,7 +415,7 @@ export default function AnomaliesPage() {
         ) : null}
         {!moduleOff && !scanPaused && summary?.learning ? (
           <p className="anomaly-learning-note" role="status">
-            Пока идёт привыкание: проверки «Новая страна» и «Регулярные короткие сессии» отключены.
+            Пока идёт привыкание, «Новая страна» не ищется. «Регулярные короткие сессии» показываются только если внешний адрес уже отмечен.
             Параметры — в <Link to="/anomalies/engine">движке аномалий</Link>.
           </p>
         ) : null}

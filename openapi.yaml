@@ -2942,6 +2942,11 @@ components:
         suppress_hours: { type: integer, minimum: 1, maximum: 168 }
         include_private: { type: boolean }
         new_country_min_share: { type: number, minimum: 0.01, maximum: 1 }
+        fanout_exclude:
+          type: array
+          maxItems: 200
+          items: { type: string }
+          description: Адреса, которые не считаются обходом хостов в сети.
         thresholds:
           $ref: "#/components/schemas/AnomalyThresholds"
         updated_at: { type: string, format: date-time }

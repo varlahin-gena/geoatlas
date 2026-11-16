@@ -115,7 +115,7 @@ function StatusPanel({ status }: { status: AnomalyScanStatus | null }) {
       </dl>
       {status.learning ? (
         <p className="anomaly-learning-note" role="status">
-          Пока идёт привыкание: проверки «Новая страна» и «Регулярные короткие сессии» отключены.
+          Пока идёт привыкание, «Новая страна» не ищется. «Регулярные короткие сессии» показываются только если внешний адрес уже отмечен.
           Остальное уже работает. Длительность задаётся в параметрах ниже.
         </p>
       ) : null}
@@ -475,13 +475,25 @@ export default function AnomalyEnginePage() {
               </label>
             </div>
 
-            <label className="anomaly-include-acked">
-              <input
-                type="checkbox"
-                checked={settings.include_private}
-                onChange={(e) => setSettings({ ...settings, include_private: e.target.checked })}
+            <label className="anomaly-engine-field">
+              Источники без обхода хостов
+              <textarea
+                rows={4}
+                value={(settings.fanout_exclude ?? []).join('\n')}
+                placeholder={'10.0.0.5\n192.168.1.10'}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    fanout_exclude: e.target.value
+                      .split(/[\s,;]+/)
+                      .map((s) => s.trim())
+                      .filter(Boolean),
+                  })
+                }
               />
-              Учитывать частные адреса (10.x, 172.16.x, 192.168.x)
+              <span className="field-hint">
+                По одному адресу. Эти адреса не считаются обходом хостов в сети. Сканирование портов по-прежнему видит и адреса локальной сети.
+              </span>
             </label>
 
             {settings.updated_at ? (

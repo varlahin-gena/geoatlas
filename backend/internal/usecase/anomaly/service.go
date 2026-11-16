@@ -11,7 +11,6 @@ import (
 
 const (
 	portScanWindow             = 5 * time.Minute
-	horizontalScanWindow       = 5 * time.Minute
 	blockedWindow              = 15 * time.Minute
 	countryWindow              = time.Hour
 	repWindow                  = 15 * time.Minute
@@ -37,6 +36,8 @@ type Config struct {
 	SuppressHours                 int
 	NewCountryMinShare            float64
 	NewCountryRepeatCooldownHours int
+	// FanoutExclude — источники, которые не поднимают обход хостов предприятия.
+	FanoutExclude []string
 	// ThresholdOverrides — optional admin overrides; nil = только install profile.
 	ThresholdOverrides *Thresholds
 }
@@ -125,6 +126,11 @@ func (s *Service) ApplySettings(st Settings) {
 	s.cfg.LearningDays = st.LearningDays
 	s.cfg.SuppressHours = st.SuppressHours
 	s.cfg.NewCountryMinShare = st.NewCountryMinShare
+	if len(st.FanoutExclude) == 0 {
+		s.cfg.FanoutExclude = nil
+	} else {
+		s.cfg.FanoutExclude = append([]string(nil), st.FanoutExclude...)
+	}
 	if st.Thresholds != nil {
 		th := *st.Thresholds
 		s.cfg.ThresholdOverrides = &th
@@ -240,8 +246,27 @@ func (s *Service) InsertSynthetic(ctx context.Context, events []Event, now time.
 	if now.IsZero() {
 		now = time.Now().UTC()
 	}
-	assignEpisodeIDs(events, now)
-	return s.store.Insert(ctx, events)
+	kept := make([]Event, 0, len(events))
+	for _, e := range events {
+		if e.SuppressionKey == "" {
+			e.SuppressionKey = suppressionKeyForEvent(e)
+		}
+		if e.Code == CodeHuntThreshold && e.SuppressionKey != "" {
+			open, err := s.store.OpenBySuppression(ctx, e.SuppressionKey)
+			if err != nil {
+				return err
+			}
+			if open {
+				continue
+			}
+		}
+		kept = append(kept, e)
+	}
+	if len(kept) == 0 {
+		return nil
+	}
+	assignEpisodeIDs(kept, now)
+	return s.store.Insert(ctx, kept)
 }
 
 func (s *Service) Ack(ctx context.Context, fingerprint, by string) error {
@@ -366,9 +391,6 @@ func (s *Service) Scan(ctx context.Context, now time.Time) ScanResult {
 	run(CodePortScan, detectorTimeout, func(c context.Context) ([]Event, error) {
 		return s.detectPortScan(c, now, th, ent)
 	})
-	run(CodeHorizontalScan, detectorTimeout, func(c context.Context) ([]Event, error) {
-		return s.detectHorizontalScan(c, now, th, ent)
-	})
 	run(CodeRepNewDst, detectorTimeout, func(c context.Context) ([]Event, error) {
 		return s.detectRepNewDst(c, now, th, ent)
 	})
@@ -379,10 +401,7 @@ func (s *Service) Scan(ctx context.Context, now time.Time) ScanResult {
 		return s.detectLateralFanout(c, now, th, ent)
 	})
 	run(CodeBeaconing, heavyDetectorTimeout, func(c context.Context) ([]Event, error) {
-		if learning {
-			return nil, nil
-		}
-		return s.detectBeaconing(c, now, th, ent)
+		return s.detectBeaconing(c, now, th, ent, learning)
 	})
 
 	if len(res.Missed) > 0 {
@@ -463,8 +482,15 @@ func suppressionKeyForCodeCountry(code, country string) SuppressionKey {
 func suppressionKeyForEvent(e Event) SuppressionKey {
 	switch e.Code {
 	case CodeNewCountryDst:
+		if e.SrcIP != "" && e.DstCountry != "" {
+			return SuppressionKey(e.Code + "|host|" + e.SrcIP + "|" + e.DstCountry)
+		}
 		if e.DstCountry != "" {
 			return suppressionKeyForCodeCountry(e.Code, e.DstCountry)
+		}
+	case CodeHuntThreshold:
+		if e.SuppressionKey != "" {
+			return e.SuppressionKey
 		}
 	case CodePortScan, CodeHorizontalScan, CodeByteSurge, CodeLateralFanout:
 		if e.SrcIP != "" {

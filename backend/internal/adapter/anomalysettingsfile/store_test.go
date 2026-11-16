@@ -3,6 +3,7 @@ package anomalysettingsfile
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	usecaseanomaly "geoatlas/internal/usecase/anomaly"
@@ -37,7 +38,7 @@ func TestStoreRoundtrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != want {
+	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v want %+v", got, want)
 	}
 	if _, err := os.Stat(path); err != nil {

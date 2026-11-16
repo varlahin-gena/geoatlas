@@ -80,9 +80,9 @@ func CodeHumanLabel(code string) string {
 	case CodeBeaconing:
 		return "Регулярные короткие сессии"
 	case CodeLateralFanout:
-		return "Обход внутренней сети"
+		return "Обход хостов предприятия"
 	case CodeHuntThreshold:
-		return "Сработал сохранённый поиск"
+		return "Охота превысила порог"
 	default:
 		return code
 	}
@@ -166,6 +166,19 @@ type CountryCount struct {
 	N       uint64
 }
 
+// HostCountryHit — страна назначения одного источника предприятия.
+type HostCountryHit struct {
+	SrcIP   string
+	Country string
+	Events  uint64
+}
+
+// BlockedPeer — адрес с числом блокировок в окне.
+type BlockedPeer struct {
+	IP     string
+	Events uint64
+}
+
 // EdgeRow — ребро src→dst за окно.
 type EdgeRow struct {
 	SrcIP      string
@@ -175,11 +188,16 @@ type EdgeRow struct {
 	DstCountry string
 }
 
-// ByteSurgeHit — кандидат byte_surge (src за текущее vs предыдущее окно).
+// ByteSurgeHit — кандидат byte_surge.
+// HostIP — хост предприятия, Peer — второй конец с наибольшим объёмом в текущем окне.
+// Direction: out — исходящий объём хоста, in — объём в хост.
 type ByteSurgeHit struct {
-	SrcIP     string
+	HostIP    string
+	Peer      string
 	BytesNow  uint64
 	BytesPrev uint64
+	Events    uint64
+	Direction string
 }
 
 // BeaconingHit — кандидат beaconing по hourly edges.

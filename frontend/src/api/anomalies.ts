@@ -37,6 +37,7 @@ export type AnomalyEngineSettings = {
   suppress_hours: number;
   include_private: boolean;
   new_country_min_share: number;
+  fanout_exclude?: string[];
   thresholds?: AnomalyThresholds | null;
   updated_at?: string;
 };

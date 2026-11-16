@@ -43,10 +43,10 @@ describe('anomalyDisplay', () => {
   it('maps detector codes to Russian labels', () => {
     expect(anomalyCodeLabel('horizontal_scan')).toBe('Обход подсети');
     expect(anomalyCodeLabel('port_scan')).toBe('Сканирование портов');
-    expect(anomalyCodeLabel('lateral_fanout')).toBe('Обход внутренней сети');
+    expect(anomalyCodeLabel('lateral_fanout')).toBe('Обход хостов предприятия');
     expect(anomalyCodeLabel('beaconing')).toBe('Регулярные короткие сессии');
     expect(anomalyCodeLabel('rep_new_peer')).toBe('Контакт с отмеченным адресом');
-    expect(anomalyCodeLabel('hunt_threshold')).toBe('Сработал сохранённый поиск');
+    expect(anomalyCodeLabel('hunt_threshold')).toBe('Охота превысила порог');
     expect(anomalyCodeLabel('unknown_code')).toBe('unknown_code');
   });
 

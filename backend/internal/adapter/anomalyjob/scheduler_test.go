@@ -31,14 +31,14 @@ func (stubStore) AssignIfEmpty(context.Context, string, string, string) error { 
 func (stubStore) CountSummary(context.Context, time.Time) (usecaseanomaly.Summary, error) {
 	return usecaseanomaly.Summary{}, nil
 }
+func (stubStore) OpenBySuppression(context.Context, usecaseanomaly.SuppressionKey) (bool, error) {
+	return false, nil
+}
 
 type stubScan struct{}
 
 func (stubScan) OldestLogTime(context.Context) (time.Time, error) { return time.Time{}, nil }
-func (stubScan) PortScan(context.Context, time.Duration, int, int, bool, []usecaseanomaly.IPRange) ([]usecaseanomaly.PortScanHit, error) {
-	return nil, nil
-}
-func (stubScan) HorizontalScan(context.Context, time.Duration, int, int, bool, []usecaseanomaly.IPRange) ([]usecaseanomaly.HorizontalScanHit, error) {
+func (stubScan) PortScan(context.Context, time.Duration, int, int, []usecaseanomaly.IPRange) ([]usecaseanomaly.PortScanHit, error) {
 	return nil, nil
 }
 func (stubScan) BlockedCount(context.Context, time.Time, time.Time, *usecaseanomaly.IPRange) (uint64, error) {
@@ -47,17 +47,20 @@ func (stubScan) BlockedCount(context.Context, time.Time, time.Time, *usecaseanom
 func (stubScan) BlockedCounts(context.Context, time.Time, time.Time, time.Time, time.Time, []usecaseanomaly.IPRange) ([]usecaseanomaly.BlockedWindowCount, error) {
 	return nil, nil
 }
-func (stubScan) CurrentCountries(context.Context, time.Duration, uint64, []usecaseanomaly.IPRange) ([]usecaseanomaly.CountryCount, error) {
+func (stubScan) BlockedPeers(context.Context, time.Time, time.Time, usecaseanomaly.IPRange, int) ([]usecaseanomaly.BlockedPeer, []usecaseanomaly.BlockedPeer, error) {
+	return nil, nil, nil
+}
+func (stubScan) HostCountries(context.Context, time.Duration, uint64, []usecaseanomaly.IPRange) ([]usecaseanomaly.HostCountryHit, error) {
 	return nil, nil
 }
-func (stubScan) CurrentCountryTotal(context.Context, time.Duration, []usecaseanomaly.IPRange) (uint64, error) {
-	return 0, nil
+func (stubScan) HostCountryBaseline(context.Context, int, uint64, []usecaseanomaly.IPRange) (map[string]struct{}, error) {
+	return map[string]struct{}{}, nil
 }
-func (stubScan) BaselineCountries(context.Context, int, uint64, []usecaseanomaly.IPRange) (map[string]struct{}, error) {
+func (stubScan) ReputationEdges(context.Context, time.Duration, uint64, int, []usecaseanomaly.IPRange) ([]usecaseanomaly.EdgeRow, error) {
 	return nil, nil
 }
-func (stubScan) RecentEdges(context.Context, time.Duration, int, []usecaseanomaly.IPRange) ([]usecaseanomaly.EdgeRow, error) {
-	return nil, nil
+func (stubScan) SeenIPs(context.Context, []string, time.Time, time.Time) (map[string]struct{}, error) {
+	return map[string]struct{}{}, nil
 }
 func (stubScan) KnownPairs(context.Context, [][2]string, time.Duration) (map[string]struct{}, error) {
 	return nil, nil
@@ -68,7 +71,7 @@ func (stubScan) ByteSurge(context.Context, time.Duration, uint64, uint64, []usec
 func (stubScan) Beaconing(context.Context, time.Duration, int, uint64, []usecaseanomaly.IPRange) ([]usecaseanomaly.BeaconingHit, error) {
 	return nil, nil
 }
-func (stubScan) LateralFanout(context.Context, time.Duration, int, int, []usecaseanomaly.IPRange) ([]usecaseanomaly.LateralFanoutHit, error) {
+func (stubScan) LateralFanout(context.Context, time.Duration, int, int, []usecaseanomaly.IPRange, []string) ([]usecaseanomaly.LateralFanoutHit, error) {
 	return nil, nil
 }
 

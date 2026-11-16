@@ -173,11 +173,7 @@ func TestTrafficScansHappyPaths(t *testing.T) {
 	}
 
 	ch.pushQuery([]any{"1.1.1.1", uint64(20), uint64(50), "RU"})
-	if hits, err := r.PortScan(ctx, time.Hour, 10, 10, false, nets); err != nil || len(hits) != 1 {
-		t.Fatalf("%v %v", hits, err)
-	}
-	ch.pushQuery([]any{"1.1.1.1", "1.1.1.0/24", uint64(30), uint64(40)})
-	if hits, err := r.HorizontalScan(ctx, time.Hour, 10, 10, true, nil); err != nil || len(hits) != 1 {
+	if hits, err := r.PortScan(ctx, time.Hour, 10, 10, nets); err != nil || len(hits) != 1 {
 		t.Fatalf("%v %v", hits, err)
 	}
 
@@ -222,12 +218,12 @@ func TestTrafficScansHappyPaths(t *testing.T) {
 	}
 
 	ch.pushQuery([]any{"1.1.1.1", "2.2.2.2", uint64(3), "RU", "US"})
-	if edges, err := r.RecentEdges(ctx, time.Hour, 0, nil); err != nil || len(edges) != 1 {
+	if edges, err := r.ReputationEdges(ctx, time.Hour, 1, 0, nil); err != nil || len(edges) != 1 {
 		t.Fatalf("%v %v", edges, err)
 	}
-	ch.pushQueryErr(errors.New("missing"))
+	ch.pushQueryErr(errors.New("unknown table"))
 	ch.pushQuery([]any{"1.1.1.1", "2.2.2.2", uint64(1), "RU", "US"})
-	if _, err := r.RecentEdges(ctx, time.Hour, 5, nets); err != nil {
+	if _, err := r.ReputationEdges(ctx, time.Hour, 1, 5, nets); err != nil {
 		t.Fatal(err)
 	}
 
@@ -244,18 +240,18 @@ func TestTrafficScansHappyPaths(t *testing.T) {
 		t.Fatalf("%v %v", m, err)
 	}
 
-	ch.pushQuery([]any{"1.1.1.1", uint64(1000), uint64(10)})
-	if hits, err := r.ByteSurge(ctx, time.Second, 1, 100, nil); err != nil || len(hits) != 1 {
+	ch.pushQuery([]any{"1.1.1.1", "2.2.2.2", uint64(1000), uint64(10), uint64(4), "out"})
+	if hits, err := r.ByteSurge(ctx, time.Second, 1, 100, nil); err != nil || len(hits) != 1 || hits[0].Direction != "out" {
 		t.Fatalf("%v %v", hits, err)
 	}
-	ch.pushQueryErr(errors.New("missing"))
-	ch.pushQuery([]any{"1.1.1.1", uint64(1000), uint64(10)})
+	ch.pushQueryErr(errors.New("unknown table"))
+	ch.pushQuery([]any{"1.1.1.1", "2.2.2.2", uint64(1000), uint64(10), uint64(4), "in"})
 	if _, err := r.ByteSurge(ctx, time.Hour, 1, 100, nets); err != nil {
 		t.Fatal(err)
 	}
 
 	ch.pushQuery([]any{"1.1.1.1", uint64(8), uint64(20)})
-	if hits, err := r.LateralFanout(ctx, time.Hour, 5, 5, nets); err != nil || len(hits) != 1 {
+	if hits, err := r.LateralFanout(ctx, time.Hour, 5, 5, nets, nil); err != nil || len(hits) != 1 {
 		t.Fatalf("%v %v", hits, err)
 	}
 }
@@ -301,5 +297,86 @@ func TestScanCountrySetNilOut(t *testing.T) {
 func TestIPv4AsUInt32SQL(t *testing.T) {
 	if got := ipv4AsUInt32SQL("src_ip"); got == "" {
 		t.Fatal("empty")
+	}
+}
+
+func TestEnterpriseScanPaths(t *testing.T) {
+	ctx := context.Background()
+	ch := &stubConn{}
+	r := New(ch)
+	now := time.Now().UTC()
+	net := usecaseanomaly.IPRange{Start: 10, End: 20}
+	nets := []usecaseanomaly.IPRange{net}
+
+	ch.pushQuery([]any{"10.0.0.1", uint64(8)})
+	ch.pushQuery([]any{"10.0.0.2", uint64(3)})
+	src, dst, err := r.BlockedPeers(ctx, now.Add(-15*time.Minute), now, net, 0)
+	if err != nil || len(src) != 1 || src[0].IP != "10.0.0.1" || len(dst) != 1 || dst[0].Events != 3 {
+		t.Fatalf("peers src=%+v dst=%+v err=%v", src, dst, err)
+	}
+	ch.pushQuery()
+	ch.pushQuery()
+	if _, _, err := r.BlockedPeers(ctx, now.Add(-15*time.Minute), now, net, 50); err != nil {
+		t.Fatal(err)
+	}
+
+	ch.pushQuery([]any{"10.0.0.1", "DE", uint64(6)})
+	hits, err := r.HostCountries(ctx, time.Hour, 5, nets)
+	if err != nil || len(hits) != 1 || hits[0].Country != "DE" {
+		t.Fatalf("%+v %v", hits, err)
+	}
+
+	ch.pushQuery([]any{"", "DE"}, []any{"10.0.0.1", "FR"})
+	base, err := r.HostCountryBaseline(ctx, 7, 1, nets)
+	if err != nil || len(base) != 1 {
+		t.Fatalf("%v %v", base, err)
+	}
+	if _, ok := base["10.0.0.1|FR"]; !ok {
+		t.Fatalf("baseline %v", base)
+	}
+
+	if seen, err := r.SeenIPs(ctx, nil, now.Add(-time.Hour), now); err != nil || len(seen) != 0 {
+		t.Fatalf("empty %v %v", seen, err)
+	}
+	if seen, err := r.SeenIPs(ctx, []string{"", "  "}, now.Add(-time.Hour), now); err != nil || len(seen) != 0 {
+		t.Fatalf("blank %v %v", seen, err)
+	}
+}
+
+func TestSeenIPsAndOpenHunt(t *testing.T) {
+	ctx := context.Background()
+	ch := &stubConn{}
+	r := New(ch)
+	now := time.Now().UTC()
+
+	ch.pushQuery([]any{"10.0.0.1"}, []any{""})
+	seen, err := r.SeenIPs(ctx, []string{" 10.0.0.1 ", "10.0.0.1", ""}, now.Add(-time.Hour), now)
+	if err != nil || len(seen) != 1 {
+		t.Fatalf("%v %v", seen, err)
+	}
+	if _, ok := seen["10.0.0.1"]; !ok {
+		t.Fatalf("seen %v", seen)
+	}
+
+	ch.pushQueryErr(errors.New("unknown table"))
+	ch.pushQuery([]any{"10.0.0.2"})
+	seen, err = r.SeenIPs(ctx, []string{"10.0.0.2"}, now.Add(-time.Hour), now)
+	if err != nil || len(seen) != 1 {
+		t.Fatalf("fallback %v %v", seen, err)
+	}
+
+	open, err := r.OpenBySuppression(ctx, "")
+	if err != nil || open {
+		t.Fatalf("empty key open=%v err=%v", open, err)
+	}
+	ch.pushQuery([]any{"fp"})
+	open, err = r.OpenBySuppression(ctx, "hunt_threshold|hunt|1")
+	if err != nil || !open {
+		t.Fatalf("open=%v err=%v", open, err)
+	}
+	ch.pushQuery()
+	open, err = r.OpenBySuppression(ctx, "hunt_threshold|hunt|2")
+	if err != nil || open {
+		t.Fatalf("closed open=%v err=%v", open, err)
 	}
 }

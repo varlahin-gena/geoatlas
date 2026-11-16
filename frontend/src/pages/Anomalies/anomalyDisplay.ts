@@ -19,10 +19,10 @@ export const ANOMALY_CODE_OPTIONS = [
   { value: 'blocked_surge', label: 'Резкий рост блокировок' },
   { value: 'byte_surge', label: 'Резкий рост трафика' },
   { value: 'beaconing', label: 'Регулярные короткие сессии' },
-  { value: 'lateral_fanout', label: 'Обход внутренней сети' },
+  { value: 'lateral_fanout', label: 'Обход хостов предприятия' },
   { value: 'new_country_dst', label: 'Новая страна' },
   { value: 'rep_new_peer', label: 'Контакт с отмеченным адресом' },
-  { value: 'hunt_threshold', label: 'Сработал сохранённый поиск' },
+  { value: 'hunt_threshold', label: 'Охота превысила порог' },
 ] as const;
 
 export const ANOMALY_SINCE_OPTIONS = [
@@ -60,13 +60,13 @@ export function anomalyCodeLabel(code?: string): string {
     case 'beaconing':
       return 'Регулярные короткие сессии';
     case 'lateral_fanout':
-      return 'Обход внутренней сети';
+      return 'Обход хостов предприятия';
     case 'new_country_dst':
       return 'Новая страна';
     case 'rep_new_peer':
       return 'Контакт с отмеченным адресом';
     case 'hunt_threshold':
-      return 'Сработал сохранённый поиск';
+      return 'Охота превысила порог';
     default:
       return code || '';
   }
