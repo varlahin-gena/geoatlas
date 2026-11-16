@@ -918,7 +918,8 @@ a.anomaly-more-item {
 }
 
 .anomaly-exclude-sheet {
-  width: min(880px, 100%);
+  width: min(1120px, calc(100vw - 48px));
+  max-width: calc(100vw - 48px);
   margin: 0 auto;
   padding: 16px 18px 20px;
   border: 1px solid var(--border);
@@ -927,6 +928,7 @@ a.anomaly-more-item {
   box-shadow: var(--shadow);
   color: var(--text);
   overflow: visible;
+  box-sizing: border-box;
 }
 
 .anomaly-exclude-sheet-head {
@@ -987,10 +989,29 @@ a.anomaly-more-item {
 }
 
 .anomaly-exclude-sheet .search-builder-rows {
-  overflow-x: auto;
+  overflow-x: visible;
   padding-bottom: 4px;
 }
 
+/* One row without sideways scroll; wrap value/remove when the sheet is still tight. */
 .anomaly-exclude-sheet .search-builder-row {
-  min-width: 640px;
+  min-width: 0;
+  width: 100%;
+  grid-template-columns: 56px 64px minmax(168px, 1.3fr) 72px minmax(168px, 1.5fr) auto;
+}
+
+.anomaly-exclude-sheet .search-builder-row > .search-builder-field,
+.anomaly-exclude-sheet .search-builder-row-nested > .search-builder-field {
+  min-width: 168px;
+}
+
+@media (max-width: 1100px) {
+  .anomaly-exclude-sheet .search-builder-row:not(.is-group) {
+    grid-template-columns: 56px 64px minmax(168px, 1fr) 72px;
+  }
+
+  .anomaly-exclude-sheet .search-builder-row:not(.is-group) > .search-builder-value,
+  .anomaly-exclude-sheet .search-builder-row:not(.is-group) > .search-builder-remove {
+    grid-column: 1 / -1;
+  }
 }
