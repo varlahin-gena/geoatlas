@@ -5,6 +5,7 @@
 [![CodeQL](https://github.com/varlahin-gena/geoatlas/actions/workflows/codeql.yml/badge.svg)](https://github.com/varlahin-gena/geoatlas/actions/workflows/codeql.yml)
 [![Image scan](https://github.com/varlahin-gena/geoatlas/actions/workflows/image-scan.yml/badge.svg)](https://github.com/varlahin-gena/geoatlas/actions/workflows/image-scan.yml)
 [![CI](https://github.com/varlahin-gena/geoatlas/actions/workflows/ci.yml/badge.svg)](https://github.com/varlahin-gena/geoatlas/actions/workflows/ci.yml)
+[![golangci-lint](https://img.shields.io/github/actions/workflow/status/varlahin-gena/geoatlas/golangci-lint.yml?branch=main&label=golangci-lint&logo=go&logoColor=white)](https://github.com/varlahin-gena/geoatlas/actions/workflows/golangci-lint.yml)
 [![coverage](https://img.shields.io/badge/coverage-%E2%89%A580%25-brightgreen)](.github/workflows/ci.yml)
 [![Go](https://img.shields.io/github/go-mod/go-version/varlahin-gena/geoatlas?filename=backend/go.mod&logo=go&logoColor=white&label=Go)](backend/go.mod)
 [![Node](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fvarlahin-gena%2Fgeoatlas%2Fmain%2Ffrontend%2Fpackage.json&query=%24.engines.node&label=Node&logo=nodedotjs&logoColor=white&color=339933)](frontend/package.json)
