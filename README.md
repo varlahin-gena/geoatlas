@@ -22,7 +22,7 @@
 - **Репутация IP.** Offline-списки и URL-фиды: фильтр и подсветка дуг на карте.
 - **Один пакет.** `geoatlas-X.Y.Z.tar.gz` для Ubuntu 20.04+ и Oracle Linux 8+ / RHEL; syslog `:514`, ClickHouse, React SPA на одном хосте (IPv4-only, доставка at-most-once).
 
-**Актуальный релиз:** [v2.7.5](https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.5) (`VERSION` = 2.7.5). Лимиты appliance — [архитектура](docs/architecture.md).
+**Актуальный релиз:** [v2.7.6](https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.6) (`VERSION` = 2.7.6). Лимиты appliance — [архитектура](docs/architecture.md).
 
 ![Карта сетевых связей в ГеоАтлас](docs/images/map-overview.png)
 
@@ -42,7 +42,7 @@
 Нужны Linux-сервер (Ubuntu 20.04+ или Oracle Linux 8+ / RHEL-совместимый), Docker поставит установщик, порты **80** (UI) и **514** tcp/udp (syslog).
 
 ```bash
-VER=2.7.5
+VER=2.7.6
 
 cd /tmp
 curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz"

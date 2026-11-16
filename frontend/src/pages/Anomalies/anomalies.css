@@ -918,7 +918,7 @@ a.anomaly-more-item {
 }
 
 .anomaly-exclude-sheet {
-  /* Fit parent (flex backdrop), not 100vw — browser side panels can be narrow. */
+  /* Fit backdrop content box, not 100vw — browser side panels can be narrow. */
   width: min(1120px, 100%);
   max-width: 100%;
   margin: 0 auto;
@@ -932,6 +932,14 @@ a.anomaly-more-item {
   box-sizing: border-box;
   container-type: inline-size;
   container-name: anomaly-exclude;
+}
+
+/* Sheet keeps class "search-box" for SearchBuilder click-outside; admin toolbar
+   .search-box is max-width: 360px — must not shrink this modal. */
+body.page-admin .anomaly-exclude-sheet.search-box {
+  flex: 0 1 auto;
+  width: min(1120px, 100%);
+  max-width: 100%;
 }
 
 .anomaly-exclude-sheet-head {
