@@ -151,17 +151,36 @@
 .search-builder-rows {
     display: flex; flex-direction: column; gap: 8px;
 }
+/* join | НЕ | field | op | value | remove — field/value must not collapse to 0 */
 .search-builder-row {
     display: grid;
-    grid-template-columns: 56px 52px minmax(0, 1.1fr) 72px minmax(140px, 1.4fr) auto;
+    grid-template-columns: 56px 64px minmax(148px, 1.2fr) 72px minmax(140px, 1.4fr) auto;
     gap: 8px;
     align-items: center;
 }
 .search-builder-row > * {
     min-width: 0;
 }
+.search-builder-row > .search-builder-join {
+    min-width: 56px;
+}
+.search-builder-row > .search-builder-negate {
+    min-width: 64px;
+    overflow: visible;
+}
+.search-builder-row > .search-builder-field,
+.search-builder-row-nested > .search-builder-field {
+    min-width: 148px;
+}
+.search-builder-row > .search-builder-op,
+.search-builder-row-nested > .search-builder-op {
+    min-width: 72px;
+}
+.search-builder-row > .search-builder-remove {
+    min-width: max-content;
+}
 .search-builder-row.is-group {
-    grid-template-columns: 56px 52px minmax(0, 1fr) auto;
+    grid-template-columns: 56px 64px minmax(0, 1fr) auto;
     align-items: start;
 }
 .search-builder-row.is-group .search-builder-group {
@@ -169,10 +188,10 @@
 }
 .search-builder-row.is-group > .search-builder-remove {
     margin-top: 8px;
-    min-width: auto;
+    min-width: max-content;
 }
 .search-builder-row-nested {
-    grid-template-columns: 52px minmax(0, 1.1fr) 72px minmax(120px, 1.4fr) auto;
+    grid-template-columns: 64px minmax(148px, 1.2fr) 72px minmax(120px, 1.4fr) auto;
     align-items: center;
 }
 .search-builder-group {
@@ -256,21 +275,21 @@
         width: min(560px, calc(100vw - 32px));
     }
     .search-builder-row {
-        grid-template-columns: 56px 52px 1fr 72px;
+        grid-template-columns: 56px 64px minmax(148px, 1fr) 72px;
     }
     .search-builder-row .search-builder-value,
     .search-builder-row > .search-builder-remove {
         grid-column: 1 / -1;
     }
     .search-builder-row.is-group {
-        grid-template-columns: 56px 52px minmax(0, 1fr);
+        grid-template-columns: 56px 64px minmax(0, 1fr);
     }
     .search-builder-row.is-group > .search-builder-remove {
         grid-column: 1 / -1;
         margin-top: 0;
     }
     .search-builder-row-nested {
-        grid-template-columns: 52px 1fr 72px;
+        grid-template-columns: 64px minmax(148px, 1fr) 72px;
     }
     .search-builder-row-nested .search-builder-value,
     .search-builder-row-nested > .search-builder-remove {
