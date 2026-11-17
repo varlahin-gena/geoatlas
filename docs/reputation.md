@@ -15,7 +15,8 @@ UI: **`/reputation`** (только **administrator**). На карте — фи
 
 ## Расписание
 
-- Интервал: `REPUTATION_FETCH_INTERVAL` (по умолчанию **6h**, не короче ~1 минуты).
+- Интервал по умолчанию: **6 часов** (`REPUTATION_FETCH_INTERVAL` — seed при первом старте).
+- На странице **`/reputation`** администратор может сменить интервал (1–168 ч); значение пишется в `/app/data/reputation_settings.json` и применяется без рестарта (`GET`/`PUT /api/reputation/settings`).
 - Кэш HTTP: ETag / Last-Modified, чтобы не качать без изменений.
 - Клиент fetch: только **публичные IPv4**-хосты; private, link-local и metadata (например `169.254.169.254`) **блокируются** (SSRF-защита).
 

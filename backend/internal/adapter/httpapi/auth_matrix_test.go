@@ -78,6 +78,8 @@ func expectedAuthMatrix() map[string]authTier {
 		"POST /api/connectors/apply":                      tierOps,
 		"GET /api/reputation/catalog":                     tierAdmin,
 		"POST /api/reputation/refresh":                    tierOps,
+		"GET /api/reputation/settings":                    tierAdmin,
+		"PUT /api/reputation/settings":                    tierAdmin,
 		"GET /api/reputation/lookup":                      tierLogin,
 		"GET /api/system/stats":                           tierAdmin,
 		"GET /api/system/security":                        tierAdmin,

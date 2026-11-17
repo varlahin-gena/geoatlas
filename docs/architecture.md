@@ -78,7 +78,7 @@
 4. **frontend** отдаёт статику SPA и проксирует `/api/*` на `backend:8080` (с `auth_request`); `/dozzle/` — на контейнер `dozzle`.
 5. **stats-collector** каждые 30 с: cgroup CPU/RAM, HTTP scrape backend (`/live`, `/api/ingest/stats`) и syslog-ng (`:9577`), пишет `system_metrics` в ClickHouse.
 6. **Anomaly engine** (фоновый job в backend): каждые `ANOMALY_SCAN_INTERVAL` сканирует `traffic_logs` в ClickHouse и пишет срабатывания в `anomaly_events`, подтверждения в `anomaly_acks`, подавления в `anomaly_suppressions`, назначения в `anomaly_assignments`. Пороги движка — отдельно, JSON `/app/data/anomaly_settings.json` (это не журнал). Отдача — `GET /api/anomalies`. Требуются сети предприятия. Типы, пороги UI и learning — [anomalies.md](anomalies.md).
-7. **Edge**: браузер ходит только в nginx (`:80`/`:443`); backend `:8080` за proxy gate (`GA_REQUIRE_PROXY`) не принимает прямые запросы с хоста (кроме loopback / Bearer). Rate limit и JSON-hardening — [configuration.md](configuration.md#api-threat-protection-edge).
+7. **Edge**: браузер ходит только в nginx (`:80`/`:443`); backend `:8080` за proxy gate (`GA_REQUIRE_PROXY`) не принимает прямые запросы с хоста (кроме loopback / Bearer). Rate limit и JSON-hardening — [configuration.md](configuration.md#защита-api-edge).
 
 ## Product limits (appliance)
 

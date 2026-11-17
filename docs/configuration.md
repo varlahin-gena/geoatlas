@@ -67,14 +67,14 @@
 
 Роли, cookie и scopes: [ui.md](ui.md#роли-и-доступ).
 
-## API threat protection (edge)
+## Защита API (edge)
 
-Эквивалент Apigee PreFlow на backend (пакет `threatprot`): injection/path guard, SpikeArrest, JSON structure limits, security headers на API-ответах. HSTS и снятие `Server` — на nginx edge.
+На backend: проверка путей/инъекций, лимит запросов (`GA_API_RATE_LIMIT_*`), лимиты JSON, security headers. HSTS и снятие `Server` — на nginx.
 
 | Переменная | По умолчанию | Назначение |
 |------------|--------------|------------|
-| `GA_API_RATE_LIMIT_RPS` | `30` | SpikeArrest: средняя скорость на клиент (IP или Bearer-prefix); `0` — выкл. |
-| `GA_API_RATE_BURST` | `60` | Burst token bucket |
+| `GA_API_RATE_LIMIT_RPS` | `30` | Средняя скорость на клиент (IP или Bearer-prefix); `0` — выкл. |
+| `GA_API_RATE_BURST` | `60` | Burst (token bucket) |
 
 Exempt от rate limit: `/live`, `/ready`, `/metrics`, `/api/live`, `/api/ready`, `/api/health`, `/api/auth/check*`. JSON-лимиты (depth 5, object keys ≤64, array ≤256, string ≤8192 / 65536 для TLS PEM) зашиты в код и проверяются до decode.
 
@@ -104,8 +104,9 @@ Onboarding МСЭ: [syslog.md](syslog.md). Лимиты ёмкости: [арх�
 | Переменная | По умолчанию | Назначение |
 |------------|--------------|------------|
 | `REPUTATION_FETCH_ENABLED` | `true` | Полный выключатель модуля |
-| `REPUTATION_FETCH_INTERVAL` | `6h` | Период опроса URL-фидов (не короче ~1m) |
+| `REPUTATION_FETCH_INTERVAL` | `6h` | Seed интервала опроса URL-фидов (UI может переопределить) |
 | `REPUTATION_FEEDS` / `REPUTATION_FEEDS_FILE` | seed / `/app/data/…` | Список фидов |
+| `REPUTATION_SETTINGS_FILE` | `/app/data/reputation_settings.json` | Интервал опроса из UI |
 | `ANOMALY_ENABLED` | `true` | Поиск аномалий |
 | `ANOMALY_SCAN_INTERVAL` | `5m` | Фоновый скан |
 | `ANOMALY_INCLUDE_PRIVATE` | `false` | Учитывать RFC1918 и т.п. |

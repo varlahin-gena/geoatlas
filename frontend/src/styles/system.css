@@ -154,15 +154,16 @@ body.page-admin {
     }
     .status-metric:last-child { border-right: none; }
     .sm-label {
-        font-size: 9px;
+        font-size: 12px;
         letter-spacing: 0.02em;
-        color: var(--text-muted);
+        color: var(--text-dim);
     }
     .sm-value {
-        font-size: 13px;
+        font-size: 14px;
         font-weight: 700;
         font-variant-numeric: tabular-nums;
         color: var(--text);
+        line-height: 1.25;
     }
     .sm-value.warn { color: var(--orange); }
     .sm-value.bad { color: var(--red); }
@@ -748,13 +749,33 @@ body.page-admin {
         gap: 6px 12px;
         margin-bottom: 6px;
         color: var(--text-dim);
-        font-size: 10px;
+        font-size: 12px;
     }
     .chart-title {
         color: var(--text-dim);
-        font-size: 11px;
+        font-size: 12px;
         font-weight: 600;
         margin-bottom: 4px;
+    }
+    .chart-host--empty {
+        height: auto !important;
+        min-height: 0;
+    }
+    .chart-empty {
+        padding: 8px 0 4px;
+    }
+    .chart-empty-title {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 550;
+        color: var(--text-muted);
+        line-height: 1.35;
+    }
+    .chart-empty-desc {
+        margin: 4px 0 0;
+        font-size: 12px;
+        color: var(--text-dim);
+        line-height: 1.4;
     }
     .chart-legend-item {
         display: inline-flex;
@@ -820,7 +841,7 @@ body.page-admin {
 
     .footer-info {
         color: var(--text-muted);
-        font-size: 11px;
+        font-size: 12px;
         text-align: right;
         padding: 4px 0;
     }
@@ -831,7 +852,7 @@ body.page-admin {
         border-radius: 4px;
         background: rgba(88, 166, 255, 0.15);
         color: var(--accent);
-        font-size: 11px;
+        font-size: 12px;
         font-weight: 700;
         letter-spacing: 0.02em;
     }

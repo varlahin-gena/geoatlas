@@ -5,6 +5,15 @@
 
 ## [Unreleased]
 
+### Added
+- **Репутация**: на `/reputation` можно сменить интервал опроса URL-фидов (1–168 ч, по умолчанию 6); `GET`/`PUT /api/reputation/settings` → `reputation_settings.json`, без рестарта.
+
+### Changed
+- **UI (HIG)**: контраст active nav / badges в light, типографика ≥12px, таблицы без обрезанных типов, operator-facing copy без API-жаргона, loading stuck → retry (~5 с), компактные empty charts на мониторинге.
+
+### Notes
+- OpenAPI API doc version: **1.22.0**
+
 ## [2.7.6] — 2026-11-16
 
 Патч: sheet исключения больше не сжимается до 360px из‑за стилей admin search-box.

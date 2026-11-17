@@ -95,7 +95,13 @@ func TestNewClampsIntervalAndNilGuards(t *testing.T) {
 	nilS.Start(context.Background())
 	nilS.Shutdown(context.Background())
 	nilS.SetFeeds(nil)
+	nilS.SetInterval(time.Hour)
 	nilS.pruneObsoleteURLLists(context.Background(), nil, nil)
+
+	s.SetInterval(time.Second) // clamps to minute
+	if s.interval < time.Minute {
+		t.Fatalf("SetInterval clamp: %v", s.interval)
+	}
 }
 
 func TestStartDisabledAndSetFeeds(t *testing.T) {

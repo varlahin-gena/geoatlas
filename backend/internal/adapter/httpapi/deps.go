@@ -96,7 +96,8 @@ type ParseDeps struct {
 
 // ReputationDeps — зависимости ReputationHandler.
 type ReputationDeps struct {
-	reputationUC *usecasereputation.Service
+	reputationUC       *usecasereputation.Service
+	reputationSettings *usecasereputation.SettingsService
 }
 
 // ConnectorsDeps — зависимости ConnectorsHandler.
@@ -127,8 +128,9 @@ type Params struct {
 	Ingest            Ingester
 	EventsUC          *usecaseevents.Service
 	GeoUC             *usecasegeo.Service
-	ReputationUC      *usecasereputation.Service
-	ConnectorsUC      *connectors.Service
+	ReputationUC         *usecasereputation.Service
+	ReputationSettingsUC *usecasereputation.SettingsService
+	ConnectorsUC         *connectors.Service
 	ParseErrorsUC     *parseerrors.Service
 	SystemUC          *usecasesystem.Service
 	SystemPinger      usecasesystem.ClickHousePinger
@@ -232,7 +234,10 @@ func NewDeps(p Params) *Deps {
 		},
 		ingest:     &IngestDeps{ingestFlushSec: p.Cfg.Ingest.FlushSec, ingest: p.Ingest},
 		parse:      &ParseDeps{queryTimeout: p.Cfg.QueryTimeout, parseErrorsUC: p.ParseErrorsUC, parseTestUC: p.ParseTestUC},
-		reputation: &ReputationDeps{reputationUC: p.ReputationUC},
+		reputation: &ReputationDeps{
+			reputationUC:       p.ReputationUC,
+			reputationSettings: p.ReputationSettingsUC,
+		},
 		connectors: &ConnectorsDeps{connectorsUC: p.ConnectorsUC, logs: p.Logs},
 		templates: &SearchTemplatesDeps{
 			authDisabled:    p.Cfg.Auth.Disabled,

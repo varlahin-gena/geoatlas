@@ -91,6 +91,7 @@ type ReputationConfig struct {
 	FetchInterval time.Duration
 	Feeds         []ReputationFeed
 	FeedsFile     string
+	SettingsFile  string
 }
 
 // AnomalyConfig — map anomaly engine + settings file.

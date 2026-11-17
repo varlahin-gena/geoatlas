@@ -1,8 +1,10 @@
 # Frontend (ГеоАтлас SPA)
 
-React + TypeScript + Vite. Multi-route SPA served by nginx.
+React + TypeScript + Vite. Многостраничный SPA, в проде отдаётся через nginx.
 
-## Dev
+Страницы, роли и OpenAPI — [docs/ui.md](../docs/ui.md). Локальный стек из git — [docs/development.md](../docs/development.md).
+
+## Разработка
 
 ```bash
 cd frontend
@@ -12,21 +14,21 @@ npm test             # vitest
 npm run build        # dist/
 ```
 
-Runtime `/config.js` is injected by the nginx entrypoint in Docker (`window.GA_CONFIG={}`).
+В Docker runtime-конфиг `/config.js` подставляет entrypoint nginx (`window.GA_CONFIG={}`).
 
-## Routes
+## Маршруты
 
-| Path | Guard |
+| Путь | Доступ |
 |------|--------|
-| `/login` | public |
-| `/` | login (administrator / operator / dashboard) |
-| `/anomalies` | login |
-| `/investigate` | login (`?alert=` fingerprint) |
-| `/change-password` | login (allow must-reset) |
+| `/login` | публичный |
+| `/` | вход (administrator / operator / dashboard) |
+| `/anomalies` | вход |
+| `/investigate` | вход (`?alert=` fingerprint) |
+| `/change-password` | вход (в т.ч. must-reset) |
 | `/system`, `/users`, `/api-tokens`, `/parse-errors`, `/parser-test`, `/geo-missing`, `/geo-ranges`, `/reputation`, `/tls` | administrator |
 
-Legacy `*.html` URLs redirect to the routes above (nginx + React Router).
+Старые URL `*.html` редиректят на маршруты выше (nginx + React Router).
 
 ## Docker
 
-`frontend/Dockerfile` multi-stage: `npm ci && npm run build` → `nginx:1.30.4-alpine` with `dist/` and `nginx-app.inc`.
+`frontend/Dockerfile` — multi-stage: `npm ci && npm run build` → `nginx:1.30.4-alpine` с `dist/` и `nginx-app.inc`.

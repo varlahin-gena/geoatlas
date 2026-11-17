@@ -130,16 +130,16 @@ export function edgesAggHint(edges?: EdgesAgg): string {
   const state = edges.state || 'idle';
   const phase = edges.phase || '';
   if (state === 'running' && phase === 'schema') {
-    return 'Идёт DROP/CREATE MV — карта временно на сырых traffic_logs.';
+    return 'Готовится схема агрегатов — карта временно на подробных логах.';
   }
   if (state === 'running') {
-    return 'Backfill агрегатов — карта на traffic_logs до state=ready.';
+    return 'Идёт заполнение агрегатов — карта на подробных логах, пока не будет готово.';
   }
   if (state === 'ready') {
-    return 'Агрегаты готовы — /api/events предпочитает edges_daily.';
+    return 'Агрегаты готовы — карта использует суточные сводки.';
   }
   if (state === 'error') {
-    return 'Ошибка Ensure*/backfill — перезапустите backend или см. логи.';
+    return 'Ошибка подготовки агрегатов — перезапустите сервис или смотрите логи.';
   }
   return '';
 }

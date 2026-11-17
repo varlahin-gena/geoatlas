@@ -1,7 +1,30 @@
 import { useEffect, useState, type ReactNode } from 'react';
 
 /** After this, Suspense fallback offers reload instead of an endless shimmer. */
-const PAGE_LOADING_STUCK_MS = 10_000;
+const PAGE_LOADING_STUCK_MS = 5_000;
+
+/** In-table / in-page fetch: replace endless skeleton with retry. */
+export const TABLE_LOADING_STUCK_MS = 5_000;
+
+/** True once `loading` has stayed true longer than `stuckAfterMs`. */
+export function useStuckLoading(
+  loading: boolean,
+  stuckAfterMs: number = TABLE_LOADING_STUCK_MS,
+): boolean {
+  const [stuck, setStuck] = useState(false);
+
+  useEffect(() => {
+    if (!loading) {
+      setStuck(false);
+      return;
+    }
+    if (stuckAfterMs <= 0) return;
+    const timer = window.setTimeout(() => setStuck(true), stuckAfterMs);
+    return () => window.clearTimeout(timer);
+  }, [loading, stuckAfterMs]);
+
+  return Boolean(loading && stuck);
+}
 
 /** Shimmer line block. */
 function SkeletonLine({
@@ -41,6 +64,66 @@ export function TableSkeleton({
       ))}
     </>
   );
+}
+
+/**
+ * Table body while fetching: skeleton → stuck retry (default 5s), or error + retry.
+ * Returns null when not loading and there is no error (caller renders data rows).
+ */
+export function TableLoadRows({
+  cols,
+  rows = 5,
+  loading,
+  error,
+  onRetry,
+  stuckAfterMs = TABLE_LOADING_STUCK_MS,
+}: {
+  cols: number;
+  rows?: number;
+  loading: boolean;
+  error?: string;
+  onRetry?: () => void;
+  stuckAfterMs?: number;
+}) {
+  const stuck = useStuckLoading(loading, stuckAfterMs);
+  const retry =
+    onRetry != null ? (
+      <button type="button" className="btn" onClick={onRetry}>
+        Повторить
+      </button>
+    ) : undefined;
+
+  if (error && !loading) {
+    return (
+      <tr>
+        <td colSpan={cols}>
+          <EmptyState compact title="Не удалось загрузить" description={error} action={retry} />
+        </td>
+      </tr>
+    );
+  }
+  if (!loading) return null;
+  if (stuck) {
+    return (
+      <tr data-testid="table-loading-stuck">
+        <td colSpan={cols}>
+          <EmptyState
+            compact
+            title="Загрузка занимает слишком много времени"
+            description="Проверьте сеть или повторите запрос."
+            action={
+              onRetry != null ? (
+                <button type="button" className="btn primary" onClick={onRetry}>
+                  Повторить
+                </button>
+              ) : undefined
+            }
+          />
+        </td>
+      </tr>
+    );
+  }
+  return <TableSkeleton cols={cols} rows={rows} />;
 }
 
 /** In-page content placeholder (inside AdminLayout). */

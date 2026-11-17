@@ -19,6 +19,7 @@ describe('glossary', () => {
     expect(scopeLabel('read')).toBe('Чтение');
     expect(scopeLabel('ops')).toBe('Операции');
     expect(scopeLabel('admin')).toBe('Админ');
-    expect(scopeOptionLabel('admin')).toContain('полный API');
+    expect(scopeOptionLabel('admin')).toContain('полный доступ');
+    expect(COPY.peersEmpty).not.toMatch(/\/api\/|src or dst/i);
   });
 });

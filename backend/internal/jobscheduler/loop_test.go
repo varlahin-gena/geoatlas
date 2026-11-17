@@ -52,7 +52,28 @@ func TestLoopNilReceiver(t *testing.T) {
 	t.Parallel()
 	var loop *Loop
 	loop.Start(context.Background(), time.Second, func(context.Context) {})
+	loop.SetInterval(time.Hour)
 	loop.CloseDone()
 	loop.Shutdown(context.Background())
 	<-loop.Done()
+}
+
+func TestLoopSetInterval(t *testing.T) {
+	t.Parallel()
+	var n atomic.Int32
+	loop := NewLoop()
+	ctx, cancel := context.WithCancel(context.Background())
+	loop.Start(ctx, time.Hour, func(context.Context) {
+		n.Add(1)
+	})
+	// immediate tick already ran; speed up subsequent ticks
+	loop.SetInterval(15 * time.Millisecond)
+	time.Sleep(60 * time.Millisecond)
+	cancel()
+	shut, shutCancel := context.WithTimeout(context.Background(), time.Second)
+	defer shutCancel()
+	loop.Shutdown(shut)
+	if n.Load() < 2 {
+		t.Fatalf("ticks = %d after SetInterval, want >= 2", n.Load())
+	}
 }

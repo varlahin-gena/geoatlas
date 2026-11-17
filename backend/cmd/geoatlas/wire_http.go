@@ -22,6 +22,7 @@ import (
 	"geoatlas/internal/adapter/huntjob"
 	"geoatlas/internal/adapter/huntsfile"
 	"geoatlas/internal/adapter/parseradapter"
+	"geoatlas/internal/adapter/reputationsettingsfile"
 	"geoatlas/internal/adapter/searchtemplatesfile"
 	"geoatlas/internal/adapter/systemlive"
 	domainauth "geoatlas/internal/auth"
@@ -37,6 +38,7 @@ import (
 	usecasehunts "geoatlas/internal/usecase/hunts"
 	"geoatlas/internal/usecase/parseerrors"
 	"geoatlas/internal/usecase/parsetest"
+	usecasereputation "geoatlas/internal/usecase/reputation"
 	"geoatlas/internal/usecase/searchtemplates"
 	usecasesystem "geoatlas/internal/usecase/system"
 )
@@ -94,6 +96,19 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 	backupUC.SetLogService(logsUC)
 	backupUC.SetHeavySlot(a.heavy)
 	a.backupJobs = backupjob.NewFromService(backupUC, time.Minute)
+
+	var reputationSettingsUC *usecasereputation.SettingsService
+	if bg.repUC != nil && a.repJobs != nil {
+		seed := usecasereputation.DefaultSettingsFromConfig(cfg.Reputation)
+		reputationSettingsUC = usecasereputation.NewSettingsService(
+			reputationsettingsfile.New(cfg.Reputation.SettingsFile),
+			seed,
+			a.repJobs.SetInterval,
+		)
+		if st, err := reputationSettingsUC.LoadAndApply(); err == nil {
+			a.repJobs.SetInterval(time.Duration(st.FetchIntervalHours) * time.Hour)
+		}
+	}
 
 	var anomalyUC *usecaseanomaly.Service
 	var anomalySettingsUC *usecaseanomaly.SettingsService
@@ -164,8 +179,9 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 		Ingest:            a.ingestSvc,
 		EventsUC:          eventsUC,
 		GeoUC:             geoUC,
-		ReputationUC:      bg.repUC,
-		ConnectorsUC:      bg.connectorsUC,
+		ReputationUC:         bg.repUC,
+		ReputationSettingsUC: reputationSettingsUC,
+		ConnectorsUC:         bg.connectorsUC,
 		ParseErrorsUC:     parseErrorsUC,
 		SystemUC:          systemUC,
 		SystemPinger:      systemRepo,

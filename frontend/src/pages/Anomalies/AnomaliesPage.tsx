@@ -11,7 +11,7 @@ import {
 import { listUserDirectory, type UserDirectoryEntry } from '@/api/users';
 import { useAuth } from '@/auth/AuthContext';
 import { AdminLayout } from '@/components/AdminLayout';
-import { EmptyState, TableSkeleton } from '@/components/Skeleton';
+import { EmptyState, TableLoadRows } from '@/components/Skeleton';
 import { useToast } from '@/components/Toast';
 import { COPY } from '@/lib/glossary';
 import { fmtDate, fmtNumber } from '@/lib/format';
@@ -201,6 +201,7 @@ export default function AnomaliesPage() {
   const [summary, setSummary] = useState<AnomalySummary | null>(null);
   const [directory, setDirectory] = useState<UserDirectoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [severity, setSeverity] = useState('');
   const [code, setCode] = useState('');
   const [sinceHours, setSinceHours] = useState('24');
@@ -226,8 +227,11 @@ export default function AnomaliesPage() {
       });
       setRows(data.items || []);
       setSummary(data.summary || null);
+      setLoadError('');
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Не удалось загрузить аномалии', 'error');
+      const msg = e instanceof Error ? e.message : 'Не удалось загрузить аномалии';
+      setLoadError(msg);
+      toast(msg, 'error');
     } finally {
       setLoading(false);
     }
@@ -584,8 +588,14 @@ export default function AnomaliesPage() {
               </tr>
             </thead>
             <tbody>
-              {loading && sorted.length === 0 ? (
-                <TableSkeleton cols={10} rows={6} />
+              {(loading || loadError) && sorted.length === 0 ? (
+                <TableLoadRows
+                  cols={10}
+                  rows={6}
+                  loading={loading}
+                  error={loadError || undefined}
+                  onRetry={() => void load()}
+                />
               ) : sorted.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="empty">

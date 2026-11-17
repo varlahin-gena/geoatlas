@@ -1,3 +1,30 @@
+.reputation-interval {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px 16px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+}
+
+.reputation-interval-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.reputation-interval-field input {
+  width: 6.5rem;
+}
+
+.reputation-interval-hint {
+  margin: 0;
+  flex: 1 1 12rem;
+  align-self: center;
+}
+
 .reputation-summary {
   display: flex;
   flex-wrap: wrap;

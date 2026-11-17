@@ -1,9 +1,10 @@
-import { apiDelete, apiFetch, apiGet, apiPath, apiPost } from './client';
+import { apiDelete, apiFetch, apiGet, apiPath, apiPost, apiPut } from './client';
 import type { components } from './openapi';
 
 export type ReputationFeed = components['schemas']['ReputationFeed'];
 export type ReputationList = components['schemas']['ReputationListMeta'];
 export type ReputationRefreshResult = components['schemas']['ReputationRefreshResult'];
+export type ReputationSettings = components['schemas']['ReputationSettings'];
 
 export function listReputationFeeds(): Promise<{ feeds?: ReputationFeed[] }> {
   return apiGet('/api/reputation/feeds');
@@ -34,4 +35,14 @@ export function refreshReputation(force = true): Promise<ReputationRefreshResult
 
 export function deleteReputationList(name: string): Promise<unknown> {
   return apiDelete(apiPath('/api/reputation/lists/{name}', { name }));
+}
+
+export function getReputationSettings(): Promise<{ settings?: ReputationSettings }> {
+  return apiGet('/api/reputation/settings');
+}
+
+export function putReputationSettings(
+  body: ReputationSettings,
+): Promise<{ settings?: ReputationSettings }> {
+  return apiPut('/api/reputation/settings', body);
 }

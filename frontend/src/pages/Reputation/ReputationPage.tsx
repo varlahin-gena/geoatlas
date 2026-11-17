@@ -13,16 +13,18 @@ import { apiFetchRaw } from '@/api/client';
 import {
   createReputationFeed,
   deleteReputationList,
+  getReputationSettings,
   listReputationCatalog,
   listReputationFeeds,
   listReputationLists,
+  putReputationSettings,
   refreshReputation,
   type ReputationFeed as Feed,
   type ReputationList as RepList,
 } from '@/api/reputation';
 import { useAuth } from '@/auth/AuthContext';
 import { AdminLayout } from '@/components/AdminLayout';
-import { EmptyState, TableSkeleton } from '@/components/Skeleton';
+import { EmptyState, TableLoadRows } from '@/components/Skeleton';
 import { useToast } from '@/components/Toast';
 import { fmtDate, fmtNumber } from '@/lib/format';
 import {
@@ -281,6 +283,7 @@ export default function ReputationPage() {
   const [lists, setLists] = useState<RepList[]>([]);
   const [catalog, setCatalog] = useState<Feed[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
   const [category, setCategory] = useState('attacks');
@@ -292,6 +295,9 @@ export default function ReputationPage() {
   const [lastRefreshAt, setLastRefreshAt] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [addBusy, setAddBusy] = useState(false);
+  const [fetchIntervalHours, setFetchIntervalHours] = useState(6);
+  const [savedIntervalHours, setSavedIntervalHours] = useState(6);
+  const [intervalBusy, setIntervalBusy] = useState(false);
 
   function resetAddForm() {
     setName('');
@@ -361,21 +367,50 @@ export default function ReputationPage() {
   const showErrorCol = errorCount > 0;
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
-      const [f, l, c] = await Promise.all([
+      const [f, l, c, s] = await Promise.all([
         listReputationFeeds(),
         listReputationLists(),
         listReputationCatalog(),
+        getReputationSettings(),
       ]);
       setFeeds(f.feeds || []);
       setLists(l.lists || []);
       setCatalog(c.feeds || []);
+      const hours = s.settings?.fetch_interval_hours ?? 6;
+      setFetchIntervalHours(hours);
+      setSavedIntervalHours(hours);
+      setLoadError('');
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Не удалось загрузить списки репутации', 'error');
+      const msg = e instanceof Error ? e.message : 'Не удалось загрузить списки репутации';
+      setLoadError(msg);
+      toast(msg, 'error');
     } finally {
       setLoading(false);
     }
   }, [toast]);
+
+  async function saveInterval() {
+    if (intervalBusy) return;
+    const hours = Math.round(Number(fetchIntervalHours));
+    if (!Number.isFinite(hours) || hours < 1 || hours > 168) {
+      toast('Интервал: от 1 до 168 часов', 'error');
+      return;
+    }
+    setIntervalBusy(true);
+    try {
+      const data = await putReputationSettings({ fetch_interval_hours: hours });
+      const saved = data.settings?.fetch_interval_hours ?? hours;
+      setFetchIntervalHours(saved);
+      setSavedIntervalHours(saved);
+      toast(`Интервал обновления: каждые ${saved} ч`, 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Не удалось сохранить интервал', 'error');
+    } finally {
+      setIntervalBusy(false);
+    }
+  }
 
   useEffect(() => {
     document.title = 'ГеоАтлас — Репутация IP';
@@ -539,6 +574,32 @@ export default function ReputationPage() {
           </button>
         </div>
 
+        <div className="reputation-interval card">
+          <label className="reputation-interval-field" htmlFor="rep-fetch-interval">
+            Интервал обновления фидов (часы)
+            <input
+              id="rep-fetch-interval"
+              type="number"
+              min={1}
+              max={168}
+              value={fetchIntervalHours}
+              disabled={loading || intervalBusy}
+              onChange={(e) => setFetchIntervalHours(Number(e.target.value))}
+            />
+          </label>
+          <button
+            type="button"
+            className="btn"
+            disabled={loading || intervalBusy || fetchIntervalHours === savedIntervalHours}
+            onClick={() => void saveInterval()}
+          >
+            {intervalBusy ? 'Сохранение…' : 'Сохранить'}
+          </button>
+          <p className="hint reputation-interval-hint">
+            По умолчанию 6 часов. Диапазон 1–168. Применяется сразу, без рестарта.
+          </p>
+        </div>
+
         <p className="reputation-summary" role="status">
           {activeRows.length ? (
             <>
@@ -566,7 +627,7 @@ export default function ReputationPage() {
         <details className="reputation-details">
           <summary>Как это устроено</summary>
           <p>
-            URL-фиды хранятся на сервере и подтягиваются по расписанию или кнопкой «Скачать фиды
+            URL-фиды хранятся на сервере и подтягиваются по интервалу выше или кнопкой «Скачать фиды
             сейчас». После добавления фида списки нужно скачать, иначе диапазоны появятся не сразу.
           </p>
           <p>
@@ -595,8 +656,14 @@ export default function ReputationPage() {
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
-                  <TableSkeleton cols={activeColSpan} rows={4} />
+                {loading || loadError ? (
+                  <TableLoadRows
+                    cols={activeColSpan}
+                    rows={4}
+                    loading={loading}
+                    error={loadError || undefined}
+                    onRetry={() => void load()}
+                  />
                 ) : !activeRows.length ? (
                   <tr>
                     <td colSpan={activeColSpan} className="empty">
@@ -669,8 +736,14 @@ export default function ReputationPage() {
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
-                  <TableSkeleton cols={5} rows={4} />
+                {loading || loadError ? (
+                  <TableLoadRows
+                    cols={5}
+                    rows={4}
+                    loading={loading}
+                    error={loadError || undefined}
+                    onRetry={() => void load()}
+                  />
                 ) : !catalog.length ? (
                   <tr>
                     <td colSpan={5} className="empty">

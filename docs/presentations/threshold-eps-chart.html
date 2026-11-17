@@ -6,12 +6,22 @@
   <title>ГеоАтлас — нагрузочный ramp</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
   <style>
+    :root {
+      --ink: #14212b;
+      --ink-soft: #3a4a55;
+      --muted: #5c6b75;
+      --teal: #0e7c66;
+      --amber: #c47a12;
+      --surface: #ffffff;
+      --page: #f7faf9;
+      --line: #d5e0dc;
+    }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       min-height: 100vh;
-      background: #000;
-      color: #e8eee9;
+      background: var(--page);
+      color: var(--ink);
       font-family: "Segoe UI", Calibri, system-ui, sans-serif;
       display: flex;
       flex-direction: column;
@@ -25,33 +35,33 @@
       font-size: 22px;
       font-weight: 650;
       letter-spacing: -0.02em;
-      color: #f2f5f4;
+      color: var(--ink);
     }
     .sub {
       margin: 0 0 20px;
       font-size: 13px;
-      color: #8a9690;
+      color: var(--muted);
     }
     .chart-wrap {
       position: relative;
       height: min(560px, 70vh);
-      background: #050505;
-      border: 1px solid #1c1c1c;
+      background: var(--surface);
+      border: 1px solid var(--line);
       border-radius: 10px;
       padding: 16px 12px 8px;
     }
     .legend-note {
       margin-top: 14px;
       font-size: 12px;
-      color: #7a8580;
+      color: var(--muted);
       display: flex;
       gap: 22px;
       flex-wrap: wrap;
     }
-    .legend-note span b { color: #c5cec9; font-weight: 600; }
-    .teal { color: #2dd4a8; }
-    .ink { color: #d1d5db; }
-    .amber { color: #e8b84a; }
+    .legend-note span b { color: var(--ink-soft); font-weight: 600; }
+    .teal { color: var(--teal); }
+    .ink { color: var(--ink); }
+    .amber { color: var(--amber); }
   </style>
 </head>
 <body>
@@ -82,8 +92,8 @@
       { t: 30000, client: 29893.0, recv: 30560.6 },
     ];
     const labels = rows.map((r) => (r.t / 1000) + 'k');
-    const grid = 'rgba(255,255,255,0.06)';
-    const tick = '#8a9690';
+    const grid = 'rgba(20, 33, 43, 0.08)';
+    const tick = '#5c6b75';
 
     new Chart(document.getElementById('c'), {
       type: 'line',
@@ -93,7 +103,7 @@
           {
             label: 'Целевой EPS',
             data: rows.map((r) => r.t),
-            borderColor: '#e8b84a',
+            borderColor: '#c47a12',
             backgroundColor: 'transparent',
             fill: false,
             tension: 0,
@@ -104,8 +114,8 @@
           {
             label: 'Клиент, EPS',
             data: rows.map((r) => r.client),
-            borderColor: '#2dd4a8',
-            backgroundColor: 'rgba(45, 212, 168, 0.08)',
+            borderColor: '#0e7c66',
+            backgroundColor: 'rgba(14, 124, 102, 0.10)',
             fill: true,
             tension: 0.2,
             pointRadius: 3,
@@ -115,7 +125,7 @@
           {
             label: 'Сервер (recv), EPS',
             data: rows.map((r) => r.recv),
-            borderColor: '#e5e7eb',
+            borderColor: '#14212b',
             backgroundColor: 'transparent',
             fill: false,
             tension: 0.2,
@@ -134,7 +144,7 @@
             position: 'top',
             align: 'end',
             labels: {
-              color: '#b8c0bb',
+              color: '#3a4a55',
               boxWidth: 12,
               boxHeight: 12,
               font: { size: 12 },
@@ -142,10 +152,10 @@
             },
           },
           tooltip: {
-            backgroundColor: '#111',
-            titleColor: '#fff',
-            bodyColor: '#d1d5db',
-            borderColor: '#333',
+            backgroundColor: '#ffffff',
+            titleColor: '#14212b',
+            bodyColor: '#3a4a55',
+            borderColor: '#d5e0dc',
             borderWidth: 1,
             callbacks: {
               label: (ctx) => {
@@ -161,7 +171,7 @@
             title: { display: true, text: 'Целевой EPS', color: tick },
             grid: { color: grid },
             ticks: { color: tick },
-            border: { color: '#222' },
+            border: { color: '#d5e0dc' },
           },
           y: {
             title: { display: true, text: 'Событий / с', color: tick },
@@ -170,7 +180,7 @@
               color: tick,
               callback: (v) => v.toLocaleString('ru-RU'),
             },
-            border: { color: '#222' },
+            border: { color: '#d5e0dc' },
             min: 0,
             suggestedMax: 32000,
           },

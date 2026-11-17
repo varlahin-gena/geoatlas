@@ -18,10 +18,10 @@
 
 1. **Аутентификация и роли** — по умолчанию включены (`administrator` / `operator` / `dashboard`); пароли УЗ — bcrypt; чувствительные действия — re-auth где предусмотрено.
 2. **Секреты вне образа** — `API_AUTH_TOKEN`, `SESSION_SECRET`, `INGEST_SHARED_SECRET`, `CLICKHOUSE_PASSWORD` задаются при старте / в `.env`, не зашиты в git.
-3. **Edge hardening** — proxy gate, rate limit API, лимиты JSON, security headers на nginx; опциональный HTTPS + HSTS.
+3. **Защита API** — доступ только через nginx, лимит запросов, лимиты JSON, security headers; опциональный HTTPS + HSTS.
 4. **Ingest allowlist** — TCP ingest от ожидаемых peer’ов (`INGEST_ALLOW_FROM`); хостовый FW / `GA_SYSLOG_ALLOW_FROM` для `:514`.
 5. **Валидация входов** — размеры upload, структура JSON, безопасный fetch репутации (`safeurl`), парсеры без выполнения кода из лога.
-6. **Целостность поставок** — релизы с `.sha256`; опционально cosign/Sigstore (см. [install.md](install.md)).
+6. **Целостность поставок** — релизы с `.sha256` на GitHub Releases; дополнительно в Assets — SBOM и cosign/Sigstore (для аудита, не обязательны для установки).
 7. **Ответ на уязвимости** — приватный advisory, цель подтверждения ≤5 рабочих дней ([SECURITY.md](../SECURITY.md)).
 
 ## Чего продукт не обещает

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: ГеоАтлас API
-  version: "1.21.0"
+  version: "1.22.0"
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
@@ -1763,6 +1763,63 @@ paths:
         "401":
           description: unauthorized
 
+  /api/reputation/settings:
+    get:
+      tags: [reputation]
+      summary: Настройки модуля репутации
+      description: |
+        Только administrator. Интервал опроса URL-фидов из `/app/data/reputation_settings.json`
+        (seed — `REPUTATION_FETCH_INTERVAL`, по умолчанию 6h).
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  settings:
+                    $ref: "#/components/schemas/ReputationSettings"
+        "401":
+          description: unauthorized
+        "503":
+          description: module disabled
+    put:
+      tags: [reputation]
+      summary: Сохранить настройки модуля репутации
+      description: |
+        Только administrator. Меняет интервал опроса без рестарта backend.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReputationSettings"
+      responses:
+        "200":
+          description: saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  settings:
+                    $ref: "#/components/schemas/ReputationSettings"
+        "400":
+          description: validation error
+        "401":
+          description: unauthorized
+        "503":
+          description: module disabled
+
   /api/reputation/lookup:
     get:
       tags: [reputation]
@@ -3519,6 +3576,18 @@ components:
         source: { type: string }
         updated_at: { type: string }
         last_error: { type: string }
+
+    ReputationSettings:
+      type: object
+      required: [fetch_interval_hours]
+      additionalProperties: false
+      properties:
+        fetch_interval_hours:
+          type: integer
+          minimum: 1
+          maximum: 168
+          description: Период опроса URL-фидов в часах (по умолчанию 6).
+        updated_at: { type: string, format: date-time }
 
     ReputationRefreshResult:
       type: object

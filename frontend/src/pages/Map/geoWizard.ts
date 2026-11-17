@@ -188,7 +188,7 @@ export function classifyEmptyMap(opts: {
     return {
       reason: 'no_events',
       title: 'Нет событий за период',
-      text: 'Попробуйте расширить период, уменьшить порог minCount или проверить syslog / ingest.',
+      text: 'Попробуйте расширить период, снизить порог событий или проверить приём логов.',
       action: { label: 'Период 7 дней', kind: 'set-period-7d' },
     };
   }

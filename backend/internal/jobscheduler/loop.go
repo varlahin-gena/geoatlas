@@ -9,9 +9,11 @@ import (
 
 // Loop владеет cancel/done горутины тикера.
 type Loop struct {
-	mu     sync.Mutex
-	cancel context.CancelFunc
-	done   chan struct{}
+	mu       sync.Mutex
+	cancel   context.CancelFunc
+	done     chan struct{}
+	ticker   *time.Ticker
+	interval time.Duration
 }
 
 // NewLoop создаёт Loop с открытым done-каналом.
@@ -42,6 +44,20 @@ func (l *Loop) CloseDone() {
 	}
 }
 
+// SetInterval меняет период тикера (hot-reload). До Start сохраняет значение
+// для первого NewTicker; после Start — Reset активного тикера.
+func (l *Loop) SetInterval(d time.Duration) {
+	if l == nil || d <= 0 {
+		return
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.interval = d
+	if l.ticker != nil {
+		l.ticker.Reset(d)
+	}
+}
+
 // Start вызывает fn сразу, затем каждые interval, пока parent не отменён.
 // Второй Start перезаписывает cancel; done закрывается один раз — не вызывайте
 // Start повторно на том же Loop после завершения.
@@ -52,6 +68,11 @@ func (l *Loop) Start(parent context.Context, interval time.Duration, fn func(ctx
 	ctx, cancel := context.WithCancel(parent)
 	l.mu.Lock()
 	l.cancel = cancel
+	if l.interval > 0 {
+		interval = l.interval
+	} else {
+		l.interval = interval
+	}
 	l.mu.Unlock()
 	go func() {
 		defer close(l.done)
@@ -59,7 +80,14 @@ func (l *Loop) Start(parent context.Context, interval time.Duration, fn func(ctx
 		if ctx.Err() != nil {
 			return
 		}
-		t := time.NewTicker(interval)
+		l.mu.Lock()
+		d := l.interval
+		if d <= 0 {
+			d = interval
+		}
+		t := time.NewTicker(d)
+		l.ticker = t
+		l.mu.Unlock()
 		defer t.Stop()
 		for {
 			select {

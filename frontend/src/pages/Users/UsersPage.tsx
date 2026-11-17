@@ -14,7 +14,7 @@ import type { UserRole } from '@/api/types';
 import { ROLE_ADMIN, ROLE_OPERATOR } from '@/api/types';
 import { USER_ROLE_OPTIONS } from '@/auth/roles';
 import { SettingsLayout } from '@/components/SettingsLayout';
-import { EmptyState, TableSkeleton } from '@/components/Skeleton';
+import { EmptyState, TableLoadRows } from '@/components/Skeleton';
 import { ReauthField, ReauthModal } from '@/components/ReauthModal';
 import { useToast } from '@/components/Toast';
 import { fmtDate } from '@/lib/format';
@@ -154,14 +154,14 @@ export default function UsersPage() {
                 </tr>
               </thead>
               <tbody>
-                {error ? (
-                  <tr>
-                    <td colSpan={6} className="empty">
-                      Ошибка: {error}
-                    </td>
-                  </tr>
-                ) : loading ? (
-                  <TableSkeleton cols={6} rows={4} />
+                {loading || error ? (
+                  <TableLoadRows
+                    cols={6}
+                    rows={4}
+                    loading={loading}
+                    error={error || undefined}
+                    onRetry={() => void load()}
+                  />
                 ) : users.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="empty">
