@@ -81,6 +81,7 @@ sudo ./deploy/oracle_linux/install_oraclelinux.sh
 - **ClickHouse** — хранение, настраиваемый TTL, резервное копирование
 - **Расследование** — охоты (`/hunts`), разбор алерта (`/investigate`), конструктор поиска и шаблоны запросов на карте
 - **Операции** — тест парсеров, журнал ошибок парсинга, страница системного мониторинга, логи контейнеров (`/dozzle/`)
+- **Защита API** — доступ только через nginx, лимиты запросов, повторный вход, ротация токенов, HSTS при HTTPS
 
 ## Документация
 
@@ -121,12 +122,14 @@ sudo ./deploy/oracle_linux/install_oraclelinux.sh
 
 Уязвимости — только приватно, см. [SECURITY.md](SECURITY.md) (подтверждение в течение 5 рабочих дней). Обычные баги — в Issues.
 
-Краткий checklist для прод-установки:
+Кратко для прод-установки:
 
-- Пароли УЗ: минимум 10 символов, буква и цифра, не из common-list
-- Syslog `:514`
-- Reputation URL-фиды: только публичные IPv4-хосты (private/metadata блокируются)
-- Установка и обновление: только `geoatlas-X.Y.Z.tar.gz` с GitHub Releases; проверяйте `.sha256` до `./update.sh` (опционально online: `.cosign.bundle` + `cosign verify-blob`, см. [install.md](docs/install.md))
+- Секреты только через `./start.sh`; пароль admin — минимум 10 символов (буква и цифра), одноразовый файл `.admin_password_once`
+- UI за HTTPS при доступе из сети; не публиковать ClickHouse `8123`/`9000` и backend `8080`/`1514`
+- Backend только за nginx (`GA_REQUIRE_PROXY=1`); syslog `:514` без TLS — ограничьте источником МСЭ
+- Пакет только с GitHub Releases: проверяйте `.sha256` до установки / `./update.sh`
+
+Полный checklist и threat model — [security-requirements.md](docs/security-requirements.md), [assurance-case.md](docs/assurance-case.md), [configuration.md](docs/configuration.md).
 
 ## Структура репозитория
 
