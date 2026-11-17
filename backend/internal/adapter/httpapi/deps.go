@@ -124,30 +124,30 @@ type AnomalyDeps struct {
 
 // Params — вход NewDeps / NewServer.
 type Params struct {
-	Cfg               config.Config
-	Ingest            Ingester
-	EventsUC          *usecaseevents.Service
-	GeoUC             *usecasegeo.Service
+	Cfg                  config.Config
+	Ingest               Ingester
+	EventsUC             *usecaseevents.Service
+	GeoUC                *usecasegeo.Service
 	ReputationUC         *usecasereputation.Service
 	ReputationSettingsUC *usecasereputation.SettingsService
 	ConnectorsUC         *connectors.Service
-	ParseErrorsUC     *parseerrors.Service
-	SystemUC          *usecasesystem.Service
-	SystemPinger      usecasesystem.ClickHousePinger
-	ParseTestUC       *parsetest.Service
-	RetentionUC       *usecaseretention.Service
-	BackupUC          *usecasebackup.Service
-	AuthUC            *usecaseauth.Service
-	Users             UserDirectory
-	Sessions          SessionParser
-	SessionRegistry   *auth.SessionRegistry
-	APITokens         APITokenStore
-	SearchTemplatesUC *searchtemplates.Service
-	AnomalyUC         *usecaseanomaly.Service
-	AnomalySettingsUC *usecaseanomaly.SettingsService
-	HuntsUC           *usecasehunts.Service
-	Logs              *usecaseaudit.Service
-	LoginPolicyPath   string
+	ParseErrorsUC        *parseerrors.Service
+	SystemUC             *usecasesystem.Service
+	SystemPinger         usecasesystem.ClickHousePinger
+	ParseTestUC          *parsetest.Service
+	RetentionUC          *usecaseretention.Service
+	BackupUC             *usecasebackup.Service
+	AuthUC               *usecaseauth.Service
+	Users                UserDirectory
+	Sessions             SessionParser
+	SessionRegistry      *auth.SessionRegistry
+	APITokens            APITokenStore
+	SearchTemplatesUC    *searchtemplates.Service
+	AnomalyUC            *usecaseanomaly.Service
+	AnomalySettingsUC    *usecaseanomaly.SettingsService
+	HuntsUC              *usecasehunts.Service
+	Logs                 *usecaseaudit.Service
+	LoginPolicyPath      string
 }
 
 // Deps — композитор HTTP-слоя: domain bags без плоских UC-полей.
@@ -232,8 +232,8 @@ func NewDeps(p Params) *Deps {
 			queryTimeout:       p.Cfg.QueryTimeout,
 			geoUC:              p.GeoUC,
 		},
-		ingest:     &IngestDeps{ingestFlushSec: p.Cfg.Ingest.FlushSec, ingest: p.Ingest},
-		parse:      &ParseDeps{queryTimeout: p.Cfg.QueryTimeout, parseErrorsUC: p.ParseErrorsUC, parseTestUC: p.ParseTestUC},
+		ingest: &IngestDeps{ingestFlushSec: p.Cfg.Ingest.FlushSec, ingest: p.Ingest},
+		parse:  &ParseDeps{queryTimeout: p.Cfg.QueryTimeout, parseErrorsUC: p.ParseErrorsUC, parseTestUC: p.ParseTestUC},
 		reputation: &ReputationDeps{
 			reputationUC:       p.ReputationUC,
 			reputationSettings: p.ReputationSettingsUC,

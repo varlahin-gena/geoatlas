@@ -4,10 +4,10 @@ import { useEffect, useState, type ReactNode } from 'react';
 const PAGE_LOADING_STUCK_MS = 5_000;
 
 /** In-table / in-page fetch: replace endless skeleton with retry. */
-export const TABLE_LOADING_STUCK_MS = 5_000;
+const TABLE_LOADING_STUCK_MS = 5_000;
 
 /** True once `loading` has stayed true longer than `stuckAfterMs`. */
-export function useStuckLoading(
+function useStuckLoading(
   loading: boolean,
   stuckAfterMs: number = TABLE_LOADING_STUCK_MS,
 ): boolean {
@@ -44,7 +44,7 @@ function SkeletonLine({
 }
 
 /** Table body placeholder rows. */
-export function TableSkeleton({
+function TableSkeleton({
   cols,
   rows = 5,
 }: {
