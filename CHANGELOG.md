@@ -5,6 +5,10 @@
 
 ## [Unreleased]
 
+## [2.7.7] — 2026-11-17
+
+Интервал опроса репутации из UI без рестарта; HIG-полировка интерфейса.
+
 ### Added
 - **Репутация**: на `/reputation` можно сменить интервал опроса URL-фидов (1–168 ч, по умолчанию 6); `GET`/`PUT /api/reputation/settings` → `reputation_settings.json`, без рестарта.
 
@@ -13,6 +17,9 @@
 
 ### Notes
 - OpenAPI API doc version: **1.22.0**
+- Продуктовая версия: **2.7.7**
+- Схема ClickHouse: без изменений Ensure*.
+- Достаточно `update.sh` 2.7.7 (recreate **backend** + **frontend**).
 
 ## [2.7.6] — 2026-11-16
 
@@ -271,6 +278,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.7.7]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.7
 [2.7.6]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.6
 [2.7.5]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.5
 [2.7.4]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.4
