@@ -171,3 +171,33 @@ func (h *ReputationHandler) RemoveFeed(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "deleted": name})
 }
+
+func (h *ReputationHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
+	if h.reputationSettings == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "reputation settings unavailable"})
+		return
+	}
+	st, err := h.reputationSettings.Get()
+	if err != nil {
+		writeInternalError(w, "reputation settings load failed", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "settings": st})
+}
+
+func (h *ReputationHandler) PutSettings(w http.ResponseWriter, r *http.Request) {
+	if h.reputationSettings == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "reputation settings unavailable"})
+		return
+	}
+	var req usecasereputation.Settings
+	if !decodeJSONBody(w, r, &req, defaultJSONBodyLimit) {
+		return
+	}
+	st, err := h.reputationSettings.Update(req)
+	if err != nil {
+		writeDomainError(w, "reputation settings update failed", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "settings": st})
+}

@@ -134,10 +134,10 @@ body.page-admin .admin-main {
   flex-shrink: 0;
 }
 .sidebar-section-title {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: var(--text-muted);
+  color: var(--text-dim);
   padding: 6px 10px 8px 10px;
 }
 .app.sidebar-collapsed .sidebar-section-title { display: none; }
@@ -171,9 +171,12 @@ body.page-admin .admin-main {
   color: var(--text-dim);
 }
 .side-btn:hover .icon { color: var(--accent); }
+/* Active row: content-color text (≥4.5:1); accent only on icon — light theme
+   used to paint the whole label in --accent on --panel-3 (~4.07:1). */
 .side-btn.active {
-  background: var(--panel-3);
-  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel-2));
+  color: var(--text);
+  font-weight: 600;
 }
 .side-btn.active .icon { color: var(--accent); }
 .app.sidebar-collapsed .side-btn.active {
@@ -183,22 +186,25 @@ body.page-admin .admin-main {
 .side-btn-badge {
   display: inline-block;
   flex-shrink: 0;
-  min-width: 16px;
-  padding: 0 5px;
+  min-width: 18px;
+  padding: 0 6px;
   border-radius: 6px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
-  line-height: 16px;
+  line-height: 18px;
   text-align: center;
 }
 .side-btn-badge.is-danger {
-  background: color-mix(in srgb, var(--red) 22%, transparent);
-  color: var(--red);
+  /* Filled chip: red-on-tint never reaches 4.5:1; white on --red does (~5.4:1). */
+  background: var(--red);
+  color: #ffffff;
+  border: 1px solid var(--red);
 }
 .side-btn-badge.is-muted {
-  background: color-mix(in srgb, var(--text-muted) 22%, transparent);
-  color: var(--text-dim);
+  background: var(--panel-3);
+  color: var(--text);
   font-weight: 600;
+  border: 1px solid var(--border);
 }
 .app.sidebar-collapsed .side-btn .label { display: none; }
 .app.sidebar-collapsed .side-btn {
@@ -216,10 +222,10 @@ body.page-admin .admin-main {
   position: absolute;
   top: 2px;
   right: 2px;
-  min-width: 14px;
-  padding: 0 3px;
-  font-size: 9px;
-  line-height: 14px;
+  min-width: 16px;
+  padding: 0 4px;
+  font-size: 11px;
+  line-height: 16px;
   pointer-events: none;
 }
 
@@ -264,10 +270,10 @@ body.page-admin .admin-main {
 .nav-flyout .side-btn-badge {
   position: static;
   display: inline-block;
-  min-width: 16px;
-  padding: 0 5px;
-  font-size: 10px;
-  line-height: 16px;
+  min-width: 18px;
+  padding: 0 6px;
+  font-size: 12px;
+  line-height: 18px;
   pointer-events: none;
 }
 .nav-flyout .side-btn {

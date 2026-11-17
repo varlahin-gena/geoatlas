@@ -206,7 +206,6 @@ export function SystemOverviewTab({
 
       <div className="footer-info">
         обновлено: {updatedAt ? updatedAt.toLocaleString('ru-RU') : '—'}
-        {stats?.backend_info ? ` · ${backendMeta}` : ''}
       </div>
     </div>
   );

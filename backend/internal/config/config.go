@@ -171,6 +171,7 @@ func FromEnv() Config {
 			FetchInterval: parser.durationFlexible("REPUTATION_FETCH_INTERVAL", 6*time.Hour),
 			Feeds:         parser.reputationFeeds("REPUTATION_FEEDS"),
 			FeedsFile:     envOr("REPUTATION_FEEDS_FILE", "/app/data/reputation_feeds.json"),
+			SettingsFile:  envOr("REPUTATION_SETTINGS_FILE", "/app/data/reputation_settings.json"),
 		},
 		Anomaly: AnomalyConfig{
 			Enabled:                       parser.bool("ANOMALY_ENABLED", true),

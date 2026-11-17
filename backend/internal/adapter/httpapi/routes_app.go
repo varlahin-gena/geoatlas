@@ -131,6 +131,12 @@ func (w *routeWiring) registerMapRoutes() {
 	w.handle("POST", "/api/reputation/refresh",
 		chain(http.HandlerFunc(w.rep.Refresh), w.opsMW, w.csrf, maxBytesMW(maxJSONBodySize)),
 	)
+	w.handle("GET", "/api/reputation/settings",
+		withTimeout(chain(http.HandlerFunc(w.rep.GetSettings), w.adminMW), healthTimeout),
+	)
+	w.handle("PUT", "/api/reputation/settings",
+		chain(http.HandlerFunc(w.rep.PutSettings), w.adminMW, w.csrf, maxBytesMW(maxJSONBodySize)),
+	)
 	w.handle("GET", "/api/reputation/lookup",
 		withTimeout(chain(http.HandlerFunc(w.rep.Lookup), w.loginMW), healthTimeout),
 	)

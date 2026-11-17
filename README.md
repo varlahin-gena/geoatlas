@@ -92,7 +92,7 @@ sudo ./deploy/oracle_linux/install_oraclelinux.sh
 | [Конфигурация](docs/configuration.md) | `.env`, секреты, модули |
 | [Обслуживание](docs/operations.md) | Запуск, профили, retention, бэкапы, логи, обновление |
 | [GeoIP](docs/geoip.md) | CSV, загрузка с сервера, 502/OOM |
-| [UI и HTTP API](docs/ui.md) | Страницы SPA, роли, OpenAPI **1.21.0** |
+| [UI и HTTP API](docs/ui.md) | Страницы SPA, роли, OpenAPI **1.22.0** |
 | [Репутация](docs/reputation.md) | Фиды и offline-списки |
 | [Аномалии](docs/anomalies.md) | Типы (`port_scan`, `byte_surge`, `beaconing`, `lateral_fanout`, …), ack/assign, разбор |
 | [Разработка](docs/development.md) | Локальный стек из git |
@@ -109,7 +109,7 @@ sudo ./deploy/oracle_linux/install_oraclelinux.sh
 | [OpenSSF Passing](docs/openssf-best-practices.md) | Шпаргалка Passing |
 | [OpenSSF Silver](docs/openssf-silver.md) | Шпаргалка Silver |
 
-Контракт REST: [`openapi.yaml`](openapi.yaml) (документ OpenAPI **1.21.0**).
+Контракт REST: [`openapi.yaml`](openapi.yaml) (документ OpenAPI **1.22.0**).
 
 ## Лицензия
 
@@ -139,6 +139,6 @@ sudo ./deploy/oracle_linux/install_oraclelinux.sh
 | `docs/` | документация оператора и разработчика |
 | `docs/images/` | скрины для README |
 | `scripts/` | CI, pack-release, бэкапы |
-| `openapi.yaml` | контракт HTTP API (OpenAPI **1.21.0**) |
+| `openapi.yaml` | контракт HTTP API (OpenAPI **1.22.0**) |
 
 Полное дерево: [docs/repo-layout.md](docs/repo-layout.md).

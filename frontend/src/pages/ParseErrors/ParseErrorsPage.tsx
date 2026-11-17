@@ -7,7 +7,7 @@ import {
   type ParseErrorRow,
 } from '@/api/parseErrors';
 import { SettingsLayout } from '@/components/SettingsLayout';
-import { EmptyState, TableSkeleton } from '@/components/Skeleton';
+import { EmptyState, TableLoadRows } from '@/components/Skeleton';
 import { useToast } from '@/components/Toast';
 import { fmtDate, fmtNumber } from '@/lib/format';
 import {
@@ -152,6 +152,7 @@ export default function ParseErrorsPage() {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<DeleteMode | null>(null);
 
@@ -161,8 +162,11 @@ export default function ParseErrorsPage() {
       const data = await listParseErrors({ limit, search });
       setRows(data.errors || []);
       setSelected(new Set());
+      setLoadError('');
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Не удалось загрузить ошибки парсинга', 'error');
+      const msg = e instanceof Error ? e.message : 'Не удалось загрузить ошибки парсинга';
+      setLoadError(msg);
+      toast(msg, 'error');
     } finally {
       setLoading(false);
     }
@@ -328,8 +332,14 @@ export default function ParseErrorsPage() {
               </tr>
             </thead>
             <tbody>
-              {loading && !rows.length ? (
-                <TableSkeleton cols={tableCols} rows={5} />
+              {(loading || loadError) && !rows.length ? (
+                <TableLoadRows
+                  cols={tableCols}
+                  rows={5}
+                  loading={loading}
+                  error={loadError || undefined}
+                  onRetry={() => void load()}
+                />
               ) : !rows.length ? (
                 <tr>
                   <td colSpan={tableCols} className="empty">

@@ -141,8 +141,8 @@ export default function TlsPage() {
     <SettingsLayout title="HTTPS-сертификаты" plainTitle>
       <div className="page-content-inner narrow">
         <p className="page-lead">
-          Режим — <code>HTTPS_ENABLED</code> в <code>.env</code> (<code>0</code> / <code>1</code> /{' '}
-          <code>auto</code>). PEM пишутся в том <code>./certs</code>.
+          Режим HTTPS задаётся при установке (выкл / вкл / auto). Файлы сертификата хранятся в
+          каталоге <code>certs</code> на сервере.
         </p>
 
         <div className="page-actions">
@@ -153,25 +153,24 @@ export default function TlsPage() {
 
         {!status?.configured ? (
           <p className="tls-banner" role="status">
-            Управление сертификатами через веб недоступно: не смонтирован{' '}
-            <code>TLS_CERT_DIR</code> в backend. Положите PEM вручную в <code>certs/</code> на
-            сервере или разверните стек через Docker Compose с томом <code>./certs</code>.
+            Управление сертификатами через веб недоступно: каталог сертификатов не подключён к
+            сервису. Положите файлы вручную в <code>certs/</code> на сервере или переустановите
+            стек с томом сертификатов.
           </p>
         ) : null}
 
         {status?.configured && !status.writable ? (
           <p className="tls-banner" role="status">
-            Каталог сертификатов смонтирован, но недоступен для записи процессу backend (uid 101).
-            На хосте: <code>sudo chown -R 101:101 certs</code>, затем перезапустите стек (
-            <code>./start.sh</code>). Форма загрузки скрыта, пока каталог не станет writable.
+            Каталог сертификатов есть, но сервис не может в него писать. На хосте выдайте права
+            владельцу процесса (обычно uid 101) на <code>certs/</code> и перезапустите стек. Форма
+            загрузки скрыта, пока каталог недоступен для записи.
           </p>
         ) : null}
 
         {httpsOff ? (
           <p className="tls-banner" role="status">
-            В конфигурации сейчас <code>HTTPS_ENABLED=0</code> (только HTTP). Загрузка PEM всё
-            равно возможна; чтобы включить HTTPS, выставьте <code>HTTPS_ENABLED=auto</code> или{' '}
-            <code>1</code> в <code>.env</code> и перезапустите стек.
+            Сейчас включён только HTTP. Загрузить сертификат можно; чтобы открыть HTTPS, включите
+            режим auto или «вкл» в конфигурации установки и перезапустите стек.
           </p>
         ) : null}
 
@@ -204,7 +203,7 @@ export default function TlsPage() {
                 <dt>Хранилище UI</dt>
                 <dd>
                   {!status?.configured
-                    ? 'нет (TLS_CERT_DIR)'
+                    ? 'не подключено'
                     : status.writable
                       ? 'доступно для записи'
                       : 'только чтение / нет прав'}
@@ -267,7 +266,7 @@ export default function TlsPage() {
               <button type="button" className="btn" disabled={busy} onClick={() => void onReload()}>
                 Применить
               </button>
-              <span className="hint">Перезагружает nginx с текущими PEM на диске</span>
+              <span className="hint">Применяет сертификаты с диска и перезапускает веб-прокси</span>
             </div>
           ) : null}
         </section>

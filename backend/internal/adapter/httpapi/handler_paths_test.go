@@ -110,8 +110,9 @@ func TestReputationHandlerNilAndUC(t *testing.T) {
 	for _, fn := range []http.HandlerFunc{
 		nilH.UploadReputation, nilH.ListLists, nilH.DeleteList, nilH.Refresh,
 		nilH.Lookup, nilH.ListFeeds, nilH.ListCatalog, nilH.AddFeed, nilH.RemoveFeed,
+		nilH.GetSettings, nilH.PutSettings,
 	} {
-		rec := call(fn, http.MethodGet, "/api/reputation", `{"name":"x","url":"https://example.com"}`)
+		rec := call(fn, http.MethodGet, "/api/reputation", `{"name":"x","url":"https://example.com","fetch_interval_hours":6}`)
 		if rec.Code != http.StatusServiceUnavailable {
 			t.Fatalf("nil: %d %s", rec.Code, rec.Body.String())
 		}

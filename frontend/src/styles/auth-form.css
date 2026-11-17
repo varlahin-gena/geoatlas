@@ -208,6 +208,10 @@ html[data-theme='light'] .auth-card input {
   width: 100%;
   margin-top: 6px;
   min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   background: var(--accent);
   color: var(--on-accent);
   border: none;
@@ -234,6 +238,27 @@ html[data-theme='light'] .auth-card input {
 }
 .auth-card button[type='submit'][aria-busy='true'] {
   cursor: wait;
+}
+.auth-btn-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid color-mix(in srgb, var(--on-accent) 35%, transparent);
+  border-top-color: var(--on-accent);
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: auth-btn-spin 0.7s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-btn-spinner {
+    animation: none;
+    border-top-color: color-mix(in srgb, var(--on-accent) 35%, transparent);
+    opacity: 0.85;
+  }
+}
+@keyframes auth-btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .auth-error {

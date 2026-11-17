@@ -10,7 +10,7 @@ import {
 } from '@/api/connectors';
 import { fetchSystemStats } from '@/api/system';
 import { SettingsLayout } from '@/components/SettingsLayout';
-import { EmptyState, TableSkeleton } from '@/components/Skeleton';
+import { EmptyState, TableLoadRows } from '@/components/Skeleton';
 import { useToast } from '@/components/Toast';
 import {
   CONNECTOR_LIVE_WINDOW_MS,
@@ -205,6 +205,7 @@ export default function ConnectorsPage() {
   const { toast } = useToast();
   const [rows, setRows] = useState<Connector[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [maxConnectors, setMaxConnectors] = useState(1);
   const [extraPorts, setExtraPorts] = useState({ min: 0, max: 0 });
   const [applyBusy, setApplyBusy] = useState(false);
@@ -240,9 +241,12 @@ export default function ConnectorsPage() {
       setRows(data.connectors || []);
       setMaxConnectors(data.max_connectors || 1);
       setExtraPorts(data.extra_ports || { min: 0, max: 0 });
+      setLoadError('');
       await refreshLive();
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Не удалось загрузить коннекторы', 'error');
+      const msg = e instanceof Error ? e.message : 'Не удалось загрузить коннекторы';
+      setLoadError(msg);
+      toast(msg, 'error');
     } finally {
       setLoading(false);
     }
@@ -477,8 +481,14 @@ export default function ConnectorsPage() {
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
-                  <TableSkeleton rows={4} cols={6} />
+                {loading || loadError ? (
+                  <TableLoadRows
+                    cols={6}
+                    rows={4}
+                    loading={loading}
+                    error={loadError || undefined}
+                    onRetry={() => void load()}
+                  />
                 ) : rows.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="empty">

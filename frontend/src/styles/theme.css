@@ -97,7 +97,8 @@ html[data-theme="light"] {
   --on-accent: #ffffff;
   --green: #1a7f37;
   --red: #cf222e;
-  --orange: #9a6700;
+  /* Warn/orange on panel & tinted badges ≥4.5:1 (was #9a6700 ≈4.2–4.4 on #eee). */
+  --orange: #7a5200;
   --shadow: 0 4px 16px rgba(17, 17, 17, 0.08);
   --floating-bg: rgba(255, 255, 255, 0.92);
   --overlay-bg: rgba(244, 244, 244, 0.55);

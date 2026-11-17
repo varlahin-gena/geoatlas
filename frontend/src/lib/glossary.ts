@@ -21,7 +21,7 @@ export const COPY = {
   huntsLoading: 'Загрузка охот…',
   peersHead: 'Пиры источника',
   peersEmpty:
-    'Нет связей за окно алерта: /api/events (карта) отбрасывает рёбра без гео у src или dst — часто у private/enterprise IP без координат в GeoIP.',
+    'Нет связей за окно алерта. Карта показывает только пары адресов с координатами — у частных и корпоративных IP их часто нет в базе GeoIP.',
   peersLoading: 'Загрузка пиров…',
   loginLocal: 'Локальный вход',
 } as const;
@@ -44,8 +44,8 @@ export function scopeOptionLabel(scope: 'read' | 'ops' | 'admin'): string {
     case 'read':
       return 'Чтение — карта и просмотр';
     case 'ops':
-      return 'Операции — ingest и загрузки';
+      return 'Операции — приём логов и загрузки';
     case 'admin':
-      return 'Админ — полный API';
+      return 'Админ — полный доступ';
   }
 }

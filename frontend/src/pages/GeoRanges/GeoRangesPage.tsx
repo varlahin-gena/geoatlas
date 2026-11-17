@@ -14,7 +14,7 @@ import {
   type GeoRangesResponse,
 } from '@/api/geo';
 import { SettingsLayout } from '@/components/SettingsLayout';
-import { EmptyState, TableSkeleton } from '@/components/Skeleton';
+import { EmptyState, TableLoadRows } from '@/components/Skeleton';
 import { useToast } from '@/components/Toast';
 import { fmtNumber } from '@/lib/format';
 import './geoRanges.css';
@@ -118,7 +118,9 @@ export default function GeoRangesPage() {
   });
   const [busy, setBusy] = useState(false);
   const [rangesLoading, setRangesLoading] = useState(true);
+  const [rangesError, setRangesError] = useState('');
   const [enterpriseLoading, setEnterpriseLoading] = useState(true);
+  const [enterpriseError, setEnterpriseError] = useState('');
   const geoFileRef = useRef<HTMLInputElement>(null);
   const [enterprise, setEnterprise] = useState<EnterpriseNet[]>([]);
   const [entSearch, setEntSearch] = useState('');
@@ -148,6 +150,7 @@ export default function GeoRangesPage() {
       setShownCount(0);
       setFilteredCount(0);
       setTruncated(false);
+      setRangesError('');
       setRangesLoading(false);
       return;
     }
@@ -159,6 +162,7 @@ export default function GeoRangesPage() {
     if (!lookup && !subnetViaQ) {
       setIpStatus({ mode: '', text: '' });
     }
+    setRangesLoading(true);
     try {
       const data = (await fetchGeoRanges(resolved.params)) as GeoRangesResponse & {
         shown?: number;
@@ -173,6 +177,7 @@ export default function GeoRangesPage() {
       setShownCount(Number.isFinite(shown) && shown >= 0 ? shown : list.length);
       setFilteredCount(Number.isFinite(filtered) && filtered >= 0 ? filtered : list.length);
       setTruncated(Boolean(data.truncated));
+      setRangesError('');
       if (data.limits) {
         setUploadMaxBytes(Number(data.limits.upload_max_bytes) || 0);
         setUploadMaxRanges(Number(data.limits.upload_max_ranges) || 0);
@@ -193,18 +198,24 @@ export default function GeoRangesPage() {
         setIpStatus({ mode: '', text: '' });
       }
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Ошибка', 'error');
+      const msg = e instanceof Error ? e.message : 'Ошибка';
+      setRangesError(msg);
+      toast(msg, 'error');
     } finally {
       setRangesLoading(false);
     }
   }, [ipSearch, q, toast]);
 
   const loadEnterprise = useCallback(async () => {
+    setEnterpriseLoading(true);
     try {
       const data = await fetchEnterpriseNets();
       setEnterprise(data.items || []);
+      setEnterpriseError('');
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Ошибка загрузки сетей предприятия', 'error');
+      const msg = e instanceof Error ? e.message : 'Ошибка загрузки сетей предприятия';
+      setEnterpriseError(msg);
+      toast(msg, 'error');
     } finally {
       setEnterpriseLoading(false);
     }
@@ -747,8 +758,14 @@ export default function GeoRangesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {enterpriseLoading ? (
-                    <TableSkeleton cols={5} rows={3} />
+                  {enterpriseLoading || enterpriseError ? (
+                    <TableLoadRows
+                      cols={5}
+                      rows={3}
+                      loading={enterpriseLoading}
+                      error={enterpriseError || undefined}
+                      onRetry={() => void loadEnterprise()}
+                    />
                   ) : !enterprise.length ? (
                     <tr>
                       <td colSpan={5} className="empty">
@@ -872,8 +889,14 @@ export default function GeoRangesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rangesLoading ? (
-                    <TableSkeleton cols={7} rows={5} />
+                  {rangesLoading || rangesError ? (
+                    <TableLoadRows
+                      cols={7}
+                      rows={5}
+                      loading={rangesLoading}
+                      error={rangesError || undefined}
+                      onRetry={() => void load()}
+                    />
                   ) : !rows.length ? (
                     <tr>
                       <td colSpan={7} className="empty">

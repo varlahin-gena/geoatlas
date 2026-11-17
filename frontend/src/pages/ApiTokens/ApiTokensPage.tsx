@@ -1,7 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { createToken, deleteToken, listTokens, rotateToken, type TokenRow, type TokenScope } from '@/api/tokens';
 import { SettingsLayout } from '@/components/SettingsLayout';
-import { EmptyState, TableSkeleton } from '@/components/Skeleton';
+import { EmptyState, TableLoadRows } from '@/components/Skeleton';
 import { ReauthField, ReauthModal } from '@/components/ReauthModal';
 import { useToast } from '@/components/Toast';
 import { scopeLabel, scopeOptionLabel, TERM } from '@/lib/glossary';
@@ -121,14 +121,14 @@ export default function ApiTokensPage() {
                 </tr>
               </thead>
               <tbody>
-                {error ? (
-                  <tr>
-                    <td colSpan={5} className="empty">
-                      Ошибка: {error}
-                    </td>
-                  </tr>
-                ) : loading ? (
-                  <TableSkeleton cols={5} rows={4} />
+                {loading || error ? (
+                  <TableLoadRows
+                    cols={5}
+                    rows={4}
+                    loading={loading}
+                    error={error || undefined}
+                    onRetry={() => void load()}
+                  />
                 ) : tokens.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="empty">
@@ -196,8 +196,8 @@ export default function ApiTokensPage() {
             </table>
           </div>
           <p className="api-tokens-env-hint">
-            Переменные <code>API_AUTH_TOKEN</code> / <code>API_AUTH_PREVIOUS_TOKEN</code> дают
-            админ-доступ вне этого списка.
+            Токен из окружения сервера (если задан при установке) даёт админ-доступ вне этого
+            списка.
           </p>
         </div>
       </div>

@@ -50,16 +50,24 @@ export function useSystemCharts(
       if (!xs.length) {
         const host = ref.current;
         host.replaceChildren();
+        host.classList.add('chart-host--empty');
         const titleEl = document.createElement('div');
         titleEl.className = 'chart-title';
         titleEl.textContent = title;
         const empty = document.createElement('div');
-        empty.className = 'empty';
-        empty.style.padding = '24px';
-        empty.textContent = 'Нет данных';
+        empty.className = 'chart-empty';
+        empty.setAttribute('role', 'status');
+        const emptyTitle = document.createElement('p');
+        emptyTitle.className = 'chart-empty-title';
+        emptyTitle.textContent = 'Нет данных за выбранный период';
+        const emptyDesc = document.createElement('p');
+        emptyDesc.className = 'chart-empty-desc';
+        emptyDesc.textContent = 'Ряд появится после накопления истории метрик.';
+        empty.append(emptyTitle, emptyDesc);
         host.append(titleEl, empty);
         return;
       }
+      ref.current.classList.remove('chart-host--empty');
       plotsRef.current.push(makeChart(ref.current, title, labels, xs, ys, chartOpts));
     };
 

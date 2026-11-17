@@ -74,7 +74,7 @@ export function AnomalyPeersPanel({
     <div className="anomaly-peers-panel">
       <div className="anomaly-peers-head">
         <strong title={TERM.peerHint}>{COPY.peersHead}</strong>
-        <span className="hint" title={`/api/events · ${periodQuery} · q=${q}`}>
+        <span className="hint" title={`Период ${periodQuery}${q ? ` · запрос ${q}` : ''}`}>
           {anomalyPeersScopeLabel(item, hours)}
         </span>
         {toolbar ? <div className="anomaly-peers-toolbar">{toolbar}</div> : null}

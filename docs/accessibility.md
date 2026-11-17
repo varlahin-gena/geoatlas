@@ -15,5 +15,3 @@ Operator UI ГеоАтлас ориентируется на [WCAG 2.0](https://
 ## Как улучшаем
 
 Баги и предложения по a11y принимаются через [GitHub Issues](https://github.com/varlahin-gena/geoatlas/issues) (метка или префикс `a11y:` приветствуются). Регрессии в навигации с клавиатуры / screen reader — приоритет наравне с функциональными багами UI.
-
-OpenSSF Silver `accessibility_best_practices` (SHOULD): **Met** — см. [openssf-silver.md](openssf-silver.md).

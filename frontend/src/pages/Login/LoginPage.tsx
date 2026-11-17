@@ -113,7 +113,14 @@ export default function LoginPage() {
           disabled={busy || !username.trim() || !password}
           aria-busy={busy}
         >
-          {busy ? 'Вход…' : 'Войти'}
+          {busy ? (
+            <>
+              <span className="auth-btn-spinner" aria-hidden />
+              Вход…
+            </>
+          ) : (
+            'Войти'
+          )}
         </button>
       </form>
     </>

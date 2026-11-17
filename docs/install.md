@@ -47,7 +47,7 @@
 
 ## Установочный пакет
 
-Один архив **`geoatlas-X.Y.Z.tar.gz`** (плюс `.sha256`; SBOM `.cdx.json` / `.spdx.json` — для аудита; `.tar.gz.cosign.bundle` и те же байты как `.tar.gz.sigstore` — подпись Sigstore; `.gittag` + `.gittag.cosign.bundle` — attestation git-тега `vX.Y.Z`) с [GitHub Releases](https://github.com/varlahin-gena/geoatlas/releases) — исходники стека, **оба** установщика (`deploy/ubuntu/…`, `deploy/oracle_linux/…`), `update.sh` и (для прод-пакета) каталог **`images/`** с готовыми Docker-образами. Это не `.deb`/`.rpm`: Docker и файрвол хоста ставит OS-скрипт из пакета.
+Прод ставят только из архива **`geoatlas-X.Y.Z.tar.gz`** с [GitHub Releases](https://github.com/varlahin-gena/geoatlas/releases) (рядом лежит `.sha256` для проверки). В пакете — стек, установщики Ubuntu и Oracle Linux / RHEL, `update.sh` и (в релизном tar.gz) каталог **`images/`** с Docker-образами. Это не `.deb`/`.rpm`: Docker и файрвол ставит OS-скрипт из пакета. Каталог установки по умолчанию — **`/opt/geoatlas`**.
 
 | Задача                                | Что запускать                                              |
 |---------------------------------------|------------------------------------------------------------|
@@ -66,29 +66,6 @@ curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/g
 sha256sum -c "geoatlas-${VER}.tar.gz.sha256"
 tar -xzf "geoatlas-${VER}.tar.gz"
 cd "geoatlas-${VER}"
-```
-
-Офлайн достаточно `.sha256`. Опционально (нужен [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) и сеть к Rekor) проверить, что пакет собран workflow релиза:
-
-```bash
-curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz.cosign.bundle"
-cosign verify-blob \
-  --bundle "geoatlas-${VER}.tar.gz.cosign.bundle" \
-  --certificate-identity-regexp 'https://github.com/varlahin-gena/geoatlas/.github/workflows/(release-tag.yml@refs/tags/v.*|sign-release-assets.yml@refs/heads/main)' \
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  "geoatlas-${VER}.tar.gz"
-# `.tar.gz.sigstore` — тот же bundle (его читает OpenSSF Scorecard). --bundle принимает любое из имён.
-# При необходимости доподписать уже выложенный tar.gz — workflow sign-release-assets.yml.
-
-# attestation git-тега vX.Y.Z (тот же workflow / OIDC)
-curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.gittag"
-curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.gittag.cosign.bundle"
-cosign verify-blob \
-  --bundle "geoatlas-${VER}.gittag.cosign.bundle" \
-  --certificate-identity-regexp 'https://github.com/varlahin-gena/geoatlas/.github/workflows/release-tag.yml@refs/tags/v.*' \
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  "geoatlas-${VER}.gittag"
-# содержимое: tag=vX.Y.Z, commit=<sha>, product=X.Y.Z — сверьте с git rev-parse v${VER}
 ```
 
 Дальше — установщик вашей ОС (см. ниже) или `./update.sh` для уже стоящей системы ([обновление](operations.md#обновление-системы)).

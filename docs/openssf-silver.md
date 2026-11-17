@@ -50,8 +50,8 @@ Passing уже получен (проект [15404](https://www.bestpractices.de
 | warnings_strict | Met | lint падает в CI |
 | implement_secure_design | Met | [assurance-case.md](assurance-case.md) |
 | crypto_* (silver) | Met / N/A | bcrypt, TLS на nginx, секреты в файлах `.env` |
-| **signed_releases** | Met | cosign keyless (`.cosign.bundle` и копия `.sigstore`) + verify в [install.md](install.md) |
-| version_tags_signed | **Met** (SUGGESTED) | cosign keyless на `.gittag` (tag+commit) в release Assets; verify в [install.md](install.md) |
+| **signed_releases** | Met | cosign keyless на релизе (`.cosign.bundle` / `.sigstore` в GitHub Release Assets) |
+| version_tags_signed | **Met** (SUGGESTED) | cosign keyless на `.gittag` (tag+commit) в Release Assets |
 | input_validation | Met | threatprot, лимиты upload, safeurl |
 | hardening | Met | proxy gate, rate limit, headers — configuration.md |
 | assurance_case | Met | [assurance-case.md](assurance-case.md) |

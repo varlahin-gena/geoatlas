@@ -3622,6 +3622,114 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/reputation/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Настройки модуля репутации
+         * @description Только administrator. Интервал опроса URL-фидов из `/app/data/reputation_settings.json`
+         *     (seed — `REPUTATION_FETCH_INTERVAL`, по умолчанию 6h).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description settings */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            ok?: boolean;
+                            settings?: components["schemas"]["ReputationSettings"];
+                        };
+                    };
+                };
+                /** @description unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description module disabled */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /**
+         * Сохранить настройки модуля репутации
+         * @description Только administrator. Меняет интервал опроса без рестарта backend.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ReputationSettings"];
+                };
+            };
+            responses: {
+                /** @description saved */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            ok?: boolean;
+                            settings?: components["schemas"]["ReputationSettings"];
+                        };
+                    };
+                };
+                /** @description validation error */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description module disabled */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/reputation/lookup": {
         parameters: {
             query?: never;
@@ -5825,6 +5933,12 @@ export interface components {
             source?: string;
             updated_at?: string;
             last_error?: string;
+        };
+        ReputationSettings: {
+            /** @description Период опроса URL-фидов в часах (по умолчанию 6). */
+            fetch_interval_hours: number;
+            /** Format: date-time */
+            updated_at?: string;
         };
         ReputationRefreshResult: {
             updated?: string[];

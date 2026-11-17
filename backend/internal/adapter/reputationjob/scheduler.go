@@ -107,6 +107,20 @@ func (s *Scheduler) SetFeeds(feeds []usecasereputation.Feed) {
 	s.mu.Unlock()
 }
 
+// SetInterval меняет период опроса фидов без рестарта (hot-reload).
+func (s *Scheduler) SetInterval(d time.Duration) {
+	if s == nil {
+		return
+	}
+	if d < time.Minute {
+		d = time.Minute
+	}
+	s.mu.Lock()
+	s.interval = d
+	s.mu.Unlock()
+	s.loop.SetInterval(d)
+}
+
 func (s *Scheduler) snapshotFeeds() []usecasereputation.Feed {
 	s.mu.Lock()
 	defer s.mu.Unlock()

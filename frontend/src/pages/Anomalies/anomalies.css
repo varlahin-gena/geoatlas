@@ -563,7 +563,9 @@
 .anomalies-table {
   table-layout: fixed;
   width: 100%;
-  min-width: 960px;
+  /* No min-width: fixed layout + 15rem actions was forcing horizontal scroll
+     even when the viewport had spare space. */
+  min-width: 0;
 }
 
 .anomalies-table th,
@@ -583,13 +585,16 @@
 
 .anomalies-table th:nth-child(3),
 .anomalies-table td:nth-child(3) {
-  width: 8.5rem;
+  width: 11rem;
 }
 
+/* Type labels are operator-facing — wrap, do not ellipsize. */
 .anomalies-table .anomaly-type-cell {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  text-overflow: unset;
+  white-space: normal;
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 .anomalies-table th:nth-child(4),
@@ -621,7 +626,7 @@
 
 .anomalies-table th:nth-child(10),
 .anomalies-table td:nth-child(10) {
-  width: 7.5rem;
+  width: 11rem;
 }
 
 .anomalies-table .anomaly-title-cell {
@@ -638,7 +643,6 @@
   max-width: 100%;
 }
 
-.anomaly-desc-subject,
 .anomaly-desc-detail,
 .anomaly-desc-delta,
 .anomaly-endpoint-cell {
@@ -651,6 +655,13 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
+  white-space: normal;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 .anomaly-desc-detail {
@@ -727,13 +738,14 @@
 .anomaly-sev-badge.sev-high {
   color: var(--red);
   border-color: color-mix(in srgb, var(--red) 45%, var(--border));
-  background: color-mix(in srgb, var(--red) 10%, transparent);
+  /* Solid panel bg: red-on-tint failed AA; --red on --panel ≥4.5:1. */
+  background: var(--panel);
 }
 
 .anomaly-sev-badge.sev-warn {
   color: var(--orange);
   border-color: color-mix(in srgb, var(--orange) 45%, var(--border));
-  background: color-mix(in srgb, var(--orange) 10%, transparent);
+  background: var(--panel);
 }
 
 .anomaly-sev-badge.sev-info {
@@ -742,7 +754,7 @@
 
 .anomalies-table td.actions {
   display: table-cell;
-  width: 15rem;
+  width: 11rem;
   white-space: nowrap;
   vertical-align: middle;
   text-align: right;
@@ -750,10 +762,10 @@
 
 .anomaly-row-actions {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
 }
 
 .anomalies-table .btn.sm {

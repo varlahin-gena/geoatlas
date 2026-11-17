@@ -74,8 +74,8 @@ export const PAGE_NAV: NavItem[] = [
   },
   {
     href: '/dozzle/',
-    label: 'Логи',
-    title: 'Логи контейнеров',
+    label: 'Dozzle',
+    title: 'Dozzle — логи контейнеров',
     group: 'system',
     match: ['/dozzle', '/dozzle/'],
     adminOnly: true,

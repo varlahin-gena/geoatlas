@@ -162,6 +162,11 @@
   width: 22%;
 }
 
+.geo-ranges-table.is-base th:nth-child(2),
+.geo-ranges-table.is-base td:nth-child(2) {
+  width: 16%;
+}
+
 .geo-ranges-table.is-base th:nth-child(5),
 .geo-ranges-table.is-base td:nth-child(5),
 .geo-ranges-table.is-base th:nth-child(6),
@@ -190,6 +195,15 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Country / region / city: show full labels; keep ellipsis on .mono (CIDR). */
+.geo-ranges-table td.geo-cell:not(.mono) {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 .geo-ranges-table .mono {

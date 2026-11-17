@@ -147,7 +147,7 @@ TTL таблиц ClickHouse настраивается без правки сг�
 | Скрипты | `scripts/backup-clickhouse.sh`, `scripts/restore-clickhouse.sh` |
 | Таблицы ClickHouse | `traffic_logs`, `geo_ranges`, `enterprise_nets`, `reputation_ranges`, `parse_errors`, `system_metrics`, `anomaly_events`, `anomaly_acks`, `anomaly_suppressions`, `anomaly_assignments` |
 | Агрегаты | те же скрипты при `BACKUP_INCLUDE_EDGES=1` (дефолт): `traffic_edges_daily`, `traffic_edges_hourly`, `traffic_edges_city_daily`, `traffic_edges_country_daily`, `traffic_edges_continent_daily` |
-| `*.auth.tgz` | файлы `/app/data`: учётки, API-токены, retention, коннекторы, hunts, шаблоны поиска, фиды, расписание бэкапа, `anomaly_settings.json`. Без `*.snap`, `*.tmp`, `.ga_backend.lock` |
+| `*.auth.tgz` | файлы `/app/data`: учётки, API-токены, retention, коннекторы, hunts, шаблоны поиска, фиды, расписание бэкапа, `anomaly_settings.json`, `reputation_settings.json`. Без `*.snap`, `*.tmp`, `.ga_backend.lock` |
 
 Список таблиц в скриптах совпадает с `backup.resolveTables`. Таблицы, которых нет в этой установке (выключенная репутация, старая схема), пропускаются. Журнал аномалий старше бэкапа, снятого до появления этих таблиц в комплекте, из того архива не вернётся.
 
@@ -260,12 +260,8 @@ cd /tmp
 curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz"
 curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz.sha256"
 sha256sum -c "geoatlas-${VER}.tar.gz.sha256"
-# опционально online: скачать .tar.gz.cosign.bundle и cosign verify-blob (см. docs/install.md)
-
 tar -xzf "geoatlas-${VER}.tar.gz"
 sudo ./geoatlas-${VER}/update.sh --package "$PWD/geoatlas-${VER}.tar.gz" --project-dir /opt/geoatlas
-# если каталог с подчёркиванием:
-# sudo ./geoatlas-${VER}/update.sh --package "$PWD/geoatlas-${VER}.tar.gz" --project-dir /opt/geoatlas
 ```
 
 Если `update.sh` уже есть в каталоге установки:
@@ -276,19 +272,4 @@ cd /tmp
 sudo /opt/geoatlas/update.sh ./geoatlas-${VER}.tar.gz
 ```
 
-**Откат на более старый релиз** — тот же сценарий: скачать `geoatlas-X.Y.Z.tar.gz` нужной версии с GitHub Releases и `./update.sh` (тома Docker и `.env` сохраняются).
-
-```bash
-tar -xzf geoatlas-${VER}.tar.gz
-cd geoatlas-${VER}
-sudo GA_INSTALL_SOURCE=package GA_INSTALL_PACKAGE="$PWD" ./deploy/ubuntu/install_ubuntu.sh
-# Oracle Linux / RHEL: ./deploy/oracle_linux/install_oraclelinux.sh
-```
-
-**Через повторный запуск install-скрипта** (спросит релиз / `main` / пакет; для релиза предпочтёт tar.gz, иначе git):
-
-```bash
-sudo ./deploy/ubuntu/install_ubuntu.sh
-# или
-sudo ./deploy/oracle_linux/install_oraclelinux.sh
-```
+**Откат на более старый релиз** — тот же сценарий: скачать нужный `geoatlas-X.Y.Z.tar.gz` с GitHub Releases, проверить `.sha256` и снова `./update.sh` (тома Docker и `.env` сохраняются).

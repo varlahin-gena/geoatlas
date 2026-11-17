@@ -18,17 +18,17 @@
 
 Известные принятые риски (не «дыры продукта» в смысле CVE): syslog без TLS, IPv4-only, single-host — см. [architecture.md](architecture.md) и [SECURITY.md](../SECURITY.md).
 
-## 2. Trust boundaries
+## 2. Границы доверия
 
 См. таблицу в [security-requirements.md](security-requirements.md#границы-доверия). Кратко: операторский хост и внутренняя docker-сеть — доверенные; внешний syslog и браузер — нет; Internet для фидов — ограничен allowlist’ом адресов.
 
-## 3. Secure design (как применяем)
+## 3. Как заложена защита
 
-- **Fail-safe defaults** — auth включён; insecure-флаги только явно.
-- **Least privilege** — роли UI; CI `permissions: contents: read` по умолчанию; job’ы с минимальными правами.
-- **Complete mediation** — маршруты за auth_request / матрицей ролей (`auth_matrix` в тестах).
-- **Defense in depth** — nginx headers + backend threatprot + сетевые ограничения.
-- **Не доверять клиенту** — лимиты и валидация на сервере.
+- **По умолчанию безопасно** — auth включён; ослабленные режимы только явными флагами.
+- **Минимальные права** — роли UI; в CI по умолчанию `permissions: contents: read`; у job’ов только нужные права.
+- **Каждый запрос проверяется** — маршруты за auth_request и матрицей ролей (`auth_matrix` в тестах).
+- **Несколько слоёв** — заголовки nginx + проверки на backend + сетевые ограничения.
+- **Клиенту не доверяем** — лимиты и валидация на сервере.
 
 ## 4. Типичные слабости реализации — как закрываем
 
@@ -41,7 +41,7 @@
 | Secrets | bcrypt паролей; CSPRNG для токенов; cosign на релизах |
 | Supply chain | Dependabot, govulncheck, CodeQL, Trivy/Grype, pinned Actions, Scorecard |
 
-Динамический анализ: unit/integration/fuzz в CI ([development.md](development.md), workflows). Memory-unsafe языков в продукте нет (Go + TypeScript) — критерий dynamic_analysis_unsafe = N/A.
+Динамический анализ: unit/integration/fuzz в CI ([development.md](development.md), workflows). Языков без memory-safety в продукте нет (Go + TypeScript).
 
 ## 5. Вывод
 
