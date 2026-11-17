@@ -16,8 +16,8 @@
 
 ГеоАтлас — визуализатор трафика МСЭ: принимает syslog, парсит логи вендоров, кладёт события в ClickHouse и рисует связи на 2D/3D карте. Польза — быстрее понять географию и характер потоков: репутация IP, аномалии (сканы, beaconing, lateral) и разбор алерта живут рядом с картой, а не в отдельных инструментах.
 
-- **Парсеры МСЭ.** UserGate, FortiGate, Cisco ASA, Cisco FTD (Firepower) и универсальный фолбэк (Generic KV); несетевые строки осознанно пропускаются, а не засоряют `parse_errors`.
-- **Карта и глобус.** Связи на 2D-карте и 3D-глобусе; группировка узлов по IP, `/24`, городу (по умолчанию) или стране.
+- **Парсеры МСЭ.** UserGate, FortiGate, Cisco ASA, Cisco FTD (Firepower) и формат событий SIEM KUMA; несетевые строки осознанно пропускаются, а не засоряют `parse_errors`.
+- **Карта и глобус.** Связи на 2D-карте и 3D-глобусе; группировка узлов по IP, `/24`, городу или стране.
 - **Аномалии рядом с картой.** Сканирование портов и обход подсети, резкий рост блокировок и трафика, beaconing, обход внутренней сети, новая страна, контакт с отмеченным адресом; разбор алерта и охоты без отдельного SIEM.
 - **Репутация IP.** Offline-списки и URL-фиды: фильтр и подсветка дуг на карте.
 - **Один пакет.** `geoatlas-X.Y.Z.tar.gz` для Ubuntu 20.04+ и Oracle Linux 8+ / RHEL; syslog `:514`, ClickHouse, React SPA на одном хосте (IPv4-only, доставка at-most-once).
@@ -39,7 +39,7 @@
 
 ## Быстрый старт
 
-Нужны Linux-сервер (Ubuntu 20.04+ или Oracle Linux 8+ / RHEL-совместимый), Docker поставит установщик, порты **80** (UI) и **514** tcp/udp (syslog).
+Нужен Linux-сервер (Ubuntu 20.04+ или Oracle Linux 8+ / RHEL-совместимый), Docker и остальные необходимые пакеты для работы системы поставит установщик, порты **80** (UI) и **514** tcp/udp (syslog).
 
 ```bash
 VER=2.7.6
@@ -81,7 +81,6 @@ sudo ./deploy/oracle_linux/install_oraclelinux.sh
 - **ClickHouse** — хранение, настраиваемый TTL, резервное копирование
 - **Расследование** — охоты (`/hunts`), разбор алерта (`/investigate`), конструктор поиска и шаблоны запросов на карте
 - **Операции** — тест парсеров, журнал ошибок парсинга, страница системного мониторинга, логи контейнеров (`/dozzle/`)
-- **Edge hardening** — proxy gate, rate limit API, re-auth, ротация токенов, HSTS при HTTPS
 
 ## Документация
 
@@ -124,16 +123,9 @@ sudo ./deploy/oracle_linux/install_oraclelinux.sh
 
 Краткий checklist для прод-установки:
 
-- Секреты только через `./start.sh` (`API_AUTH_TOKEN`, `SESSION_SECRET`, `INGEST_SHARED_SECRET`, `CLICKHOUSE_PASSWORD`)
 - Пароли УЗ: минимум 10 символов, буква и цифра, не из common-list
-- Одноразовый пароль admin: `.admin_password_once` (600), не stdout
-- UI за HTTPS при доступе из сети; не публиковать ClickHouse `8123`/`9000`, backend `8080`/`1514`
-- `GA_REQUIRE_PROXY=1` в compose (не открывать backend мимо nginx); rate limit API — `GA_API_RATE_LIMIT_*`
-- ClickHouse `default`: networks loopback+RFC1918 (не `::/0`)
-- Syslog `:514` **без TLS/auth** — ограничьте источником МСЭ (`GA_SYSLOG_ALLOW_FROM` / Security Group / firewall)
-- Ingest внутри docker: маркер с `INGEST_SHARED_SECRET` + `INGEST_ALLOW_FROM=syslog-ng` (`POST /api/ingest` — Bearer/ops, без маркера)
+- Syslog `:514`
 - Reputation URL-фиды: только публичные IPv4-хосты (private/metadata блокируются)
-- Ротация env Bearer: `API_AUTH_PREVIOUS_TOKEN` / `API_OPS_PREVIOUS_TOKEN`; именованные токены — rotate в UI
 - Установка и обновление: только `geoatlas-X.Y.Z.tar.gz` с GitHub Releases; проверяйте `.sha256` до `./update.sh` (опционально online: `.cosign.bundle` + `cosign verify-blob`, см. [install.md](docs/install.md))
 
 ## Структура репозитория
