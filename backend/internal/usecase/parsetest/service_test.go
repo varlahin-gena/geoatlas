@@ -77,8 +77,10 @@ func TestRunParsedSkippedErrorAndGeo(t *testing.T) {
 		"ok": {
 			OK: true, Vendor: "v",
 			Log: model.TrafficLog{
-				SrcIP: "1.1.1.1", DstIP: "8.8.8.8",
+				Device: "fw1", SrcIP: "1.1.1.1", DstIP: "8.8.8.8",
 				SrcPort: 1, DstPort: 443, Action: "allow", Proto: "tcp",
+				Rule: "AllowOut", SrcZone: "Trusted", DstZone: "Untrusted",
+				BytesSent: 100, BytesRecv: 200, PacketsSent: 3, PacketsRecv: 4,
 			},
 		},
 		"skip":  {Skipped: true, Vendor: "v", Reason: "drop"},
@@ -98,8 +100,15 @@ func TestRunParsedSkippedErrorAndGeo(t *testing.T) {
 	if res.Received != 4 || res.Parsed != 1 || res.Skipped != 2 || res.Errors != 1 {
 		t.Fatalf("%+v", res)
 	}
-	if res.Results[0].SrcCountry != "AU" || res.Results[0].DstCountry != "US" {
-		t.Fatalf("%+v", res.Results[0])
+	got := res.Results[0]
+	if got.SrcCountry != "AU" || got.DstCountry != "US" {
+		t.Fatalf("%+v", got)
+	}
+	if got.Device != "fw1" || got.Rule != "AllowOut" || got.SrcZone != "Trusted" || got.DstZone != "Untrusted" {
+		t.Fatalf("%+v", got)
+	}
+	if got.BytesSent != 100 || got.BytesRecv != 200 || got.PacketsSent != 3 || got.PacketsRecv != 4 {
+		t.Fatalf("%+v", got)
 	}
 	if res.Results[1].Reason != "drop" {
 		t.Fatalf("%+v", res.Results[1])

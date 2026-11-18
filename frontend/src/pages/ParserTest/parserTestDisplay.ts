@@ -22,16 +22,13 @@ export function shortParseLine(raw?: string, max = 80): string {
   return `${text.slice(0, max - 1)}…`;
 }
 
-export function parseFieldsLabel(row: {
-  src_ip?: string;
-  dst_ip?: string;
-  action?: string;
-  proto?: string;
-  reason?: string;
-  parsed?: boolean;
-}): string {
-  if (row.parsed) {
-    return `${row.src_ip || '?'} → ${row.dst_ip || '?'} · ${row.action || '—'} · ${row.proto || '—'}`;
+/** Empty string / nullish / zero numeric (omitempty) → em dash. */
+export function formatParseCell(value?: string | number | null): string {
+  if (value === undefined || value === null) return '—';
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value) || value === 0) return '—';
+    return String(value);
   }
-  return (row.reason || '').trim() || '—';
+  const text = value.trim();
+  return text || '—';
 }

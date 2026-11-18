@@ -4,7 +4,7 @@ import { SettingsLayout } from '@/components/SettingsLayout';
 import { useToast } from '@/components/Toast';
 import { fmtNumber } from '@/lib/format';
 import {
-  parseFieldsLabel,
+  formatParseCell,
   parseRowStatus,
   parseRowStatusLabel,
   shortParseLine,
@@ -18,10 +18,22 @@ interface ParseRow {
   skipped?: boolean;
   vendor?: string;
   reason?: string;
+  device?: string;
   src_ip?: string;
   dst_ip?: string;
+  src_port?: number;
+  dst_port?: number;
   action?: string;
   proto?: string;
+  rule?: string;
+  src_zone?: string;
+  dst_zone?: string;
+  src_country?: string;
+  dst_country?: string;
+  bytes_sent?: number;
+  bytes_recv?: number;
+  packets_sent?: number;
+  packets_recv?: number;
 }
 
 interface ParseTestResult {
@@ -33,6 +45,29 @@ interface ParseTestResult {
   max_lines?: number;
   results?: ParseRow[];
 }
+
+const RESULT_COLUMNS = [
+  { key: 'status', label: 'Статус' },
+  { key: 'vendor', label: 'Вендор' },
+  { key: 'device', label: 'Устройство' },
+  { key: 'src_ip', label: 'Src IP' },
+  { key: 'src_port', label: 'Sport' },
+  { key: 'dst_ip', label: 'Dst IP' },
+  { key: 'dst_port', label: 'Dport' },
+  { key: 'action', label: 'Action' },
+  { key: 'proto', label: 'Proto' },
+  { key: 'rule', label: 'Rule' },
+  { key: 'src_zone', label: 'Src zone' },
+  { key: 'dst_zone', label: 'Dst zone' },
+  { key: 'src_country', label: 'Src CC' },
+  { key: 'dst_country', label: 'Dst CC' },
+  { key: 'bytes_sent', label: 'Bytes out' },
+  { key: 'bytes_recv', label: 'Bytes in' },
+  { key: 'packets_sent', label: 'Pkts out' },
+  { key: 'packets_recv', label: 'Pkts in' },
+  { key: 'reason', label: 'Причина' },
+  { key: 'line', label: 'Строка' },
+] as const;
 
 export default function ParserTestPage() {
   const { toast } = useToast();
@@ -97,6 +132,7 @@ export default function ParserTestPage() {
   }
 
   const rows = result?.results || [];
+  const colCount = RESULT_COLUMNS.length;
 
   return (
     <SettingsLayout title="Тест парсеров" plainTitle>
@@ -220,20 +256,21 @@ export default function ParserTestPage() {
                 ) : null}
               </div>
 
-              <div className="table-wrap">
+              <div className="table-wrap parser-test-table-wrap">
                 <table className="parser-test-table">
                   <thead>
                     <tr>
-                      <th scope="col">Статус</th>
-                      <th scope="col">Вендор</th>
-                      <th scope="col">Причина / поля</th>
-                      <th scope="col">Строка</th>
+                      {RESULT_COLUMNS.map((col) => (
+                        <th key={col.key} scope="col">
+                          {col.label}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
                     {!rows.length ? (
                       <tr>
-                        <td colSpan={4} className="empty">
+                        <td colSpan={colCount} className="empty">
                           Нет строк
                         </td>
                       </tr>
@@ -247,8 +284,24 @@ export default function ParserTestPage() {
                                 {parseRowStatusLabel(status)}
                               </span>
                             </td>
-                            <td>{r.vendor || '—'}</td>
-                            <td>{parseFieldsLabel(r)}</td>
+                            <td>{formatParseCell(r.vendor)}</td>
+                            <td>{formatParseCell(r.device)}</td>
+                            <td className="mono">{formatParseCell(r.src_ip)}</td>
+                            <td className="mono">{formatParseCell(r.src_port)}</td>
+                            <td className="mono">{formatParseCell(r.dst_ip)}</td>
+                            <td className="mono">{formatParseCell(r.dst_port)}</td>
+                            <td>{formatParseCell(r.action)}</td>
+                            <td>{formatParseCell(r.proto)}</td>
+                            <td>{formatParseCell(r.rule)}</td>
+                            <td>{formatParseCell(r.src_zone)}</td>
+                            <td>{formatParseCell(r.dst_zone)}</td>
+                            <td>{formatParseCell(r.src_country)}</td>
+                            <td>{formatParseCell(r.dst_country)}</td>
+                            <td className="mono">{formatParseCell(r.bytes_sent)}</td>
+                            <td className="mono">{formatParseCell(r.bytes_recv)}</td>
+                            <td className="mono">{formatParseCell(r.packets_sent)}</td>
+                            <td className="mono">{formatParseCell(r.packets_recv)}</td>
+                            <td>{formatParseCell(r.reason)}</td>
                             <td>
                               <span className="parser-test-line" title={r.line || undefined}>
                                 {shortParseLine(r.line)}

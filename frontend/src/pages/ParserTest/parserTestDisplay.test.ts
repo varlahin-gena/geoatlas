@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  parseFieldsLabel,
+  formatParseCell,
   parseRowStatus,
   parseRowStatusLabel,
   shortParseLine,
@@ -16,17 +16,13 @@ describe('parserTestDisplay', () => {
     expect(parseRowStatusLabel('error')).toBe('Ошибка');
   });
 
-  it('formats fields and truncates lines', () => {
-    expect(
-      parseFieldsLabel({
-        parsed: true,
-        src_ip: '1.1.1.1',
-        dst_ip: '2.2.2.2',
-        action: 'allow',
-        proto: 'TCP',
-      }),
-    ).toBe('1.1.1.1 → 2.2.2.2 · allow · TCP');
-    expect(parseFieldsLabel({ reason: 'no match' })).toBe('no match');
+  it('formats cells and truncates lines', () => {
+    expect(formatParseCell('allow')).toBe('allow');
+    expect(formatParseCell('  ')).toBe('—');
+    expect(formatParseCell(undefined)).toBe('—');
+    expect(formatParseCell(null)).toBe('—');
+    expect(formatParseCell(0)).toBe('—');
+    expect(formatParseCell(443)).toBe('443');
     expect(shortParseLine('a'.repeat(90)).endsWith('…')).toBe(true);
   });
 });
