@@ -5,6 +5,20 @@
 
 ## [Unreleased]
 
+## [2.7.9] — 2026-11-18
+
+Патч: страница «Парсеры» снова загружает правила; шапка settings выровнена под HIG.
+
+### Fixed
+- **Парсеры**: `GET /api/parsers` больше не отдаёт 500 — `priority` из ClickHouse сканируется как `Int32`, перед seed дополнительно ensure `parser_rules`, битый `spec_json` не валит весь список.
+- **UI**: title settings-pane без префикса «Настройки ·»; действия «Добавить правило» / «Обновить» в topbar; при ошибке загрузки — banner с «Повторить».
+
+### Notes
+- OpenAPI API doc version: **1.23.0**
+- Продуктовая версия: **2.7.9**
+- Схема ClickHouse: без изменений Ensure* (таблица `parser_rules` уже в 2.7.8).
+- Достаточно `update.sh` 2.7.9 (recreate **backend** + **frontend**).
+
 ## [2.7.8] — 2026-11-18
 
 Редактируемые правила парсеров CEF/KV; устойчивая выгрузка большой базы GeoIP; полировка аномалий и мониторинга.
@@ -300,6 +314,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.7.9]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.9
 [2.7.8]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.8
 [2.7.7]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.7
 [2.7.6]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.6
