@@ -58,7 +58,10 @@ func (s *uploadStore) Truncate(context.Context) error {
 	return nil
 }
 func (*uploadStore) Load(context.Context) ([]model.GeoRange, error) { return nil, nil }
-func (*uploadStore) Count(context.Context) (int, error)             { return 0, nil }
+func (*uploadStore) Stream(context.Context, func(model.GeoRange) error) error {
+	return nil
+}
+func (*uploadStore) Count(context.Context) (int, error) { return 0, nil }
 func (*uploadStore) FindByIP(context.Context, string) (model.GeoRange, bool, error) {
 	return model.GeoRange{}, false, nil
 }

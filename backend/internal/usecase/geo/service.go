@@ -2,6 +2,7 @@ package geo
 
 import (
 	"context"
+	"encoding/csv"
 	"errors"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"net"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -406,19 +408,61 @@ func (s *Service) UpdateRange(ctx context.Context, originalNetwork, network, cou
 	}, nil
 }
 
+// exportCSVFlushRows — как часто сбрасывать буфер csv.Writer в соединение.
+// Полная база — миллионы строк; без сброса прокси рвёт «тихое» соединение.
+const exportCSVFlushRows = 4096
+
+// ExportCSV пишет базу потоком. Таблица уже отсортирована в ClickHouse,
+// поэтому пересечения отбрасываются на лету и второй копии в RAM нет.
 func (s *Service) ExportCSV(ctx context.Context, w io.Writer) error {
-	ranges, err := s.store.Load(ctx)
+	if s == nil || s.store == nil {
+		return fmt.Errorf("geo store unavailable")
+	}
+	if s.codec == nil {
+		return fmt.Errorf("geo codec unavailable")
+	}
+	cw := csv.NewWriter(w)
+	if err := cw.Write([]string{"Network", "Country", "Region", "City", "Latitude", "Longitude"}); err != nil {
+		return err
+	}
+	var prevEnd uint32
+	var hasPrev bool
+	written := 0
+	err := s.store.Stream(ctx, func(g model.GeoRange) error {
+		if g.EndIP < g.StartIP {
+			return nil
+		}
+		if hasPrev && g.StartIP <= prevEnd {
+			return nil
+		}
+		hasPrev = true
+		prevEnd = g.EndIP
+		if err := cw.Write([]string{
+			s.codec.FormatNetwork(g.StartIP, g.EndIP),
+			g.Country,
+			g.Region,
+			g.City,
+			strconv.FormatFloat(g.Lat, 'f', -1, 64),
+			strconv.FormatFloat(g.Lon, 'f', -1, 64),
+		}); err != nil {
+			return err
+		}
+		written++
+		if written%exportCSVFlushRows == 0 {
+			cw.Flush()
+			return cw.Error()
+		}
+		return nil
+	})
 	if err != nil {
 		return err
 	}
-	clean, _ := s.codec.Normalize(ranges)
-	sort.Slice(clean, func(i, j int) bool {
-		if clean[i].StartIP == clean[j].StartIP {
-			return clean[i].EndIP < clean[j].EndIP
-		}
-		return clean[i].StartIP < clean[j].StartIP
-	})
-	return s.codec.WriteCSV(w, clean)
+	cw.Flush()
+	if err := cw.Error(); err != nil {
+		return err
+	}
+	slog.Info("geo export done", "rows", written)
+	return nil
 }
 
 // ClearResult — итог полной очистки geo_ranges + in-memory индекса.

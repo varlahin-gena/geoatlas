@@ -163,10 +163,16 @@
         include /etc/nginx/includes/proxy-headers.inc;
     }
 
+    # Полная база — сотни МБ. Буфер nginx и gzip держат ответ целиком,
+    # а send_timeout 60s рвёт скачивание, пока ClickHouse ещё читает строки.
     location = /api/geo-ranges/export {
         auth_request /auth-check-ops;
         proxy_pass http://backend:8080/api/geo-ranges/export;
+        proxy_buffering off;
+        gzip off;
+        send_timeout 600s;
         proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
         include /etc/nginx/includes/proxy-headers.inc;
     }
 

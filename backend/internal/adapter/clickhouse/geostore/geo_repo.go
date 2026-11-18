@@ -40,6 +40,10 @@ func (r *GeoRepository) Load(ctx context.Context) ([]model.GeoRange, error) {
 	return LoadGeoRanges(ctx, r.writeCH)
 }
 
+func (r *GeoRepository) Stream(ctx context.Context, fn func(model.GeoRange) error) error {
+	return StreamGeoRanges(ctx, r.writeCH, fn)
+}
+
 func (r *GeoRepository) Count(ctx context.Context) (int, error) {
 	return CountGeoRanges(ctx, r.apiConn())
 }
