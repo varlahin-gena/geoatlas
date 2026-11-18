@@ -2,7 +2,7 @@ import { FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } f
 import { Link } from 'react-router-dom';
 import {
   createGeoRange,
-  exportGeoRanges,
+  downloadGeoRangesCsv,
   fetchGeoMissing,
   type GeoMissingRow as MissingRow,
   type GeoMissingSummary as Summary,
@@ -101,6 +101,7 @@ export default function GeoMissingPage() {
   const [rows, setRows] = useState<MissingRow[]>([]);
   const [summary, setSummary] = useState<Summary>({});
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [editIp, setEditIp] = useState<string | null>(null);
   const [form, setForm] = useState({
     network: '',
@@ -155,24 +156,17 @@ export default function GeoMissingPage() {
   const publicFocus = displaySummary.public_focus || displaySummary.by_kind?.public_unknown || 0;
   const showPublicBanner = publicFocus > 0;
 
-  async function exportCsv() {
-    try {
-      const res = await exportGeoRanges();
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
-      const cd = res.headers.get('Content-Disposition') || '';
-      const m = cd.match(/filename="?([^";]+)"?/i);
-      const name = (m && m[1]) || `geoip-${new Date().toISOString().slice(0, 10)}.csv`;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = name;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast('GeoIP CSV скачан', 'success');
-    } catch (e) {
-      toast(e instanceof Error ? e.message : 'Не удалось выгрузить CSV', 'error');
-    }
+  useEffect(() => {
+    if (!exporting) return;
+    const timer = window.setTimeout(() => setExporting(false), 10_000);
+    return () => window.clearTimeout(timer);
+  }, [exporting]);
+
+  function exportCsv() {
+    if (exporting) return;
+    setExporting(true);
+    downloadGeoRangesCsv();
+    toast('Выгрузка началась. Файл появится в загрузках браузера.', 'info');
   }
 
   async function copyPublic() {
@@ -257,8 +251,8 @@ export default function GeoMissingPage() {
           <button type="button" className="btn" onClick={() => void copyPublic()}>
             Копировать публичные IP
           </button>
-          <button type="button" className="btn" onClick={() => void exportCsv()}>
-            Выгрузить GeoIP CSV
+          <button type="button" className="btn" disabled={exporting} onClick={exportCsv}>
+            {exporting ? 'Выгрузка…' : 'Выгрузить GeoIP CSV'}
           </button>
         </div>
 

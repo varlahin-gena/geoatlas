@@ -25,6 +25,9 @@ type RangeStore interface {
 	Replace(ctx context.Context, ranges []model.GeoRange) (int, error)
 	Truncate(ctx context.Context) error
 	Load(ctx context.Context) ([]model.GeoRange, error)
+	// Stream отдаёт строки geo_ranges по возрастанию (start_ip, end_ip),
+	// не загружая таблицу в память. Ошибка fn останавливает обход.
+	Stream(ctx context.Context, fn func(model.GeoRange) error) error
 	Count(ctx context.Context) (int, error)
 	FindByIP(ctx context.Context, ipStr string) (model.GeoRange, bool, error)
 	ListPage(ctx context.Context, limit int, q string) (items []model.GeoRange, total, filtered int, truncated bool, err error)

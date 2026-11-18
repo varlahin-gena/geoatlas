@@ -8,6 +8,7 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
+	"sort"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -429,6 +430,21 @@ func (m *memRangeStore) Truncate(context.Context) error {
 }
 func (m *memRangeStore) Load(context.Context) ([]model.GeoRange, error) {
 	return append([]model.GeoRange(nil), m.ranges...), nil
+}
+func (m *memRangeStore) Stream(_ context.Context, fn func(model.GeoRange) error) error {
+	rows := append([]model.GeoRange(nil), m.ranges...)
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].StartIP == rows[j].StartIP {
+			return rows[i].EndIP < rows[j].EndIP
+		}
+		return rows[i].StartIP < rows[j].StartIP
+	})
+	for _, g := range rows {
+		if err := fn(g); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 func (m *memRangeStore) Count(context.Context) (int, error) { return len(m.ranges), nil }
 func (m *memRangeStore) FindByIP(context.Context, string) (model.GeoRange, bool, error) {

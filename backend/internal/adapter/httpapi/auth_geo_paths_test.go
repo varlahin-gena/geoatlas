@@ -2,9 +2,11 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -305,8 +307,9 @@ func TestAuthSessionChangeLogoutDismiss(t *testing.T) {
 }
 
 type pathGeoStore struct {
-	idx    *geoip.Index
-	ranges []model.GeoRange
+	idx       *geoip.Index
+	ranges    []model.GeoRange
+	streamErr error
 }
 
 func (m *pathGeoStore) Replace(_ context.Context, ranges []model.GeoRange) (int, error) {
@@ -325,6 +328,24 @@ func (m *pathGeoStore) Truncate(context.Context) error {
 }
 func (m *pathGeoStore) Load(context.Context) ([]model.GeoRange, error) {
 	return append([]model.GeoRange(nil), m.ranges...), nil
+}
+func (m *pathGeoStore) Stream(_ context.Context, fn func(model.GeoRange) error) error {
+	if m.streamErr != nil {
+		return m.streamErr
+	}
+	rows := append([]model.GeoRange(nil), m.ranges...)
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].StartIP == rows[j].StartIP {
+			return rows[i].EndIP < rows[j].EndIP
+		}
+		return rows[i].StartIP < rows[j].StartIP
+	})
+	for _, g := range rows {
+		if err := fn(g); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 func (m *pathGeoStore) Count(context.Context) (int, error) { return len(m.ranges), nil }
 func (m *pathGeoStore) FindByIP(_ context.Context, ipStr string) (model.GeoRange, bool, error) {
@@ -423,6 +444,9 @@ func TestGeoRangesEnterpriseMissingHappy(t *testing.T) {
 	rec = call(h.ExportGeoRangesCSV, http.MethodGet, "/api/geo/ranges.csv", "")
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "Network") {
 		t.Fatalf("export: %d %s", rec.Code, rec.Body.String())
+	}
+	if ct := rec.Header().Get("Content-Type"); !strings.Contains(ct, "text/csv") {
+		t.Fatalf("export content-type: %q", ct)
 	}
 
 	rec = call(h.AddEnterpriseNet, http.MethodPost, "/api/geo/enterprise-nets",
@@ -557,6 +581,19 @@ func TestAuthCheckMeWithSession(t *testing.T) {
 	h.Check(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("check for op: %d", rec.Code)
+	}
+}
+
+func TestExportGeoRangesCSVStoreError(t *testing.T) {
+	store := &pathGeoStore{streamErr: errors.New("ch down")}
+	geoUC := usecasegeo.New(store, nil, nil, nil, geoipcodec.New(), 0)
+	h := &GeoHandler{GeoDeps: &GeoDeps{geoUC: geoUC}}
+	rec := call(h.ExportGeoRangesCSV, http.MethodGet, "/api/geo-ranges/export", "")
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("export err: %d %s", rec.Code, rec.Body.String())
+	}
+	if strings.Contains(rec.Header().Get("Content-Type"), "text/csv") {
+		t.Fatal("csv download headers set before a failed query")
 	}
 }
 
