@@ -150,8 +150,13 @@ html[data-theme='light'] .parser-test-field textarea {
   font-size: 13px;
 }
 
+.parser-test-table-wrap {
+  max-width: 100%;
+}
+
 .parser-test-table {
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
   font-size: 13px;
 }
@@ -162,13 +167,31 @@ html[data-theme='light'] .parser-test-field textarea {
   text-align: left;
   border-bottom: 1px solid var(--border);
   vertical-align: top;
+  white-space: nowrap;
 }
 
 .parser-test-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--panel-2);
   font-size: 12px;
   font-weight: 500;
   color: var(--text-dim);
-  white-space: nowrap;
+}
+
+.parser-test-table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--panel-2) 55%, transparent);
+}
+
+.parser-test-table tbody tr:hover {
+  background: var(--panel-2);
+}
+
+.parser-test-table td.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
 }
 
 .parser-test-status {
@@ -200,9 +223,13 @@ html[data-theme='light'] .parser-test-field textarea {
 }
 
 .parser-test-line {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  display: inline-block;
+  max-width: 28rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
   font-size: 12px;
   color: var(--text-dim);
-  word-break: break-all;
-  max-width: 28rem;
+  vertical-align: top;
 }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { AnomalyEvent } from '@/api/anomalies';
 import {
   anomalyCodeLabel,
@@ -6,6 +6,7 @@ import {
   anomalyEventsHours,
   anomalyEventsQuery,
   anomalyMapHref,
+  anomalyPeersHours,
   anomalyPeersPeriodQuery,
   anomalyPeersScopeLabel,
   compareAnomalies,
@@ -167,20 +168,23 @@ describe('anomalyDisplay', () => {
           window_end: '2026-11-13T03:34:00.000Z',
           map: { q: 'src:1.0.1.50' },
         } as AnomalyEvent,
-        1,
+        24,
       ),
-    ).toBe('Связи за окно алерта · источник 1.0.1.50');
+    ).toBe('Связи за 24 ч · источник 1.0.1.50');
   });
 
-  it('prefers absolute anomaly window for peers period', () => {
-    const q = anomalyPeersPeriodQuery({
-      window_start: '2026-11-13T03:29:00.000Z',
-      window_end: '2026-11-13T03:34:00.000Z',
-      map: { period: '15m' },
-    } as AnomalyEvent);
-    expect(q).toContain('from=');
-    expect(q).toContain('to=');
-    expect(q).not.toContain('hours=');
-    expect(anomalyPeersPeriodQuery(item)).toBe('hours=1');
+  it('widens peers period like the map jump (default ≥1d + alert age)', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-19T12:00:00Z'));
+    const old = {
+      detected_at: '2026-08-19T00:00:00Z',
+      window_start: '2026-08-18T23:00:00Z',
+      window_end: '2026-08-19T00:00:00Z',
+      map: { period: '1h', group: 'ip', filter: 'all', q: 'src:10.27.87.178 dst:США' },
+    } as AnomalyEvent;
+    expect(anomalyPeersPeriodQuery(old)).toBe('days=1');
+    expect(anomalyPeersHours(old)).toBe(24);
+    expect(anomalyPeersPeriodQuery(item)).toBe('days=1');
+    vi.useRealTimers();
   });
 });
