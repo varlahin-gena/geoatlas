@@ -70,39 +70,39 @@ export function SystemPipelineTab({
         <h3 className="card-title">Конвейер</h3>
         <div className="pipeline">
           <div className={`pipeline-stage ${syslogStageStatus}`}>
-            <div className="stage-name">Syslog-NG</div>
-            <div className="stage-value">{fmtNumber(syslogEps)} eps</div>
+            <div className="stage-name">Syslog</div>
+            <div className="stage-value">{fmtNumber(syslogEps)} EPS</div>
             <div className="stage-meta">
               {num(syslogng.udp_processed) + num(syslogng.tcp_processed) === 0
-                ? 'stats scrape пуст — recreate syslog-ng (prometheus+legacy)'
-                : `udp: ${fmtNumber(syslogng.udp_processed)} · tcp: ${fmtNumber(syslogng.tcp_processed)} (processed)`}
+                ? 'Метрики пусты — пересоздайте контейнер syslog-ng'
+                : `UDP: ${fmtNumber(syslogng.udp_processed)} · TCP: ${fmtNumber(syslogng.tcp_processed)}`}
               {num(syslogng.queued) > 0
-                ? ` · q: ${fmtNumber(syslogng.queued)}${
+                ? ` · очередь: ${fmtNumber(syslogng.queued)}${
                     syslogCap > 0 ? ` (${fmtPercent(syslogQueuePct)})` : ''
                   }`
                 : ''}
               {num(syslogng.dropped_total) > 0
-                ? ` · drop: ${fmtNumber(syslogng.dropped_total)} (${fmtNumber(syslogngDropsPerSec)}/s)`
+                ? ` · потери: ${fmtNumber(syslogng.dropped_total)} (${fmtNumber(syslogngDropsPerSec)}/с)`
                 : ''}
             </div>
           </div>
           <div className="pipeline-arrow">→</div>
           <div className={`pipeline-stage ${ingestStageStatus}`}>
-            <div className="stage-name">Backend Ingest</div>
+            <div className="stage-name">Приём</div>
             <div className="stage-value">
-              {fmtNumber(rate.events_per_sec || 0)} eps
+              {fmtNumber(rate.events_per_sec || 0)} EPS
             </div>
             <div className="stage-meta">
-              conn: {fmtNumber(ingest.connections)}, buf: {fmtNumber(buffered)}, q:{' '}
+              соединения: {fmtNumber(ingest.connections)}, буфер: {fmtNumber(buffered)}, очередь:{' '}
               {fmtNumber(qDepth)}/{fmtNumber(qCap)}
               {qCap > 0 ? ` (${fmtPercent(queuePct)})` : ''}
               {num(ingest.dropped_total) > 0
-                ? `, drop: ${fmtNumber(ingest.dropped_total)} (${fmtNumber(dropsPerSec)}/s)`
+                ? `, потери: ${fmtNumber(ingest.dropped_total)} (${fmtNumber(dropsPerSec)}/с)`
                 : ''}
               {num(ingest.buffer_drops_total) > 0
-                ? `, buffer_drop: ${fmtNumber(ingest.buffer_drops_total)} (${fmtNumber(bufferDropsPerSec)}/s)`
+                ? `, потери буфера: ${fmtNumber(ingest.buffer_drops_total)} (${fmtNumber(bufferDropsPerSec)}/с)`
                 : ''}
-              {num(ingest.circuit_open) >= 1 ? ', circuit: open' : ''}
+              {num(ingest.circuit_open) >= 1 ? ', запись на паузе' : ''}
             </div>
           </div>
           <div className="pipeline-arrow">→</div>
@@ -126,8 +126,8 @@ export function SystemPipelineTab({
                   <th>ID</th>
                   <th>Принято syslog (UDP / TCP)</th>
                   <th>Очередь / потери syslog</th>
-                  <th>Скорость backend, EPS</th>
-                  <th>Принято backend</th>
+                  <th>Скорость приёма, EPS</th>
+                  <th>Принято всего</th>
                   <th>Отброшено / отказ auth</th>
                   <th>Последнее событие</th>
                 </tr>
@@ -156,53 +156,53 @@ export function SystemPipelineTab({
             </table>
           </div>
           <p className="hint">
-            Управление портами — в разделе Система → Коннекторы. Syslog — накопленные счётчики до
-            backend; скорость — EPS с атрибуцией по коннектору; очередь/потери — буфер syslog-ng.
+            Порты настраиваются в Система → Коннекторы. Syslog — счётчики до приёма; скорость — EPS
+            по коннектору; очередь и потери — буфер syslog.
           </p>
         </section>
       ) : null}
 
       <section className="row cols-2">
         <div className="card card-compact">
-          <h3 className="card-title">Ingest</h3>
+          <h3 className="card-title">Приём логов</h3>
           <div className="kv-grid cols-2">
             {(
               [
                 ['Лаг', fmtLag(ingest.lag_sec)],
                 [
-                  'Queue',
+                  'Очередь',
                   `${fmtNumber(qDepth)} / ${fmtNumber(qCap)}${
                     qCap > 0 ? ` (${fmtPercent(queuePct)})` : ''
                   }`,
                 ],
                 [
-                  'Queue bytes',
+                  'Очередь, байты',
                   qBytesCap > 0
                     ? `${fmtBytes(qBytes)} / ${fmtBytes(qBytesCap)}`
                     : fmtBytes(qBytes),
                 ],
-                ['Buffered', fmtNumber(buffered)],
+                ['Буфер', fmtNumber(buffered)],
                 [
-                  'Dropped',
-                  `${fmtNumber(ingest.dropped_total)} (${fmtNumber(dropsPerSec)}/s)`,
+                  'Потери',
+                  `${fmtNumber(ingest.dropped_total)} (${fmtNumber(dropsPerSec)}/с)`,
                 ],
                 [
-                  'Buffer drops',
-                  `${fmtNumber(ingest.buffer_drops_total)} (${fmtNumber(bufferDropsPerSec)}/s)`,
+                  'Потери буфера',
+                  `${fmtNumber(ingest.buffer_drops_total)} (${fmtNumber(bufferDropsPerSec)}/с)`,
                 ],
-                ['Last drop', fmtDropAt(lastDropAt)],
-                ['Received', fmtNumber(ingest.received_total)],
-                ['Inserted', fmtNumber(ingest.inserted_total)],
-                ['Skipped', fmtNumber(ingest.skipped_total)],
-                ['Parse err.', fmtNumber(ingest.parse_errors_total)],
-                ['Connections', fmtNumber(ingest.connections)],
-                ['Parse (1h)', fmtNumber(parseErr1h)],
-                ['Circuit', num(ingest.circuit_open) >= 1 ? 'open' : 'closed'],
-                ['Uptime', fmtUptime(uptimeSec)],
-                ['syslog-ng queued', fmtNumber(syslogng.queued)],
+                ['Последняя потеря', fmtDropAt(lastDropAt)],
+                ['Принято', fmtNumber(ingest.received_total)],
+                ['Записано', fmtNumber(ingest.inserted_total)],
+                ['Пропущено', fmtNumber(ingest.skipped_total)],
+                ['Ошибки разбора', fmtNumber(ingest.parse_errors_total)],
+                ['Соединения', fmtNumber(ingest.connections)],
+                ['Ошибки разбора (1 ч)', fmtNumber(parseErr1h)],
+                ['Запись в БД', num(ingest.circuit_open) >= 1 ? 'на паузе' : 'активна'],
+                ['Аптайм', fmtUptime(uptimeSec)],
+                ['Очередь syslog', fmtNumber(syslogng.queued)],
                 [
-                  'syslog-ng dropped',
-                  `${fmtNumber(syslogng.dropped_total)} (${fmtNumber(syslogngDropsPerSec)}/s)`,
+                  'Потери syslog',
+                  `${fmtNumber(syslogng.dropped_total)} (${fmtNumber(syslogngDropsPerSec)}/с)`,
                 ],
               ] as const
             ).map(([k, v]) => (
@@ -217,18 +217,18 @@ export function SystemPipelineTab({
           <h3 className="card-title">Хранилище</h3>
           <div className="kv-grid cols-2">
             <div className="kv-row">
-              <span className="k">traffic_logs</span>
+              <span className="k">Логи трафика</span>
               <span className="v">
                 {fmtNumber(storage.traffic_logs?.row_count)} /{' '}
                 {fmtBytes(storage.traffic_logs?.bytes_on_disk)}
               </span>
             </div>
             <div className="kv-row">
-              <span className="k">active parts</span>
+              <span className="k">Активные части</span>
               <span className="v">{fmtNumber(storage.clickhouse?.active_parts)}</span>
             </div>
             <div className="kv-row">
-              <span className="k">geo_ranges</span>
+              <span className="k">Geo-диапазоны</span>
               <span className="v">
                 {fmtNumber(storage.geo_ranges?.row_count)} диапазонов
               </span>
@@ -243,8 +243,8 @@ export function SystemPipelineTab({
           {(
             [
               ['traffic_logs_days', 'Логи трафика (дни)', 'retTrafficLogs'],
-              ['edges_days', 'Агрегаты рёбер (дни)', 'retEdges'],
-              ['parse_errors_days', 'Ошибки парсинга (дни)', 'retParseErrors'],
+              ['edges_days', 'Сводки для карты (дни)', 'retEdges'],
+              ['parse_errors_days', 'Ошибки разбора (дни)', 'retParseErrors'],
               ['system_metrics_days', 'Метрики системы (дни)', 'retSystemMetrics'],
             ] as const
           ).map(([key, label, id]) => (
@@ -269,7 +269,7 @@ export function SystemPipelineTab({
           </button>
         </form>
         <p className="hint">
-          Уменьшение TTL удалит старые партиции при следующем merge/drop в ClickHouse.
+          При уменьшении срока старые данные удалятся при следующей очистке в ClickHouse.
           {retention.updated_at ? ` Обновлено: ${fmtDate(retention.updated_at)}` : ''}
         </p>
       </section>

@@ -5,6 +5,7 @@ import type { HistoryPayload } from '@/api/systemTypes';
 import type { ToastKind } from '@/components/Toast';
 import { usePolling } from '@/lib/usePolling';
 import { alignSeries, makeChart, type ChartFormatOpts } from './systemCharts';
+import { containerLabel } from './systemFormat';
 import { CONTAINERS, type Tab } from './systemTypes';
 
 export function useSystemCharts(
@@ -71,36 +72,36 @@ export function useSystemCharts(
       plotsRef.current.push(makeChart(ref.current, title, labels, xs, ys, chartOpts));
     };
 
-    mk(chartEvents, 'События / сек', ['Ingest rate (live)', 'DB ingest (1m avg)'], [
+    mk(chartEvents, 'События / сек (EPS)', ['Приём (live)', 'Запись в БД (средн. 1 мин)'], [
       'pipeline.rate.events_per_sec',
       'pipeline.ingest.events_per_sec_db',
     ]);
-    mk(chartLag, 'Лаг ingest (сек)', ['Lag (sec)'], ['pipeline.ingest.lag_sec']);
+    mk(chartLag, 'Лаг приёма (сек)', ['Лаг'], ['pipeline.ingest.lag_sec']);
     mk(
       chartCpu,
       'CPU контейнеров (% хоста)',
-      [...CONTAINERS],
+      CONTAINERS.map((c) => containerLabel(c)),
       CONTAINERS.map((c) => `container.${c}.cpu_pct`),
       { isPercent: true },
     );
     mk(
       chartMem,
-      'Память контейнеров (без page cache)',
-      [...CONTAINERS],
+      'Память контейнеров',
+      CONTAINERS.map((c) => containerLabel(c)),
       CONTAINERS.map((c) => `container.${c}.mem_bytes`),
       { isBytes: true },
     );
     mk(
       chartBuffer,
       'Буферы',
-      ['Ingest buffered', 'syslog-ng queued'],
+      ['Буфер приёма', 'Очередь syslog'],
       ['pipeline.ingest.buffered_lines', 'pipeline.syslogng.queued'],
       { isInt: true },
     );
     mk(
       chartStorage,
       'Размер хранилища',
-      ['traffic_logs'],
+      ['Логи трафика'],
       ['storage.traffic_logs.bytes_on_disk'],
       { isBytes: true },
     );
@@ -113,7 +114,7 @@ export function useSystemCharts(
       const data = await fetchSystemHistory(period);
       paintHistory(data);
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Ошибка history', 'error');
+      toast(e instanceof Error ? e.message : 'Не удалось загрузить графики', 'error');
     } finally {
       historyFetching.current = false;
     }

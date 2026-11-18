@@ -193,8 +193,8 @@ export function SystemBackupTab() {
     if (
       !confirm(
         `Подключить «${b.name}» для просмотра на карте?\n\n` +
-          `Данные попадут в shadow-таблицы ga_bak_* (live и ingest не трогаются). ` +
-          `На карте переключите источник на «Резервная копия».`,
+          `Копия откроется отдельно от живых данных — приём логов не затронется. ` +
+          `На карте выберите источник «Резервная копия».`,
       )
     ) {
       return;
@@ -214,7 +214,7 @@ export function SystemBackupTab() {
   const detach = async (b: BackupEntry) => {
     if (
       !confirm(
-        `Отключить «${b.name}»?\n\nShadow-таблицы ga_bak_* будут удалены. Live-данные и файлы бэкапа на диске останутся.`,
+        `Отключить «${b.name}»?\n\nВременные таблицы копии будут удалены. Живые данные и файлы бэкапа на диске останутся.`,
       )
     ) {
       return;
@@ -281,18 +281,18 @@ export function SystemBackupTab() {
           </button>
         </div>
         <p className="hint">
-          Снимки на томе <code>clickhouse-backups</code>. «Подключить» открывает shadow{' '}
-          <code>ga_bak_*</code> на карте; live не меняется.
+          Снимки хранятся на томе <code>clickhouse-backups</code>. «Подключить» показывает копию на
+          карте отдельно от живых данных.
         </p>
         <details className="details-toggle">
-          <summary>Полное восстановление и kill-switch</summary>
+          <summary>Полное восстановление и аварийное отключение</summary>
           <p className="hint">
-            Полный restore: <code>./scripts/restore-clickhouse.sh &lt;name&gt;</code>. Kill-switch:{' '}
-            <code>BACKUP_ENABLED=0</code>. При включённом расписании внешний cron{' '}
+            Полное восстановление: <code>./scripts/restore-clickhouse.sh &lt;name&gt;</code>. Чтобы
+            запретить бэкапы: <code>BACKUP_ENABLED=0</code>. При включённом расписании внешний cron{' '}
             <code>scripts/backup-clickhouse.sh</code> не обязателен.
           </p>
         </details>
-        {loading && !cat ? <ContentSkeleton label="Загрузка backup…" /> : null}
+        {loading && !cat ? <ContentSkeleton label="Загрузка…" /> : null}
         {cat ? (
           <div className="kv-grid cols-2">
             <div className="kv-row">
@@ -319,8 +319,8 @@ export function SystemBackupTab() {
             <div className="kv-row">
               <span className="k">Политика</span>
               <span className="v">
-                хранить {fmtNumber(cat.keep)} · рёбра {cat.include_edges ? 'да' : 'нет'} · auth{' '}
-                {cat.include_auth ? 'да' : 'нет'}
+                хранить {fmtNumber(cat.keep)} · сводки карты {cat.include_edges ? 'да' : 'нет'} ·
+                учётные данные {cat.include_auth ? 'да' : 'нет'}
               </span>
             </div>
             <div className="kv-row">
@@ -331,7 +331,7 @@ export function SystemBackupTab() {
               <span className="k">Расписание</span>
               <span className="v">
                 {schedulePausedByEnv ? (
-                  <>в файле вкл, но <code>BACKUP_ENABLED=0</code></>
+                  <>в настройках включено, но на сервере <code>BACKUP_ENABLED=0</code></>
                 ) : dirty ? (
                   <>есть несохранённые изменения</>
                 ) : savedSched.enabled ? (
@@ -344,7 +344,7 @@ export function SystemBackupTab() {
               </span>
             </div>
             <div className="kv-row">
-              <span className="k">След. авто</span>
+              <span className="k">Следующий авто</span>
               <span className="v">
                 {scheduleActive && cat.next_run_at
                   ? fmtDate(cat.next_run_at, savedSched.timezone)
@@ -384,14 +384,14 @@ export function SystemBackupTab() {
             {dirty
               ? 'не сохранено'
               : schedulePausedByEnv
-                ? 'пауза (env)'
+                ? 'пауза на сервере'
                 : savedSched.enabled
                   ? 'расписание вкл'
                   : 'расписание выкл'}
           </span>
         </div>
         <p className="hint">
-          Ежедневный автобэкап в выбранном поясе — в нём же «След. авто» и «Последний авто».
+          Ежедневный автобэкап в выбранном поясе — в нём же «Следующий авто» и «Последний авто».
         </p>
         <p className="hint" style={{ marginTop: 8 }}>
           {dirty ? (
@@ -404,7 +404,7 @@ export function SystemBackupTab() {
                 : ' · автобэкап выключен'}
             </>
           ) : (
-            <>Сохранённых правок из UI пока нет (действуют дефолты env).</>
+            <>Из UI ещё не сохраняли — действуют настройки сервера по умолчанию.</>
           )}
         </p>
         <div className="kv-grid cols-2" style={{ marginTop: 12 }}>
@@ -501,7 +501,7 @@ export function SystemBackupTab() {
             </span>
           </div>
           <div className="kv-row">
-            <span className="k">Рёбра</span>
+            <span className="k">Сводки для карты</span>
             <span className="v">
               <label className="toggle" style={{ margin: 0 }}>
                 <input
@@ -509,12 +509,12 @@ export function SystemBackupTab() {
                   checked={!!sched.include_edges}
                   onChange={(e) => setSched((s) => ({ ...s, include_edges: e.target.checked }))}
                 />
-                <span>traffic_edges_*</span>
+                <span>{sched.include_edges ? 'включить' : 'не включать'}</span>
               </label>
             </span>
           </div>
           <div className="kv-row">
-            <span className="k">Auth-снимок</span>
+            <span className="k">Учётные данные</span>
             <span className="v">
               <label className="toggle" style={{ margin: 0 }}>
                 <input
@@ -522,7 +522,7 @@ export function SystemBackupTab() {
                   checked={!!sched.include_auth}
                   onChange={(e) => setSched((s) => ({ ...s, include_auth: e.target.checked }))}
                 />
-                <span>*.auth.tgz (/app/data)</span>
+                <span>{sched.include_auth ? 'включить' : 'не включать'}</span>
               </label>
             </span>
           </div>
@@ -564,8 +564,8 @@ export function SystemBackupTab() {
       <section className="card card-compact">
         <h3 className="card-title">Список бэкапов</h3>
         <p className="hint">
-          Время — пояс расписания (<code>{savedSched.timezone || sched.timezone || 'UTC'}</code>).
-          Auth-снимок — <code>/app/data</code> (<code>*.auth.tgz</code>), не трафик.
+          Время — в поясе расписания (<code>{savedSched.timezone || sched.timezone || 'UTC'}</code>).
+          «Учётные данные» — пользователи и сессии, не логи трафика.
         </p>
         {backups.length === 0 ? (
           <EmptyState
@@ -587,8 +587,8 @@ export function SystemBackupTab() {
                   </th>
                   <th scope="col">Источник</th>
                   <th scope="col">Размер</th>
-                  <th scope="col" title="Снимок /app/data (*.auth.tgz), не ClickHouse-таблицы">
-                    Auth-снимок
+                  <th scope="col" title="Снимок пользователей и сессий, не таблицы трафика">
+                    Учётные данные
                   </th>
                   <th scope="col">Состояние</th>
                   <th scope="col">Действия</th>
@@ -669,7 +669,7 @@ export function SystemBackupTab() {
           }}
         >
           <h3 className="card-title" style={{ margin: 0 }}>
-            История DR
+            История операций
           </h3>
           <span className="hint">Последние 50 событий</span>
         </div>
@@ -696,7 +696,7 @@ export function SystemBackupTab() {
                 {history.map((item, idx) => (
                   <tr key={`${item.timestamp || 't'}-${item.action || 'a'}-${idx}`}>
                     <td>{fmtDate(item.timestamp, savedSched.timezone || sched.timezone)}</td>
-                    <td>{item.actor || 'system'}</td>
+                    <td>{item.actor || 'система'}</td>
                     <td title={item.action || undefined}>{auditActionLabel(item.action)}</td>
                     <td>{item.target || '—'}</td>
                     <td>{formatDRStatus(item.status)}</td>
