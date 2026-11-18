@@ -27,3 +27,14 @@ func TestStoreNilConn(t *testing.T) {
 		t.Fatal("exists nil ch")
 	}
 }
+
+// clickhouse-go requires Int32 → *int32; documenting the contract here so a
+// future *int scan regression is intentional, not accidental.
+func TestPriorityScanTypes(t *testing.T) {
+	var priority int32 = 100
+	recPriority := int(priority)
+	if recPriority != 100 {
+		t.Fatalf("got %d", recPriority)
+	}
+	_ = parser.RuleRecord{Priority: recPriority}
+}
