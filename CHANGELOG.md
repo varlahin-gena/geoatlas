@@ -5,6 +5,28 @@
 
 ## [Unreleased]
 
+## [2.7.8] — 2026-11-18
+
+Редактируемые правила парсеров CEF/KV; устойчивая выгрузка большой базы GeoIP; полировка аномалий и мониторинга.
+
+### Added
+- **Парсеры**: UserGate / FortiGate / Generic живут в ClickHouse (`parser_rules`) с hot reload; страница `/parsers` — CRUD, dry-run, enable/priority. Cisco ASA / FTD остаются встроенными.
+- **Тест парсеров**: нормализованные поля показываются колонками результата.
+
+### Changed
+- **Аномалии**: «Связи» — обычная кнопка в строке (без меню «Ещё»); период peers согласован с прыжком на карту.
+- **Конструктор поиска**: «НЕ» — читаемый toggle-chip.
+- **Мониторинг**: operator-facing формулировки вместо API-жаргона.
+
+### Fixed
+- **GeoIP**: выгрузка CSV стримится из ClickHouse и скачивается браузером — базы на миллионы диапазонов больше не рвут соединение (`Failed to fetch`).
+
+### Notes
+- OpenAPI API doc version: **1.23.0**
+- Продуктовая версия: **2.7.8**
+- Схема ClickHouse: таблица `parser_rules` (Ensure* / `init.sql`).
+- Достаточно `update.sh` 2.7.8 (recreate **backend** + **frontend**).
+
 ## [2.7.7] — 2026-11-17
 
 Интервал опроса репутации из UI без рестарта; HIG-полировка интерфейса.
@@ -278,6 +300,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.7.8]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.8
 [2.7.7]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.7
 [2.7.6]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.6
 [2.7.5]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.5

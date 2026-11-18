@@ -22,7 +22,7 @@
 - **Репутация IP.** Offline-списки и URL-фиды: фильтр и подсветка дуг на карте.
 - **Один пакет.** `geoatlas-X.Y.Z.tar.gz` для Ubuntu 20.04+ и Oracle Linux 8+ / RHEL; syslog `:514`, ClickHouse, React SPA на одном хосте (IPv4-only, доставка at-most-once).
 
-**Актуальный релиз:** [v2.7.7](https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.7) (`VERSION` = 2.7.7). Лимиты appliance — [архитектура](docs/architecture.md).
+**Актуальный релиз:** [v2.7.8](https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.8) (`VERSION` = 2.7.8). Лимиты appliance — [архитектура](docs/architecture.md).
 
 ![Карта сетевых связей в ГеоАтлас](docs/images/map-overview.png)
 
@@ -42,7 +42,7 @@
 Нужен Linux-сервер (Ubuntu 20.04+ или Oracle Linux 8+ / RHEL-совместимый), Docker и остальные необходимые пакеты для работы системы поставит установщик, порты **80** (UI) и **514** tcp/udp (syslog).
 
 ```bash
-VER=2.7.7
+VER=2.7.8
 
 cd /tmp
 curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz"
@@ -93,7 +93,7 @@ sudo ./deploy/oracle_linux/install_oraclelinux.sh
 | [Конфигурация](docs/configuration.md) | `.env`, секреты, модули |
 | [Обслуживание](docs/operations.md) | Запуск, профили, retention, бэкапы, логи, обновление |
 | [GeoIP](docs/geoip.md) | CSV, загрузка с сервера, 502/OOM |
-| [UI и HTTP API](docs/ui.md) | Страницы SPA, роли, OpenAPI **1.22.0** |
+| [UI и HTTP API](docs/ui.md) | Страницы SPA, роли, OpenAPI **1.23.0** |
 | [Репутация](docs/reputation.md) | Фиды и offline-списки |
 | [Аномалии](docs/anomalies.md) | Типы (`port_scan`, `byte_surge`, `beaconing`, `lateral_fanout`, …), ack/assign, разбор |
 | [Разработка](docs/development.md) | Локальный стек из git |
@@ -110,7 +110,7 @@ sudo ./deploy/oracle_linux/install_oraclelinux.sh
 | [OpenSSF Passing](docs/openssf-best-practices.md) | Шпаргалка Passing |
 | [OpenSSF Silver](docs/openssf-silver.md) | Шпаргалка Silver |
 
-Контракт REST: [`openapi.yaml`](openapi.yaml) (документ OpenAPI **1.22.0**).
+Контракт REST: [`openapi.yaml`](openapi.yaml) (документ OpenAPI **1.23.0**).
 
 ## Лицензия
 
@@ -142,6 +142,6 @@ sudo ./deploy/oracle_linux/install_oraclelinux.sh
 | `docs/` | документация оператора и разработчика |
 | `docs/images/` | скрины для README |
 | `scripts/` | CI, pack-release, бэкапы |
-| `openapi.yaml` | контракт HTTP API (OpenAPI **1.22.0**) |
+| `openapi.yaml` | контракт HTTP API (OpenAPI **1.23.0**) |
 
 Полное дерево: [docs/repo-layout.md](docs/repo-layout.md).
