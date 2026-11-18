@@ -2,7 +2,7 @@ import { apiFetch } from '@/api/client';
 
 export type ParserKind = 'cef' | 'kv';
 
-export interface ParserFieldMap {
+interface ParserFieldMap {
   src?: string;
   dst?: string;
   spt?: string;
@@ -21,7 +21,7 @@ export interface ParserFieldMap {
   time?: string;
 }
 
-export interface ParserTransforms {
+interface ParserTransforms {
   proto_map_number?: boolean;
   time_unit?: string;
   skip_undefined_zones?: boolean;
@@ -51,7 +51,7 @@ export interface ParserItem {
   spec?: ParserSpec;
 }
 
-export interface ParseDryRunRow {
+interface ParseDryRunRow {
   n: number;
   line: string;
   parsed: boolean;
@@ -74,10 +74,6 @@ export interface ParseDryRunResult {
 
 export function listParsers() {
   return apiFetch<{ ok: boolean; parsers: ParserItem[] }>('/api/parsers');
-}
-
-export function getParser(id: string) {
-  return apiFetch<{ ok: boolean; parser: ParserItem }>(`/api/parsers/${encodeURIComponent(id)}`);
 }
 
 export function createParser(body: {
@@ -115,14 +111,6 @@ export function updateParser(
 export function deleteParser(id: string) {
   return apiFetch<{ ok: boolean }>(`/api/parsers/${encodeURIComponent(id)}`, {
     method: 'DELETE',
-  });
-}
-
-export function reorderParsers(order: { id: string; priority: number }[]) {
-  return apiFetch<{ ok: boolean }>('/api/parsers/order', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ order }),
   });
 }
 
