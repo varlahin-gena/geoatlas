@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  capacityHint,
   capacityTone,
+  containerLabel,
   dropsTone,
+  edgesAggBadge,
+  edgesAggHint,
+  edgesAggMessageLabel,
+  edgesMapSourceLabel,
   fmtBytes,
+  healthStateLabel,
   pipelineIngestStatus,
   pipelineSyslogStatus,
   queueTone,
@@ -51,5 +58,26 @@ describe('systemFormat', () => {
     expect(pipelineSyslogStatus({}, 1, 0, 100)).toBe('bad');
     expect(pipelineSyslogStatus({ queued: 80 }, 1, 50, 0)).toBe('warn');
     expect(pipelineSyslogStatus({ queued: 90 }, 1, 50, 0)).toBe('bad');
+  });
+
+  it('edges agg copy stays human-readable', () => {
+    expect(edgesAggBadge({ state: 'ready' })).toBe('готово');
+    expect(edgesAggBadge({ state: 'running', phase: 'backfill' })).toBe('в работе · заполнение');
+    expect(edgesMapSourceLabel('edges_daily')).toBe('суточные сводки');
+    expect(edgesMapSourceLabel('traffic_logs')).toBe('подробные логи');
+    expect(edgesAggMessageLabel('up to date')).toMatch(/актуальны/i);
+    expect(edgesAggHint({ state: 'ready', message: 'up to date' })).toMatch(/суточные/i);
+    expect(edgesAggHint({ state: 'running', phase: 'schema' })).toMatch(/подробных логах/i);
+  });
+
+  it('overview health and capacity copy stays human-readable', () => {
+    expect(healthStateLabel('up')).toBe('работает');
+    expect(healthStateLabel('down')).toBe('недоступен');
+    expect(healthStateLabel('stopped')).toBe('остановлен');
+    expect(healthStateLabel('unknown')).toBe('неизвестно');
+    expect(containerLabel('backend')).toBe('Сервер');
+    expect(containerLabel('syslog-ng')).toBe('Syslog');
+    expect(capacityHint(130)).toMatch(/выше лимита/i);
+    expect(capacityHint(95)).toMatch(/близка к лимиту/i);
   });
 });

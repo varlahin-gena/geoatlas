@@ -178,12 +178,44 @@ func (h *GeoHandler) ExportGeoRangesCSV(w http.ResponseWriter, r *http.Request) 
 	defer cancel()
 
 	filename := "geoip-" + time.Now().UTC().Format("20060102-150405") + ".csv"
-	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
-	w.WriteHeader(http.StatusOK)
-	if err := h.geoUC.ExportCSV(ctx, w); err != nil {
+	out := &exportFlushWriter{w: w, filename: filename}
+	if err := h.geoUC.ExportCSV(ctx, out); err != nil {
+		if !out.started {
+			writeDomainError(w, "geo export failed", err)
+			return
+		}
 		slog.Error("geo export: write failed", "err", err)
 	}
+}
+
+// exportFlushWriter ставит заголовки скачивания на первом байте и периодически
+// сбрасывает буфер. Пока байт нет, хендлер ещё может ответить JSON-ошибкой.
+// X-Accel-Buffering запрещает nginx копить весь CSV перед отдачей клиенту.
+type exportFlushWriter struct {
+	w        http.ResponseWriter
+	filename string
+	started  bool
+	pending  int
+}
+
+func (f *exportFlushWriter) Write(p []byte) (int, error) {
+	if !f.started {
+		f.started = true
+		h := f.w.Header()
+		h.Set("Content-Type", "text/csv; charset=utf-8")
+		h.Set("Content-Disposition", `attachment; filename="`+f.filename+`"`)
+		h.Set("Cache-Control", "no-store")
+		h.Set("X-Accel-Buffering", "no")
+		h.Set("X-Content-Type-Options", "nosniff")
+	}
+	n, err := f.w.Write(p)
+	f.pending += n
+	if f.pending >= 256<<10 {
+		f.pending = 0
+		_ = http.NewResponseController(f.w).Flush()
+		extendConnDeadline(f.w, exportWriteTimeout)
+	}
+	return n, err
 }
 
 func (h *GeoHandler) ClearGeoRanges(w http.ResponseWriter, r *http.Request) {

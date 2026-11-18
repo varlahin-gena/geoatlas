@@ -9,7 +9,7 @@
 | **Рабочее место** | Карта |
 | **Разбор** | Аномалии, разбор алерта, охоты |
 | **Система** | Мониторинг, Dozzle, движок аномалий, репутация |
-| **Данные** | Ошибки парсинга, тест парсеров, GeoIP |
+| **Данные** | Ошибки парсинга, парсеры, тест парсеров, GeoIP |
 | **Доступ** | Пользователи, API-токены, HTTPS-сертификаты |
 
 **Command palette** — `Ctrl/⌘K` (или `/`, если фокус не в поле ввода): переход по страницам, команды карты (период), тема и плотность UI.
@@ -28,6 +28,7 @@
 | `/parse-errors`        | Журнал ошибок парсинга| administrator       | Поиск, удаление, отправка в тест парсеров                                                                                                            |
 | `/geo-missing`         | IP без GeoIP          | administrator       | Адреса без координат; добавление в GeoIP; выгрузка CSV                                                                                               |
 | `/geo-ranges`          | База GeoIP            | administrator       | Просмотр/правка диапазонов, выгрузка CSV                                                                                                             |
+| `/parsers`             | Правила парсеров      | administrator       | CRUD CEF/KV rules в ClickHouse, dry-run, enable/priority; Cisco built-in read-only                                                                  |
 | `/parser-test`         | Тест парсеров         | administrator       | До 200 строк, пресеты вендоров, parsed/skipped/error                                                                                                 |
 | `/system`              | Системный мониторинг  | administrator       | Обзор / Pipeline / Безопасность / Графики / Резервное копирование                                                                                    |
 | `/tls`                 | TLS / сертификаты     | administrator       | Сведения о HTTPS/сертификатах UI; upload PEM с re-auth                                                                                               |

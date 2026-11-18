@@ -103,6 +103,27 @@ func (w *routeWiring) registerAdminSystemRoutes() {
 	w.handle("POST", "/api/parse-errors/delete",
 		chain(http.HandlerFunc(w.parse.DeleteParseErrors), w.adminMW, w.csrf, maxBytesMW(maxJSONBodySize)),
 	)
+	w.handle("GET", "/api/parsers",
+		withTimeout(chain(http.HandlerFunc(w.parse.ListParsers), w.adminMW), readTimeout),
+	)
+	w.handle("POST", "/api/parsers",
+		chain(http.HandlerFunc(w.parse.CreateParser), w.adminMW, w.csrf, maxBytesMW(maxJSONBodySize)),
+	)
+	w.handle("PUT", "/api/parsers/order",
+		chain(http.HandlerFunc(w.parse.ReorderParsers), w.adminMW, w.csrf, maxBytesMW(maxJSONBodySize)),
+	)
+	w.handle("POST", "/api/parsers/dry-run",
+		chain(http.HandlerFunc(w.parse.DryRunParser), w.adminMW, w.csrf, maxBytesMW(maxParseTestSize)),
+	)
+	w.handle("GET", "/api/parsers/{id}",
+		withTimeout(chain(http.HandlerFunc(w.parse.GetParser), w.adminMW), readTimeout),
+	)
+	w.handle("PUT", "/api/parsers/{id}",
+		chain(http.HandlerFunc(w.parse.UpdateParser), w.adminMW, w.csrf, maxBytesMW(maxJSONBodySize)),
+	)
+	w.handle("DELETE", "/api/parsers/{id}",
+		chain(http.HandlerFunc(w.parse.DeleteParser), w.adminMW, w.csrf, maxBytesMW(maxJSONBodySize)),
+	)
 }
 
 func (w *routeWiring) registerUploadRoutes() {

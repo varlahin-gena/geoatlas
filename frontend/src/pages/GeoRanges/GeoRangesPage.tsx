@@ -5,7 +5,7 @@ import {
   addEnterpriseNet,
   clearGeoRanges,
   deleteEnterpriseNet,
-  exportGeoRanges,
+  downloadGeoRangesCsv,
   fetchEnterpriseNets,
   fetchGeoRanges,
   updateGeoRange,
@@ -117,6 +117,7 @@ export default function GeoRangesPage() {
     lon: '',
   });
   const [busy, setBusy] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [rangesLoading, setRangesLoading] = useState(true);
   const [rangesError, setRangesError] = useState('');
   const [enterpriseLoading, setEnterpriseLoading] = useState(true);
@@ -479,6 +480,19 @@ export default function GeoRangesPage() {
     }
   }
 
+  useEffect(() => {
+    if (!exporting) return;
+    const timer = window.setTimeout(() => setExporting(false), 10_000);
+    return () => window.clearTimeout(timer);
+  }, [exporting]);
+
+  function onExportCsv() {
+    if (exporting || busy) return;
+    setExporting(true);
+    downloadGeoRangesCsv();
+    toast('Выгрузка началась. Файл появится в загрузках браузера.', 'info');
+  }
+
   const sliceHint =
     !ipLookupActive && !textSearchActive && totalInDb > shownCount
       ? `На экране первые ${fmtNumber(shownCount || rows.length)} из ${fmtNumber(totalInDb)} — уточните страну или IP.`
@@ -516,28 +530,10 @@ export default function GeoRangesPage() {
           <button
             type="button"
             className="btn"
-            disabled={busy}
-            onClick={async () => {
-              try {
-                const res = await exportGeoRanges();
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const blob = await res.blob();
-                const cd = res.headers.get('Content-Disposition') || '';
-                const m = cd.match(/filename="?([^";]+)"?/i);
-                const name = (m && m[1]) || `geoip-${new Date().toISOString().slice(0, 10)}.csv`;
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = name;
-                a.click();
-                URL.revokeObjectURL(url);
-                toast('GeoIP CSV скачан', 'success');
-              } catch (e) {
-                toast(e instanceof Error ? e.message : 'Ошибка', 'error');
-              }
-            }}
+            disabled={busy || exporting}
+            onClick={onExportCsv}
           >
-            Выгрузить CSV
+            {exporting ? 'Выгрузка…' : 'Выгрузить CSV'}
           </button>
         </div>
         <nav className="geo-ranges-tabs" role="tablist" aria-label="Разделы базы GeoIP">

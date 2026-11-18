@@ -39,6 +39,35 @@ func LoadGeoRanges(ctx context.Context, ch clickhouse.Conn) ([]model.GeoRange, e
 	return scanGeoRangeRows(rows)
 }
 
+// StreamGeoRanges обходит geo_ranges по start_ip, end_ip и не копит строки.
+func StreamGeoRanges(ctx context.Context, ch clickhouse.Conn, fn func(model.GeoRange) error) error {
+	if ch == nil {
+		return fmt.Errorf("clickhouse conn is nil")
+	}
+	if fn == nil {
+		return fmt.Errorf("geo stream callback is nil")
+	}
+	rows, err := ch.Query(ctx, `
+		SELECT start_ip, end_ip, country, region, city, lat, lon
+		FROM geo_ranges
+		ORDER BY start_ip, end_ip
+	`)
+	if err != nil {
+		return fmt.Errorf("query geo_ranges: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var g model.GeoRange
+		if err := rows.Scan(&g.StartIP, &g.EndIP, &g.Country, &g.Region, &g.City, &g.Lat, &g.Lon); err != nil {
+			return err
+		}
+		if err := fn(g); err != nil {
+			return err
+		}
+	}
+	return rows.Err()
+}
+
 // LoadGeoSnapshot читает geo_ranges и строит compact snapshot потоково.
 func LoadGeoSnapshot(ctx context.Context, ch clickhouse.Conn) (*geoip.BuiltSnapshot, error) {
 	if ch == nil {

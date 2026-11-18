@@ -138,8 +138,8 @@ grep -q 'classifyEmptyMap\|skipped_no_geo\|skippedNoGeo' \
 ok "auth/ui/search/map contracts"
 
 grep -q 'statusDrops\|id="statusDrops"' frontend/src/pages/System/SystemPage.tsx || fail "system: statusDrops tile"
-grep -q 'Buffer drops' frontend/src/pages/System/SystemPipelineTab.tsx || fail "system: Buffer drops kv"
-grep -q 'Queue bytes\|queue_bytes' frontend/src/pages/System/SystemPipelineTab.tsx || fail "system: queue_bytes"
+grep -q 'Потери буфера' frontend/src/pages/System/SystemPipelineTab.tsx || fail "system: Buffer drops kv"
+grep -q 'Очередь, байты\|queue_bytes' frontend/src/pages/System/SystemPipelineTab.tsx || fail "system: queue_bytes"
 ok "system ingest drop visibility"
 
 grep -q 'geo-ranges/clear' frontend/src/api/geo.ts || fail "geo-ranges clear API"

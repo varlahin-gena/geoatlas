@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,8 +16,9 @@ import (
 )
 
 type crudStore struct {
-	ranges []model.GeoRange
-	err    error
+	ranges    []model.GeoRange
+	err       error
+	loadCalls int
 }
 
 func (s *crudStore) Replace(_ context.Context, ranges []model.GeoRange) (int, error) {
@@ -30,7 +33,26 @@ func (s *crudStore) Truncate(context.Context) error {
 	return s.err
 }
 func (s *crudStore) Load(context.Context) ([]model.GeoRange, error) {
+	s.loadCalls++
 	return append([]model.GeoRange(nil), s.ranges...), s.err
+}
+func (s *crudStore) Stream(_ context.Context, fn func(model.GeoRange) error) error {
+	if s.err != nil {
+		return s.err
+	}
+	rows := append([]model.GeoRange(nil), s.ranges...)
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].StartIP == rows[j].StartIP {
+			return rows[i].EndIP < rows[j].EndIP
+		}
+		return rows[i].StartIP < rows[j].StartIP
+	})
+	for _, g := range rows {
+		if err := fn(g); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 func (s *crudStore) Count(context.Context) (int, error) { return len(s.ranges), s.err }
 func (s *crudStore) FindByIP(_ context.Context, ipStr string) (model.GeoRange, bool, error) {
@@ -197,6 +219,45 @@ func TestAppendUpdateExport(t *testing.T) {
 	var buf bytes.Buffer
 	if err := s.ExportCSV(context.Background(), &buf); err != nil || buf.Len() == 0 {
 		t.Fatalf("export: %v len=%d", err, buf.Len())
+	}
+	if !strings.Contains(buf.String(), "Network,Country,Region,City,Latitude,Longitude") {
+		t.Fatalf("export header: %s", buf.String())
+	}
+}
+
+func TestExportCSVStreamsWithoutLoadAndSkipsOverlap(t *testing.T) {
+	store := &crudStore{ranges: []model.GeoRange{
+		{StartIP: 10, EndIP: 20, Country: "KeepA", Region: "R", City: "C", Lat: 1, Lon: 2},
+		{StartIP: 15, EndIP: 25, Country: "SkipOverlap", Region: "R", City: "C"},
+		{StartIP: 5, EndIP: 4, Country: "SkipInvalid", Region: "R", City: "C"},
+		{StartIP: 30, EndIP: 40, Country: "KeepB", Region: "R", City: "C", Lat: 3.5, Lon: 4},
+	}}
+	s := New(store, nil, nil, nil, &crudCodec{parseOK: true}, 0)
+	var buf bytes.Buffer
+	if err := s.ExportCSV(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	if store.loadCalls != 0 {
+		t.Fatalf("Load calls = %d, export must stream", store.loadCalls)
+	}
+	body := buf.String()
+	if !strings.Contains(body, "KeepA") || !strings.Contains(body, "KeepB") {
+		t.Fatalf("missing rows: %s", body)
+	}
+	if strings.Contains(body, "SkipOverlap") || strings.Contains(body, "SkipInvalid") {
+		t.Fatalf("skipped rows leaked: %s", body)
+	}
+}
+
+func TestExportCSVStoreErrorWritesNothing(t *testing.T) {
+	store := &crudStore{err: errors.New("ch down")}
+	s := New(store, nil, nil, nil, &crudCodec{parseOK: true}, 0)
+	var buf bytes.Buffer
+	if err := s.ExportCSV(context.Background(), &buf); err == nil {
+		t.Fatal("want error")
+	}
+	if buf.Len() != 0 {
+		t.Fatalf("wrote %q before query failure", buf.String())
 	}
 }
 

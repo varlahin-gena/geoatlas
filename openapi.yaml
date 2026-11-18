@@ -2544,6 +2544,122 @@ paths:
         "200":
           description: Parse results
 
+  /api/parsers:
+    get:
+      tags: [parse]
+      summary: Список парсеров (DB rules + built-in)
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: parsers list
+    post:
+      tags: [parse]
+      summary: Создать CEF/KV правило
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ParserRuleCreate"
+      responses:
+        "200":
+          description: created
+        "400":
+          description: validation error
+        "409":
+          description: conflict
+
+  /api/parsers/order:
+    put:
+      tags: [parse]
+      summary: Изменить priority правил
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ParserOrderRequest"
+      responses:
+        "200":
+          description: ok
+
+  /api/parsers/dry-run:
+    post:
+      tags: [parse]
+      summary: Dry-run строк через правило или live registry
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ParserDryRun"
+      responses:
+        "200":
+          description: parse-test shaped result
+
+  /api/parsers/{id}:
+    get:
+      tags: [parse]
+      summary: Один парсер
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: parser
+        "404":
+          description: not found
+    put:
+      tags: [parse]
+      summary: Обновить CEF/KV правило
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ParserRuleUpdate"
+      responses:
+        "200":
+          description: updated
+    delete:
+      tags: [parse]
+      summary: Удалить CEF/KV правило
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: deleted
+
 components:
   securitySchemes:
     bearerAuth:
@@ -3554,6 +3670,50 @@ components:
         port: { type: integer }
         protocols: { type: string, enum: [udp, tcp, both] }
         enabled: { type: boolean }
+
+    ParserRuleCreate:
+      type: object
+      additionalProperties: false
+      required: [id, spec]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        vendor: { type: string }
+        enabled: { type: boolean }
+        priority: { type: integer }
+        spec: { type: object, additionalProperties: true }
+    ParserRuleUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string }
+        vendor: { type: string }
+        enabled: { type: boolean }
+        priority: { type: integer }
+        spec: { type: object, additionalProperties: true }
+    ParserDryRun:
+      type: object
+      additionalProperties: false
+      required: [text]
+      properties:
+        text: { type: string }
+        rule_id: { type: string }
+        vendor: { type: string }
+        name: { type: string }
+        spec: { type: object, additionalProperties: true }
+    ParserOrderRequest:
+      type: object
+      additionalProperties: false
+      required: [order]
+      properties:
+        order:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              id: { type: string }
+              priority: { type: integer }
 
     ReputationFeed:
       type: object

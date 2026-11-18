@@ -197,7 +197,7 @@ export function SystemSecurityTab() {
 
 
       <section className="card">
-        <h3 className="card-title">Политика блокировки УЗ</h3>
+        <h3 className="card-title">Политика блокировки входа</h3>
         <p className="hint">Сколько раз можно ошибиться с паролем и на сколько потом блокировать вход.</p>
         <form className="form-row policy-form" onSubmit={onSavePolicy}>
           <div className="field">
@@ -212,7 +212,7 @@ export function SystemSecurityTab() {
             />
           </div>
           <div className="field">
-            <label htmlFor="lockWindow">За сколько секунд</label>
+            <label htmlFor="lockWindow">Окно подсчёта, сек</label>
             <input
               id="lockWindow"
               type="number"
@@ -223,7 +223,7 @@ export function SystemSecurityTab() {
             />
           </div>
           <div className="field">
-            <label htmlFor="lockDuration">Блокировать на, сек</label>
+            <label htmlFor="lockDuration">Длительность блокировки, сек</label>
             <input
               id="lockDuration"
               type="number"

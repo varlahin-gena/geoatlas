@@ -1,5 +1,15 @@
 import { fmtDate, fmtNumber } from '@/lib/format';
-import { capacityTone, fmtBytes, fmtLag, num } from './systemFormat';
+import {
+  capacityHint,
+  capacityTone,
+  containerLabel,
+  edgesAggMessageLabel,
+  edgesMapSourceLabel,
+  fmtBytes,
+  fmtLag,
+  healthStateLabel,
+  num,
+} from './systemFormat';
 import { CONTAINERS, type EdgesAgg, type SystemStats } from './systemTypes';
 
 export function SystemOverviewTab({
@@ -30,15 +40,15 @@ export function SystemOverviewTab({
   updatedAt: Date | null;
 }) {
   const backendMeta = [
-    `goroutines: ${fmtNumber(stats?.backend_info?.num_goroutine)}`,
+    `потоки: ${fmtNumber(stats?.backend_info?.num_goroutine)}`,
     stats?.backend_info?.heap_alloc_mb != null
-      ? `heap: ${Number(stats.backend_info.heap_alloc_mb).toFixed(1)} MB`
-      : 'heap: —',
+      ? `память: ${Number(stats.backend_info.heap_alloc_mb).toFixed(1)} МБ`
+      : 'память: —',
     stats?.backend_info?.geo_index_mb != null
-      ? `GeoIP index: ${Number(stats.backend_info.geo_index_mb).toFixed(1)} MB`
+      ? `GeoIP: ${Number(stats.backend_info.geo_index_mb).toFixed(1)} МБ`
       : null,
     stats?.backend_info?.geo_index_ranges != null
-      ? `ranges: ${fmtNumber(stats.backend_info.geo_index_ranges)}`
+      ? `диапазоны: ${fmtNumber(stats.backend_info.geo_index_ranges)}`
       : null,
   ]
     .filter(Boolean)
@@ -62,7 +72,7 @@ export function SystemOverviewTab({
             <div className="meter-label">
               Нагрузка к лимиту профиля (EPS):{' '}
               <span>
-                {fmtNumber(Math.round(eps))} / {fmtNumber(epsMax)} eps
+                {fmtNumber(Math.round(eps))} / {fmtNumber(epsMax)} EPS
               </span>
             </div>
             <div className="capacity-track">
@@ -71,44 +81,42 @@ export function SystemOverviewTab({
                 style={{ width: `${Math.min(150, Math.min(100, capPct))}%` }}
               />
             </div>
-            <div className="capacity-hint">
-              {capPct > 125
-                ? 'Нагрузка превышает лимит EPS профиля — рассмотрите upgrade или ./scripts/tune-resources.sh'
-                : 'Нагрузка близка к лимиту EPS профиля'}
-            </div>
+            <div className="capacity-hint">{capacityHint(capPct)}</div>
           </div>
         </section>
       ) : null}
 
       <section className="row cols-2">
         <div className="card card-compact">
-          <h3 className="card-title">Health компонентов</h3>
+          <h3 className="card-title">Состояние сервисов</h3>
           <div className="health-grid">
             {([
               {
-                name: 'Backend',
+                name: 'Сервер',
                 health: backendHealth,
                 meta: backendMeta,
               },
               {
-                name: 'Ingest',
+                name: 'Приём логов',
                 health: ingestHealth,
-                meta: `conn: ${fmtNumber(ingest.connections)} · lag: ${fmtLag(ingest.lag_sec)}`,
+                meta: `соединения: ${fmtNumber(ingest.connections)} · лаг: ${fmtLag(ingest.lag_sec)}`,
               },
             ] as const).map((item) => {
               const h = item.health || {};
-              let stateText = String(h.state_text || 'unknown');
+              let stateText = healthStateLabel(
+                h.state_text != null ? String(h.state_text) : 'unknown',
+              );
               let css: 'ok' | 'warn' | 'bad' = 'warn';
               if (h.up != null) {
                 const up = Number(h.up);
-                stateText = up >= 1 ? 'up' : 'down';
+                stateText = healthStateLabel(up >= 1 ? 'up' : 'down');
                 css = up >= 1 ? 'ok' : 'bad';
               } else if (h.state != null) {
                 const st = Number(h.state);
                 if (st > 0) css = 'ok';
                 else if (st < 0) css = 'bad';
                 else css = 'warn';
-                if (h.state_text == null) stateText = String(h.state);
+                if (h.state_text == null) stateText = healthStateLabel(String(h.state));
               }
               return (
                 <div key={item.name} className={`health-card ${css}`}>
@@ -132,9 +140,9 @@ export function SystemOverviewTab({
               return (
                 <div key={name} className={`container-chip${up ? ' up' : ''}`}>
                   <span className="dot" />
-                  <span className="name">{name}</span>
+                  <span className="name">{containerLabel(name)}</span>
                   <span className="metrics">
-                    CPU {c?.cpu_pct != null ? `${Number(c.cpu_pct).toFixed(1)}%` : '—'} · Mem{' '}
+                    CPU {c?.cpu_pct != null ? `${Number(c.cpu_pct).toFixed(1)}%` : '—'} · память{' '}
                     {c?.mem_bytes != null ? fmtBytes(c.mem_bytes) : '—'}
                   </span>
                 </div>
@@ -146,24 +154,24 @@ export function SystemOverviewTab({
 
       <section className="card card-compact edges-card">
         <h3 className="card-title">
-          Агрегаты рёбер{' '}
+          Сводки для карты{' '}
           <span className="profile-badge">
             {edgesBadge}
           </span>
         </h3>
         <div className="kv-grid cols-3">
           <div className="kv-row">
-            <span className="k">Raw / agg</span>
+            <span className="k">Логи / сводки</span>
             <span className="v">
               {fmtNumber(edges?.raw_rows)} / {fmtNumber(edges?.agg_rows)}
             </span>
           </div>
           <div className="kv-row">
-            <span className="k">Карта</span>
-            <span className="v">{edges?.map_source || '—'}</span>
+            <span className="k">Источник карты</span>
+            <span className="v">{edgesMapSourceLabel(edges?.map_source)}</span>
           </div>
           <div className="kv-row">
-            <span className="k">Backfill</span>
+            <span className="k">Дозаполнение</span>
             <span className="v">
               {edges?.days_total
                 ? `${fmtNumber(edges.days_done)} / ${fmtNumber(edges.days_total)}`
@@ -178,18 +186,18 @@ export function SystemOverviewTab({
           className="details-toggle"
           open={edges?.state === 'running' || edges?.state === 'error'}
         >
-          <summary>+ Подробности</summary>
+          <summary>Подробности</summary>
           <div className="kv-grid cols-2">
             <div className="kv-row">
-              <span className="k">Сообщение</span>
-              <span className="v">{edges?.message || '—'}</span>
+              <span className="k">Статус</span>
+              <span className="v">{edgesAggMessageLabel(edges?.message)}</span>
             </div>
             <div className="kv-row">
-              <span className="k">prefer_agg</span>
+              <span className="k">Карта на сводках</span>
               <span className="v">{edges?.prefer_agg ? 'да' : 'нет'}</span>
             </div>
             <div className="kv-row">
-              <span className="k">geo prefer_agg</span>
+              <span className="k">Гео на сводках</span>
               <span className="v">{edges?.geo_prefer_agg ? 'да' : 'нет'}</span>
             </div>
             <div className="kv-row">
@@ -197,7 +205,7 @@ export function SystemOverviewTab({
               <span className="v">{fmtDate(edges?.updated_at)}</span>
             </div>
             <div className="kv-row">
-              <span className="k">Старт</span>
+              <span className="k">Начато</span>
               <span className="v">{fmtDate(edges?.started_at)}</span>
             </div>
           </div>
@@ -205,7 +213,7 @@ export function SystemOverviewTab({
       </section>
 
       <div className="footer-info">
-        обновлено: {updatedAt ? updatedAt.toLocaleString('ru-RU') : '—'}
+        Обновлено: {updatedAt ? updatedAt.toLocaleString('ru-RU') : '—'}
       </div>
     </div>
   );

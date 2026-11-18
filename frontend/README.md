@@ -25,7 +25,7 @@ npm run build        # dist/
 | `/anomalies` | вход |
 | `/investigate` | вход (`?alert=` fingerprint) |
 | `/change-password` | вход (в т.ч. must-reset) |
-| `/system`, `/users`, `/api-tokens`, `/parse-errors`, `/parser-test`, `/geo-missing`, `/geo-ranges`, `/reputation`, `/tls` | administrator |
+| `/system`, `/users`, `/api-tokens`, `/parse-errors`, `/parsers`, `/parser-test`, `/geo-missing`, `/geo-ranges`, `/reputation`, `/tls` | administrator |
 
 Старые URL `*.html` редиректят на маршруты выше (nginx + React Router).
 

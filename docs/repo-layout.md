@@ -37,7 +37,7 @@ geoatlas/
 │       ├── logging/                  # slog setup
 │       ├── model/                    # доменные структуры; action vocab SoT (go generate → backfill sh + schema SQL)
 │       ├── mapagg/                   # агрегация рёбер/узлов для карты
-│       └── parser/                   # парсеры вендоров
+│       └── parser/                   # парсеры: built-in Cisco + CEF/KV RuleParser
 ├── pkg/
 │   ├── chconn/                       # общий ClickHouse connect
 │   └── syslogngstats/                # CSV/Prometheus parser stats-exporter

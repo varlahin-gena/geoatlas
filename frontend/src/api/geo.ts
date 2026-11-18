@@ -1,4 +1,4 @@
-import { apiDelete, apiFetchRaw, apiGetQuery, apiPost, apiPut } from './client';
+import { apiDelete, apiGetQuery, apiPost, apiPut } from './client';
 import type { components } from './openapi';
 
 export type GeoRange = components['schemas']['GeoRange'];
@@ -37,8 +37,19 @@ export function clearGeoRanges(): Promise<{ index_before?: number }> {
   return apiPost('/api/geo-ranges/clear', {});
 }
 
-export function exportGeoRanges(): Promise<Response> {
-  return apiFetchRaw('/api/geo-ranges/export');
+/**
+ * Скачивание полной базы браузером, без сборки файла в памяти вкладки.
+ * Сессия уходит cookie того же origin; fetch().blob() на миллионах строк
+ * обрывался с «Failed to fetch».
+ */
+export function downloadGeoRangesCsv(): void {
+  const a = document.createElement('a');
+  a.href = '/api/geo-ranges/export';
+  a.download = `geoip-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  window.setTimeout(() => a.remove(), 0);
 }
 
 export function fetchGeoMissing(query: string): Promise<GeoMissingResponse> {

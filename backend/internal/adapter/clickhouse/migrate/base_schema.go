@@ -59,6 +59,24 @@ TTL toDateTime(timestamp) + INTERVAL 7 DAY DELETE
 SETTINGS index_granularity = 8192, ttl_only_drop_parts = 1
 `
 
+const parserRulesDDL = `
+CREATE TABLE IF NOT EXISTS parser_rules
+(
+    id         String,
+    name       String,
+    vendor     LowCardinality(String),
+    enabled    UInt8,
+    priority   Int32,
+    seed       UInt8,
+    spec_json  String CODEC(ZSTD(3)),
+    updated_at DateTime64(3),
+    ver        UInt64,
+    is_deleted UInt8 DEFAULT 0
+)
+ENGINE = ReplacingMergeTree(ver)
+ORDER BY id
+`
+
 const systemMetricsDDL = `
 CREATE TABLE IF NOT EXISTS system_metrics
 (
@@ -102,6 +120,7 @@ func coldBootstrapStatements() []bootstrapStmt {
 		{title: "enterprise_nets: подсети предприятия для аномалий", sql: enterpriseNetsDDL},
 		{title: "reputation_ranges: офлайн-репутационные списки", sql: reputationRangesDDL},
 		{title: "parse_errors: строки логов, которые не удалось распарсить", sql: parseErrorsDDL},
+		{title: "parser_rules: редактируемые CEF/KV парсеры", sql: parserRulesDDL},
 		{title: "system_metrics: метрики самой системы", sql: systemMetricsDDL},
 		{title: "v_metrics_latest: последние значения метрик", sql: metricsLatestViewDDL},
 		{title: "dr_events: история backup/restore операций", sql: drEventsDDL},
