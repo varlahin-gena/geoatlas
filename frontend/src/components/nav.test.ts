@@ -51,6 +51,7 @@ describe('groupNav', () => {
     ]);
     expect(sections.find((s) => s.id === 'data')?.items.map((i) => i.href)).toEqual([
       '/parse-errors',
+      '/parsers',
       '/parser-test',
       '/geo-missing',
       '/geo-ranges',
