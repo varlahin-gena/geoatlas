@@ -5,8 +5,8 @@ import type { MapLine } from '@/api/eventsTypes';
 import { fmtNumber } from '@/lib/format';
 import { COPY, TERM } from '@/lib/glossary';
 import {
-  anomalyEventsHours,
   anomalyEventsQuery,
+  anomalyPeersHours,
   anomalyPeersPeriodQuery,
   anomalyPeersScopeLabel,
 } from './anomalyDisplay';
@@ -21,8 +21,9 @@ export function AnomalyPeersPanel({
   onLinesLoaded?: (lines: MapLine[]) => void;
 }) {
   const q = anomalyEventsQuery(item);
-  const hours = anomalyEventsHours(item);
+  const hours = anomalyPeersHours(item);
   const periodQuery = anomalyPeersPeriodQuery(item);
+  const country = (item.map?.country || '').trim() || undefined;
   const [lines, setLines] = useState<MapLine[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -43,6 +44,7 @@ export function AnomalyPeersPanel({
       groupBy: 'ip',
       limit: 100,
       filter: item.map?.filter && item.map.filter !== 'all' ? item.map.filter : undefined,
+      country,
       q,
       periodQuery,
       source: 'live',
@@ -66,7 +68,7 @@ export function AnomalyPeersPanel({
         if (!ac.signal.aborted) setLoading(false);
       });
     return () => ac.abort();
-  }, [q, periodQuery, item.map?.filter, item.fingerprint]);
+  }, [q, periodQuery, country, item.map?.filter, item.fingerprint]);
 
   if (!q) return null;
 
