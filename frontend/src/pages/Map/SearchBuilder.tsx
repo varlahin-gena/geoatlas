@@ -235,14 +235,16 @@ export function SearchBuilder({
                     И
                   </span>
                 )}
-                <label className="search-builder-negate">
-                  <input
-                    type="checkbox"
-                    checked={row.negate}
-                    onChange={(e) => updateRow(idx, { negate: e.target.checked })}
-                  />
+                <button
+                  type="button"
+                  className={`search-builder-negate${row.negate ? ' is-on' : ''}`}
+                  aria-pressed={row.negate}
+                  aria-label="Отрицание условия (NOT)"
+                  title="Отрицание условия"
+                  onClick={() => updateRow(idx, { negate: !row.negate })}
+                >
                   НЕ
-                </label>
+                </button>
                 {row.kind === 'term' ? (
                   <>
                     <FieldSelect
@@ -278,18 +280,20 @@ export function SearchBuilder({
                     <div className="search-builder-group-children">
                       {row.children.map((child, cidx) => (
                         <div key={cidx} className="search-builder-row search-builder-row-nested">
-                          <label className="search-builder-negate">
-                            <input
-                              type="checkbox"
-                              checked={child.negate}
-                              onChange={(e) => {
-                                const children = row.children.slice();
-                                children[cidx] = { ...child, negate: e.target.checked };
-                                updateRow(idx, { children });
-                              }}
-                            />
+                          <button
+                            type="button"
+                            className={`search-builder-negate${child.negate ? ' is-on' : ''}`}
+                            aria-pressed={child.negate}
+                            aria-label="Отрицание условия (NOT)"
+                            title="Отрицание условия"
+                            onClick={() => {
+                              const children = row.children.slice();
+                              children[cidx] = { ...child, negate: !child.negate };
+                              updateRow(idx, { children });
+                            }}
+                          >
                             НЕ
-                          </label>
+                          </button>
                           <FieldSelect
                             value={child.field}
                             onChange={(field) => {
