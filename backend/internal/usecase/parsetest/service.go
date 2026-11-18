@@ -12,20 +12,28 @@ const MaxLines = 200 // защита от вставки огромного фа
 
 // Row — одна строка результата parse-test.
 type Row struct {
-	N          int    `json:"n"`
-	Line       string `json:"line"`
-	Parsed     bool   `json:"parsed"`
-	Skipped    bool   `json:"skipped"`
-	Vendor     string `json:"vendor,omitempty"`
-	Reason     string `json:"reason,omitempty"`
-	SrcIP      string `json:"src_ip,omitempty"`
-	DstIP      string `json:"dst_ip,omitempty"`
-	SrcPort    uint32 `json:"src_port,omitempty"`
-	DstPort    uint32 `json:"dst_port,omitempty"`
-	Action     string `json:"action,omitempty"`
-	Proto      string `json:"proto,omitempty"`
-	SrcCountry string `json:"src_country,omitempty"`
-	DstCountry string `json:"dst_country,omitempty"`
+	N           int    `json:"n"`
+	Line        string `json:"line"`
+	Parsed      bool   `json:"parsed"`
+	Skipped     bool   `json:"skipped"`
+	Vendor      string `json:"vendor,omitempty"`
+	Reason      string `json:"reason,omitempty"`
+	Device      string `json:"device,omitempty"`
+	SrcIP       string `json:"src_ip,omitempty"`
+	DstIP       string `json:"dst_ip,omitempty"`
+	SrcPort     uint32 `json:"src_port,omitempty"`
+	DstPort     uint32 `json:"dst_port,omitempty"`
+	Action      string `json:"action,omitempty"`
+	Proto       string `json:"proto,omitempty"`
+	Rule        string `json:"rule,omitempty"`
+	SrcZone     string `json:"src_zone,omitempty"`
+	DstZone     string `json:"dst_zone,omitempty"`
+	SrcCountry  string `json:"src_country,omitempty"`
+	DstCountry  string `json:"dst_country,omitempty"`
+	BytesSent   uint64 `json:"bytes_sent,omitempty"`
+	BytesRecv   uint64 `json:"bytes_recv,omitempty"`
+	PacketsSent uint64 `json:"packets_sent,omitempty"`
+	PacketsRecv uint64 `json:"packets_recv,omitempty"`
 }
 
 // Result — сводка parse-test.
@@ -96,12 +104,20 @@ func (s *Service) Run(r io.Reader) (Result, error) {
 		case res.OK:
 			parsed++
 			tl := res.Log
+			row.Device = tl.Device
 			row.SrcIP = tl.SrcIP
 			row.DstIP = tl.DstIP
 			row.SrcPort = tl.SrcPort
 			row.DstPort = tl.DstPort
 			row.Action = string(tl.Action)
 			row.Proto = tl.Proto
+			row.Rule = tl.Rule
+			row.SrcZone = tl.SrcZone
+			row.DstZone = tl.DstZone
+			row.BytesSent = tl.BytesSent
+			row.BytesRecv = tl.BytesRecv
+			row.PacketsSent = tl.PacketsSent
+			row.PacketsRecv = tl.PacketsRecv
 
 			if s.geo != nil {
 				if m := mapagg.IPGroupMeta(s.geo, tl.SrcIP, "country"); m.Valid {
