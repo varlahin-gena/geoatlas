@@ -69,7 +69,7 @@ func TestPostCASmoke(t *testing.T) {
 		&parser.CiscoASA{},
 		&parser.GenericKV{},
 	)
-	pta := parseradapter.NewParseTest(parsers)
+	pta := parseradapter.NewParseTestFromRegistry(parsers)
 	parseTestUC := parsetest.New(pta, geoIdx, pta)
 
 	ingestSvc := ingestnet.NewService(ingestnet.Config{

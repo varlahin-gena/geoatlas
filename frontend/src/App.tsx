@@ -25,6 +25,9 @@ const ParseErrorsPage = lazyRetry(() => import('@/pages/ParseErrors/ParseErrorsP
 const ParserTestPage = lazyRetry(() => import('@/pages/ParserTest/ParserTestPage'), {
   label: 'тест парсеров',
 });
+const ParsersPage = lazyRetry(() => import('@/pages/Parsers/ParsersPage'), {
+  label: 'парсеры',
+});
 const GeoMissingPage = lazyRetry(() => import('@/pages/GeoMissing/GeoMissingPage'), {
   label: 'IP без координат',
 });
@@ -141,6 +144,16 @@ export default function App() {
                   <RequireAuth admin>
                     <Lazy label="ошибки парсинга">
                       <ParseErrorsPage />
+                    </Lazy>
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/parsers"
+                element={
+                  <RequireAuth admin>
+                    <Lazy label="парсеры">
+                      <ParsersPage />
                     </Lazy>
                   </RequireAuth>
                 }

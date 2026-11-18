@@ -28,7 +28,6 @@ import (
 	domainauth "geoatlas/internal/auth"
 	"geoatlas/internal/config"
 	"geoatlas/internal/installprofile"
-	"geoatlas/internal/parser"
 	usecaseanomaly "geoatlas/internal/usecase/anomaly"
 	usecaseaudit "geoatlas/internal/usecase/auditlog"
 	usecaseauth "geoatlas/internal/usecase/auth"
@@ -43,7 +42,7 @@ import (
 	usecasesystem "geoatlas/internal/usecase/system"
 )
 
-func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, parsers *parser.Registry) *httpapi.Server {
+func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pp parserParts) *httpapi.Server {
 	trafficRepo := trafficstore.NewTrafficRepository(a.pools.API)
 	geoRepo := geostore.NewGeoRepository(a.pools.API, a.pools.Ingest)
 	// Не передавать typed-nil *ReloadableReputationIndex в ReputationLookuper:
@@ -61,7 +60,7 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 		geoUC.SetSoftMemLimitBytes(config.BackendSoftMemLimitBytes(p.Limits.Backend.MemoryGB))
 	}
 	parseErrorsUC := parseerrors.New(perrorstore.NewParseErrorRepository(a.pools.API, a.pools.Ingest))
-	parseTestAdapter := parseradapter.NewParseTest(parsers)
+	parseTestAdapter := parseradapter.NewParseTest(pp.reg, pp.samples)
 	parseTestUC := parsetest.New(parseTestAdapter, bg.geo, parseTestAdapter)
 	systemRepo := sysstore.NewSystemRepository(a.pools.API)
 	logRepo := auditstore.New(a.pools.API)
@@ -183,6 +182,8 @@ func buildHTTP(cfg config.Config, a *app, auth authParts, bg backgroundParts, pa
 		ReputationSettingsUC: reputationSettingsUC,
 		ConnectorsUC:         bg.connectorsUC,
 		ParseErrorsUC:        parseErrorsUC,
+		ParsersUC:            pp.uc,
+		LiveParse:            pp.reg,
 		SystemUC:             systemUC,
 		SystemPinger:         systemRepo,
 		ParseTestUC:          parseTestUC,

@@ -93,15 +93,15 @@ func buildApp(ctx context.Context, cfg config.Config) (*app, error) {
 	}
 
 	bg := wireBackground(ctx, bgCtx, a, cfg)
-	parsers := newParserRegistry()
+	pp := wireParsers(ctx, a)
 	a.prom = appmetrics.New(nil)
-	startIngest(a, cfg, bg.geo, parsers)
+	startIngest(a, cfg, bg.geo, pp.reg)
 	a.skipGate.Set(anomalyjob.Gate{Ingest: a.ingestSvc})
 	if a.geoJobs != nil {
 		a.geoJobs.SetGate(a.skipGate)
 	}
 	a.prom.SetIngest(a.ingestSvc)
-	a.srv = buildHTTP(cfg, a, authParts, bg, parsers)
+	a.srv = buildHTTP(cfg, a, authParts, bg, pp)
 	if a.repJobs != nil {
 		a.repJobs.Start(bgCtx)
 	}

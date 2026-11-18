@@ -115,6 +115,14 @@ export const PAGE_NAV: NavItem[] = [
     adminOnly: true,
   },
   {
+    href: '/parsers',
+    label: 'Парсеры',
+    title: 'Правила парсеров',
+    group: 'data',
+    match: ['/parsers'],
+    adminOnly: true,
+  },
+  {
     href: '/parser-test',
     label: 'Тест парсеров',
     group: 'data',

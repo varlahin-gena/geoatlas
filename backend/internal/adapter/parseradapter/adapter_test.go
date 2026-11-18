@@ -29,11 +29,11 @@ func TestAdapterNilAndParse(t *testing.T) {
 	if r := pt.ParseVerbose("x"); r.Reason != "parser unavailable" {
 		t.Fatalf("%+v", r)
 	}
-	pta := NewParseTest(nil)
+	pta := NewParseTest(nil, nil)
 	if r := pta.ParseVerbose("x"); r.Reason != "parser unavailable" {
 		t.Fatalf("%+v", r)
 	}
-	pta = NewParseTest(reg)
+	pta = NewParseTestFromRegistry(reg)
 	_ = pta.ParseVerbose("src=1.1.1.1 dst=8.8.8.8")
 	if len(pta.SamplesByVendor()) == 0 {
 		t.Fatal("samples empty")

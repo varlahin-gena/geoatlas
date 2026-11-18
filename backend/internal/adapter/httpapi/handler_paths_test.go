@@ -375,6 +375,14 @@ func TestParseHandlerUnavailable(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("samples nil: %d", rec.Code)
 	}
+	rec = call(h.ListParsers, http.MethodGet, "/api/parsers", "")
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("list parsers: %d", rec.Code)
+	}
+	rec = call(h.CreateParser, http.MethodPost, "/api/parsers", `{}`)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("create parsers: %d", rec.Code)
+	}
 }
 
 func TestGeoHandlerClearExportNil(t *testing.T) {
