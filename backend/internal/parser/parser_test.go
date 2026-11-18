@@ -58,15 +58,13 @@ func checkTL(t *testing.T, name string, got model.TrafficLog, w tlWant) {
 	eqU64("packets_recv", got.PacketsRecv, w.pktRecv)
 }
 
-// testRegistry — тот же порядок парсеров, что и в cmd/geoatlas/main.go.
+// testRegistry — hybrid: seed CEF/KV rules + built-in Cisco (как production).
 func testRegistry() *Registry {
-	return NewRegistry(
-		&UserGateCEF{},
-		&FortigateCEF{},
-		&CiscoFTD{},
-		&CiscoASA{},
-		&GenericKV{},
-	)
+	reg, err := BuildRegistry(DefaultSeedRules())
+	if err != nil {
+		panic(err)
+	}
+	return reg
 }
 
 // ============================================================

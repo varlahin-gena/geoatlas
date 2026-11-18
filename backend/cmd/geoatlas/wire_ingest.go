@@ -13,17 +13,7 @@ import (
 	usecaseingest "geoatlas/internal/usecase/ingest"
 )
 
-func newParserRegistry() *parser.Registry {
-	return parser.NewRegistry(
-		&parser.UserGateCEF{},
-		&parser.FortigateCEF{},
-		&parser.CiscoFTD{},
-		&parser.CiscoASA{},
-		&parser.GenericKV{},
-	)
-}
-
-func startIngest(a *app, cfg config.Config, geo *geostore.ReloadableGeoIndex, parsers *parser.Registry) {
+func startIngest(a *app, cfg config.Config, geo *geostore.ReloadableGeoIndex, parsers *parser.ReloadableRegistry) {
 	lineParser := parseradapter.New(parsers)
 	ingestRepo := ingeststore.NewIngestRepository(a.pools.Ingest)
 	var insertObs usecaseingest.InsertObserver

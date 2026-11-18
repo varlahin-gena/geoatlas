@@ -9,6 +9,7 @@ import (
 	"geoatlas/internal/adapter/httpapi/loginthrottle"
 	"geoatlas/internal/auth"
 	"geoatlas/internal/config"
+	"geoatlas/internal/parser"
 	usecaseanomaly "geoatlas/internal/usecase/anomaly"
 	usecaseaudit "geoatlas/internal/usecase/auditlog"
 	usecaseauth "geoatlas/internal/usecase/auth"
@@ -18,6 +19,7 @@ import (
 	usecasegeo "geoatlas/internal/usecase/geo"
 	usecasehunts "geoatlas/internal/usecase/hunts"
 	"geoatlas/internal/usecase/parseerrors"
+	"geoatlas/internal/usecase/parsers"
 	"geoatlas/internal/usecase/parsetest"
 	usecasereputation "geoatlas/internal/usecase/reputation"
 	usecaseretention "geoatlas/internal/usecase/retention"
@@ -87,11 +89,19 @@ type IngestDeps struct {
 	ingest         Ingester
 }
 
-// ParseDeps — зависимости ParseHandler (parse-errors + parse-test).
+// liveParser — hot-path parse для dry-run (текущий registry).
+type liveParser interface {
+	ParseVerbose(line string) parser.ParseResult
+}
+
+// ParseDeps — зависимости ParseHandler (parse-errors + parse-test + parser rules).
 type ParseDeps struct {
 	queryTimeout  time.Duration
 	parseErrorsUC *parseerrors.Service
 	parseTestUC   *parsetest.Service
+	parsersUC     *parsers.Service
+	liveParse     liveParser
+	logs          *usecaseaudit.Service
 }
 
 // ReputationDeps — зависимости ReputationHandler.
@@ -132,6 +142,8 @@ type Params struct {
 	ReputationSettingsUC *usecasereputation.SettingsService
 	ConnectorsUC         *connectors.Service
 	ParseErrorsUC        *parseerrors.Service
+	ParsersUC            *parsers.Service
+	LiveParse            liveParser
 	SystemUC             *usecasesystem.Service
 	SystemPinger         usecasesystem.ClickHousePinger
 	ParseTestUC          *parsetest.Service
@@ -233,7 +245,14 @@ func NewDeps(p Params) *Deps {
 			geoUC:              p.GeoUC,
 		},
 		ingest: &IngestDeps{ingestFlushSec: p.Cfg.Ingest.FlushSec, ingest: p.Ingest},
-		parse:  &ParseDeps{queryTimeout: p.Cfg.QueryTimeout, parseErrorsUC: p.ParseErrorsUC, parseTestUC: p.ParseTestUC},
+		parse: &ParseDeps{
+			queryTimeout:  p.Cfg.QueryTimeout,
+			parseErrorsUC: p.ParseErrorsUC,
+			parseTestUC:   p.ParseTestUC,
+			parsersUC:     p.ParsersUC,
+			liveParse:     p.LiveParse,
+			logs:          p.Logs,
+		},
 		reputation: &ReputationDeps{
 			reputationUC:       p.ReputationUC,
 			reputationSettings: p.ReputationSettingsUC,

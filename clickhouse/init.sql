@@ -119,6 +119,25 @@ TTL toDateTime(timestamp) + INTERVAL 7 DAY DELETE
 SETTINGS index_granularity = 8192, ttl_only_drop_parts = 1;
 
 -- ============================================================
+-- parser_rules: редактируемые CEF/KV парсеры
+-- ============================================================
+CREATE TABLE IF NOT EXISTS parser_rules
+(
+    id         String,
+    name       String,
+    vendor     LowCardinality(String),
+    enabled    UInt8,
+    priority   Int32,
+    seed       UInt8,
+    spec_json  String CODEC(ZSTD(3)),
+    updated_at DateTime64(3),
+    ver        UInt64,
+    is_deleted UInt8 DEFAULT 0
+)
+ENGINE = ReplacingMergeTree(ver)
+ORDER BY id;
+
+-- ============================================================
 -- system_metrics: метрики самой системы
 -- ============================================================
 CREATE TABLE IF NOT EXISTS system_metrics

@@ -34,6 +34,10 @@ var mutationPaths = []struct {
 	{"put", "/api/system/tls"},
 	{"put", "/api/system/backup-schedule"},
 	{"post", "/api/parse-errors/delete"},
+	{"post", "/api/parsers"},
+	{"put", "/api/parsers/order"},
+	{"post", "/api/parsers/dry-run"},
+	{"put", "/api/parsers/{id}"},
 	{"post", "/api/me/hunts"},
 	{"put", "/api/me/hunts/{id}"},
 }
