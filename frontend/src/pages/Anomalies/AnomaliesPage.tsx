@@ -100,12 +100,6 @@ function EpisodesPanel({
   );
 }
 
-function closeAnomalyMore(target: EventTarget | null) {
-  const root =
-    target instanceof Element ? (target.closest('details') as HTMLDetailsElement | null) : null;
-  if (root) root.open = false;
-}
-
 function AnomalyRowActions({
   item,
   acked,
@@ -139,6 +133,16 @@ function AnomalyRowActions({
       >
         На карте
       </Link>
+      {canPeers ? (
+        <button
+          type="button"
+          className="btn sm"
+          aria-expanded={expanded}
+          onClick={onTogglePeers}
+        >
+          {expanded ? 'Скрыть связи' : 'Связи'}
+        </button>
+      ) : null}
       {!acked ? (
         <button
           type="button"
@@ -149,25 +153,6 @@ function AnomalyRowActions({
         >
           Закрыть
         </button>
-      ) : null}
-      {canPeers ? (
-        <details className="anomaly-more">
-          <summary className="btn sm ghost">Ещё</summary>
-          <div className="anomaly-more-menu" role="menu">
-            <button
-              type="button"
-              role="menuitem"
-              className="anomaly-more-item"
-              aria-expanded={expanded}
-              onClick={(e) => {
-                closeAnomalyMore(e.currentTarget);
-                onTogglePeers();
-              }}
-            >
-              {expanded ? 'Скрыть связи' : 'Связи'}
-            </button>
-          </div>
-        </details>
       ) : null}
     </div>
   );
