@@ -47,6 +47,44 @@ export function fmtLag(sec: unknown): string {
   return `${(s / 3600).toFixed(1)} ч`;
 }
 
+const HEALTH_STATE_LABEL: Record<string, string> = {
+  up: 'работает',
+  down: 'недоступен',
+  unknown: 'неизвестно',
+  running: 'работает',
+  idle: 'простой',
+  stopped: 'остановлен',
+  ok: 'в норме',
+  warn: 'внимание',
+  error: 'ошибка',
+  degraded: 'ограничен',
+};
+
+const CONTAINER_LABEL: Record<string, string> = {
+  backend: 'Сервер',
+  clickhouse: 'ClickHouse',
+  'syslog-ng': 'Syslog',
+  frontend: 'Интерфейс',
+};
+
+/** Health badge: up/down/running → Russian, unknown tokens pass through. */
+export function healthStateLabel(raw?: string | null): string {
+  if (raw == null || raw === '') return 'неизвестно';
+  const key = String(raw).trim().toLowerCase();
+  return HEALTH_STATE_LABEL[key] || String(raw);
+}
+
+export function containerLabel(name: string): string {
+  return CONTAINER_LABEL[name] || name;
+}
+
+export function capacityHint(capPct: number): string {
+  if (capPct > 125) {
+    return 'Нагрузка выше лимита профиля — увеличьте профиль или снизьте входящий поток.';
+  }
+  return 'Нагрузка близка к лимиту профиля.';
+}
+
 export function fmtUptime(sec: unknown): string {
   const s = num(sec);
   if (s < 60) return `${Math.round(s)} с`;
@@ -124,23 +162,73 @@ export function fmtDropAt(iso: unknown): string {
   return d.toLocaleString();
 }
 
+const EDGES_STATE_LABEL: Record<string, string> = {
+  idle: 'ожидание',
+  pending: 'ожидает заполнения',
+  running: 'в работе',
+  ready: 'готово',
+  error: 'ошибка',
+};
+
+const EDGES_PHASE_LABEL: Record<string, string> = {
+  schema: 'схема',
+  backfill: 'заполнение',
+};
+
+const EDGES_MESSAGE_HINT: Record<string, string> = {
+  'up to date': 'Сводки актуальны — карта читает суточные данные.',
+  'not started': 'Подготовка сводок ещё не запускалась.',
+  'traffic_logs empty': 'Сырых логов пока нет — сводки появятся после первых событий.',
+};
+
+/** Badge for Overview: human status, not raw state/phase tokens. */
+export function edgesAggBadge(edges?: EdgesAgg): string {
+  if (!edges) return '—';
+  const state = edges.state || 'idle';
+  const stateLabel = EDGES_STATE_LABEL[state] || state;
+  const phase = edges.phase || '';
+  if (!phase || state === 'ready' || state === 'idle') return stateLabel;
+  const phaseLabel = EDGES_PHASE_LABEL[phase] || phase;
+  return `${stateLabel} · ${phaseLabel}`;
+}
+
+export function edgesMapSourceLabel(source?: string): string {
+  if (!source) return '—';
+  if (source === 'edges_daily') return 'суточные сводки';
+  if (source === 'traffic_logs') return 'подробные логи';
+  return source;
+}
+
+export function edgesAggMessageLabel(message?: string): string {
+  if (!message) return '—';
+  return EDGES_MESSAGE_HINT[message] || message;
+}
+
 export function edgesAggHint(edges?: EdgesAgg): string {
   if (!edges) return '';
-  if (edges.message) return edges.message;
+  const msg = (edges.message || '').trim();
+  if (msg && EDGES_MESSAGE_HINT[msg]) return EDGES_MESSAGE_HINT[msg];
+
   const state = edges.state || 'idle';
   const phase = edges.phase || '';
   if (state === 'running' && phase === 'schema') {
-    return 'Готовится схема агрегатов — карта временно на подробных логах.';
+    return 'Готовится схема сводок — карта временно на подробных логах.';
   }
   if (state === 'running') {
-    return 'Идёт заполнение агрегатов — карта на подробных логах, пока не будет готово.';
+    return 'Идёт заполнение сводок — карта пока на подробных логах.';
+  }
+  if (state === 'pending') {
+    return 'Схема готова, заполнение истории ещё не запускалось.';
   }
   if (state === 'ready') {
-    return 'Агрегаты готовы — карта использует суточные сводки.';
+    return 'Сводки готовы — карта читает суточные данные.';
   }
   if (state === 'error') {
-    return 'Ошибка подготовки агрегатов — перезапустите сервис или смотрите логи.';
+    return msg
+      ? `Ошибка подготовки сводок: ${msg}`
+      : 'Ошибка подготовки сводок — перезапустите сервис или смотрите логи.';
   }
+  if (msg) return msg;
   return '';
 }
 

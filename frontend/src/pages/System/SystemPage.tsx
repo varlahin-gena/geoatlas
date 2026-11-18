@@ -9,6 +9,7 @@ import {
   bufferTone,
   capacityTone,
   dropsTone,
+  edgesAggBadge,
   edgesAggHint,
   lagTone,
   num,
@@ -147,9 +148,7 @@ export default function SystemPage() {
   // Do not mirror backend EPS — hides a dead/empty syslog-ng scrape.
   const syslogEps = num(syslogng.events_per_sec);
   const edgesHint = edgesAggHint(edges);
-  const edgesBadge = edges?.phase
-    ? `${edges.state || 'idle'}/${edges.phase}`
-    : edges?.state || '—';
+  const edgesBadge = edgesAggBadge(edges);
 
   const healthLevel = useMemo(() => {
     const hasError = alerts.some((a) => a.level === 'error');
@@ -164,7 +163,14 @@ export default function SystemPage() {
       ? `${alerts.length} проблем`
       : healthLevel === 'warn'
         ? `${alerts.length} предупр.`
-        : 'Система OK';
+        : 'Система в норме';
+
+  const alertLevelLabel = (level?: string) => {
+    if (level === 'error') return 'ошибка';
+    if (level === 'warn') return 'внимание';
+    if (level === 'info') return 'инфо';
+    return level || '';
+  };
 
   const backendHealth = stats?.health?.backend || {};
   const ingestHealth = stats?.health?.ingest || {};
@@ -219,7 +225,7 @@ export default function SystemPage() {
                   const ackKey = `${a.code || ''}|${a.target || ''}`;
                   return (
                     <div key={`${a.code}-${i}`} className={`alert-row ${a.level || ''}`}>
-                      <span className="level">{a.level}</span>
+                      <span className="level">{alertLevelLabel(a.level)}</span>
                       <div className="alert-body">
                         {a.code ? <span className="code">{a.code}</span> : null}
                         {a.target ? <span className="target">{a.target}</span> : null}
@@ -268,13 +274,13 @@ export default function SystemPage() {
               <span className={`sm-value ${toneClass(bufferTone(buffered))}`}>{fmtNumber(buffered)}</span>
             </div>
             <div className="status-metric">
-              <span className="sm-label">Drops</span>
+              <span className="sm-label">Потери</span>
               <span
                 className={`sm-value ${toneClass(dropsTone(dropsPerSec + syslogngDropsPerSec, bufferDropsPerSec))}`}
                 id="statusDrops"
-                title={`admission ${fmtNumber(dropsPerSec)}/s · buffer ${fmtNumber(bufferDropsPerSec)}/s · syslog-ng ${fmtNumber(syslogngDropsPerSec)}/s`}
+                title={`приём ${fmtNumber(dropsPerSec)}/с · буфер ${fmtNumber(bufferDropsPerSec)}/с · syslog ${fmtNumber(syslogngDropsPerSec)}/с`}
               >
-                {fmtNumber(dropsPerSec + bufferDropsPerSec + syslogngDropsPerSec)}/s
+                {fmtNumber(dropsPerSec + bufferDropsPerSec + syslogngDropsPerSec)}/с
               </span>
             </div>
             <div className="status-metric" hidden={!epsMax}>
