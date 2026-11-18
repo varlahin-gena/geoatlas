@@ -1,5 +1,32 @@
 .parsers-lead {
+  margin: 0 0 1rem;
+  max-width: 52rem;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+
+.parsers-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
   margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--red) 45%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--red) 10%, var(--panel));
+}
+
+.parsers-banner strong {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.parsers-banner p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  max-width: 40rem;
 }
 
 .parsers-toolbar {

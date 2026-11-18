@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 
+	"geoatlas/internal/adapter/clickhouse/migrate"
 	"geoatlas/internal/adapter/clickhouse/parserstore"
 	"geoatlas/internal/adapter/parseradapter"
 	"geoatlas/internal/parser"
@@ -17,6 +18,11 @@ type parserParts struct {
 }
 
 func wireParsers(ctx context.Context, a *app) parserParts {
+	// Ensure parser_rules even if early HTTP schema ran against an older binary
+	// or a different pool — List/seed must not 500 on missing table.
+	if err := migrate.EnsureBaseSchema(ctx, a.pools.API); err != nil {
+		slog.Warn("parser_rules schema ensure failed", "err", err)
+	}
 	store := parserstore.New(a.pools.API, a.pools.Ingest)
 	reg := parser.NewReloadable(nil)
 	samples := parseradapter.NewSamplesHolder(parser.SamplesFromRules(nil))

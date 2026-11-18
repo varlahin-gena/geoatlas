@@ -114,6 +114,7 @@ export default function ParsersPage() {
   const { toast } = useToast();
   const [items, setItems] = useState<ParserItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<Draft | null>(null);
   const [isCreate, setIsCreate] = useState(false);
@@ -121,11 +122,18 @@ export default function ParsersPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await listParsers();
       setItems(res.parsers || []);
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Не удалось загрузить парсеры', 'error');
+      const msg = e instanceof Error ? e.message : 'Не удалось загрузить парсеры';
+      setLoadError(
+        msg === 'internal server error'
+          ? 'Не удалось загрузить правила парсеров. Проверьте, что таблица parser_rules создана, и обновите страницу.'
+          : msg,
+      );
+      toast(msg === 'internal server error' ? 'Не удалось загрузить парсеры' : msg, 'error');
     } finally {
       setLoading(false);
     }
@@ -225,37 +233,51 @@ export default function ParsersPage() {
     }
   }
 
+  const toolbar = (
+    <>
+      <button
+        type="button"
+        className="btn primary"
+        disabled={busy}
+        onClick={() => {
+          setIsCreate(true);
+          setEditing(newDraft());
+          setDryResult(null);
+        }}
+      >
+        Добавить правило
+      </button>
+      <button type="button" className="btn" disabled={busy || loading} onClick={() => void load()}>
+        Обновить
+      </button>
+    </>
+  );
+
   return (
-    <SettingsLayout title="Парсеры">
+    <SettingsLayout title="Парсеры" actions={toolbar}>
       <p className="page-lead parsers-lead">
-        CEF/KV-правила в ClickHouse; Cisco ASA/FTD — встроенный код. Порядок = priority (меньше —
-        раньше). После сохранения registry перезагружается без рестарта ingest.
+        CEF/KV-правила хранятся в ClickHouse; Cisco ASA/FTD — встроенный код. Меньший priority
+        срабатывает раньше. После сохранения registry перезагружается без рестарта ingest.
       </p>
 
-      <div className="parsers-toolbar">
-        <button
-          type="button"
-          className="btn primary"
-          disabled={busy}
-          onClick={() => {
-            setIsCreate(true);
-            setEditing(newDraft());
-            setDryResult(null);
-          }}
-        >
-          Добавить правило
-        </button>
-        <button type="button" className="btn" disabled={busy || loading} onClick={() => void load()}>
-          Обновить
-        </button>
-      </div>
+      {loadError ? (
+        <div className="parsers-banner" role="alert">
+          <div>
+            <strong>Не удалось загрузить список</strong>
+            <p>{loadError}</p>
+          </div>
+          <button type="button" className="btn" disabled={loading} onClick={() => void load()}>
+            Повторить
+          </button>
+        </div>
+      ) : null}
 
       <div className="card">
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Priority</th>
+                <th>Приоритет</th>
                 <th>ID</th>
                 <th>Имя</th>
                 <th>Vendor</th>
@@ -268,6 +290,16 @@ export default function ParsersPage() {
             <tbody>
               {loading ? (
                 <TableLoadRows cols={8} rows={5} loading={loading} onRetry={() => void load()} />
+              ) : loadError ? (
+                <tr>
+                  <td colSpan={8} className="empty">
+                    <EmptyState
+                      compact
+                      title="Список недоступен"
+                      description="Исправьте ошибку загрузки и нажмите «Повторить»."
+                    />
+                  </td>
+                </tr>
               ) : sorted.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="empty">

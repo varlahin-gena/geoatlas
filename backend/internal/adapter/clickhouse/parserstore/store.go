@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
@@ -44,16 +45,20 @@ func (s *Store) List(ctx context.Context) ([]parser.RuleRecord, error) {
 		var (
 			rec      parser.RuleRecord
 			enabled  uint8
+			priority int32
 			seed     uint8
 			specJSON string
 		)
-		if err := rows.Scan(&rec.ID, &rec.Name, &rec.Vendor, &enabled, &rec.Priority, &seed, &specJSON); err != nil {
-			return nil, err
+		// ClickHouse Int32 must scan into int32 — *int fails on amd64.
+		if err := rows.Scan(&rec.ID, &rec.Name, &rec.Vendor, &enabled, &priority, &seed, &specJSON); err != nil {
+			return nil, fmt.Errorf("scan parser_rules: %w", err)
 		}
+		rec.Priority = int(priority)
 		rec.Enabled = enabled != 0
 		rec.Seed = seed != 0
 		if err := json.Unmarshal([]byte(specJSON), &rec.Spec); err != nil {
-			return nil, fmt.Errorf("parse spec for %q: %w", rec.ID, err)
+			slog.Warn("parser_rules: skip row with invalid spec_json", "id", rec.ID, "err", err)
+			continue
 		}
 		out = append(out, rec)
 	}

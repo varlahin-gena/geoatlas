@@ -303,25 +303,62 @@ body.page-admin .topbar {
   height: var(--topbar-h);
   min-height: var(--topbar-h);
   flex-shrink: 0;
-  background: var(--panel);
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  backdrop-filter: saturate(1.2) blur(12px);
+  -webkit-backdrop-filter: saturate(1.2) blur(12px);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 16px;
+  gap: 16px;
+  /* Match settings-content horizontal rhythm so title/actions align with the page. */
+  padding: 0 24px;
 }
-body.page-admin .topbar .title { font-weight: 600; letter-spacing: 0.3px; white-space: nowrap; }
+@media (prefers-reduced-transparency: reduce) {
+  body.page-admin .topbar {
+    background: var(--panel);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+body.page-admin .topbar .topbar-title,
+body.page-admin .topbar .title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  max-width: min(42vw, 28rem);
+}
 body.page-admin .topbar .title .sub {
   color: var(--text-muted);
   font-weight: 400;
-  margin-left: 6px;
+  font-size: 13px;
+  margin-left: 8px;
 }
-.topbar-spacer { flex: 1; }
+.topbar-spacer { flex: 1; min-width: 12px; }
 body.page-admin .topbar-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   flex-shrink: 0;
+}
+body.page-admin .topbar-actions .btn {
+  min-height: 28px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+@media (max-width: 860px) {
+  body.page-admin .topbar {
+    padding: 0 16px;
+    gap: 10px;
+  }
+  body.page-admin .topbar .topbar-title,
+  body.page-admin .topbar .title {
+    max-width: 46vw;
+  }
 }
 body.page-map .topbar .topbar-spacer { flex: 1; min-width: 8px; }
 
@@ -332,11 +369,13 @@ a.status-pill:hover { background: var(--panel-3); color: var(--text); }
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px;
+  min-height: 28px;
+  padding: 0 10px;
   background: var(--panel-2);
   border: 1px solid var(--border);
-  border-radius: 999px;
-  font-size: 11px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--text-dim);
   flex-shrink: 0;
   user-select: none;

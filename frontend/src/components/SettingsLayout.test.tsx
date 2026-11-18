@@ -19,7 +19,7 @@ vi.mock('./Shell', () => ({
 }));
 
 describe('SettingsLayout', () => {
-  it('prefixes title and renders children without settings panes', () => {
+  it('uses plain pane title by default and renders children', () => {
     render(
       <MemoryRouter initialEntries={['/users']}>
         <SettingsLayout title="Пользователи">
@@ -27,20 +27,31 @@ describe('SettingsLayout', () => {
         </SettingsLayout>
       </MemoryRouter>,
     );
-    expect(screen.getByText('Настройки · Пользователи')).toBeTruthy();
+    expect(screen.getByText('Пользователи')).toBeTruthy();
+    expect(screen.queryByText('Настройки · Пользователи')).toBeNull();
     expect(screen.queryByLabelText('Разделы настроек')).toBeNull();
     expect(screen.getByText('тело')).toBeTruthy();
   });
 
-  it('keeps plain title when requested', () => {
+  it('can prefix Настройки when plainTitle is false', () => {
     render(
-      <MemoryRouter initialEntries={['/connectors']}>
-        <SettingsLayout title="Коннекторы" plainTitle>
+      <MemoryRouter initialEntries={['/parsers']}>
+        <SettingsLayout title="Парсеры" plainTitle={false}>
           <p>тело</p>
         </SettingsLayout>
       </MemoryRouter>,
     );
-    expect(screen.getByText('Коннекторы')).toBeTruthy();
-    expect(screen.queryByText('Настройки · Коннекторы')).toBeNull();
+    expect(screen.getByText('Настройки · Парсеры')).toBeTruthy();
+  });
+
+  it('renders topbar actions when provided', () => {
+    render(
+      <MemoryRouter initialEntries={['/parsers']}>
+        <SettingsLayout title="Парсеры" actions={<button type="button">Добавить правило</button>}>
+          <p>тело</p>
+        </SettingsLayout>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('button', { name: 'Добавить правило' })).toBeTruthy();
   });
 });
