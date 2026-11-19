@@ -130,7 +130,7 @@ export default function ParsersPage() {
       const msg = e instanceof Error ? e.message : 'Не удалось загрузить парсеры';
       setLoadError(
         msg === 'internal server error'
-          ? 'Не удалось загрузить правила парсеров. Проверьте, что таблица parser_rules создана, и обновите страницу.'
+          ? 'Не удалось загрузить правила. Убедитесь, что таблица parser_rules создана, затем обновите страницу.'
           : msg,
       );
       toast(msg === 'internal server error' ? 'Не удалось загрузить парсеры' : msg, 'error');
@@ -153,10 +153,10 @@ export default function ParsersPage() {
     setBusy(true);
     try {
       await updateParser(p.id, { enabled: !p.enabled });
-      toast(p.enabled ? 'Отключён' : 'Включён', 'success');
+      toast(p.enabled ? 'Правило отключено' : 'Правило включено', 'success');
       await load();
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Ошибка обновления', 'error');
+      toast(e instanceof Error ? e.message : 'Не удалось обновить правило', 'error');
     } finally {
       setBusy(false);
     }
@@ -164,15 +164,15 @@ export default function ParsersPage() {
 
   async function onDelete(p: ParserItem) {
     if (!p.editable) return;
-    if (!window.confirm(`Удалить парсер «${p.name}» (${p.id})?`)) return;
+    if (!window.confirm(`Удалить правило «${p.name}» (${p.id})?`)) return;
     setBusy(true);
     try {
       await deleteParser(p.id);
-      toast('Удалён', 'success');
+      toast('Правило удалено', 'success');
       if (editing?.id === p.id) setEditing(null);
       await load();
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Ошибка удаления', 'error');
+      toast(e instanceof Error ? e.message : 'Не удалось удалить правило', 'error');
     } finally {
       setBusy(false);
     }
@@ -194,7 +194,7 @@ export default function ParsersPage() {
           priority: editing.priority,
           spec,
         });
-        toast('Создан', 'success');
+        toast('Правило создано', 'success');
       } else {
         await updateParser(editing.id, {
           name: editing.name,
@@ -203,12 +203,12 @@ export default function ParsersPage() {
           priority: editing.priority,
           spec,
         });
-        toast('Сохранён', 'success');
+        toast('Правило сохранено', 'success');
       }
       setIsCreate(false);
       await load();
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Ошибка сохранения', 'error');
+      toast(err instanceof Error ? err.message : 'Не удалось сохранить правило', 'error');
     } finally {
       setBusy(false);
     }
@@ -227,7 +227,7 @@ export default function ParsersPage() {
       });
       setDryResult(res);
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Dry-run failed', 'error');
+      toast(err instanceof Error ? err.message : 'Не удалось проверить строку', 'error');
     } finally {
       setBusy(false);
     }
@@ -256,9 +256,36 @@ export default function ParsersPage() {
   return (
     <SettingsLayout title="Парсеры" actions={toolbar}>
       <p className="page-lead parsers-lead">
-        CEF/KV-правила хранятся в ClickHouse; Cisco ASA/FTD — встроенный код. Меньший priority
-        срабатывает раньше. После сохранения registry перезагружается без рестарта ingest.
+        Здесь система учится разбирать строки логов МСЭ в поля карты (IP, порты, действие). Готовые
+        шаблоны UserGate / FortiGate уже в списке — чаще всего достаточно отредактировать шаблон или
+        скопировать его идею под свой формат.
       </p>
+
+      <details className="parsers-details">
+        <summary>Как добавить своё правило</summary>
+        <ol>
+          <li>
+            Возьмите одну реальную строку лога (из «Ошибок парсинга» или с устройства).
+          </li>
+          <li>
+            Нажмите «Добавить правило». Для CEF укажите производителя из заголовка строки (
+            <code>CEF:0|Vendor|…</code>). Для KV — ключи, которые обязаны быть в строке.
+          </li>
+          <li>
+            В «Полях» сопоставьте имена системы (<code>src</code>, <code>dst</code>, <code>act</code>…)
+            с ключами в логе. Слева — наше поле, справа — как оно называется у вендора.
+          </li>
+          <li>
+            Вставьте строку в «Проверку» и нажмите «Проверить». Если IP и действие появились —
+            сохраните. Иначе поправьте сопоставление.
+          </li>
+        </ol>
+        <p>
+          Чем меньше приоритет, тем раньше правило пробуется. Cisco ASA/FTD встроены в код и здесь
+          не редактируются. После сохранения правило сразу участвует в приёме логов — рестарт не
+          нужен. Живой поток удобно смотреть на странице «Тест парсеров».
+        </p>
+      </details>
 
       {loadError ? (
         <div className="parsers-banner" role="alert">
@@ -280,10 +307,10 @@ export default function ParsersPage() {
                 <th>Приоритет</th>
                 <th>ID</th>
                 <th>Имя</th>
-                <th>Vendor</th>
-                <th>Kind</th>
+                <th>Производитель</th>
+                <th>Тип</th>
                 <th>Источник</th>
-                <th>Вкл</th>
+                <th>Вкл.</th>
                 <th />
               </tr>
             </thead>
@@ -303,7 +330,11 @@ export default function ParsersPage() {
               ) : sorted.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="empty">
-                    <EmptyState compact title="Нет парсеров" description="Добавьте CEF/KV правило." />
+                    <EmptyState
+                      compact
+                      title="Нет правил"
+                      description="Нажмите «Добавить правило» и пройдите шаги из подсказки выше."
+                    />
                   </td>
                 </tr>
               ) : (
@@ -318,11 +349,11 @@ export default function ParsersPage() {
                     <td>{p.kind || '—'}</td>
                     <td>
                       {p.source === 'builtin' ? (
-                        <span className="parsers-badge is-builtin">код</span>
+                        <span className="parsers-badge is-builtin">встроено</span>
                       ) : p.seed ? (
-                        <span className="parsers-badge is-seed">seed</span>
+                        <span className="parsers-badge is-seed">шаблон</span>
                       ) : (
-                        <span className="parsers-badge">db</span>
+                        <span className="parsers-badge">своё</span>
                       )}
                     </td>
                     <td>
@@ -331,7 +362,7 @@ export default function ParsersPage() {
                         checked={p.enabled}
                         disabled={!p.editable || busy}
                         onChange={() => void toggleEnabled(p)}
-                        aria-label={`Включить ${p.id}`}
+                        aria-label={p.enabled ? `Отключить ${p.name}` : `Включить ${p.name}`}
                       />
                     </td>
                     <td>
@@ -348,7 +379,7 @@ export default function ParsersPage() {
                                 setDryResult(null);
                               }}
                             >
-                              Изменить
+                              Редактировать
                             </button>
                             <button
                               type="button"
@@ -360,7 +391,7 @@ export default function ParsersPage() {
                             </button>
                           </>
                         ) : (
-                          <span className="hint">только код</span>
+                          <span className="hint">только просмотр</span>
                         )}
                       </div>
                     </td>
@@ -373,8 +404,13 @@ export default function ParsersPage() {
       </div>
 
       {editing ? (
-        <div className="card" style={{ marginTop: '1rem' }}>
+        <div className="card parsers-editor" style={{ marginTop: '1rem' }}>
           <h3>{isCreate ? 'Новое правило' : `Правило ${editing.id}`}</h3>
+          <p className="parsers-editor-lead">
+            {isCreate
+              ? 'Заполните, кто шлёт логи и как называются поля → проверьте на реальной строке → сохраните.'
+              : 'Меняйте сопоставление полей, проверяйте на строке лога, затем сохраняйте.'}
+          </p>
           <form className="parsers-form-grid" onSubmit={(e) => void onSave(e)}>
             <div className="parsers-form-row">
               <label>
@@ -383,8 +419,10 @@ export default function ParsersPage() {
                   value={editing.id}
                   disabled={!isCreate || busy}
                   required
+                  placeholder="my-firewall"
                   onChange={(e) => setEditing({ ...editing, id: e.target.value })}
                 />
+                <span className="field-hint">Латиницей, без пробелов. После создания не меняется.</span>
               </label>
               <label>
                 Имя
@@ -392,28 +430,33 @@ export default function ParsersPage() {
                   value={editing.name}
                   required
                   disabled={busy}
+                  placeholder="Мой МСЭ CEF"
                   onChange={(e) => setEditing({ ...editing, name: e.target.value })}
                 />
+                <span className="field-hint">Как правило видно в списке.</span>
               </label>
               <label>
-                Vendor
+                Производитель
                 <input
                   value={editing.vendor}
                   disabled={busy}
+                  placeholder="usergate"
                   onChange={(e) => setEditing({ ...editing, vendor: e.target.value })}
                 />
+                <span className="field-hint">Короткий ярлык устройства (не путать с CEF Vendor).</span>
               </label>
               <label>
-                Priority
+                Приоритет
                 <input
                   type="number"
                   value={editing.priority}
                   disabled={busy}
                   onChange={(e) => setEditing({ ...editing, priority: Number(e.target.value) || 0 })}
                 />
+                <span className="field-hint">Меньше число — раньше пробуем. Шаблоны: 100–200.</span>
               </label>
               <label>
-                Kind
+                Тип
                 <select
                   value={editing.kind}
                   disabled={busy}
@@ -430,9 +473,10 @@ export default function ParsersPage() {
                     });
                   }}
                 >
-                  <option value="cef">cef</option>
-                  <option value="kv">kv</option>
+                  <option value="cef">CEF</option>
+                  <option value="kv">KV (ключ=значение)</option>
                 </select>
+                <span className="field-hint">CEF — строки с заголовком CEF:0|…; KV — пары key=value.</span>
               </label>
               <label style={{ flexDirection: 'row', alignItems: 'center', gap: '0.5rem' }}>
                 <input
@@ -441,59 +485,107 @@ export default function ParsersPage() {
                   disabled={busy}
                   onChange={(e) => setEditing({ ...editing, enabled: e.target.checked })}
                 />
-                Включён
+                Включено
               </label>
             </div>
 
             {editing.kind === 'cef' ? (
               <label>
-                CEF Vendor
+                Производитель в CEF
                 <input
                   value={editing.cefVendor}
                   required
                   disabled={busy}
+                  placeholder="Usergate"
                   onChange={(e) => setEditing({ ...editing, cefVendor: e.target.value })}
                 />
+                <span className="field-hint">
+                  Точное имя из CEF-заголовка после первой «|», например Usergate или Fortinet.
+                </span>
               </label>
             ) : (
               <label>
-                Required keys (через запятую)
+                Обязательные ключи (через запятую)
                 <input
                   value={editing.requiredKeys}
                   required
                   disabled={busy}
+                  placeholder="src,dst"
                   onChange={(e) => setEditing({ ...editing, requiredKeys: e.target.value })}
                 />
+                <span className="field-hint">
+                  Правило сработает только если все эти ключи есть в строке.
+                </span>
               </label>
             )}
 
             <label>
-              Fields (JSON)
+              Поля (JSON)
               <textarea
                 rows={8}
                 value={editing.fieldsJSON}
                 disabled={busy}
+                spellCheck={false}
                 onChange={(e) => setEditing({ ...editing, fieldsJSON: e.target.value })}
               />
+              <span className="field-hint">
+                Слева поле GeoAtlas (<code>src</code>, <code>dst</code>, <code>act</code>…), справа —
+                ключ в логе. Пример: <code>{`"src": "src", "bytes_sent": "in"`}</code>.
+              </span>
             </label>
             <label>
-              Transforms (JSON)
-              <textarea
-                rows={6}
-                value={editing.transformsJSON}
-                disabled={busy}
-                onChange={(e) => setEditing({ ...editing, transformsJSON: e.target.value })}
-              />
-            </label>
-            <label>
-              Samples (по строке)
+              Преобразования (JSON)
               <textarea
                 rows={4}
+                value={editing.transformsJSON}
+                disabled={busy}
+                spellCheck={false}
+                onChange={(e) => setEditing({ ...editing, transformsJSON: e.target.value })}
+              />
+              <span className="field-hint">
+                Обычно хватает <code>{`{"time_unit":"auto"}`}</code>. Остальное — тонкая настройка
+                (зоны, протокол, склейка правила).
+              </span>
+            </label>
+            <label>
+              Примеры (по одной строке)
+              <textarea
+                rows={3}
                 value={editing.samplesText}
                 disabled={busy}
+                spellCheck={false}
+                placeholder="Вставьте сюда образцы логов — пригодятся для проверки и пресетов"
                 onChange={(e) => setEditing({ ...editing, samplesText: e.target.value })}
               />
             </label>
+
+            <div className="parsers-dry-run">
+              <h4>Проверка перед сохранением</h4>
+              <p className="field-hint" style={{ marginTop: 0 }}>
+                Вставьте строку лога и нажмите «Проверить». В ответе должны появиться IP и действие —
+                тогда правило можно сохранять.
+              </p>
+              <label>
+                Строка лога
+                <textarea
+                  rows={3}
+                  value={editing.dryText}
+                  disabled={busy}
+                  spellCheck={false}
+                  placeholder="CEF:0|Vendor|Product|… src=… dst=… act=…"
+                  onChange={(e) => setEditing({ ...editing, dryText: e.target.value })}
+                />
+              </label>
+              <button
+                type="button"
+                className="btn"
+                disabled={busy || !editing.dryText}
+                onClick={() => void onDryRun()}
+              >
+                Проверить
+              </button>
+              {dryResult ? <pre>{JSON.stringify(dryResult, null, 2)}</pre> : null}
+            </div>
 
             <div className="parsers-actions">
               <button type="submit" className="btn primary" disabled={busy}>
@@ -512,25 +604,6 @@ export default function ParsersPage() {
               </button>
             </div>
           </form>
-
-          <div className="parsers-dry-run">
-            <h4>Dry-run</h4>
-            <label>
-              Строка лога
-              <textarea
-                rows={3}
-                value={editing.dryText}
-                disabled={busy}
-                onChange={(e) => setEditing({ ...editing, dryText: e.target.value })}
-              />
-            </label>
-            <button type="button" className="btn" disabled={busy || !editing.dryText} onClick={() => void onDryRun()}>
-              Прогнать
-            </button>
-            {dryResult ? (
-              <pre>{JSON.stringify(dryResult, null, 2)}</pre>
-            ) : null}
-          </div>
         </div>
       ) : null}
     </SettingsLayout>

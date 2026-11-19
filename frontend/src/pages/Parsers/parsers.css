@@ -5,6 +5,64 @@
   line-height: 1.45;
 }
 
+.parsers-details {
+  margin: 0 0 1rem;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.parsers-details summary {
+  cursor: pointer;
+  user-select: none;
+}
+
+.parsers-details summary:hover {
+  color: var(--text);
+}
+
+.parsers-details[open] summary {
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.parsers-details ol {
+  margin: 0 0 8px;
+  padding-left: 1.25rem;
+  max-width: 48rem;
+  line-height: 1.5;
+}
+
+.parsers-details li + li {
+  margin-top: 6px;
+}
+
+.parsers-details p {
+  margin: 0;
+  line-height: 1.45;
+  max-width: 48rem;
+}
+
+.parsers-details code {
+  font-size: 12px;
+}
+
+.parsers-editor-lead {
+  margin: 0 0 1rem;
+  max-width: 48rem;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.parsers-form-grid .field-hint {
+  margin-top: 0.15rem;
+  line-height: 1.35;
+}
+
+.parsers-form-grid .field-hint code {
+  font-size: 11px;
+}
+
 .parsers-banner {
   display: flex;
   align-items: flex-start;
