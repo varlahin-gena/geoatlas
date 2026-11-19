@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -114,6 +115,7 @@ func threatWindowFromCounts(logs *usecaseaudit.Service, ctx context.Context, sin
 	}
 	counts, err := logs.CountAuditByAction(ctx, since, "security.")
 	if err != nil {
+		slog.Warn("security threat counts query failed", "since", since, "err", err)
 		return w
 	}
 	for _, c := range counts {

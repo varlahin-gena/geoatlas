@@ -93,6 +93,17 @@ func assignAny(dest, val any) error {
 	switch d := dest.(type) {
 	case *string:
 		*d = fmt.Sprint(val)
+	case *uint64:
+		switch v := val.(type) {
+		case uint64:
+			*d = v
+		case int:
+			*d = uint64(v)
+		case int64:
+			*d = uint64(v)
+		default:
+			return fmt.Errorf("uint64 from %T", val)
+		}
 	case *time.Time:
 		t, ok := val.(time.Time)
 		if !ok {
