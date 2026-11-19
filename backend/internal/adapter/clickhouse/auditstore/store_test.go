@@ -176,3 +176,25 @@ func TestListAuditQueryErrorAndScanError(t *testing.T) {
 		t.Fatal("want scan err")
 	}
 }
+
+func TestCountAuditByActionScansUInt64(t *testing.T) {
+	ch := &stubConn{}
+	ch.push([]any{"security.csrf.reject", uint64(2)}, []any{"security.proxy_gate.reject", uint64(1)})
+	r := New(ch)
+	out, err := r.CountAuditByAction(context.Background(), time.Now().Add(-time.Hour), "security.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out) != 2 || out[0].Action != "security.csrf.reject" || out[0].Count != 2 || out[1].Count != 1 {
+		t.Fatalf("%+v", out)
+	}
+}
+
+func TestCountAuditByActionQueryError(t *testing.T) {
+	ch := &stubConn{}
+	ch.pushErr(errors.New("q fail"))
+	r := New(ch)
+	if _, err := r.CountAuditByAction(context.Background(), time.Now(), "security."); err == nil {
+		t.Fatal("want query err")
+	}
+}

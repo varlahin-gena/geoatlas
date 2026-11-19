@@ -172,11 +172,14 @@ func (r *Repository) CountAuditByAction(ctx context.Context, since time.Time, pr
 	defer rows.Close()
 	out := make([]usecaseaudit.ActionCount, 0, 16)
 	for rows.Next() {
-		var ac usecaseaudit.ActionCount
-		if err := rows.Scan(&ac.Action, &ac.Count); err != nil {
+		var (
+			action string
+			n      uint64 // count() is UInt64; clickhouse-go rejects Scan into *int64
+		)
+		if err := rows.Scan(&action, &n); err != nil {
 			return nil, err
 		}
-		out = append(out, ac)
+		out = append(out, usecaseaudit.ActionCount{Action: action, Count: int64(n)})
 	}
 	return out, rows.Err()
 }
