@@ -2,6 +2,13 @@
   margin-top: 16px;
 }
 
+/* While a pull-down is open, drop the scroll clip so the menu can paint
+   outside the table frame (same pattern as Users / Connectors). Without this,
+   a single-row table grows a vertical scrollbar and the row actions break. */
+.hunts-table-wrap:has(.hunt-more[open]) {
+  overflow: visible;
+}
+
 .hunts-table {
   table-layout: fixed;
   width: 100%;
@@ -153,6 +160,12 @@
   display: none;
 }
 
+.hunt-more[open] > summary.btn.sm.ghost {
+  background: var(--panel-3);
+  border-color: var(--border);
+  color: var(--text);
+}
+
 .hunt-more-menu {
   position: absolute;
   right: 0;
@@ -164,6 +177,18 @@
   border-radius: 8px;
   background: var(--panel);
   box-shadow: var(--shadow);
+}
+
+/* Last of several rows: open upward so the menu stays over the table.
+   A single-row table keeps the default downward placement into free space. */
+.hunts-table tbody tr:last-child:not(:only-child) .hunt-more-menu {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
+.hunts-table tbody tr:has(.hunt-more[open]) {
+  position: relative;
+  z-index: calc(var(--z-dropdown) + 1);
 }
 
 .hunt-more-item {

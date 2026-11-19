@@ -474,7 +474,12 @@ export default function HuntsPage() {
                             {running === h.id ? '…' : 'Запустить'}
                           </button>
                           <details className="hunt-more">
-                            <summary className="btn sm ghost">Ещё</summary>
+                            <summary
+                              className="btn sm ghost"
+                              aria-label={`Ещё действия: ${title}`}
+                            >
+                              Ещё
+                            </summary>
                             <div className="hunt-more-menu" role="menu">
                               <button
                                 type="button"
@@ -491,7 +496,7 @@ export default function HuntsPage() {
                                   });
                                 }}
                               >
-                                Настройки
+                                Настройки…
                               </button>
                               <button
                                 type="button"
