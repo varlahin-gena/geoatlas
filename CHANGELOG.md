@@ -5,6 +5,21 @@
 
 ## [Unreleased]
 
+## [2.7.10] — 2026-11-19
+
+Патч: счётчики «Отклонённые запросы» снова показывают CSRF / proxy-gate / лимит API; полировка парсеров и Hunts.
+
+### Fixed
+- **Безопасность**: «Отклонённые запросы» больше не остаются нулями при наличии `security.*` в `audit_events` — `count()` из ClickHouse сканируется как `UInt64`.
+- **Парсеры**: понятные русские подписи, подсказки полей и короткий how-to для CEF/KV-правил.
+- **Hunts**: меню «Ещё» у одной строки больше не раздувает таблицу и не ломает действия.
+
+### Notes
+- OpenAPI API doc version: **1.23.0**
+- Продуктовая версия: **2.7.10**
+- Схема ClickHouse: без изменений Ensure*.
+- Достаточно `update.sh` 2.7.10 (recreate **backend** + **frontend**).
+
 ## [2.7.9] — 2026-11-18
 
 Патч: страница «Парсеры» снова загружает правила; шапка settings выровнена под HIG.
@@ -314,6 +329,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.7.10]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.10
 [2.7.9]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.9
 [2.7.8]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.8
 [2.7.7]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.7
