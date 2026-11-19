@@ -5,178 +5,35 @@
 
 ## [Unreleased]
 
-## [2.7.10] — 2026-11-19
+## [2.8.0] — 2026-11-19
 
-Патч: счётчики «Отклонённые запросы» снова показывают CSRF / proxy-gate / лимит API; полировка парсеров и Hunts.
-
-### Fixed
-- **Безопасность**: «Отклонённые запросы» больше не остаются нулями при наличии `security.*` в `audit_events` — `count()` из ClickHouse сканируется как `UInt64`.
-- **Парсеры**: понятные русские подписи, подсказки полей и короткий how-to для CEF/KV-правил.
-- **Hunts**: меню «Ещё» у одной строки больше не раздувает таблицу и не ломает действия.
-
-### Notes
-- OpenAPI API doc version: **1.23.0**
-- Продуктовая версия: **2.7.10**
-- Схема ClickHouse: без изменений Ensure*.
-- Достаточно `update.sh` 2.7.10 (recreate **backend** + **frontend**).
-
-## [2.7.9] — 2026-11-18
-
-Патч: страница «Парсеры» снова загружает правила; шапка settings выровнена под HIG.
-
-### Fixed
-- **Парсеры**: `GET /api/parsers` больше не отдаёт 500 — `priority` из ClickHouse сканируется как `Int32`, перед seed дополнительно ensure `parser_rules`, битый `spec_json` не валит весь список.
-- **UI**: title settings-pane без префикса «Настройки ·»; действия «Добавить правило» / «Обновить» в topbar; при ошибке загрузки — banner с «Повторить».
-
-### Notes
-- OpenAPI API doc version: **1.23.0**
-- Продуктовая версия: **2.7.9**
-- Схема ClickHouse: без изменений Ensure* (таблица `parser_rules` уже в 2.7.8).
-- Достаточно `update.sh` 2.7.9 (recreate **backend** + **frontend**).
-
-## [2.7.8] — 2026-11-18
-
-Редактируемые правила парсеров CEF/KV; устойчивая выгрузка большой базы GeoIP; полировка аномалий и мониторинга.
+Минор после 2.7.0: редактируемые парсеры CEF/KV, исключения и полировка движка аномалий, репутация из UI, экспорт карты и HIG-фиксы.
 
 ### Added
-- **Парсеры**: UserGate / FortiGate / Generic живут в ClickHouse (`parser_rules`) с hot reload; страница `/parsers` — CRUD, dry-run, enable/priority. Cisco ASA / FTD остаются встроенными.
-- **Тест парсеров**: нормализованные поля показываются колонками результата.
-
-### Changed
-- **Аномалии**: «Связи» — обычная кнопка в строке (без меню «Ещё»); период peers согласован с прыжком на карту.
-- **Конструктор поиска**: «НЕ» — читаемый toggle-chip.
-- **Мониторинг**: operator-facing формулировки вместо API-жаргона.
-
-### Fixed
-- **GeoIP**: выгрузка CSV стримится из ClickHouse и скачивается браузером — базы на миллионы диапазонов больше не рвут соединение (`Failed to fetch`).
-
-### Notes
-- OpenAPI API doc version: **1.23.0**
-- Продуктовая версия: **2.7.8**
-- Схема ClickHouse: таблица `parser_rules` (Ensure* / `init.sql`).
-- Достаточно `update.sh` 2.7.8 (recreate **backend** + **frontend**).
-
-## [2.7.7] — 2026-11-17
-
-Интервал опроса репутации из UI без рестарта; HIG-полировка интерфейса.
-
-### Added
-- **Репутация**: на `/reputation` можно сменить интервал опроса URL-фидов (1–168 ч, по умолчанию 6); `GET`/`PUT /api/reputation/settings` → `reputation_settings.json`, без рестарта.
-
-### Changed
-- **UI (HIG)**: контраст active nav / badges в light, типографика ≥12px, таблицы без обрезанных типов, operator-facing copy без API-жаргона, loading stuck → retry (~5 с), компактные empty charts на мониторинге.
-
-### Notes
-- OpenAPI API doc version: **1.22.0**
-- Продуктовая версия: **2.7.7**
-- Схема ClickHouse: без изменений Ensure*.
-- Достаточно `update.sh` 2.7.7 (recreate **backend** + **frontend**).
-
-## [2.7.6] — 2026-11-16
-
-Патч: sheet исключения больше не сжимается до 360px из‑за стилей admin search-box.
-
-### Fixed
-- **Движок аномалий**: `body.page-admin .search-box { max-width: 360px }` больше не режет sheet исключения — окно снова до ~1120px.
-
-### Notes
-- OpenAPI API doc version: **1.21.0**
-- Продуктовая версия: **2.7.6**
-- Схема ClickHouse: без изменений Ensure*.
-- Достаточно `update.sh` 2.7.6 (recreate **frontend**).
-
-## [2.7.5] — 2026-11-16
-
-Патч: sheet исключения на движке аномалий без горизонтальной прокрутки.
-
-### Fixed
-- **Движок аномалий**: ширина sheet исключения до ~1120px / ширины родителя; убран forced `min-width` строки; на узком sheet условие переносится через container query.
-
-### Notes
-- OpenAPI API doc version: **1.21.0**
-- Продуктовая версия: **2.7.5**
-- Схема ClickHouse: без изменений Ensure*.
-- Достаточно `update.sh` 2.7.5 (recreate **frontend**).
-
-## [2.7.4] — 2026-11-16
-
-Патч: сетка конструктора исключений на движке аномалий больше не теряет поле и «НЕ».
-
-### Fixed
-- **Конструктор запросов**: в sheet исключения колонки поля и «НЕ» не схлопываются; кнопка «Закрыть» остаётся справа в шапке.
-
-### Notes
-- OpenAPI API doc version: **1.21.0**
-- Продуктовая версия: **2.7.4**
-- Схема ClickHouse: без изменений Ensure*.
-- Достаточно `update.sh` 2.7.4 (recreate **backend** + **frontend**).
-
-## [2.7.3] — 2026-11-16
-
-Патч: проверки аномалий ближе к разбору аналитика, исключение по запросу карты, профили не превышают RAM хоста, журнал аномалий возвращается вместе с трафиком.
-
-### Added
-- **Движок аномалий**: у каждой проверки своё исключение тем же конструктором, что поиск на карте. Совпавший трафик не входит только в эту проверку.
-
-### Changed
-- **Аномалии**: сканирование портов считает отказы; обход хостов предприятия вместо обхода подсети; репутация, новая страна, beacon, всплеск трафика и охота срабатывают, когда есть что смотреть.
-- **Навигация**: пункт `/anomalies/engine` — **«Движок аномалий»**.
-- **Профили**: рекомендация — меньший из классов по CPU и RAM. `tiny` — 1.5 ГиБ ClickHouse, 768 МиБ backend, 384 МиБ syslog-ng. Байтовая очередь ingest от 64 МиБ до 1 ГиБ. `xlarge` — от 64 ГиБ RAM.
-- **Движок аномалий**: секции «Расписание» и «Чувствительность»; IP без обхода хостов у карточки lateral fanout; Save только при несохранённых правках.
-
-### Fixed
-- **`/ready`**: остаётся 503, пока нет схемы events. Обычные HTTP-соединения больше не держатся 35 минут. Скан аномалий записывает проверки, которые не уложились в бюджет тика.
-- **Бэкап**: `backup-clickhouse.sh` / `restore-clickhouse.sh` возвращают журнал аномалий вместе с трафиком.
-- **Движок аномалий**: «Конструктор запроса» для исключений больше не ломает админ-topbar; стили конструктора общие для карты и настроек.
-
-### Notes
-- OpenAPI API doc version: **1.21.0**
-- Продуктовая версия: **2.7.3**
-- Схема ClickHouse: без изменений Ensure*.
-- Достаточно `update.sh` 2.7.3 (recreate **backend** + **frontend**). Уже стоящий сервер не пересчитывает профиль сам: `./scripts/tune-resources.sh`.
-
-## [2.7.2] — 2026-11-14
-
-Патч: понятные названия аномалий в UI, фикс полей в группе конструктора запросов, CSV load-test без локали RU.
-
-### Changed
-- **Аномалии**: человекочитаемые типы и заголовки (без жаргона «движок» / «веер» / «beaconing» в UI); пункт меню **«Настройки»** вместо «Движок».
-- **scripts/load-test-connectors.ps1**: CSV soak/threshold через `InvariantCulture`; параметр `-ThresholdLog`.
-- **docs/presentations**: HTML/PNG графики EPS (soak / threshold).
-
-### Fixed
-- **Конструктор запросов**: поле «Значение» внутри группы условий больше не схлопывается (гибкая CSS Grid + класс `search-builder-value`).
-
-### Notes
-- OpenAPI API doc version: **1.21.0**
-- Продуктовая версия: **2.7.2**
-- Схема ClickHouse: без изменений Ensure*.
-- Достаточно `update.sh` 2.7.2 (recreate **backend** + **frontend**).
-
-## [2.7.1] — 2026-11-13
-
-Патч: демо аномалий на боевой, пиры в разборе по окну алерта, кнопка «Закрыть», фикс PNG-экспорта карты.
-
-### Added
-- **Демо аномалий**: `scripts/emulate-map-load.ps1` — `-Recipes` (default `port_scan,lateral_fanout`), `-AnomalyOnly`; seed-скрипты карты (`seed-demo-map.*`).
+- **Парсеры**: UserGate / FortiGate / Generic в ClickHouse (`parser_rules`) с hot reload; страница `/parsers` — CRUD, dry-run, enable/priority, русские подписи и how-to. Cisco ASA / FTD остаются встроенными.
+- **Движок аномалий**: у каждой проверки своё исключение тем же конструктором, что поиск на карте.
+- **Репутация**: интервал опроса URL-фидов на `/reputation` (1–168 ч, по умолчанию 6) без рестарта.
 - **Карта**: экспорт PNG (MapLibre + deck.gl).
-- **docs/presentations**: материалы meetup + скрипт сборки pptx.
+- **Демо аномалий**: `scripts/emulate-map-load.ps1` (`-Recipes`, `-AnomalyOnly`) и seed-скрипты карты; материалы meetup в `docs/presentations`.
 
 ### Changed
-- **Аномалии**: видимая кнопка **«Закрыть»** (ack) на `/anomalies` и `/investigate`; статус «Закрыт» / фильтр «С закрытыми».
-- **Разбор**: пиры запрашиваются по абсолютному окну алерта (`from`/`to`), а не «последний 1 ч от сейчас».
-- **Архитектура**: обновлена схема docker-сети и таблица «кто с кем говорит».
+- **Аномалии**: человекочитаемые типы; «Закрыть» (ack) на `/anomalies` и `/investigate`; пиры по окну алерта; секции «Расписание» / «Чувствительность»; проверки ближе к разбору аналитика (порты, enterprise hosts, reputation / new country / beacon / surge).
+- **Профили**: рекомендация — меньший класс по CPU и RAM; `tiny` / байтовая очередь ingest / `xlarge` от 64 ГиБ RAM.
+- **UI (HIG)**: active nav, типографика, operator-facing copy, loading→retry, компактные empty charts; конструктор «НЕ» как toggle-chip.
 
 ### Fixed
-- **lateral_fanout** в демо: src/dst только в gray enterprise nets (`10.0` / `10.25` / `10.27` / `10.28` / `10.30`) — раньше src `10.68.*` часто вне `enterprise_nets`.
-- **Пиры пустые**: scan map period `15m` → `2h`; подсказка про отсутствие гео у src/dst.
-- **Экспорт PNG карты**: MapLibre v6 — `canvasContextAttributes.preserveDrawingBuffer` (top-level флаг игнорировался → чёрная подложка); ожидание кадра `render` и композит map+overlay по размеру canvas MapLibre.
+- **Безопасность**: счётчики «Отклонённые запросы» снова считают CSRF / proxy-gate / лимит API (`UInt64` из ClickHouse).
+- **Парсеры**: `GET /api/parsers` не отдаёт 500 на `priority` / битый `spec_json`; ensure `parser_rules` перед seed.
+- **GeoIP**: стриминговая выгрузка CSV больших баз без `Failed to fetch`.
+- **Конструктор / sheet исключений**: колонки поля и «НЕ», ширина sheet ~1120px, value в группах условий.
+- **Hunts / карта**: меню «Ещё» у одной строки; PNG-экспорт MapLibre v6 (`preserveDrawingBuffer`); демо lateral_fanout только в gray enterprise nets.
+- **`/ready`**, бэкап журнала аномалий, HTTP keep-alive и бюджет скана аномалий.
 
 ### Notes
-- OpenAPI API doc version: **1.21.0**
-- Продуктовая версия: **2.7.1**
-- Схема ClickHouse: без изменений Ensure*.
-- Достаточно `update.sh` 2.7.1 (recreate **backend** + **frontend**).
+- OpenAPI API doc version: **1.23.0**
+- Продуктовая версия: **2.8.0**
+- Схема ClickHouse: таблица `parser_rules` (Ensure* / `init.sql`).
+- Обновление с 2.7.0: `update.sh` 2.8.0 (recreate **backend** + **frontend**). Уже стоящий сервер не пересчитывает профиль сам: `./scripts/tune-resources.sh`.
 
 ## [2.7.0] — 2026-11-12
 
@@ -329,16 +186,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
-[2.7.10]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.10
-[2.7.9]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.9
-[2.7.8]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.8
-[2.7.7]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.7
-[2.7.6]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.6
-[2.7.5]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.5
-[2.7.4]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.4
-[2.7.3]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.3
-[2.7.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.2
-[2.7.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.1
+[2.8.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.8.0
 [2.7.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.0
 [2.6.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.0
 
