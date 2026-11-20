@@ -5,6 +5,19 @@
 
 ## [Unreleased]
 
+## [2.8.4] — 2026-11-20
+
+Патч: GeoIP upload — не маскировать ранний 413/409 в HTTP 502 за nginx.
+
+### Fixed
+- **GeoIP**: при раннем отклонении `/upload-geo` тело запроса сливается (nginx `proxy_request_buffering off`), UI при 502 подсказывает OOM / curl с сервера.
+
+### Notes
+- **тестовый / pre-release**
+- OpenAPI API doc version: **1.23.0**
+- Продуктовая версия: **2.8.4**
+- Большой CSV на профиле small по-прежнему может убить backend по OOM — заливка с сервера: [docs/geoip.md](docs/geoip.md).
+
 ## [2.8.3] — 2026-11-20
 
 Патч: третий вариант доступа к сайту — HTTPS с редиректом.
@@ -225,6 +238,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.8.4]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.8.4
 [2.8.3]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.8.3
 [2.8.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.8.2
 [2.8.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.8.1

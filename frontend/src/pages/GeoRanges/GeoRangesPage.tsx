@@ -461,10 +461,14 @@ export default function GeoRangesPage() {
         ? await res.json().catch(() => ({}))
         : await res.text();
       if (!res.ok) {
-        const msg =
+        let msg =
           typeof data === 'object' && data && 'error' in data
             ? String((data as { error: unknown }).error)
             : `HTTP ${res.status}`;
+        if (res.status === 502 || res.status === 504) {
+          msg =
+            'Шлюз оборвал загрузку (часто OOM backend на большом CSV). Очистите базу и залейте с сервера через curl — см. docs/geoip.md. Логи: docker logs backend';
+        }
         throw new Error(msg);
       }
       const ranges =

@@ -12,6 +12,19 @@ import (
 	"geoatlas/internal/apperr"
 )
 
+// drainUploadBody читает остаток тела (с лимитом), чтобы nginx с
+// proxy_request_buffering off не превращал ранний 409/413 в HTTP 502.
+func drainUploadBody(r *http.Request, limit int64) {
+	if r == nil || r.Body == nil {
+		return
+	}
+	if limit <= 0 {
+		limit = 64 << 20 // 64 MiB — достаточно сбросить буфер клиента/прокси
+	}
+	_, _ = io.Copy(io.Discard, io.LimitReader(r.Body, limit))
+	_ = r.Body.Close()
+}
+
 func (h *GeoHandler) UploadGeo(w http.ResponseWriter, r *http.Request) {
 	if h.geoUC == nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "geo service unavailable"})
@@ -32,6 +45,7 @@ func (h *GeoHandler) UploadGeo(w http.ResponseWriter, r *http.Request) {
 	// Early 409 до чтения body — иначе клиент успеет залить сотни МиБ впустую.
 	if err := h.geoUC.PrecheckUpload(dryRun); err != nil {
 		slog.Info("geo upload early reject", "dry_run", dryRun, "index_ranges", indexRanges, "err", err.Error())
+		drainUploadBody(r, h.maxGeoUploadSize)
 		writeDomainError(w, "geo csv upload failed", err)
 		return
 	}
@@ -42,6 +56,7 @@ func (h *GeoHandler) UploadGeo(w http.ResponseWriter, r *http.Request) {
 				", limit " + strconv.FormatInt(max, 10) + " bytes; GEOIP_UPLOAD_MAX_BYTES / MAX_GEO_UPLOAD_SIZE)",
 		)
 		slog.Info("geo upload early reject", "dry_run", dryRun, "content_length", r.ContentLength, "err", err.Error())
+		drainUploadBody(r, max)
 		writeDomainError(w, "geo csv upload failed", err)
 		return
 	}
@@ -53,9 +68,11 @@ func (h *GeoHandler) UploadGeo(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			var maxBytes *http.MaxBytesError
 			if errors.As(err, &maxBytes) {
+				drainUploadBody(r, h.maxGeoUploadSize)
 				writeDomainError(w, "geo csv upload failed", err)
 				return
 			}
+			drainUploadBody(r, h.maxGeoUploadSize)
 			writeBadRequest(w, "missing file")
 			return
 		}
