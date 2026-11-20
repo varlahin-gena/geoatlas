@@ -296,16 +296,22 @@ confirm_admin_password_step() {
         return 0
     fi
 
-    local pass
-    pass="$(ga_prompt_admin_password "${AUTH_ADMIN_USER:-admin}")" || {
+    # Не через $(...): иначе whiptail msgbox рисует в pipe и «зависает» после подтверждения.
+    GA_ADMIN_PASSWORD_RESULT=""
+    if ! ga_prompt_admin_password "${AUTH_ADMIN_USER:-admin}"; then
         log "Пароль администратора не задан — установка прервана."
         exit 1
-    }
+    fi
+    if [[ -z "${GA_ADMIN_PASSWORD_RESULT:-}" ]]; then
+        log "Пароль администратора пуст — установка прервана."
+        exit 1
+    fi
     AUTH_ADMIN_USER="${AUTH_ADMIN_USER:-admin}"
-    AUTH_ADMIN_PASSWORD="$pass"
+    AUTH_ADMIN_PASSWORD="$GA_ADMIN_PASSWORD_RESULT"
     AUTH_ADMIN_MUST_RESET=0
     GA_ADMIN_PASSWORD_PRINT=0
     export AUTH_ADMIN_USER AUTH_ADMIN_PASSWORD AUTH_ADMIN_MUST_RESET GA_ADMIN_PASSWORD_PRINT
+    unset GA_ADMIN_PASSWORD_RESULT
     log "Пароль администратора принят."
 }
 

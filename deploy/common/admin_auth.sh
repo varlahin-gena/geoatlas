@@ -54,10 +54,15 @@ ga_validate_admin_password() {
     return 0
 }
 
-# Спросить пароль дважды. stdout = пароль. return 1 при отмене.
+# Спросить пароль дважды.
+# Результат: GA_ADMIN_PASSWORD_RESULT (и stdout для совместимости).
+# Не вызывайте через pass="$(ga_prompt_admin_password)" — TUI должен видеть /dev/tty.
+# Предпочтительно: ga_prompt_admin_password user; pass="$GA_ADMIN_PASSWORD_RESULT"
+# return 1 при отмене.
 ga_prompt_admin_password() {
     local user="${1:-admin}"
     local a b
+    GA_ADMIN_PASSWORD_RESULT=""
     if ! declare -F ga_ui_passwordbox >/dev/null 2>&1; then
         echo "TUI passwordbox недоступен." >&2
         return 1
@@ -85,7 +90,12 @@ ga_prompt_admin_password() {
             fi
             continue
         fi
-        printf '%s' "$a"
+        GA_ADMIN_PASSWORD_RESULT="$a"
+        export GA_ADMIN_PASSWORD_RESULT
+        # stdout — только если вызывающий явно читает pipe; иначе не засоряем лог.
+        if [[ ! -t 1 ]]; then
+            printf '%s' "$a"
+        fi
         return 0
     done
 }

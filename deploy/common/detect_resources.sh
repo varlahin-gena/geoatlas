@@ -558,10 +558,18 @@ write_env_file() {
             can_ask=1
         fi
         if (( can_ask == 1 )); then
-            admin_pass="$(ga_prompt_admin_password "$admin_user")" || {
+            # Не через $(...): иначе whiptail msgbox рисует в pipe и «зависает».
+            GA_ADMIN_PASSWORD_RESULT=""
+            if ! ga_prompt_admin_password "$admin_user"; then
                 _ga_log "Пароль администратора не задан — установка прервана."
                 exit 1
-            }
+            fi
+            admin_pass="${GA_ADMIN_PASSWORD_RESULT:-}"
+            unset GA_ADMIN_PASSWORD_RESULT
+            if [[ -z "$admin_pass" ]]; then
+                _ga_log "Пароль администратора пуст — установка прервана."
+                exit 1
+            fi
             admin_must=0
         else
             admin_pass="$(ga_rand_hex 12)"
