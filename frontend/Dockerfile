@@ -8,7 +8,7 @@ COPY public ./public
 COPY src ./src
 RUN npm run build
 
-FROM nginx:1.30.6-alpine@sha256:0e52bd054126cdc040b1276c0af347aeb02a41b9cfe305d6094767ac30e97949
+FROM nginx:1.30.6-alpine@sha256:901e593c95dc85f5a729f5765516321366ef4ac401821431d408897e95287d0a
 # apk upgrade: Trivy CRITICAL в alpine 3.24 (не только OpenSSL).
 # nginx 1.30.6: CVE-2026-15176 / 93479 / 97205 (+ medium) fixed vs 1.30.5.
 RUN apk upgrade --no-cache && \
