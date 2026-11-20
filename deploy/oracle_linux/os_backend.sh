@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# OS-бэкенд установщика: Oracle Linux / RHEL / Rocky / Alma (dnf + firewalld + SELinux).
-# Подключается из deploy/install.sh до install_orchestrator.sh.
+# OS-бэкенд: Oracle Linux / RHEL / Rocky / Alma (dnf + firewalld + SELinux).
+# Подключается из deploy/install.sh и deploy/uninstall.sh.
 
 GA_OS_FAMILY="rhel"
 GA_OS_LABEL="Oracle Linux"
@@ -89,12 +89,72 @@ ga_os_after_docker() {
 ga_os_chmod_extra() {
     cat <<EOF
 deploy/install.sh
+deploy/uninstall.sh
 deploy/common/install_orchestrator.sh
 deploy/common/select_ui_access.sh
 deploy/oracle_linux/os_backend.sh
-deploy/oracle_linux/uninstall_oraclelinux.sh
 EOF
 }
+
+# --- Uninstall hooks (вызываются из common/uninstall.sh) ---
+
+ga_os_audit_firewall() {
+    if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld 2>/dev/null; then
+        echo "  Сетевой экран     : включён, правила портов будут сняты при удалении"
+        echo "[$(date +'%F %T')] [firewall] audit: firewalld active" >&2
+    elif command -v firewall-cmd >/dev/null 2>&1; then
+        echo "  Сетевой экран     : выключен"
+        echo "[$(date +'%F %T')] [firewall] audit: firewalld installed, inactive" >&2
+    else
+        echo "  Сетевой экран     : не найден"
+        echo "[$(date +'%F %T')] [firewall] audit: firewalld not found" >&2
+    fi
+}
+
+ga_audit_firewall() { ga_os_audit_firewall; }
+
+ga_os_remove_firewall_rules() {
+    if [[ "${REMOVE_FIREWALL_RULES:-1}" != "1" ]]; then
+        return
+    fi
+
+    local http_port="80"
+    local https_port=""
+    local project_dir="${GA_PROJECT_DIR:-${PROJECT_DIR:-/opt/geoatlas}}"
+    if [[ -f "${project_dir}/.env" ]]; then
+        local v
+        v="$(grep -E '^[[:space:]]*HTTP_PORT=' "${project_dir}/.env" 2>/dev/null | tail -n1 | cut -d= -f2- || true)"
+        [[ -n "$v" ]] && http_port="$v"
+        v="$(grep -E '^[[:space:]]*HTTPS_PORT=' "${project_dir}/.env" 2>/dev/null | tail -n1 | cut -d= -f2- || true)"
+        [[ -n "$v" ]] && https_port="$v"
+    fi
+    [[ -z "$https_port" ]] && https_port="443"
+
+    if ! command -v firewall-cmd >/dev/null 2>&1 || ! systemctl is-active --quiet firewalld; then
+        echo "[$(date +'%F %T')] Сетевой экран не активен — пропуск снятия правил."
+        return
+    fi
+
+    echo "[$(date +'%F %T')] Снятие правил сетевого экрана..."
+    firewall-cmd --permanent --remove-port="${http_port}/tcp" || true
+    firewall-cmd --permanent --remove-port="${https_port}/tcp" || true
+    firewall-cmd --permanent --remove-port=80/tcp || true
+    firewall-cmd --permanent --remove-port=443/tcp || true
+    # Legacy: backend был на 8080
+    firewall-cmd --permanent --remove-port=8080/tcp || true
+
+    _ga_os_source_firewall_helpers || true
+    if declare -F ga_firewalld_remove_syslog >/dev/null 2>&1; then
+        ga_firewalld_remove_syslog
+    else
+        firewall-cmd --permanent --remove-port=514/tcp || true
+        firewall-cmd --permanent --remove-port=514/udp || true
+    fi
+
+    firewall-cmd --reload || true
+}
+
+ga_remove_firewall_rules() { ga_os_remove_firewall_rules; }
 
 ga_os_install_packages() {
     log "Установка зависимостей..."

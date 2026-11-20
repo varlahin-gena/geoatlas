@@ -249,7 +249,11 @@ docker compose exec clickhouse sh -c 'clickhouse-client --password "$CLICKHOUSE_
 - `syslog-ng.d/zz_profile.conf`, `syslog-ng.d/01-ingest-auth.conf`
 - `clickhouse/users.d/zz_install_limits.xml`
 
-Образы пересобираются на сервере (`./start.sh`); нужен доступ к Docker Hub (базовые образы).
+В интерактивном режиме (TTY) скрипт показывает приветствие, аудит версий, при необходимости запрашивает путь к пакету, план (остановить / запустить) и подтверждение; долгие шаги идут через gauge. Wizard установки (доступ к UI, пароль, модули, сетевой экран) **не** повторяется.
+
+Для CI и скриптов: `--yes` / `FORCE=1` — без меню; `--no-stop` / `--no-start` — пропуск остановки или запуска.
+
+Образы подтягиваются при `./start.sh` (или из `images/` в релизном пакете).
 
 **Единственный путь обновления** — скачать пакет на сервер, проверить SHA-256, `./update.sh`:
 
@@ -270,6 +274,12 @@ sudo ./geoatlas-${VER}/update.sh --package "$PWD/geoatlas-${VER}.tar.gz" --proje
 cd /tmp
 # … скачать и sha256sum -c, как выше …
 sudo /opt/geoatlas/update.sh ./geoatlas-${VER}.tar.gz
+```
+
+Неинтерактивно (Ansible/CI):
+
+```bash
+sudo FORCE=1 /opt/geoatlas/update.sh --yes ./geoatlas-${VER}.tar.gz
 ```
 
 **Откат на более старый релиз** — тот же сценарий: скачать нужный `geoatlas-X.Y.Z.tar.gz` с GitHub Releases, проверить `.sha256` и снова `./update.sh` (тома Docker и `.env` сохраняются).

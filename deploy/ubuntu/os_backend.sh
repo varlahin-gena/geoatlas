@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# OS-бэкенд установщика: Debian/Ubuntu (apt + UFW).
-# Подключается из deploy/install.sh до install_orchestrator.sh.
+# OS-бэкенд: Debian/Ubuntu (apt + UFW).
+# Подключается из deploy/install.sh и deploy/uninstall.sh.
 
 GA_OS_FAMILY="debian"
 GA_OS_LABEL="Ubuntu"
@@ -65,12 +65,75 @@ ga_os_after_docker() { :; }
 ga_os_chmod_extra() {
     cat <<EOF
 deploy/install.sh
+deploy/uninstall.sh
 deploy/common/install_orchestrator.sh
 deploy/common/select_ui_access.sh
 deploy/ubuntu/os_backend.sh
-deploy/ubuntu/uninstall_ubuntu.sh
 EOF
 }
+
+# --- Uninstall hooks (вызываются из common/uninstall.sh) ---
+
+ga_os_audit_firewall() {
+    if command -v ufw >/dev/null 2>&1; then
+        if ufw status 2>/dev/null | grep -qi "Status: active"; then
+            echo "  Сетевой экран     : включён, правила портов будут сняты при удалении"
+            echo "[$(date +'%F %T')] [firewall] audit: UFW active" >&2
+        else
+            echo "  Сетевой экран     : выключен"
+            echo "[$(date +'%F %T')] [firewall] audit: UFW installed, inactive" >&2
+        fi
+    else
+        echo "  Сетевой экран     : не найден"
+        echo "[$(date +'%F %T')] [firewall] audit: UFW not installed" >&2
+    fi
+}
+
+ga_audit_firewall() { ga_os_audit_firewall; }
+
+ga_os_remove_firewall_rules() {
+    if [[ "${REMOVE_FIREWALL_RULES:-1}" != "1" ]]; then
+        return
+    fi
+
+    local http_port="80"
+    local https_port=""
+    local project_dir="${GA_PROJECT_DIR:-${PROJECT_DIR:-/opt/geoatlas}}"
+    if [[ -f "${project_dir}/.env" ]]; then
+        local v
+        v="$(grep -E '^[[:space:]]*HTTP_PORT=' "${project_dir}/.env" 2>/dev/null | tail -n1 | cut -d= -f2- || true)"
+        [[ -n "$v" ]] && http_port="$v"
+        v="$(grep -E '^[[:space:]]*HTTPS_PORT=' "${project_dir}/.env" 2>/dev/null | tail -n1 | cut -d= -f2- || true)"
+        [[ -n "$v" ]] && https_port="$v"
+    fi
+    [[ -z "$https_port" ]] && https_port="443"
+
+    if ! command -v ufw >/dev/null 2>&1; then
+        return
+    fi
+
+    echo "[$(date +'%F %T')] Снятие правил сетевого экрана..."
+    ufw delete allow "${http_port}/tcp" || true
+    ufw delete allow "${https_port}/tcp" || true
+    ufw delete allow 80/tcp || true
+    ufw delete allow 443/tcp || true
+    # Legacy: backend был на 8080
+    ufw delete allow 8080/tcp || true
+
+    _ga_os_source_firewall_helpers || true
+    if declare -F ga_ufw_remove_syslog >/dev/null 2>&1; then
+        ga_ufw_remove_syslog
+    else
+        ufw delete allow 514/tcp || true
+        ufw delete allow 514/udp || true
+    fi
+
+    if ufw status | grep -qi "Status: active"; then
+        ufw reload || true
+    fi
+}
+
+ga_remove_firewall_rules() { ga_os_remove_firewall_rules; }
 
 ga_os_install_packages() {
     log "Обновление списков пакетов..."

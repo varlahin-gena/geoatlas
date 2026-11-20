@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Единый TUI-слой для install/uninstall (whiptail → dialog → текст).
+# Единый TUI-слой для install/uninstall/update (whiptail → dialog → текст).
 #
 # Использование:
 #   source deploy/common/ui.sh

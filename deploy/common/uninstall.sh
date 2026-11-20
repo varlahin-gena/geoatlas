@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Общая логика удаления ГеоАтлас.
-# Подключается из deploy/ubuntu/uninstall_ubuntu.sh и deploy/oracle_linux/uninstall_oraclelinux.sh.
+# Подключается из deploy/uninstall.sh после OS-бэкенда (os_backend.sh).
 #
-# Обёртка должна определить ga_remove_firewall_rules() до source.
-# Опционально: ga_audit_firewall() для строки аудита firewall.
+# OS-бэкенд должен определить ga_remove_firewall_rules() / ga_os_remove_firewall_rules().
+# Опционально: ga_audit_firewall() / ga_os_audit_firewall() для строки аудита.
 #
 # Переменные окружения:
 #   GA_PROJECT_DIR          — каталог проекта (по умолчанию /opt/geoatlas)
@@ -17,6 +17,7 @@
 #
 # CLI: --help --dry-run -y|--yes --preset --purge|--clean|--stop
 #      --volumes --images --keep-files --no-firewall
+# TUI: только clean | purge (stop/custom — через CLI).
 
 set -Eeuo pipefail
 
@@ -115,26 +116,28 @@ _ga_show_help() {
 
 Использование:
   sudo bash deploy/uninstall.sh [опции]
-  sudo bash deploy/ubuntu/uninstall_ubuntu.sh [опции]
-  sudo bash deploy/oracle_linux/uninstall_oraclelinux.sh [опции]
+
+  GA_FORCE_OS_FAMILY=debian|rhel — принудительно выбрать семейство ОС
 
 Опции:
   -h, --help          показать эту справку
   --dry-run           показать план и аудит, ничего не менять
   -y, --yes           не спрашивать подтверждение (FORCE=1)
   --preset PRESET     stop | clean | purge
-  --stop              только остановить стек (preset stop)
+  --stop              только остановить систему (preset stop)
   --clean             безопасное удаление (preset clean, по умолчанию)
   --purge             полное удаление включая данные (preset purge)
-  --volumes           удалить Docker volumes (ClickHouse, бэкапы, auth-users)
-  --images            удалить локально собранные образы
+  --volumes           удалить данные ClickHouse, бэкапы и учётки
+  --images            удалить образы контейнеров системы
   --keep-files        сохранить каталог проекта
-  --no-firewall       не трогать правила firewall (HTTP/HTTPS/514)
+  --no-firewall       не трогать правила сетевого экрана
 
 Пресеты:
-  stop   — остановить docker compose, всё остальное сохранить
-  clean  — stop + удалить файлы проекта + firewall (volumes сохраняются)
-  purge  — clean + volumes (CH/бэкапы/учётки) + локальные образы
+  stop   — остановить систему, всё остальное сохранить
+  clean  — stop + удалить файлы проекта + сетевой экран (данные сохраняются)
+  purge  — clean + данные (CH/бэкапы/учётки) + образы контейнеров
+
+В интерактивном меню доступны только clean и purge; stop — через --stop.
 
 Переменные окружения (для Ansible/CI):
   FORCE=1  GA_DRY_RUN=1  GA_UNINSTALL_PRESET=purge
@@ -237,9 +240,9 @@ _ga_apply_preset() {
 
 _ga_preset_label() {
     case "$1" in
-        stop)  echo "только остановить стек" ;;
-        clean) echo "безопасное удаление (volumes сохраняются)" ;;
-        purge) echo "полное удаление (ClickHouse, бэкапы, auth-users)" ;;
+        stop)  echo "только остановить систему" ;;
+        clean) echo "безопасное удаление (данные сохраняются)" ;;
+        purge) echo "полное удаление (данные ClickHouse, бэкапы, учётки)" ;;
         *)     echo "$1" ;;
     esac
 }
@@ -252,10 +255,8 @@ _ga_interactive_wizard() {
         if ! choice="$(ga_ui_radiolist \
             "Удаление ГеоАтлас" \
             "Выберите режим удаления:" \
-            clean "Безопасное удаление — стек, каталог и firewall (volumes сохраняются)" ON \
-            purge "Полное удаление — volumes (CH/бэкапы/учётки) и локальные образы" OFF \
-            stop "Только остановить стек (для обновления/отладки)" OFF \
-            custom "Настроить вручную" OFF \
+            clean "Безопасное удаление — остановить систему и убрать файлы; данные сохраняются" ON \
+            purge "Полное удаление — плюс данные ClickHouse, бэкапы, учётки и образы" OFF \
             cancel "Отмена" OFF)"; then
             _ga_log "Отменено пользователем."
             exit 0
@@ -268,16 +269,6 @@ _ga_interactive_wizard() {
                 ;;
             purge)
                 _ga_apply_preset purge
-                GA_WIZARD_USED=1
-                return 0
-                ;;
-            stop)
-                _ga_apply_preset stop
-                GA_WIZARD_USED=1
-                return 0
-                ;;
-            custom)
-                _ga_interactive_custom
                 GA_WIZARD_USED=1
                 return 0
                 ;;
@@ -299,11 +290,9 @@ _ga_interactive_wizard() {
     echo "  Удаление ГеоАтлас"
     echo "══════════════════════════════════════════════════════════"
     echo ""
-    echo "  [1] Безопасное удаление — остановить стек, удалить каталог проекта и firewall"
-    echo "      (Docker volumes: ClickHouse, бэкапы, auth-users — сохраняются)"
-    echo "  [2] Полное удаление (purge) — всё включая volumes и образы"
-    echo "  [3] Только остановить стек (для обновления/отладки)"
-    echo "  [4] Настроить вручную"
+    echo "  [1] Безопасное удаление — остановить систему, убрать файлы и правила экрана"
+    echo "      (данные ClickHouse, бэкапы и учётки сохраняются)"
+    echo "  [2] Полное удаление — всё включая данные и образы контейнеров"
     echo "  [q] Отмена"
     echo ""
 
@@ -324,83 +313,16 @@ _ga_interactive_wizard() {
                 GA_WIZARD_USED=1
                 return 0
                 ;;
-            3|stop)
-                _ga_apply_preset stop
-                GA_WIZARD_USED=1
-                return 0
-                ;;
-            4|custom|manual)
-                _ga_interactive_custom
-                GA_WIZARD_USED=1
-                return 0
-                ;;
             q|quit|cancel|отмена)
                 _ga_log "Отменено пользователем."
                 exit 0
                 ;;
             *)
-                echo "  Не понял «${choice}». Enter = [1], либо 2/3/4/q." >&2
+                echo "  Не понял «${choice}». Enter = [1], либо 2/q." >&2
                 ;;
         esac
     done
 }
-
-_ga_interactive_custom() {
-    _ga_log "Ручная настройка параметров удаления:"
-    _ga_ensure_ui || true
-
-    if declare -F ga_ui_checklist >/dev/null 2>&1; then
-        local selected=""
-        if selected="$(ga_ui_checklist \
-            "Параметры удаления" \
-            "Отметьте, что удалить:" \
-            volumes "Docker volumes (ClickHouse, бэкапы, auth-users) — НЕОБРАТИМО" OFF \
-            files "Каталог проекта ${GA_PROJECT_DIR}" ON \
-            firewall "Правила firewall (HTTP/HTTPS/514)" ON \
-            images "Локально собранные Docker-образы стека" OFF)"; then
-            REMOVE_DOCKER_VOLUMES=0
-            REMOVE_PROJECT_FILES=0
-            REMOVE_FIREWALL_RULES=0
-            REMOVE_IMAGES=0
-            local list=",${selected},"
-            [[ "$list" == *",volumes,"* ]] && REMOVE_DOCKER_VOLUMES=1
-            [[ "$list" == *",files,"* ]] && REMOVE_PROJECT_FILES=1
-            [[ "$list" == *",firewall,"* ]] && REMOVE_FIREWALL_RULES=1
-            [[ "$list" == *",images,"* ]] && REMOVE_IMAGES=1
-            return 0
-        else
-            _ga_log "Отменено пользователем."
-            exit 0
-        fi
-    fi
-
-    echo ""
-
-    if _ga_yesno "Удалить Docker volumes (ClickHouse, бэкапы, auth-users)? НЕОБРАТИМО"; then
-        REMOVE_DOCKER_VOLUMES=1
-    else
-        REMOVE_DOCKER_VOLUMES=0
-    fi
-
-    if _ga_yesno_default_yes "Удалить каталог проекта ${GA_PROJECT_DIR}?"; then
-        REMOVE_PROJECT_FILES=1
-    else
-        REMOVE_PROJECT_FILES=0
-    fi
-
-    if _ga_yesno_default_yes "Удалить правила firewall (HTTP/HTTPS/514)?"; then
-        REMOVE_FIREWALL_RULES=1
-    else
-        REMOVE_FIREWALL_RULES=0
-    fi
-
-    if _ga_yesno "Удалить локально собранные Docker-образы стека?"; then
-        REMOVE_IMAGES=1
-    else
-        REMOVE_IMAGES=0
-    fi
-}
-
 _ga_format_bytes() {
     local bytes="$1"
     if (( bytes >= 1073741824 )); then
@@ -436,7 +358,7 @@ _ga_audit_compose() {
 
 _ga_audit_volumes() {
     if ! command -v docker >/dev/null 2>&1; then
-        echo "  Docker volumes   : docker недоступен"
+        echo "  Данные           : Docker недоступен"
         return
     fi
 
@@ -454,14 +376,14 @@ _ga_audit_volumes() {
         mount="$(docker volume inspect "$vol" --format '{{.Mountpoint}}' 2>/dev/null || true)"
         if [[ -n "$mount" && -d "$mount" ]]; then
             du_size="$(du -sb "$mount" 2>/dev/null | cut -f1 || echo 0)"
-            echo "  Том              : ${vol} ($(_ga_format_bytes "${du_size:-0}"))"
+            echo "  Данные           : ${vol} ($(_ga_format_bytes "${du_size:-0}"))"
         else
-            echo "  Том              : ${vol}"
+            echo "  Данные           : ${vol}"
         fi
     done
 
     if (( found == 0 )); then
-        echo "  Docker volumes   : тома проекта не найдены"
+        echo "  Данные           : тома проекта не найдены"
     fi
 }
 
@@ -485,7 +407,9 @@ ga_audit_installation() {
         _ga_audit_project_dir "$GA_PROJECT_DIR"
         _ga_audit_compose "$GA_PROJECT_DIR"
         _ga_audit_volumes
-        if declare -F ga_audit_firewall >/dev/null; then
+        if declare -F ga_os_audit_firewall >/dev/null; then
+            ga_os_audit_firewall
+        elif declare -F ga_audit_firewall >/dev/null; then
             ga_audit_firewall
         fi
     )"
@@ -514,36 +438,36 @@ _ga_print_plan() {
     echo ""
     _ga_log "==================== ПЛАН УДАЛЕНИЯ ===================="
     _ga_log "Каталог проекта       : ${GA_PROJECT_DIR}"
-    _ga_log "Остановить стек (down): да"
+    _ga_log "Остановить систему    : да"
     if [[ "$REMOVE_DOCKER_VOLUMES" == "1" ]]; then
-        _ga_log "Docker volumes        : БУДУТ УДАЛЕНЫ (CH data, бэкапы, auth-users)  <-- НЕОБРАТИМО"
+        _ga_log "Данные                : БУДУТ УДАЛЕНЫ (ClickHouse, бэкапы, учётки)  <-- НЕОБРАТИМО"
     else
-        _ga_log "Docker volumes        : сохраняются (ClickHouse, бэкапы, auth-users)"
+        _ga_log "Данные                : сохраняются (ClickHouse, бэкапы, учётки)"
     fi
     if [[ "$REMOVE_IMAGES" == "1" ]]; then
-        _ga_log "Локальные образы      : будут удалены (--rmi local)"
+        _ga_log "Образы контейнеров    : будут удалены"
     else
-        _ga_log "Локальные образы      : сохраняются"
+        _ga_log "Образы контейнеров    : сохраняются"
     fi
     if [[ "$REMOVE_FIREWALL_RULES" == "1" ]]; then
-        _ga_log "Правила firewall      : будут удалены"
+        _ga_log "Правила сетевого экрана: будут удалены"
     else
-        _ga_log "Правила firewall      : сохраняются"
+        _ga_log "Правила сетевого экрана: сохраняются"
     fi
     if [[ "$REMOVE_PROJECT_FILES" == "1" ]]; then
         if [[ "$REMOVE_DOCKER_VOLUMES" == "1" ]]; then
-            _ga_log "Каталог проекта       : БУДЕТ УДАЛЁН (rm -rf ${GA_PROJECT_DIR})"
+            _ga_log "Каталог проекта       : БУДЕТ УДАЛЁН (${GA_PROJECT_DIR})"
         else
-            _ga_log "Каталог проекта       : будет удалён (volumes ClickHouse/бэкапы/auth сохранятся)"
+            _ga_log "Каталог проекта       : будет удалён (данные ClickHouse/бэкапы/учётки сохранятся)"
         fi
     else
         _ga_log "Каталог проекта       : сохраняется"
     fi
     if [[ -n "$GA_PRESET" ]]; then
-        _ga_log "Preset                : ${GA_PRESET} ($(_ga_preset_label "$GA_PRESET"))"
+        _ga_log "Режим                 : ${GA_PRESET} ($(_ga_preset_label "$GA_PRESET"))"
     fi
     if [[ "$GA_DRY_RUN" == "1" ]]; then
-        _ga_log "Режим                 : DRY-RUN (изменения не будут применены)"
+        _ga_log "Проверка              : DRY-RUN (изменения не будут применены)"
     fi
     _ga_log "======================================================"
     echo ""
@@ -561,15 +485,15 @@ _ga_confirm() {
         exit 1
     fi
 
-    # Выбор в wizard/custom — уже подтверждение; лишние вопросы не задаём.
+    # Выбор в wizard — уже подтверждение; лишние вопросы не задаём.
     if [[ "${GA_WIZARD_USED}" == "1" ]]; then
         if [[ "$REMOVE_DOCKER_VOLUMES" == "1" ]]; then
-            if ! _ga_yesno "Будут удалены volumes: ClickHouse, бэкапы и auth-users. Это необратимо. Продолжить?"; then
+            if ! _ga_yesno "Будут удалены данные ClickHouse, бэкапы и учётки. Это необратимо. Продолжить?"; then
                 _ga_log "Отменено пользователем."
                 exit 0
             fi
         fi
-        _ga_log "Запуск удаления (preset: ${GA_PRESET:-custom})..."
+        _ga_log "Запуск удаления (режим: ${GA_PRESET:-clean})..."
         return 0
     fi
 
@@ -579,7 +503,7 @@ _ga_confirm() {
     fi
 
     if [[ "$REMOVE_DOCKER_VOLUMES" == "1" ]]; then
-        if ! _ga_yesno "Будут удалены volumes: ClickHouse, бэкапы и auth-users. Это необратимо. Продолжить?"; then
+        if ! _ga_yesno "Будут удалены данные ClickHouse, бэкапы и учётки. Это необратимо. Продолжить?"; then
             _ga_log "Отменено пользователем."
             exit 0
         fi
@@ -593,18 +517,18 @@ _ga_step() {
 _ga_stop_stack() {
     if [[ -d "$GA_PROJECT_DIR" ]] && command -v docker >/dev/null 2>&1 && [[ -f "${GA_PROJECT_DIR}/docker-compose.yml" ]]; then
         cd "$GA_PROJECT_DIR"
-        _ga_log "Остановка стека Docker Compose..."
+        _ga_log "Остановка системы..."
 
         local down_args=(down --remove-orphans)
         if [[ "$REMOVE_DOCKER_VOLUMES" == "1" ]]; then
-            _ga_log "ВНИМАНИЕ: REMOVE_DOCKER_VOLUMES=1 — данные ClickHouse, бэкапы и auth-users будут УДАЛЕНЫ!"
+            _ga_log "ВНИМАНИЕ: данные ClickHouse, бэкапы и учётки будут УДАЛЕНЫ!"
             down_args+=(-v)
         else
-            _ga_log "Docker volumes сохранены (удалить: --volumes или preset purge)."
+            _ga_log "Данные сохранены (удалить: --volumes или --purge)."
         fi
 
         if [[ "$REMOVE_IMAGES" == "1" ]]; then
-            _ga_log "Локально собранные образы будут удалены (--rmi local)."
+            _ga_log "Образы контейнеров системы будут удалены."
             down_args+=(--rmi local)
         fi
 
@@ -622,7 +546,7 @@ _ga_stop_stack() {
         fi
         cd /
     else
-        _ga_log "Каталог проекта, compose-файл или docker не найдены — пропуск compose down."
+        _ga_log "Каталог проекта или Docker не найдены — пропуск остановки."
     fi
 }
 
@@ -653,7 +577,7 @@ _ga_remove_project_files() {
 
 _ga_remove_firewall() {
     if [[ "$REMOVE_FIREWALL_RULES" != "1" ]]; then
-        _ga_log "Удаление правил файрвола пропущено."
+        _ga_log "Снятие правил сетевого экрана пропущено."
         return
     fi
 
@@ -662,10 +586,12 @@ _ga_remove_firewall() {
         return
     fi
 
-    if declare -F ga_remove_firewall_rules >/dev/null; then
+    if declare -F ga_os_remove_firewall_rules >/dev/null; then
+        ga_os_remove_firewall_rules
+    elif declare -F ga_remove_firewall_rules >/dev/null; then
         ga_remove_firewall_rules
     else
-        _ga_log "ВНИМАНИЕ: ga_remove_firewall_rules не определён — пропуск файрвола."
+        _ga_log "ВНИМАНИЕ: хук сетевого экрана не определён — пропуск."
     fi
 }
 
@@ -673,20 +599,22 @@ _ga_print_summary() {
     _ga_log "Удаление завершено."
     _ga_log "Docker Engine на хосте не удалялся."
     if [[ "$REMOVE_IMAGES" != "1" ]]; then
-        _ga_log "Примечание: локально собранные образы сохранены (удалить: --images или preset purge)."
+        _ga_log "Примечание: образы контейнеров сохранены (удалить: --images или --purge)."
     fi
     if [[ "$REMOVE_DOCKER_VOLUMES" != "1" && "$REMOVE_PROJECT_FILES" == "1" ]]; then
-        _ga_log "Примечание: Docker volumes сохранены — ClickHouse, бэкапы и auth-users можно восстановить при повторной установке,"
+        _ga_log "Примечание: данные сохранены — ClickHouse, бэкапы и учётки можно восстановить при повторной установке,"
         _ga_log "      если тома не были удалены вручную."
     fi
     _ga_ensure_ui || true
     if declare -F ga_ui_msgbox >/dev/null 2>&1; then
         local note=""
         if [[ "$REMOVE_DOCKER_VOLUMES" != "1" && "$REMOVE_PROJECT_FILES" == "1" ]]; then
-            note=$'\n\nDocker volumes (ClickHouse, бэкапы, auth-users) сохранены.'
+            note=$'\n\nДанные ClickHouse, бэкапы и учётки сохранены.'
+        elif [[ "$REMOVE_DOCKER_VOLUMES" == "1" ]]; then
+            note=$'\n\nДанные и образы удалены согласно выбранному режиму.'
         fi
         ga_ui_msgbox "Удаление завершено" \
-"ГеоАтлас удалён согласно выбранному режиму.
+"ГеоАтлас удалён.
 Docker Engine на хосте не трогали.${note}" || true
     fi
 }
@@ -728,20 +656,20 @@ ga_run_uninstall() {
 
     _ga_ensure_ui || true
 
-    _ga_step 1 "Остановка Docker Compose стека"
-    _ga_run_gauge_fn "Остановка стека" "docker compose down…" _ga_stop_stack
+    _ga_step 1 "Остановка системы"
+    _ga_run_gauge_fn "Остановка" "Остановка системы…" _ga_stop_stack
 
-    _ga_step 2 "Удаление правил файрвола"
-    _ga_run_gauge_fn "Файрвол" "Удаление правил файрвола…" _ga_remove_firewall
+    _ga_step 2 "Сетевой экран"
+    _ga_run_gauge_fn "Сетевой экран" "Снятие правил сетевого экрана…" _ga_remove_firewall
 
-    _ga_step 3 "Удаление файлов проекта"
+    _ga_step 3 "Файлы проекта"
     _ga_run_gauge_fn "Файлы проекта" "Удаление ${GA_PROJECT_DIR}…" _ga_remove_project_files
 
     _ga_print_summary
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    echo "Этот модуль подключается через deploy/uninstall.sh или OS-обёртки."
+    echo "Этот модуль подключается через deploy/uninstall.sh."
     echo "Запуск: sudo bash deploy/uninstall.sh --help"
     exit 1
 fi
