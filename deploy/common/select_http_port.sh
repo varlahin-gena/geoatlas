@@ -54,13 +54,13 @@ _ga_port_ask_custom() {
     local answer=""
     while true; do
         if declare -F ga_ui_inputbox >/dev/null 2>&1; then
-            answer="$(ga_ui_inputbox "HTTP-порт" "Введите TCP-порт (1–65535):" "$def")" || answer=""
+            answer="$(ga_ui_inputbox "Порт сайта" "Номер порта (1–65535):" "$def")" || answer=""
         else
             if [[ -r /dev/tty && -w /dev/tty ]]; then
-                printf 'HTTP-порт [%s]: ' "$def" >/dev/tty
+                printf 'Порт сайта [%s]: ' "$def" >/dev/tty
                 read -r answer </dev/tty || answer=""
             else
-                printf 'HTTP-порт [%s]: ' "$def" >&2
+                printf 'Порт сайта [%s]: ' "$def" >&2
                 read -r answer || answer=""
             fi
         fi
@@ -71,7 +71,7 @@ _ga_port_ask_custom() {
             return 0
         fi
         if declare -F ga_ui_msgbox >/dev/null 2>&1; then
-            ga_ui_msgbox "HTTP-порт" \
+            ga_ui_msgbox "Порт сайта" \
                 "Некорректный порт «${answer}». Нужно число от 1 до 65535." || true
         else
             echo "  Некорректный порт «${answer}». Нужно число от 1 до 65535." >&2
@@ -120,21 +120,21 @@ confirm_http_port() {
     _ga_port_ensure_ui || true
     local choice="" title prompt
     if _ga_port_https_on; then
-        title="HTTP-порт"
-        prompt="Порт HTTP (редирект на HTTPS или параллельный доступ).
-TLS уже: ${HTTPS_PORT:-443}"
+        title="Порт HTTP"
+        prompt="Порт для HTTP (редирект на HTTPS или параллельный доступ).
+HTTPS уже: ${HTTPS_PORT:-443}"
     else
         title="Порт веб-интерфейса"
-        prompt="На каком порту открыть UI (только HTTP)?"
+        prompt="На каком порту открыть сайт?"
     fi
 
     if declare -F ga_ui_radiolist >/dev/null 2>&1; then
         if ! choice="$(ga_ui_radiolist \
             "$title" \
             "$prompt" \
-            80 "HTTP :80" ON \
-            8080 "HTTP :8080" OFF \
-            custom "Указать вручную" OFF)"; then
+            80 "Порт сайта: 80" ON \
+            8080 "Порт сайта: 8080" OFF \
+            custom "Указать другой порт" OFF)"; then
             _ga_port_log "Установка отменена пользователем."
             exit 0
         fi
@@ -158,11 +158,13 @@ TLS уже: ${HTTPS_PORT:-443}"
     esac
     _ga_port_set_confirmed "$HTTP_PORT"
     _ga_port_log "Выбран HTTP_PORT=${HTTP_PORT}"
-    if declare -F ga_ui_msgbox >/dev/null 2>&1 && [[ "${GA_UI_BACKEND:-text}" != "text" ]]; then
-        local summary="HTTP: порт ${HTTP_PORT}."
+    if [[ "${GA_INSTALL_QUIET_DIALOGS:-0}" != "1" ]] \
+        && declare -F ga_ui_msgbox >/dev/null 2>&1 \
+        && [[ "${GA_UI_BACKEND:-text}" != "text" ]]; then
+        local summary="Порт HTTP: ${HTTP_PORT}."
         if _ga_port_https_on; then
             summary="${summary}
-HTTPS: порт ${HTTPS_PORT:-443} (TLS)."
+Порт HTTPS: ${HTTPS_PORT:-443}."
         fi
         ga_ui_msgbox "$title" "$summary" || true
     fi

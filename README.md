@@ -52,19 +52,11 @@ tar -xzf "geoatlas-${VER}.tar.gz"
 cd "geoatlas-${VER}"
 ```
 
-**Ubuntu:**
-
 ```bash
-sudo ./deploy/ubuntu/install_ubuntu.sh
+sudo ./deploy/install.sh
 ```
 
-**Oracle Linux / RHEL / Rocky / Alma:**
-
-```bash
-sudo ./deploy/oracle_linux/install_oraclelinux.sh
-```
-
-Установщик спросит модули, HTTPS и пароль admin (мин. 10 символов, буква и цифра). После запуска:
+Установщик сам определяет ОС (Ubuntu/Debian или Oracle Linux / RHEL / Rocky / Alma), ставит **полный стек** и спросит доступ к сайту (HTTP/HTTPS), режим производительности и пароль admin (мин. 10 символов, буква и цифра). После запуска:
 
 1. Откройте `http://<IP_сервера>/` (при HTTPS — `https://…`).
 2. Войдите как **admin** (роль `administrator`).
@@ -138,7 +130,7 @@ sudo ./deploy/oracle_linux/install_oraclelinux.sh
 | `backend/` | Go API, парсеры, GeoIP, ingest |
 | `frontend/` | React SPA → nginx |
 | `clickhouse/` | конфиг и скрипты CH |
-| `deploy/` | установщики Ubuntu / Oracle Linux |
+| `deploy/` | единый установщик + OS-бэкенды Ubuntu / Oracle Linux |
 | `docs/` | документация оператора и разработчика |
 | `docs/images/` | скрины для README |
 | `scripts/` | CI, pack-release, бэкапы |

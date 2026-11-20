@@ -47,13 +47,14 @@
 
 ## Установочный пакет
 
-Прод ставят только из архива **`geoatlas-X.Y.Z.tar.gz`** с [GitHub Releases](https://github.com/varlahin-gena/geoatlas/releases) (рядом лежит `.sha256` для проверки). В пакете — стек, установщики Ubuntu и Oracle Linux / RHEL, `update.sh` и (в релизном tar.gz) каталог **`images/`** с Docker-образами. Это не `.deb`/`.rpm`: Docker и файрвол ставит OS-скрипт из пакета. Каталог установки по умолчанию — **`/opt/geoatlas`**.
+Прод ставят только из архива **`geoatlas-X.Y.Z.tar.gz`** с [GitHub Releases](https://github.com/varlahin-gena/geoatlas/releases) (рядом лежит `.sha256` для проверки). В пакете — стек, единый установщик (`deploy/install.sh`) с OS-бэкендами Ubuntu и Oracle Linux / RHEL, `update.sh` и (в релизном tar.gz) каталог **`images/`** с Docker-образами. Это не `.deb`/`.rpm`: Docker и файрвол ставит установщик из пакета. Каталог установки по умолчанию — **`/opt/geoatlas`**.
 
 | Задача                                | Что запускать                                              |
 |---------------------------------------|------------------------------------------------------------|
-| Первая установка, Ubuntu              | `deploy/ubuntu/install_ubuntu.sh` из распакованного пакета |
-| Первая установка, Oracle Linux / RHEL | `deploy/oracle_linux/install_oraclelinux.sh` из пакета     |
+| Первая установка (любая поддерживаемая ОС) | `deploy/install.sh` из распакованного пакета          |
 | Обновление                            | `/opt/geoatlas/update.sh` + новый tar.gz                   |
+
+Принудительное семейство ОС: `GA_FORCE_OS_FAMILY=debian|rhel`.
 
 **Общий первый шаг на сервере** (Ubuntu и Oracle Linux одинаково):
 
@@ -68,64 +69,42 @@ tar -xzf "geoatlas-${VER}.tar.gz"
 cd "geoatlas-${VER}"
 ```
 
-Дальше — установщик вашей ОС (см. ниже) или `./update.sh` для уже стоящей системы ([обновление](operations.md#обновление-системы)).
+Дальше — `./deploy/install.sh` или `./update.sh` для уже стоящей системы ([обновление](operations.md#обновление-системы)).
 
 После первого запуска: направьте syslog МСЭ на `:514` — [syslog.md](syslog.md); переменные `.env` — [configuration.md](configuration.md).
 
-## Ubuntu
+## Установщик (`deploy/install.sh`)
 
 После шагов выше (пакет в `/tmp/geoatlas-${VER}`):
 
 ```bash
-sudo ./deploy/ubuntu/install_ubuntu.sh
+sudo ./deploy/install.sh
 ```
 
-Скрипт устанавливает Docker, накладывает пакет в `/opt/geoatlas`, **интерактивно предлагает модули** и профиль производительности, настраивает UFW и запускает стек.
+Скрипт определяет семейство ОС (`/etc/os-release`), подключает OS-бэкенд и общий оркестратор: ставит Docker, накладывает пакет в `/opt/geoatlas`, ставит **полный стек** (без выбора модулей), спрашивает доступ к сайту, режим производительности и пароль admin, настраивает сетевой экран и запускает систему.
 
-Диалоги установки и удаления — **TUI** (`whiptail` → `dialog` → текст). Долгие шаги (apt/Docker) показывают **gauge**.
+Диалоги установки и удаления — **TUI** (`whiptail` → `dialog` → текст). Долгие шаги показывают **gauge**.
 
-**Что делает скрипт:**
+**Pipeline:**
 
-1. Обновляет списки пакетов
-2. Устанавливает `curl`, `ufw`, `whiptail` (опционально `dialog`)
-3. Устанавливает Docker Engine и compose plugin (если ещё нет)
-4. Накладывает пакет из текущего каталога в `/opt/geoatlas`
-5. Спрашивает, какие модули ставить (checklist: авторизация, API-токен, syslog-ng, stats-collector, репутация IP, Dozzle)
-6. Спрашивает **HTTPS** (свои PEM; можно оставить только HTTP)
-7. Спрашивает **порт(ы)**: при HTTPS — порт TLS, затем HTTP (редирект); при HTTP-only — порт UI (80 / 8080 или свой)
-8. Запускает детектор ресурсов и предлагает профиль
-9. Настраивает UFW (HTTP, при HTTPS — TLS-порт, и при необходимости 514)
-10. Вызывает `./start.sh` (можно отказаться на последнем шаге)
+1. Подготовка системы (пакеты ОС и Docker)
+2. Наложение пакета в `/opt/geoatlas`
+3. Доступ к сайту (HTTP или HTTPS, порты, сертификаты)
+4. Режим производительности
+5. Пароль администратора
+6. Сетевой экран (открытие портов; на Ubuntu отдельно — включить экран)
+7. Итог и запуск (`./start.sh`, можно отказаться)
 
-**Выбор модулей (интерактивно или через env):**
+**Полный стек** (всегда): ClickHouse, Backend, Frontend, UI-авторизация, API Bearer, syslog-ng (`:514`), stats-collector, репутация IP, Dozzle. Для CI тихий override: `GA_MODULES` / `GA_ENABLE_*`.
 
-| Модуль           | По умолчанию | Что даёт                                                                        |
-|------------------|--------------|---------------------------------------------------------------------------------|
-| UI-авторизация   | вкл.         | логин, роли admin/operator/dashboard (`AUTH_DISABLED` при отказе)               |
-| API Bearer-токен | вкл.         | защита мутирующих API (`API_AUTH_DISABLED` при отказе)                          |
-| syslog-ng        | вкл.         | приём syslog на `:514` (Compose profile `syslog`)                               |
-| stats-collector  | вкл.         | метрики / `/system` (Compose profile `stats`)                                   |
-| Репутация IP     | вкл.         | модуль целиком; при отказе `REPUTATION_FETCH_ENABLED=false` (API/UI/фиды выкл.) |
-| Dozzle           | вкл.         | realtime-логи UI `/dozzle/` (profile `dozzle`; `docker.sock` + start/stop/restart) |
+**OS-бэкенды:**
 
-Ядро (ClickHouse + Backend + Frontend) ставится всегда.
+| Семейство | ОС | Пакеты / Docker | Сетевой экран | Дополнительно |
+|-----------|----|-----------------|---------------|---------------|
+| `debian` | Ubuntu, Debian, Mint, Pop | apt + Docker CE | UFW (`ENABLE_UFW`, `UFW_AUTO_ENABLE`) | — |
+| `rhel` | Oracle Linux, RHEL, Rocky, Alma, CentOS | dnf + Docker CE | firewalld (`ENABLE_FIREWALL`) | снятие podman/buildah; SELinux (`DISABLE_SELINUX`) |
 
-## Oracle Linux / RHEL
-
-Поддерживаются Oracle Linux, RHEL, Rocky Linux, AlmaLinux, CentOS. **Тот же** `geoatlas-X.Y.Z.tar.gz`, что для Ubuntu.
-
-После распаковки пакета на сервере:
-
-```bash
-sudo ./deploy/oracle_linux/install_oraclelinux.sh
-```
-
-**Что делает скрипт:**
-
-1. Удаляет конфликтующие пакеты (`podman`, `buildah`, `runc`) при необходимости
-2. Устанавливает Docker CE из официального репозитория
-3. Настраивает SELinux (`container_manage_cgroup`) или переводит в permissive (опционально)
-4. Накладывает пакет в `/opt/geoatlas`, предлагает модули, HTTPS, HTTP-порт, профиль, настраивает firewalld и запускает стек
+Принудительно: `GA_FORCE_OS_FAMILY=debian|rhel`.
 
 ## Ручная установка из пакета
 
