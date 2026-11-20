@@ -5,6 +5,18 @@
 
 ## [Unreleased]
 
+## [2.8.2] — 2026-11-20
+
+Патч: зависание установщика на шаге пароля администратора (whiptail).
+
+### Fixed
+- **Установка**: whiptail msgbox/passwordbox больше не рисуются в pipe внутри `$(...)` — UI всегда на `/dev/tty`; пароль админа читается без внешнего command substitution.
+
+### Notes
+- **тестовый / pre-release**
+- OpenAPI API doc version: **1.23.0**
+- Продуктовая версия: **2.8.2**
+
 ## [2.8.1] — 2026-11-20
 
 Патч: единый деинсталлятор и интерактивный `update.sh` (проверка скриптов установки).
@@ -201,6 +213,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.8.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.8.2
 [2.8.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.8.1
 [2.8.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.8.0
 [2.7.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.0

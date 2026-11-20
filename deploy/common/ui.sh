@@ -345,6 +345,16 @@ _ga_ui_tui_cmd() {
     fi
 }
 
+# UI всегда на /dev/tty: иначе внутри $(...) whiptail рисует в pipe и «зависает».
+# Результат (password/input/list) — на stdout вызывающего через fd3.
+_ga_ui_whiptail_result() {
+    # args: same as whiptail after binary name
+    local out rc=0
+    out="$(whiptail "$@" 3>&1 1>/dev/tty 2>&3)" || rc=$?
+    (( rc == 0 )) || return 1
+    printf '%s' "$out"
+}
+
 _ga_ui_tui_msgbox() {
     local title="$1"
     local text="$2"
@@ -355,7 +365,7 @@ _ga_ui_tui_msgbox() {
             --msgbox "$text" "$GA_UI_HEIGHT" "$GA_UI_WIDTH" 2>&1 >/dev/tty
     else
         "$cmd" --backtitle "$GA_UI_BACKTITLE" --title "$title" \
-            --msgbox "$text" "$GA_UI_HEIGHT" "$GA_UI_WIDTH"
+            --msgbox "$text" "$GA_UI_HEIGHT" "$GA_UI_WIDTH" >/dev/tty
     fi
 }
 
@@ -374,7 +384,7 @@ _ga_ui_tui_yesno() {
             "${extra[@]}" --yesno "$text" "$GA_UI_HEIGHT" "$GA_UI_WIDTH" 2>&1 >/dev/tty
     else
         "$cmd" --backtitle "$GA_UI_BACKTITLE" --title "$title" \
-            "${extra[@]}" --yesno "$text" "$GA_UI_HEIGHT" "$GA_UI_WIDTH"
+            "${extra[@]}" --yesno "$text" "$GA_UI_HEIGHT" "$GA_UI_WIDTH" >/dev/tty
     fi
 }
 
@@ -396,15 +406,15 @@ _ga_ui_tui_checklist() {
             --checklist "$text" "$GA_UI_HEIGHT" "$GA_UI_WIDTH" "$GA_UI_LIST_HEIGHT" \
             "${items[@]}" 2>&1 >/dev/tty)" || rc=$?
     else
-        out="$("$cmd" --backtitle "$GA_UI_BACKTITLE" --title "$title" \
+        out="$(_ga_ui_whiptail_result --backtitle "$GA_UI_BACKTITLE" --title "$title" \
             --checklist "$text" "$GA_UI_HEIGHT" "$GA_UI_WIDTH" "$GA_UI_LIST_HEIGHT" \
-            "${items[@]}" 3>&1 1>&2 2>&3)" || rc=$?
+            "${items[@]}")" || rc=$?
     fi
     (( rc == 0 )) || return 1
     out="${out//\"/}"
     # shellcheck disable=SC2086
     local -a selected=($out)
-    (IFS=','; echo "${selected[*]-}")
+    (IFS=','; printf '%s' "${selected[*]-}")
 }
 
 _ga_ui_tui_radiolist() {
@@ -425,14 +435,14 @@ _ga_ui_tui_radiolist() {
             --radiolist "$text" "$GA_UI_HEIGHT" "$GA_UI_WIDTH" "$GA_UI_LIST_HEIGHT" \
             "${items[@]}" 2>&1 >/dev/tty)" || rc=$?
     else
-        out="$("$cmd" --backtitle "$GA_UI_BACKTITLE" --title "$title" \
+        out="$(_ga_ui_whiptail_result --backtitle "$GA_UI_BACKTITLE" --title "$title" \
             --radiolist "$text" "$GA_UI_HEIGHT" "$GA_UI_WIDTH" "$GA_UI_LIST_HEIGHT" \
-            "${items[@]}" 3>&1 1>&2 2>&3)" || rc=$?
+            "${items[@]}")" || rc=$?
     fi
     (( rc == 0 )) || return 1
     out="${out//\"/}"
     out="${out%%[[:space:]]*}"
-    echo "$out"
+    printf '%s' "$out"
 }
 
 _ga_ui_tui_inputbox() {
@@ -445,11 +455,11 @@ _ga_ui_tui_inputbox() {
         out="$("$cmd" --backtitle "$GA_UI_BACKTITLE" --title "$title" \
             --inputbox "$text" "$GA_UI_HEIGHT" "$GA_UI_WIDTH" "$def" 2>&1 >/dev/tty)" || rc=$?
     else
-        out="$("$cmd" --backtitle "$GA_UI_BACKTITLE" --title "$title" \
-            --inputbox "$text" "$GA_UI_HEIGHT" "$GA_UI_WIDTH" "$def" 3>&1 1>&2 2>&3)" || rc=$?
+        out="$(_ga_ui_whiptail_result --backtitle "$GA_UI_BACKTITLE" --title "$title" \
+            --inputbox "$text" "$GA_UI_HEIGHT" "$GA_UI_WIDTH" "$def")" || rc=$?
     fi
     (( rc == 0 )) || return 1
-    echo "$out"
+    printf '%s' "$out"
 }
 
 _ga_ui_tui_passwordbox() {
@@ -461,11 +471,11 @@ _ga_ui_tui_passwordbox() {
         out="$("$cmd" --backtitle "$GA_UI_BACKTITLE" --title "$title" \
             --insecure --passwordbox "$text" "$GA_UI_HEIGHT" "$GA_UI_WIDTH" 2>&1 >/dev/tty)" || rc=$?
     else
-        out="$("$cmd" --backtitle "$GA_UI_BACKTITLE" --title "$title" \
-            --passwordbox "$text" "$GA_UI_HEIGHT" "$GA_UI_WIDTH" 3>&1 1>&2 2>&3)" || rc=$?
+        out="$(_ga_ui_whiptail_result --backtitle "$GA_UI_BACKTITLE" --title "$title" \
+            --passwordbox "$text" "$GA_UI_HEIGHT" "$GA_UI_WIDTH")" || rc=$?
     fi
     (( rc == 0 )) || return 1
-    echo "$out"
+    printf '%s' "$out"
 }
 
 # Однократный кадр gauge (для ступенчатого прогресса).
@@ -491,7 +501,7 @@ ga_ui_gauge() {
                     --gauge "$text" "$GA_UI_GAUGE_HEIGHT" "$GA_UI_WIDTH" "$pct" 2>&1 >/dev/tty || true
             else
                 echo "$pct" | "$cmd" --backtitle "$GA_UI_BACKTITLE" --title "$title" \
-                    --gauge "$text" "$GA_UI_GAUGE_HEIGHT" "$GA_UI_WIDTH" "$pct" || true
+                    --gauge "$text" "$GA_UI_GAUGE_HEIGHT" "$GA_UI_WIDTH" "$pct" >/dev/tty || true
             fi
             ;;
         *)
@@ -554,7 +564,7 @@ $(tail -n 25 "$logf" 2>/dev/null || true)" || true
                 --gauge "$text" "$GA_UI_GAUGE_HEIGHT" "$GA_UI_WIDTH" 0 2>&1 >/dev/tty || true
         else
             "$cmd" --backtitle "$GA_UI_BACKTITLE" --title "$title" \
-                --gauge "$text" "$GA_UI_GAUGE_HEIGHT" "$GA_UI_WIDTH" 0 || true
+                --gauge "$text" "$GA_UI_GAUGE_HEIGHT" "$GA_UI_WIDTH" 0 >/dev/tty || true
         fi
     }
 
@@ -695,7 +705,7 @@ ga_ui_passwordbox() {
                 return 1
             fi
             if out="$(_ga_ui_tui_passwordbox "$title" "$text")"; then
-                echo "$out"
+                printf '%s' "$out"
                 return 0
             fi
             return 1
@@ -705,7 +715,9 @@ ga_ui_passwordbox() {
                 return 1
             fi
             out="$(_ga_ui_text_passwordbox "$title" "$text")" || return 1
-            echo "$out"
+            # text helper уже печатает \n — убираем хвостовой перевод строки
+            out="${out%$'\n'}"
+            printf '%s' "$out"
             return 0
             ;;
     esac
