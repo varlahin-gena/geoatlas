@@ -57,5 +57,5 @@ confirm_ui_access() {
         export GA_HTTP_PORT_CONFIRMED=1
     fi
 
-    _ga_ui_access_log "Доступ к UI: HTTPS_ENABLED=${HTTPS_ENABLED:-0} HTTPS_PORT=${HTTPS_PORT:-443} HTTP_PORT=${HTTP_PORT:-80}"
+    _ga_ui_access_log "Доступ к UI: HTTPS_ENABLED=${HTTPS_ENABLED:-0} HTTPS_PORT=${HTTPS_PORT:-443} HTTP_PORT=${HTTP_PORT:-80} HTTP_REDIRECT=${HTTP_REDIRECT:-1}"
 }

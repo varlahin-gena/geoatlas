@@ -258,7 +258,7 @@ docker compose exec clickhouse sh -c 'clickhouse-client --password "$CLICKHOUSE_
 **Единственный путь обновления** — скачать пакет на сервер, проверить SHA-256, `./update.sh`:
 
 ```bash
-VER=2.8.2   # нужный релиз
+VER=2.8.3   # нужный релиз
 
 cd /tmp
 curl -fLO "https://github.com/varlahin-gena/geoatlas/releases/download/v${VER}/geoatlas-${VER}.tar.gz"
