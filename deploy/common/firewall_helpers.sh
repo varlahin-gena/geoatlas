@@ -65,3 +65,37 @@ ga_firewalld_allow_syslog() {
         fi
     done < <(ga_syslog_ports)
 }
+
+ga_ufw_remove_syslog() {
+    local from="${GA_SYSLOG_ALLOW_FROM:-}"
+    local port
+    while read -r port; do
+        [[ -z "$port" ]] && continue
+        if [[ -n "$from" ]]; then
+            _ga_fw_log "UFW: удаление ${port}/tcp+udp с ${from}"
+            ufw delete allow from "$from" to any port "$port" proto tcp || true
+            ufw delete allow from "$from" to any port "$port" proto udp || true
+        else
+            ufw delete allow "${port}/tcp" || true
+            ufw delete allow "${port}/udp" || true
+        fi
+    done < <(ga_syslog_ports)
+}
+
+ga_firewalld_remove_syslog() {
+    local from="${GA_SYSLOG_ALLOW_FROM:-}"
+    local family="ipv4"
+    local port
+    while read -r port; do
+        [[ -z "$port" ]] && continue
+        if [[ -n "$from" ]]; then
+            [[ "$from" == *:* ]] && family="ipv6"
+            _ga_fw_log "firewalld: удаление ${port}/tcp+udp с ${from} (${family})"
+            firewall-cmd --permanent --remove-rich-rule="rule family=\"${family}\" source address=\"${from}\" port port=\"${port}\" protocol=\"tcp\" accept" || true
+            firewall-cmd --permanent --remove-rich-rule="rule family=\"${family}\" source address=\"${from}\" port port=\"${port}\" protocol=\"udp\" accept" || true
+        else
+            firewall-cmd --permanent --remove-port="${port}/tcp" || true
+            firewall-cmd --permanent --remove-port="${port}/udp" || true
+        fi
+    done < <(ga_syslog_ports)
+}
