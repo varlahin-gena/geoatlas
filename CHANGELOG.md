@@ -5,6 +5,18 @@
 
 ## [Unreleased]
 
+## [2.8.3] — 2026-11-20
+
+Патч: третий вариант доступа к сайту — HTTPS с редиректом.
+
+### Changed
+- **Установка**: в «Доступ к сайту» снова три режима — HTTP, HTTPS, HTTPS с перенаправлением HTTP→HTTPS (без отдельного yesno).
+
+### Notes
+- **тестовый / pre-release**
+- OpenAPI API doc version: **1.23.0**
+- Продуктовая версия: **2.8.3**
+
 ## [2.8.2] — 2026-11-20
 
 Патч: зависание установщика на шаге пароля администратора (whiptail).
@@ -213,6 +225,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.8.3]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.8.3
 [2.8.2]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.8.2
 [2.8.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.8.1
 [2.8.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.8.0

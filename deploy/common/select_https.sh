@@ -352,10 +352,11 @@ confirm_https() {
 
     # Явный шаг пошаговой установки.
     _ga_https_ensure_ui || true
-    local default_on="OFF" default_off="ON"
+    local default_off="ON" default_on="OFF" default_redirect="OFF"
     if _ga_https_certs_present "$project_dir"; then
-        default_on="ON"
         default_off="OFF"
+        default_on="OFF"
+        default_redirect="ON"
     fi
 
     _ga_https_log "Спрашиваем про доступ к веб-интерфейсу…"
@@ -365,35 +366,58 @@ confirm_https() {
             "Как открывать веб-интерфейс?
 Порты спросим следующим шагом." \
             off "Обычный HTTP" "$default_off" \
-            on "Защищённый доступ (HTTPS)" "$default_on")"; then
+            on "Защищённый доступ (HTTPS)" "$default_on" \
+            redirect "HTTPS с перенаправлением HTTP → HTTPS" "$default_redirect")"; then
             _ga_https_log "Установка отменена пользователем."
             exit 0
         fi
     else
-        if _ga_https_certs_present "$project_dir"; then
-            choice="on"
+        echo "" >&2
+        echo "  [1] Обычный HTTP" >&2
+        echo "  [2] Защищённый доступ (HTTPS)" >&2
+        echo "  [3] HTTPS с перенаправлением HTTP → HTTPS" >&2
+        local def_n=1
+        _ga_https_certs_present "$project_dir" && def_n=3
+        local answer=""
+        if [[ -r /dev/tty && -w /dev/tty ]]; then
+            printf 'Ваш выбор [%s]: ' "$def_n" >/dev/tty
+            read -r answer </dev/tty || answer=""
         else
-            choice="off"
+            printf 'Ваш выбор [%s]: ' "$def_n" >&2
+            read -r answer || answer=""
         fi
-        _ga_https_log "UI radiolist недоступен — HTTPS_ENABLED=${choice}"
+        answer="${answer//[[:space:]]/}"
+        [[ -z "$answer" ]] && answer="$def_n"
+        case "$answer" in
+            2|on) choice="on" ;;
+            3|redirect|redir) choice="redirect" ;;
+            *) choice="off" ;;
+        esac
+        _ga_https_log "Текстовый выбор — ${choice}"
     fi
 
     case "$choice" in
         on|1|yes|enable)
             HTTPS_ENABLED=1
+            HTTP_REDIRECT=0
+            ;;
+        redirect|redir|https-redirect)
+            HTTPS_ENABLED=1
+            HTTP_REDIRECT=1
             ;;
         auto)
             HTTPS_ENABLED=auto
+            HTTP_REDIRECT="${HTTP_REDIRECT:-${GA_HTTP_REDIRECT:-1}}"
             ;;
         *)
             HTTPS_ENABLED=0
+            HTTP_REDIRECT="${HTTP_REDIRECT:-${GA_HTTP_REDIRECT:-1}}"
             ;;
     esac
-    export HTTPS_ENABLED
+    export HTTPS_ENABLED HTTP_REDIRECT
     export GA_HTTPS_CONFIRMED=1
 
     HTTPS_PORT="${HTTPS_PORT:-${GA_HTTPS_PORT:-443}}"
-    HTTP_REDIRECT="${HTTP_REDIRECT:-${GA_HTTP_REDIRECT:-1}}"
 
     if _ga_https_truthy "$HTTPS_ENABLED" || [[ "$HTTPS_ENABLED" == "auto" ]]; then
         if [[ -t 0 ]] || declare -F ga_ui_inputbox >/dev/null 2>&1; then
@@ -402,12 +426,6 @@ confirm_https() {
                     "Использовать порт ${HTTPS_PORT} для защищённого доступа?
 (Нет — указать другой)" 1; then
                     HTTPS_PORT="$(_ga_https_ask_port "$HTTPS_PORT")"
-                fi
-                if ga_ui_yesno "Перенаправление" \
-                    "Автоматически перенаправлять с HTTP на HTTPS?" 1; then
-                    HTTP_REDIRECT=1
-                else
-                    HTTP_REDIRECT=0
                 fi
             else
                 HTTPS_PORT="$(_ga_https_ask_port "$HTTPS_PORT")"
