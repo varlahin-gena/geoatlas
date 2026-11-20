@@ -64,24 +64,24 @@ ga_prompt_admin_password() {
     fi
     while true; do
         if ! a="$(ga_ui_passwordbox "Пароль администратора" \
-            "Учётка ${user} (роль administrator).
+            "Учётка «${user}» для входа в веб-интерфейс.
 Минимум 10 символов, буква и цифра, без пробелов и кавычек.
-Другие пользователи — после входа, в разделе «Пользователи».")"; then
+Остальных пользователей можно добавить после входа.")"; then
             return 1
         fi
         if ! ga_validate_admin_password "$user" "$a"; then
             if declare -F ga_ui_msgbox >/dev/null 2>&1; then
-                ga_ui_msgbox "Пароль" "Пароль не принят. Повторите ввод." || true
+                ga_ui_msgbox "Пароль" "Пароль не принят. Проверьте требования и повторите ввод." || true
             fi
             continue
         fi
         if ! b="$(ga_ui_passwordbox "Подтверждение пароля" \
-            "Повторите пароль для ${user}.")"; then
+            "Введите тот же пароль ещё раз.")"; then
             return 1
         fi
         if [[ "$a" != "$b" ]]; then
             if declare -F ga_ui_msgbox >/dev/null 2>&1; then
-                ga_ui_msgbox "Пароль" "Пароли не совпали." || true
+                ga_ui_msgbox "Пароль" "Пароли не совпали. Попробуйте снова." || true
             fi
             continue
         fi

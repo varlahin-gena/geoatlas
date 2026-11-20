@@ -264,27 +264,29 @@ print_host_summary() {
     ram_gib="$(awk -v mb="$ram_mb" 'BEGIN { printf "%.1f", mb / 1024 }')"
     profile_capacity "$recommended"
     local summary
-    summary="CPU ядер: ${cpu}
-RAM: ${ram_gib} GiB (${ram_mb} MiB)
-Свободно диска: ${disk_gb} GiB (/)
-Рекомендация: $(profile_label_ru "$recommended") [${recommended}]
-Расчётная EPS: до ${EPS_MAX} событий/с"
+    summary="Процессор: ${cpu} ядер
+Память: ${ram_gib} ГиБ
+Свободно на диске: ${disk_gb} ГиБ
+Рекомендуемый режим: $(profile_label_ru "$recommended")
+Оценка нагрузки: до ${EPS_MAX} событий/с"
 
     # Детальный dump — в лог (stderr/stdout для install log).
     echo ""
     echo "══════════════════════════════════════════════════════════"
     echo "  Анализ сервера"
     echo "══════════════════════════════════════════════════════════"
-    echo "  CPU ядер       : $cpu"
-    echo "  RAM            : ${ram_gib} GiB (${ram_mb} MiB)"
-    echo "  Свободно диска : ${disk_gb} GiB (/)"
+    echo "  Процессор      : $cpu ядер"
+    echo "  Память         : ${ram_gib} ГиБ (${ram_mb} МиБ)"
+    echo "  Свободно диска : ${disk_gb} ГиБ (/)"
     echo "  Рекомендация   : $(profile_label_ru "$recommended") [$recommended]"
-    echo "  Расчётная EPS  : до ${EPS_MAX} событий/с"
+    echo "  Оценка EPS     : до ${EPS_MAX} событий/с"
     echo "══════════════════════════════════════════════════════════"
     echo ""
 
     _ga_res_ensure_ui || true
-    if declare -F ga_ui_msgbox >/dev/null 2>&1 && [[ "${GA_UI_BACKEND:-text}" != "text" ]]; then
+    if [[ "${GA_INSTALL_QUIET_DIALOGS:-0}" != "1" ]] \
+        && declare -F ga_ui_msgbox >/dev/null 2>&1 \
+        && [[ "${GA_UI_BACKEND:-text}" != "text" ]]; then
         ga_ui_msgbox "Анализ сервера" "$summary" || true
     fi
 }
@@ -347,16 +349,16 @@ confirm_profile() {
             profile_capacity "$p"
             on_flag=OFF
             mark=""
-            [[ "$p" == "$recommended" ]] && on_flag=ON && mark=" ← рекомендуется"
-            desc="$(profile_label_ru "$p")${mark} · $(_ga_gib "$CH_MEM_MB")/$(_ga_gib "$BE_MEM_MB")G"
+            [[ "$p" == "$recommended" ]] && on_flag=ON && mark=" — рекомендуется"
+            desc="$(profile_label_ru "$p")${mark}"
             items+=("$p" "$desc" "$on_flag")
         done
 
         local answer
         if answer="$(ga_ui_radiolist \
-            "Профиль производительности" \
-            "Рекомендация по ресурсам хоста: ${recommended}
-Выберите профиль:" \
+            "Режим производительности" \
+            "Рекомендуется: $(profile_label_ru "$recommended")
+Выберите режим под ресурсы сервера:" \
             "${items[@]}")"; then
             case "$answer" in
                 tiny|small|medium|large|xlarge)
@@ -549,7 +551,9 @@ write_env_file() {
             _ga_log "ОШИБКА: не найден deploy/common/admin_auth.sh"
             exit 1
         fi
-        if [[ "${GA_UI_AVAILABLE:-0}" == "1" ]] \
+        # Оркестратор установки спрашивает пароль отдельным шагом (GA_SKIP_ADMIN_PROMPT=1).
+        if [[ "${GA_SKIP_ADMIN_PROMPT:-0}" != "1" ]] \
+            && [[ "${GA_UI_AVAILABLE:-0}" == "1" ]] \
             && declare -F ga_ui_passwordbox >/dev/null 2>&1; then
             can_ask=1
         fi
@@ -878,15 +882,16 @@ warn_if_profile_exceeds_host() {
     fi
 }
 
-apply_resource_profile() {
+# Только детект + выбор профиля (без записи .env). Для установщика: пароль — отдельный шаг.
+select_resource_profile() {
     local project_dir="${1:-.}"
 
     if [[ "${GA_SKIP_PROFILE:-0}" == "1" ]]; then
-        _ga_log "GA_SKIP_PROFILE=1 — генерация конфигурации пропущена."
+        _ga_log "GA_SKIP_PROFILE=1 — выбор профиля пропущен."
         return 0
     fi
 
-    local cpu ram_mb disk_gb cgroup recommended profile
+    local cpu ram_mb disk_gb cgroup recommended
 
     cpu="$(detect_cpu_cores)"
     ram_mb="$(detect_ram_mb)"
@@ -897,6 +902,13 @@ apply_resource_profile() {
     cgroup="$(detect_cgroup_version)"
     recommended="$(recommend_profile "$cpu" "$ram_mb")"
 
+    GA_HOST_CPU="$cpu"
+    GA_HOST_RAM_MB="$ram_mb"
+    GA_HOST_DISK_GB="$disk_gb"
+    GA_HOST_CGROUP="$cgroup"
+    GA_RECOMMENDED_PROFILE="$recommended"
+    export GA_HOST_CPU GA_HOST_RAM_MB GA_HOST_DISK_GB GA_HOST_CGROUP GA_RECOMMENDED_PROFILE
+
     print_host_summary "$cpu" "$ram_mb" "$disk_gb" "$recommended"
     warn_if_constraints "$ram_mb" "$disk_gb" "$cgroup"
 
@@ -904,14 +916,43 @@ apply_resource_profile() {
         return 1
     fi
 
+    if [[ -z "${GA_SELECTED_PROFILE:-}" ]]; then
+        GA_SELECTED_PROFILE="$recommended"
+    fi
+    export GA_SELECTED_PROFILE
+    return 0
+}
+
+# Запись .env / override / limits по уже выбранному GA_SELECTED_PROFILE.
+commit_resource_profile() {
+    local project_dir="${1:-.}"
+    local profile recommended cpu ram_mb disk_gb cgroup
+
+    if [[ "${GA_SKIP_PROFILE:-0}" == "1" ]]; then
+        _ga_log "GA_SKIP_PROFILE=1 — запись профиля пропущена."
+        return 0
+    fi
+
     profile="${GA_SELECTED_PROFILE:-}"
+    recommended="${GA_RECOMMENDED_PROFILE:-$profile}"
+    cpu="${GA_HOST_CPU:-$(detect_cpu_cores)}"
+    ram_mb="${GA_HOST_RAM_MB:-$(detect_ram_mb)}"
+    disk_gb="${GA_HOST_DISK_GB:-0}"
+    cgroup="${GA_HOST_CGROUP:-$(detect_cgroup_version)}"
+    if (( disk_gb == 0 )); then
+        disk_gb="$(detect_disk_gb_avail "$project_dir")"
+        (( disk_gb == 0 )) && disk_gb="$(detect_disk_gb_avail "/")"
+    fi
+
     if [[ -z "$profile" ]]; then
+        _ga_log "Профиль не выбран — пропуск commit_resource_profile."
         return 0
     fi
 
     if ! profile_params "$profile"; then
-        _ga_log "ОШИБКА: некорректный профиль '$profile', откат на $recommended"
-        profile="$recommended"
+        _ga_log "ОШИБКА: некорректный профиль '$profile', откат на ${recommended:-medium}"
+        profile="${recommended:-medium}"
+        GA_SELECTED_PROFILE="$profile"
         profile_params "$profile"
     fi
     profile_capacity "$profile"
@@ -925,6 +966,12 @@ apply_resource_profile() {
 
     echo ""
     print_applied_config "$profile"
+}
+
+apply_resource_profile() {
+    local project_dir="${1:-.}"
+    select_resource_profile "$project_dir" || return 1
+    commit_resource_profile "$project_dir"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

@@ -434,6 +434,25 @@ EOF
     fi
 }
 
+# Включить полный стек модулей (без UI). Тихий override: GA_MODULES / GA_ENABLE_*.
+ga_enable_all_modules() {
+    _ga_mod_set_defaults
+    GA_MODULE_AUTH=1
+    GA_MODULE_API_AUTH=1
+    GA_MODULE_SYSLOG=1
+    GA_MODULE_STATS=1
+    GA_MODULE_REPUTATION=1
+    GA_MODULE_DOZZLE=1
+    if [[ -n "${GA_MODULES+x}" ]]; then
+        _ga_mod_parse_list "${GA_MODULES}"
+    fi
+    _ga_mod_from_env_flags
+    _ga_mod_build_compose_profiles
+    export GA_MODULE_AUTH GA_MODULE_API_AUTH GA_MODULE_SYSLOG GA_MODULE_STATS
+    export GA_MODULE_REPUTATION GA_MODULE_DOZZLE GA_COMPOSE_PROFILES
+    _ga_mod_log "Полный стек модулей: auth=${GA_MODULE_AUTH} api_auth=${GA_MODULE_API_AUTH} syslog=${GA_MODULE_SYSLOG} stats=${GA_MODULE_STATS} reputation=${GA_MODULE_REPUTATION} dozzle=${GA_MODULE_DOZZLE} profiles=${GA_COMPOSE_PROFILES}"
+}
+
 # Короткий запрос «продолжить установку?» перед стартом стека.
 confirm_start_stack() {
     if [[ "${GA_AUTO_MODULES:-0}" == "1" ]] || [[ "${GA_FORCE:-0}" == "1" ]] || [[ "${FORCE:-0}" == "1" ]]; then
@@ -444,33 +463,23 @@ confirm_start_stack() {
     fi
     _ga_mod_ensure_ui || true
     echo "" >&2
-    if _ga_mod_yesno "Запустить стек Docker Compose сейчас?" 1; then
+    if _ga_mod_yesno "Запустить систему сейчас?" 1; then
         return 0
     fi
-    echo "Установка подготовила файлы, но стек не запущен. Позже: cd ${1:-/opt/geoatlas} && ./start.sh" >&2
+    echo "Файлы готовы, но система ещё не запущена. Позже: cd ${1:-/opt/geoatlas} && ./start.sh" >&2
     return 1
 }
 
-# Интерактивный вопрос про firewall (если ENABLE_* ещё не задан явно в env).
+# Интерактивный вопрос про сетевой экран (если ENABLE_* не задан снаружи).
 confirm_firewall() {
     # $1 — имя переменной: ENABLE_UFW или ENABLE_FIREWALL
     local var_name="$1"
     local current="${!var_name:-1}"
 
-    # Если уже явно задано снаружи — не спрашиваем.
-    if [[ -n "${!var_name+x}" ]] && [[ -n "${!var_name}" ]]; then
-        # Переменная экспортирована вызывающим — оставляем как есть.
-        # Но при первом запуске скрипта она всегда имеет default из install_*.sh,
-        # поэтому проверяем GA_ASK_FIREWALL / TTY отдельно ниже.
-        :
-    fi
-
     if [[ "${GA_AUTO_MODULES:-0}" == "1" ]] || [[ ! -t 0 ]]; then
         return 0
     fi
 
-    # Спрашиваем только если пользователь не передал явное значение через окружение
-    # до запуска (см. install_*: если ENABLE_UFW задан снаружи, GA_FIREWALL_FROM_ENV=1).
     if [[ "${GA_FIREWALL_FROM_ENV:-0}" == "1" ]]; then
         return 0
     fi
@@ -491,11 +500,22 @@ confirm_firewall() {
     if [[ "$https_on" == "1" ]]; then
         ports="${ports}, ${HTTPS_PORT:-443}"
     fi
-    if _ga_mod_yesno "Настроить правила firewall (порты ${ports}, 514/tcp+udp)?" "${current}"; then
+    # Полный стек: syslog всегда на 514.
+    ports="${ports}, 514"
+    if declare -F ga_ui_yesno >/dev/null 2>&1; then
+        if ga_ui_yesno "Сетевой экран" \
+            "Открыть порты на сервере (${ports})?
+Это нужно, чтобы сайт и приём логов работали снаружи." "${current}"; then
+            printf -v "$var_name" '%s' "1"
+        else
+            printf -v "$var_name" '%s' "0"
+            _ga_mod_log "Настройка сетевого экрана пропущена."
+        fi
+    elif _ga_mod_yesno "Открыть порты на сервере (${ports})?" "${current}"; then
         printf -v "$var_name" '%s' "1"
     else
         printf -v "$var_name" '%s' "0"
-        _ga_mod_log "Настройка firewall пропущена."
+        _ga_mod_log "Настройка сетевого экрана пропущена."
     fi
     export "${var_name?}"
 }

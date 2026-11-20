@@ -85,13 +85,13 @@ _ga_https_ask_port() {
     local answer=""
     while true; do
         if declare -F ga_ui_inputbox >/dev/null 2>&1; then
-            answer="$(ga_ui_inputbox "HTTPS-порт" "TCP-порт TLS (1–65535):" "$def")" || answer=""
+            answer="$(ga_ui_inputbox "Порт HTTPS" "Номер порта (1–65535):" "$def")" || answer=""
         else
             if [[ -r /dev/tty && -w /dev/tty ]]; then
-                printf 'HTTPS-порт [%s]: ' "$def" >/dev/tty
+                printf 'Порт HTTPS [%s]: ' "$def" >/dev/tty
                 read -r answer </dev/tty || answer=""
             else
-                printf 'HTTPS-порт [%s]: ' "$def" >&2
+                printf 'Порт HTTPS [%s]: ' "$def" >&2
                 read -r answer || answer=""
             fi
         fi
@@ -102,7 +102,7 @@ _ga_https_ask_port() {
             return 0
         fi
         if declare -F ga_ui_msgbox >/dev/null 2>&1; then
-            ga_ui_msgbox "HTTPS-порт" \
+            ga_ui_msgbox "Порт HTTPS" \
                 "Некорректный порт «${answer}». Нужно число от 1 до 65535." || true
         else
             echo "  Некорректный порт «${answer}»." >&2
@@ -195,7 +195,9 @@ _ga_https_ask_cert_paths() {
 }
 
 # Цепочка: после HTTPS спросить HTTP-порт (идемпотентно).
+# Мастер confirm_ui_access задаёт GA_SKIP_HTTPS_HTTP_CHAIN=1 и зовёт порт сам.
 _ga_https_chain_http_port() {
+    [[ "${GA_SKIP_HTTPS_HTTP_CHAIN:-0}" == "1" ]] && return 0
     [[ "${GA_HTTP_PORT_CONFIRMED:-0}" == "1" ]] && return 0
     local helper
     helper="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)/select_http_port.sh"
@@ -238,11 +240,12 @@ _ga_https_prompt_certs_when_enabled() {
 
     if declare -F ga_ui_radiolist >/dev/null 2>&1; then
         if ! choice="$(ga_ui_radiolist \
-            "Сертификаты TLS" \
-            "HTTPS включён. Где взять PEM?" \
-            later "Положить вручную в certs/ позже" ON \
-            copy "Указать пути и скопировать сейчас" OFF \
-            dir "Каталог с fullchain.pem + privkey.pem" OFF)"; then
+            "Сертификаты" \
+            "Нужны файлы сертификата для защищённого доступа.
+Как продолжить?" \
+            later "Положить файлы в каталог certs/ позже" ON \
+            copy "Указать пути к файлам и скопировать сейчас" OFF \
+            dir "Указать каталог с сертификатом и ключом" OFF)"; then
             _ga_https_log "Установка отменена пользователем."
             exit 0
         fi
@@ -264,30 +267,32 @@ _ga_https_prompt_certs_when_enabled() {
             local d=""
             if declare -F ga_ui_inputbox >/dev/null 2>&1; then
                 d="$(ga_ui_inputbox "Каталог сертификатов" \
-                    "Каталог с fullchain.pem и privkey.pem:" \
+                    "Папка с файлами fullchain.pem и privkey.pem:" \
                     "${GA_CERTS_DIR:-}")" || d=""
             else
-                printf 'Каталог с PEM: ' >&2
+                printf 'Каталог сертификатов: ' >&2
                 read -r d || d=""
             fi
             if [[ -n "$d" ]]; then
                 GA_CERTS_DIR="$d"
                 export GA_CERTS_DIR
                 if ! _ga_https_install_certs "$project_dir"; then
-                    _ga_https_log "ВНИМАНИЕ: в каталоге нет ожидаемых PEM"
+                    _ga_https_log "ВНИМАНИЕ: в каталоге нет ожидаемых файлов сертификата"
                 fi
             fi
             ;;
         *)
-            if declare -F ga_ui_msgbox >/dev/null 2>&1 && [[ "${GA_UI_BACKEND:-text}" != "text" ]]; then
-                ga_ui_msgbox "HTTPS" \
-                    "Перед запуском положите:
-  ${project_dir}/certs/fullchain.pem
-  ${project_dir}/certs/privkey.pem
+            if [[ "${GA_INSTALL_QUIET_DIALOGS:-0}" != "1" ]] \
+                && declare -F ga_ui_msgbox >/dev/null 2>&1 \
+                && [[ "${GA_UI_BACKEND:-text}" != "text" ]]; then
+                ga_ui_msgbox "Сертификаты" \
+                    "Перед запуском положите в каталог certs/:
+  fullchain.pem
+  privkey.pem
 
 Подробнее: certs/README.md" || true
             else
-                _ga_https_log "Положите PEM в ${project_dir}/certs/ до ./start.sh"
+                _ga_https_log "Положите сертификаты в ${project_dir}/certs/ до ./start.sh"
             fi
             ;;
     esac
@@ -353,21 +358,20 @@ confirm_https() {
         default_off="OFF"
     fi
 
-    _ga_https_log "Спрашиваем про HTTPS (UI)…"
+    _ga_https_log "Спрашиваем про доступ к веб-интерфейсу…"
     if declare -F ga_ui_radiolist >/dev/null 2>&1; then
         if ! choice="$(ga_ui_radiolist \
-            "HTTPS" \
-            "Сначала режим доступа к UI.
+            "Доступ к сайту" \
+            "Как открывать веб-интерфейс?
 Порты спросим следующим шагом." \
-            off "Только HTTP" "$default_off" \
-            on "HTTPS (TLS, свои PEM)" "$default_on" \
-            auto "Авто: HTTPS если PEM уже в certs/" OFF)"; then
+            off "Обычный HTTP" "$default_off" \
+            on "Защищённый доступ (HTTPS)" "$default_on")"; then
             _ga_https_log "Установка отменена пользователем."
             exit 0
         fi
     else
         if _ga_https_certs_present "$project_dir"; then
-            choice="auto"
+            choice="on"
         else
             choice="off"
         fi
@@ -394,13 +398,13 @@ confirm_https() {
     if _ga_https_truthy "$HTTPS_ENABLED" || [[ "$HTTPS_ENABLED" == "auto" ]]; then
         if [[ -t 0 ]] || declare -F ga_ui_inputbox >/dev/null 2>&1; then
             if declare -F ga_ui_yesno >/dev/null 2>&1; then
-                if ! ga_ui_yesno "HTTPS-порт" \
-                    "Использовать порт ${HTTPS_PORT} для HTTPS?
+                if ! ga_ui_yesno "Порт HTTPS" \
+                    "Использовать порт ${HTTPS_PORT} для защищённого доступа?
 (Нет — указать другой)" 1; then
                     HTTPS_PORT="$(_ga_https_ask_port "$HTTPS_PORT")"
                 fi
-                if ga_ui_yesno "Редирект HTTP→HTTPS" \
-                    "Перенаправлять HTTP на HTTPS?" 1; then
+                if ga_ui_yesno "Перенаправление" \
+                    "Автоматически перенаправлять с HTTP на HTTPS?" 1; then
                     HTTP_REDIRECT=1
                 else
                     HTTP_REDIRECT=0
@@ -419,18 +423,20 @@ confirm_https() {
     fi
 
     _ga_https_log "Выбрано: HTTPS_ENABLED=${HTTPS_ENABLED}, HTTPS_PORT=${HTTPS_PORT}, HTTP_REDIRECT=${HTTP_REDIRECT}"
-    if declare -F ga_ui_msgbox >/dev/null 2>&1 && [[ "${GA_UI_BACKEND:-text}" != "text" ]]; then
+    if [[ "${GA_INSTALL_QUIET_DIALOGS:-0}" != "1" ]] \
+        && declare -F ga_ui_msgbox >/dev/null 2>&1 \
+        && [[ "${GA_UI_BACKEND:-text}" != "text" ]]; then
         local summary
         if _ga_https_falsy "$HTTPS_ENABLED"; then
-            summary="HTTPS выключен. Далее — выбор HTTP-порта."
+            summary="Выбран обычный HTTP. Далее — порт сайта."
         else
-            summary="HTTPS: ${HTTPS_ENABLED}
-Порт TLS: ${HTTPS_PORT}
-Редирект HTTP→HTTPS: ${HTTP_REDIRECT}
-Сертификаты: ${project_dir}/certs/
-Далее — выбор HTTP-порта."
+            summary="Защищённый доступ включён.
+Порт HTTPS: ${HTTPS_PORT}
+Перенаправление HTTP→HTTPS: ${HTTP_REDIRECT}
+Каталог сертификатов: ${project_dir}/certs/
+Далее — порт HTTP."
         fi
-        ga_ui_msgbox "HTTPS" "$summary" || true
+        ga_ui_msgbox "Доступ к сайту" "$summary" || true
     fi
 
     _ga_https_chain_http_port

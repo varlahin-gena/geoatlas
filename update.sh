@@ -37,8 +37,8 @@ usage() {
   --no-start          не запускать ./start.sh
   -h, --help          эта справка
 
-Первичная установка из пакета — через deploy/ubuntu/install_ubuntu.sh
-(или install_oraclelinux.sh) из распакованного geoatlas-X.Y.Z.
+Первичная установка из пакета — через deploy/install.sh
+из распакованного geoatlas-X.Y.Z.
 EOF
 }
 
@@ -177,7 +177,7 @@ main() {
         echo "В ${PROJECT_DIR} нет установленной системы (нет docker-compose.yml)." >&2
         echo "Первичная установка из пакета:" >&2
         echo "  tar -xzf geoatlas-X.Y.Z.tar.gz && cd geoatlas-X.Y.Z" >&2
-        echo "  sudo ./deploy/ubuntu/install_ubuntu.sh" >&2
+        echo "  sudo ./deploy/install.sh" >&2
         exit 1
     fi
 
