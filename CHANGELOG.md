@@ -5,6 +5,21 @@
 
 ## [Unreleased]
 
+## [2.8.1] — 2026-11-20
+
+Патч: единый деинсталлятор и интерактивный `update.sh` (проверка скриптов установки).
+
+### Changed
+- **Удаление**: `deploy/uninstall.sh` как у установщика — OS-бэкенды, TUI только «безопасное» / «полное»; CLI `--stop` сохранён.
+- **Обновление**: `update.sh` — welcome, аудит версий, пакет, план stop/start, gauge; `--yes` / `FORCE=1` для CI.
+- Убраны OS-обёртки `uninstall_*.sh`.
+
+### Notes
+- **тестовый / pre-release** — для проверки install / uninstall / update на стенде.
+- OpenAPI API doc version: **1.23.0**
+- Продуктовая версия: **2.8.1**
+- Обновление с 2.8.0: `update.sh` 2.8.1 (recreate не обязателен для данных; достаточно нового пакета).
+
 ## [2.8.0] — 2026-11-19
 
 Минор после 2.7.0: редактируемые парсеры CEF/KV, исключения и полировка движка аномалий, репутация из UI, экспорт карты и HIG-фиксы.
@@ -186,6 +201,7 @@
 - OpenAPI API doc version: **1.2.0**
 - Продуктовая версия (этот файл / git tag): **1.0.0**
 
+[2.8.1]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.8.1
 [2.8.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.8.0
 [2.7.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.7.0
 [2.6.0]: https://github.com/varlahin-gena/geoatlas/releases/tag/v2.6.0
