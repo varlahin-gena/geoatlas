@@ -624,13 +624,18 @@ func TestGeoUploadDryAndApply(t *testing.T) {
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("nil geo: %d", rec.Code)
 	}
-	req = httptest.NewRequest(http.MethodPost, "/upload-geo", strings.NewReader(csv))
+	// Early 413 must still consume leftover body (nginx unbuffered → else 502).
+	fat := strings.NewReader(strings.Repeat("x", 64*1024))
+	req = httptest.NewRequest(http.MethodPost, "/upload-geo", fat)
 	req.ContentLength = 1 << 30
 	req.Header.Set("Content-Type", "text/csv")
 	rec = httptest.NewRecorder()
 	h.UploadGeo(rec, req)
 	if rec.Code != http.StatusRequestEntityTooLarge {
 		t.Fatalf("too large: %d %s", rec.Code, rec.Body.String())
+	}
+	if n, _ := io.Copy(io.Discard, fat); n != 0 {
+		t.Fatalf("early 413 left %d unread body bytes", n)
 	}
 	req = httptest.NewRequest(http.MethodPost, "/upload-geo", strings.NewReader("--b\r\n--b--\r\n"))
 	req.Header.Set("Content-Type", "multipart/form-data; boundary=b")
