@@ -565,7 +565,7 @@ jobs:
           output: trivy-fs.sarif
           exit-code: "0"
 
-      - uses: github/codeql-action/upload-sarif@9418214df1f2c4b8128c770156c409013b07d6b9 # v3
+      - uses: github/codeql-action/upload-sarif@74c1aea9df7c0f02e9b7bfe4a8935abf2e5e3aa6 # v3
         if: always()
         with:
           sarif_file: trivy-fs.sarif
@@ -579,7 +579,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+      - uses: actions/dependency-review-action@bbc44d14a204704ccc493733616cd1e93a0321ec # v5.0.1
         with:
           fail-on-severity: high
           fail-on-scopes: runtime
@@ -622,7 +622,7 @@ jobs:
           tar -xzf "$archive" actionlint
           ./actionlint -color -shellcheck= -pyflakes=
 
-      - uses: zizmorcore/zizmor-action@45d7276c9ca790aabd705e31ca99c6185c3e76dd # v0.8.1
+      - uses: zizmorcore/zizmor-action@1b4550e929643b8b26a62303c6bd64814271a4f1 # v0.9.2
         with:
           advanced-security: false
           min-severity: high
